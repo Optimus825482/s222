@@ -70,6 +70,69 @@ FIND_SKILL_TOOL = {
     },
 }
 
+SAVE_MEMORY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "save_memory",
+        "description": (
+            "Save important information to persistent memory for future reference. "
+            "Use after completing tasks to remember solutions, user preferences, "
+            "learned patterns, or key findings. Categories: general, solution, preference, pattern, research."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "The information to remember (be concise but complete)",
+                },
+                "category": {
+                    "type": "string",
+                    "enum": ["general", "solution", "preference", "pattern", "research"],
+                    "description": "Memory category",
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Tags for easier recall (e.g. ['python', 'api', 'bug-fix'])",
+                },
+            },
+            "required": ["content"],
+        },
+    },
+}
+
+RECALL_MEMORY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "recall_memory",
+        "description": (
+            "Search persistent memory for relevant past knowledge. "
+            "Use at the START of tasks to check if similar problems were solved before, "
+            "or to recall user preferences and past decisions."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "What to search for in memory",
+                },
+                "category": {
+                    "type": "string",
+                    "enum": ["general", "solution", "preference", "pattern", "research"],
+                    "description": "Filter by category (optional)",
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Max results to return (default 5)",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+}
+
 USE_SKILL_TOOL = {
     "type": "function",
     "function": {
@@ -95,6 +158,8 @@ USE_SKILL_TOOL = {
 # ── Orchestrator Tools ───────────────────────────────────────────
 
 ORCHESTRATOR_TOOLS = [
+    SAVE_MEMORY_TOOL,
+    RECALL_MEMORY_TOOL,
     {
         "type": "function",
         "function": {
@@ -183,6 +248,8 @@ ORCHESTRATOR_TOOLS = [
 RESEARCHER_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    RECALL_MEMORY_TOOL,
+    SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
 ]
@@ -192,6 +259,8 @@ RESEARCHER_TOOLS = [
 THINKER_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    RECALL_MEMORY_TOOL,
+    SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
 ]
@@ -201,6 +270,8 @@ THINKER_TOOLS = [
 SPEED_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    RECALL_MEMORY_TOOL,
+    SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
 ]
@@ -209,6 +280,8 @@ SPEED_TOOLS = [
 
 REASONER_TOOLS = [
     WEB_SEARCH_TOOL,
+    RECALL_MEMORY_TOOL,
+    SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
 ]

@@ -284,6 +284,25 @@ class BaseAgent(ABC):
             )
             return format_fetch_result(result)
 
+        if fn_name == "save_memory":
+            from tools.memory import save_memory
+            entry = save_memory(
+                content=fn_args["content"],
+                category=fn_args.get("category", "general"),
+                tags=fn_args.get("tags"),
+                source_agent=self.role.value,
+            )
+            return f"Memory saved: {entry['id']} [{entry['category']}]"
+
+        if fn_name == "recall_memory":
+            from tools.memory import recall_memory, format_recall_results
+            results = recall_memory(
+                query=fn_args["query"],
+                category=fn_args.get("category"),
+                max_results=fn_args.get("max_results", 5),
+            )
+            return format_recall_results(results)
+
         if fn_name == "find_skill":
             from tools.skill_finder import find_skills, format_skill_results
             skills = find_skills(

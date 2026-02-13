@@ -57,11 +57,31 @@ class OrchestratorAgent(BaseAgent):
         return ORCHESTRATOR_TOOLS
 
     def build_context(self, thread: Thread, task_input: str) -> list[dict[str, str]]:
-        """Orchestrator sees full context."""
+        """Orchestrator sees full context + relevant memories."""
         history = build_orchestrator_context(thread)
+
+        # Auto-recall relevant memories
+        memory_context = ""
+        try:
+            from tools.memory import recall_memory, format_recall_results
+            memories = recall_memory(query=task_input, max_results=3)
+            if memories:
+                memory_context = (
+                    "\n\n--- RELEVANT MEMORIES ---\n"
+                    + format_recall_results(memories)
+                    + "\n--- END MEMORIES ---\n"
+                )
+        except Exception:
+            pass  # Memory failures should never block execution
+
         messages = [{"role": "system", "content": self.system_prompt()}]
-        if history.strip():
-            messages.append({"role": "user", "content": f"Thread history:\n{history}"})
+        if history.strip() or memory_context:
+            ctx = ""
+            if history.strip():
+                ctx += f"Thread history:\n{history}"
+            if memory_context:
+                ctx += memory_context
+            messages.append({"role": "user", "content": ctx})
             messages.append({"role": "assistant", "content": "I have the full context."})
         messages.append({"role": "user", "content": task_input})
         return messages
@@ -127,6 +147,8 @@ class OrchestratorAgent(BaseAgent):
         last_events = thread.events[-5:]
         for ev in reversed(last_events):
             if ev.event_type == EventType.TOOL_CALL and "direct_response" in ev.content:
+                # Auto-save direct responses too
+                self._auto_save_memory(user_input, decision)
                 return decision
 
         # Step 2: If tasks were created, run the pipeline
@@ -146,6 +168,43 @@ class OrchestratorAgent(BaseAgent):
                 )
                 final = await self.execute(synth_input, thread)
                 current_task.final_result = final
+
+                # Auto-save to memory
+                self._auto_save_memory(user_input, final)
+
                 return final
 
         return decision
+
+
+    def _auto_save_memory(self, user_input: str, result: str) -> None:
+        """Silently save task completion to persistent memory."""
+        try:
+            from tools.memory import save_memory
+
+            # Build concise summary
+            summary = (
+                f"Task: {user_input[:200]}\n"
+                f"Result: {result[:300]}"
+            )
+
+            # Extract simple tags from input
+            tags = []
+            keywords = ["search", "code", "analyze", "math", "translate", "summarize",
+                        "research", "compare", "explain", "calculate", "predict"]
+            input_lower = user_input.lower()
+            for kw in keywords:
+                if kw in input_lower:
+                    tags.append(kw)
+            if not tags:
+                tags = ["task-completion"]
+
+            save_memory(
+                content=summary,
+                category="solution",
+                tags=tags,
+                source_agent="orchestrator",
+            )
+        except Exception:
+            pass  # Never let memory failures affect the user
+

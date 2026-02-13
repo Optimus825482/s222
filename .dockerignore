@@ -8,4 +8,8 @@ __pycache__/
 .vscode/
 .idea/
 data/threads/*
+data/memory.json
+data/memory.db
+data/memory.db-wal
+data/memory.db-shm
 !data/.gitkeep
