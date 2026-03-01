@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import PWAInstallPrompt from "@/components/pwa-install-prompt";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -70,6 +71,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-dvh bg-surface antialiased font-sans safe-bottom">
         {children}
+        <PWAInstallPrompt />
       </body>
     </html>
   );
