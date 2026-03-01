@@ -337,7 +337,7 @@ function SessionList({
               e.stopPropagation();
               onDelete(t.id);
             }}
-            className="shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity px-2.5 flex items-center justify-center text-red-400 hover:text-red-300 min-w-[36px]"
+            className="shrink-0 opacity-40 group-hover:opacity-100 focus:opacity-100 transition-opacity px-2.5 flex items-center justify-center text-red-400 hover:text-red-300 min-w-[36px] min-h-[44px]"
             aria-label="Oturumu sil"
           >
             <Trash2 className="w-3.5 h-3.5" />
