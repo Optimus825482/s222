@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   api,
   getMemoryStats,
@@ -184,9 +185,9 @@ function SkillDetailModal({
     sourceColor[skill?.source ?? ""] ??
     "bg-slate-500/15 text-slate-400 border-slate-500/30";
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Skill detayı"
@@ -327,7 +328,8 @@ function SkillDetailModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -528,108 +530,113 @@ export function SkillsPanel() {
         )}
       </div>
 
-      {showSkillsModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Skills listesi"
-        >
+      {showSkillsModal &&
+        createPortal(
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowSkillsModal(false)}
-            aria-hidden="true"
-          />
-          <div className="relative z-10 w-full max-w-3xl max-h-[85vh] flex flex-col rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-              <div className="flex items-center gap-2">
-                <Puzzle className="w-4 h-4 text-blue-400" aria-hidden="true" />
-                <span className="text-sm font-semibold text-slate-200">
-                  Skills
-                </span>
-                <span className="text-[10px] text-slate-500 bg-surface-raised px-2 py-0.5 rounded border border-border">
-                  {skills.length + autoSkills.length} toplam
-                </span>
-              </div>
-              <button
-                onClick={() => setShowSkillsModal(false)}
-                aria-label="Modalı kapat"
-                className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer rounded hover:bg-white/5 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {/* Table */}
-            <div className="flex-1 overflow-y-auto">
-              <table className="w-full text-[11px]">
-                <thead className="sticky top-0 bg-[#1a1f2e] border-b border-border">
-                  <tr>
-                    <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                      İsim
-                    </th>
-                    <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                      Kategori
-                    </th>
-                    <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                      Kaynak
-                    </th>
-                    <th className="text-right px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                      Kullanım
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {[...skills, ...autoSkills].map((s) => (
-                    <tr
-                      key={s.id}
-                      onClick={() => {
-                        setSelectedSkillId(s.id);
-                        setShowSkillsModal(false);
-                      }}
-                      className="hover:bg-white/5 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-2.5 text-slate-200 font-medium">
-                        {s.name}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[9px]">
-                          {s.category}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span
-                          className={`px-1.5 py-0.5 rounded border text-[9px] font-medium ${
-                            s.source === "builtin"
-                              ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                              : s.source === "auto-learned"
-                                ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                : "bg-green-500/10 text-green-400 border-green-500/20"
-                          }`}
-                        >
-                          {s.source === "auto-learned"
-                            ? "🤖 Otomatik"
-                            : s.source === "builtin"
-                              ? "📦 Yerleşik"
-                              : "✏️ Özel"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-slate-500">
-                        {s.use_count ?? 0}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {skills.length === 0 && autoSkills.length === 0 && (
-                <div className="text-center py-8 text-[11px] text-slate-600">
-                  Henüz skill yok
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Skills listesi"
+          >
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowSkillsModal(false)}
+              aria-hidden="true"
+            />
+            <div className="relative z-10 w-full max-w-3xl max-h-[85vh] flex flex-col rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+                <div className="flex items-center gap-2">
+                  <Puzzle
+                    className="w-4 h-4 text-blue-400"
+                    aria-hidden="true"
+                  />
+                  <span className="text-sm font-semibold text-slate-200">
+                    Skills
+                  </span>
+                  <span className="text-[10px] text-slate-500 bg-surface-raised px-2 py-0.5 rounded border border-border">
+                    {skills.length + autoSkills.length} toplam
+                  </span>
                 </div>
-              )}
+                <button
+                  onClick={() => setShowSkillsModal(false)}
+                  aria-label="Modalı kapat"
+                  className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer rounded hover:bg-white/5 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {/* Table */}
+              <div className="flex-1 overflow-y-auto">
+                <table className="w-full text-[11px]">
+                  <thead className="sticky top-0 bg-[#1a1f2e] border-b border-border">
+                    <tr>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                        İsim
+                      </th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                        Kategori
+                      </th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                        Kaynak
+                      </th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                        Kullanım
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {[...skills, ...autoSkills].map((s) => (
+                      <tr
+                        key={s.id}
+                        onClick={() => {
+                          setSelectedSkillId(s.id);
+                          setShowSkillsModal(false);
+                        }}
+                        className="hover:bg-white/5 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-2.5 text-slate-200 font-medium">
+                          {s.name}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[9px]">
+                            {s.category}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span
+                            className={`px-1.5 py-0.5 rounded border text-[9px] font-medium ${
+                              s.source === "builtin"
+                                ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                : s.source === "auto-learned"
+                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                  : "bg-green-500/10 text-green-400 border-green-500/20"
+                            }`}
+                          >
+                            {s.source === "auto-learned"
+                              ? "🤖 Otomatik"
+                              : s.source === "builtin"
+                                ? "📦 Yerleşik"
+                                : "✏️ Özel"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-500">
+                          {s.use_count ?? 0}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {skills.length === 0 && autoSkills.length === 0 && (
+                  <div className="text-center py-8 text-[11px] text-slate-600">
+                    Henüz skill yok
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
