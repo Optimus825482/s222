@@ -3,8 +3,6 @@ services:
     image: pgvector/pgvector:pg16
     container_name: multi-agent-postgres
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_DB: multiagent
       POSTGRES_USER: agent
@@ -23,8 +21,6 @@ services:
       dockerfile: Dockerfile
     container_name: multi-agent-backend
     restart: unless-stopped
-    ports:
-      - "8001:8001"
     environment:
       DATABASE_URL: postgresql://agent:${POSTGRES_PASSWORD:-agent_secret_2024}@postgres:5432/multiagent
       NVIDIA_API_KEY: ${NVIDIA_API_KEY}
