@@ -2,6 +2,7 @@
   "name": "Multi-Agent Ops Center",
   "short_name": "Agent Ops",
   "description": "Qwen3 80B Orchestrator + 4 Specialist Agents — 12-Factor Architecture",
+  "id": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0e1a",
@@ -9,6 +10,21 @@
   "orientation": "any",
   "categories": ["productivity", "developer"],
   "lang": "tr",
+  "screenshots": [
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Multi-Agent Ops Center"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "label": "Multi-Agent Ops Center"
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-72.png",
