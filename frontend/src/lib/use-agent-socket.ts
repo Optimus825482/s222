@@ -110,6 +110,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     wsRef.current?.close();
     reconnectAttempts.current = 0;
     connect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearReconnectTimer, connect]);
 
   useEffect(() => {

@@ -16,7 +16,11 @@ export default function PWAInstallPrompt() {
     // Zaten yüklüyse gösterme
     if (window.matchMedia("(display-mode: standalone)").matches) return;
     // iOS Safari standalone kontrolü
-    if ((window.navigator as any).standalone === true) return;
+    if (
+      (window.navigator as Navigator & { standalone?: boolean }).standalone ===
+      true
+    )
+      return;
 
     const handler = (e: Event) => {
       e.preventDefault();
