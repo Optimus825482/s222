@@ -1,6 +1,6 @@
 """
 State management — 12-Factor #5 & #12: Unified state, stateless reducer.
-JSON file-based persistence for threads.
+JSON file-based persistence for threads. User-isolated storage.
 """
 
 from __future__ import annotations
@@ -15,32 +15,41 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 THREADS_DIR = DATA_DIR / "threads"
 
 
-def _ensure_dirs() -> None:
-    THREADS_DIR.mkdir(parents=True, exist_ok=True)
+def _threads_dir(user_id: str | None = None) -> Path:
+    if user_id:
+        return THREADS_DIR / user_id
+    return THREADS_DIR
 
 
-def save_thread(thread: Thread) -> str:
+def _ensure_dirs(user_id: str | None = None) -> None:
+    _threads_dir(user_id).mkdir(parents=True, exist_ok=True)
+
+
+def save_thread(thread: Thread, user_id: str | None = None) -> str:
     """Persist thread to JSON file. Returns thread id."""
-    _ensure_dirs()
-    path = THREADS_DIR / f"{thread.id}.json"
+    _ensure_dirs(user_id)
+    path = _threads_dir(user_id) / f"{thread.id}.json"
     path.write_text(thread.model_dump_json(indent=2), encoding="utf-8")
     return thread.id
 
 
-def load_thread(thread_id: str) -> Thread | None:
+def load_thread(thread_id: str, user_id: str | None = None) -> Thread | None:
     """Load thread from JSON file."""
-    path = THREADS_DIR / f"{thread_id}.json"
+    path = _threads_dir(user_id) / f"{thread_id}.json"
     if not path.exists():
-        return None
+        # Fallback: try root threads dir (backward compat)
+        path = THREADS_DIR / f"{thread_id}.json"
+        if not path.exists():
+            return None
     data = json.loads(path.read_text(encoding="utf-8"))
     return Thread.model_validate(data)
 
 
-def list_threads(limit: int = 50) -> list[dict]:
+def list_threads(limit: int = 50, user_id: str | None = None) -> list[dict]:
     """List recent threads with basic info."""
-    _ensure_dirs()
+    _ensure_dirs(user_id)
     threads = []
-    files = sorted(THREADS_DIR.glob("*.json"), key=os.path.getmtime, reverse=True)
+    files = sorted(_threads_dir(user_id).glob("*.json"), key=os.path.getmtime, reverse=True)
     for f in files[:limit]:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
@@ -61,8 +70,13 @@ def list_threads(limit: int = 50) -> list[dict]:
     return threads
 
 
-def delete_thread(thread_id: str) -> bool:
+def delete_thread(thread_id: str, user_id: str | None = None) -> bool:
     """Delete a thread file."""
+    path = _threads_dir(user_id) / f"{thread_id}.json"
+    if path.exists():
+        path.unlink()
+        return True
+    # Fallback: root dir
     path = THREADS_DIR / f"{thread_id}.json"
     if path.exists():
         path.unlink()
@@ -70,11 +84,11 @@ def delete_thread(thread_id: str) -> bool:
     return False
 
 
-def delete_all_threads() -> int:
-    """Delete all thread files. Returns count of deleted threads."""
-    _ensure_dirs()
+def delete_all_threads(user_id: str | None = None) -> int:
+    """Delete all thread files for a user. Returns count of deleted threads."""
+    _ensure_dirs(user_id)
     count = 0
-    for f in THREADS_DIR.glob("*.json"):
+    for f in _threads_dir(user_id).glob("*.json"):
         try:
             f.unlink()
             count += 1

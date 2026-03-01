@@ -12,11 +12,14 @@ if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
 import asyncio
+import hashlib
 import json
 import re
+import secrets
 import time
 import traceback
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -61,6 +64,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Auth ─────────────────────────────────────────────────────────
+
+USERS = {
+    "erkan": {
+        "password_hash": hashlib.sha256("518518".encode()).hexdigest(),
+        "full_name": "Erkan Erdem",
+        "user_id": "erkan",
+    },
+    "yigit": {
+        "password_hash": hashlib.sha256("518518".encode()).hexdigest(),
+        "full_name": "Yiğit Avcı",
+        "user_id": "yigit",
+    },
+}
+
+# In-memory token store: token -> user_id
+_active_tokens: dict[str, str] = {}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+def _get_user_from_token(token: str) -> dict | None:
+    user_id = _active_tokens.get(token)
+    if not user_id:
+        return None
+    return USERS.get(user_id)
 
 
 # ── Request/Response Models ──────────────────────────────────────
@@ -109,6 +143,41 @@ class TeachRequest(BaseModel):
     content: str
 
 
+# ── Auth Endpoints ────────────────────────────────────────────────
+
+@app.post("/api/auth/login")
+async def api_login(req: LoginRequest):
+    user = USERS.get(req.username.lower())
+    if not user:
+        raise HTTPException(401, "Kullanıcı bulunamadı")
+    expected = hashlib.sha256(req.password.encode()).hexdigest()
+    if user["password_hash"] != expected:
+        raise HTTPException(401, "Şifre hatalı")
+    token = secrets.token_hex(32)
+    _active_tokens[token] = user["user_id"]
+    return {
+        "token": token,
+        "user_id": user["user_id"],
+        "full_name": user["full_name"],
+    }
+
+
+@app.post("/api/auth/logout")
+async def api_logout(authorization: str = ""):
+    token = authorization.replace("Bearer ", "").strip()
+    _active_tokens.pop(token, None)
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+async def api_me(authorization: str = ""):
+    token = authorization.replace("Bearer ", "").strip()
+    user = _get_user_from_token(token)
+    if not user:
+        raise HTTPException(401, "Geçersiz token")
+    return {"user_id": user["user_id"], "full_name": user["full_name"]}
+
+
 # ── REST Endpoints: Models & Config ──────────────────────────────
 
 @app.get("/api/models")
@@ -129,36 +198,36 @@ async def get_pipelines():
 # ── REST Endpoints: Threads ──────────────────────────────────────
 
 @app.get("/api/threads")
-async def api_list_threads(limit: int = 20):
-    return list_threads(limit=limit)
+async def api_list_threads(limit: int = 20, user_id: str = ""):
+    return list_threads(limit=limit, user_id=user_id or None)
 
 
 @app.post("/api/threads")
-async def api_create_thread():
+async def api_create_thread(user_id: str = ""):
     thread = Thread()
-    save_thread(thread)
+    save_thread(thread, user_id=user_id or None)
     return {"id": thread.id}
 
 
 @app.get("/api/threads/{thread_id}")
-async def api_get_thread(thread_id: str):
-    thread = load_thread(thread_id)
+async def api_get_thread(thread_id: str, user_id: str = ""):
+    thread = load_thread(thread_id, user_id=user_id or None)
     if not thread:
         raise HTTPException(404, "Thread not found")
     return thread.model_dump(mode="json")
 
 
 @app.delete("/api/threads/{thread_id}")
-async def api_delete_thread(thread_id: str):
-    ok = delete_thread(thread_id)
+async def api_delete_thread(thread_id: str, user_id: str = ""):
+    ok = delete_thread(thread_id, user_id=user_id or None)
     if not ok:
         raise HTTPException(404, "Thread not found")
     return {"deleted": True}
 
 
 @app.delete("/api/threads")
-async def api_delete_all_threads():
-    count = delete_all_threads()
+async def api_delete_all_threads(user_id: str = ""):
+    count = delete_all_threads(user_id=user_id or None)
     return {"deleted": count}
 
 
@@ -752,13 +821,14 @@ async def ws_chat(ws: WebSocket):
             message = data.get("message", "")
             thread_id = data.get("thread_id")
             pipeline_str = data.get("pipeline_type", "auto")
+            user_id = data.get("user_id", "")
 
             if not message:
                 await ws.send_json({"type": "error", "message": "Empty message"})
                 continue
 
             # Load or create thread
-            thread = load_thread(thread_id) if thread_id else None
+            thread = load_thread(thread_id, user_id=user_id or None) if thread_id else None
             if not thread:
                 thread = Thread()
 
@@ -782,8 +852,9 @@ async def ws_chat(ws: WebSocket):
                     message, thread,
                     live_monitor=monitor,
                     forced_pipeline=forced_pipe,
+                    user_id=user_id or None,
                 )
-                save_thread(thread)
+                save_thread(thread, user_id=user_id or None)
 
                 if monitor.should_stop():
                     monitor.error("Kullanıcı tarafından durduruldu")

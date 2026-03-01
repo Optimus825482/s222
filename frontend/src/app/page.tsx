@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAgentSocket } from "@/lib/use-agent-socket";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type { Thread, ThreadSummary, PipelineType } from "@/lib/types";
 import { Sidebar } from "@/components/sidebar";
 import { CockpitHeader } from "@/components/cockpit-header";
@@ -19,6 +21,17 @@ import { MobileNav } from "../components/mobile-nav";
 import { MobileResultPanel } from "../components/mobile-result-panel";
 
 export default function Home() {
+  const router = useRouter();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) {
+      router.replace("/login");
+    }
+  }, [user, router]);
+
+  if (!user) return null;
+
   const [thread, setThread] = useState<Thread | null>(null);
   const [threadList, setThreadList] = useState<ThreadSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineType>("auto");

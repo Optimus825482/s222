@@ -100,7 +100,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
 
   let inCode = false;
   let codeBuf: string[] = [];
-  let codeLang = "";
+  let _codeLang = "";
 
   for (let idx = 0; idx < lines.length; idx++) {
     const line = lines[idx];
@@ -118,10 +118,10 @@ function renderMarkdown(text: string): React.ReactNode[] {
         );
         codeBuf = [];
         inCode = false;
-        codeLang = "";
+        _codeLang = "";
       } else {
         inCode = true;
-        codeLang = stripped.slice(3).trim();
+        _codeLang = stripped.slice(3).trim();
       }
       continue;
     }

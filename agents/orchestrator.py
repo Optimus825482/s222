@@ -650,7 +650,7 @@ class OrchestratorAgent(BaseAgent):
 
     # ── Main Entry Point ─────────────────────────────────────────
 
-    async def route_and_execute(self, user_input: str, thread: Thread, live_monitor=None, forced_pipeline: PipelineType | None = None) -> str:
+    async def route_and_execute(self, user_input: str, thread: Thread, live_monitor=None, forced_pipeline: PipelineType | None = None, user_id: str | None = None) -> str:
         """
         Main entry: user message → deep research detection → orchestrator → pipeline → result.
         forced_pipeline: If user selected a specific pipeline from UI, override auto-detection.
@@ -712,7 +712,7 @@ class OrchestratorAgent(BaseAgent):
             idea_task.status = TaskStatus.COMPLETED
             thread.tasks.append(idea_task)
 
-            self._auto_save_memory(user_input, result)
+            self._auto_save_memory(user_input, result, user_id=user_id)
             return result
 
         # Check for presentation generation
@@ -769,7 +769,7 @@ class OrchestratorAgent(BaseAgent):
                 pres_task.status = TaskStatus.COMPLETED
                 thread.tasks.append(pres_task)
 
-                self._auto_save_memory(pending_topic, result)
+                self._auto_save_memory(pending_topic, result, user_id=user_id)
                 return result
 
         if is_presentation:
@@ -808,7 +808,7 @@ class OrchestratorAgent(BaseAgent):
                 pres_task.status = TaskStatus.COMPLETED
                 thread.tasks.append(pres_task)
 
-                self._auto_save_memory(user_input, result)
+                self._auto_save_memory(user_input, result, user_id=user_id)
                 return result
 
             # No slide count specified — show MINI/MIDI/MAXI options
@@ -859,7 +859,7 @@ class OrchestratorAgent(BaseAgent):
                 pres_task.status = TaskStatus.COMPLETED
                 thread.tasks.append(pres_task)
 
-                self._auto_save_memory(user_input, result)
+                self._auto_save_memory(user_input, result, user_id=user_id)
                 return result
 
         # User forced deep research from UI, or auto-detected
@@ -928,7 +928,7 @@ class OrchestratorAgent(BaseAgent):
             )
             final = await self.execute(synth_input, thread)
             task.final_result = final
-            self._auto_save_memory(user_input, final)
+            self._auto_save_memory(user_input, final, user_id=user_id)
             return final
 
         if is_deep:
@@ -992,7 +992,7 @@ class OrchestratorAgent(BaseAgent):
             )
             final = await self.execute(synth_input, thread)
             task.final_result = final
-            self._auto_save_memory(user_input, final)
+            self._auto_save_memory(user_input, final, user_id=user_id)
             return final
 
         # ── Phase 1: Let orchestrator LLM decide (non-deep queries) ──
@@ -1005,7 +1005,7 @@ class OrchestratorAgent(BaseAgent):
         last_events = thread.events[-5:]
         for ev in reversed(last_events):
             if ev.event_type == EventType.TOOL_CALL and "direct_response" in ev.content:
-                self._auto_save_memory(user_input, decision)
+                self._auto_save_memory(user_input, decision, user_id=user_id)
                 return decision
 
         # ── Phase 2: Run pipeline if tasks were created ──
@@ -1076,7 +1076,7 @@ class OrchestratorAgent(BaseAgent):
                 )
                 final = await self.execute(synth_input, thread)
                 current_task.final_result = final
-                self._auto_save_memory(user_input, final)
+                self._auto_save_memory(user_input, final, user_id=user_id)
                 return final
 
         return decision
@@ -1128,7 +1128,7 @@ class OrchestratorAgent(BaseAgent):
 
         return user_input
 
-    def _auto_save_memory(self, user_input: str, result: str) -> None:
+    def _auto_save_memory(self, user_input: str, result: str, user_id: str | None = None) -> None:
         """Silently save task completion to persistent memory + auto-create skill if pattern detected."""
         tags: list[str] = []
         keywords = ["search", "code", "analyze", "math", "translate", "summarize",
@@ -1149,7 +1149,7 @@ class OrchestratorAgent(BaseAgent):
             save_memory(
                 content=summary,
                 category="solution",
-                tags=tags,
+                tags=tags + ([f"user:{user_id}"] if user_id else []),
                 source_agent="orchestrator",
             )
         except Exception:

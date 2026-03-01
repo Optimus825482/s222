@@ -1,8 +1,38 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
+function getAuthToken(): string {
+  try {
+    const stored = localStorage.getItem("ops-center-auth");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed?.state?.user?.token || "";
+    }
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+function getCurrentUserId(): string {
+  try {
+    const stored = localStorage.getItem("ops-center-auth");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed?.state?.user?.user_id || "";
+    }
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
 async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getAuthToken();
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...init,
   });
   if (!res.ok) {
@@ -23,15 +53,37 @@ export const api = {
   health: () => fetcher<{ status: string }>("/api/health"),
 
   // Threads
-  listThreads: (limit = 20) =>
-    fetcher<ThreadSummary[]>(`/api/threads?limit=${limit}`),
-  createThread: () =>
-    fetcher<{ id: string }>("/api/threads", { method: "POST" }),
-  getThread: (id: string) => fetcher<Thread>(`/api/threads/${id}`),
-  deleteThread: (id: string) =>
-    fetcher<{ deleted: boolean }>(`/api/threads/${id}`, { method: "DELETE" }),
-  deleteAllThreads: () =>
-    fetcher<{ deleted: number }>("/api/threads", { method: "DELETE" }),
+  listThreads: (limit = 20) => {
+    const uid = getCurrentUserId();
+    return fetcher<ThreadSummary[]>(
+      `/api/threads?limit=${limit}${uid ? `&user_id=${uid}` : ""}`,
+    );
+  },
+  createThread: () => {
+    const uid = getCurrentUserId();
+    return fetcher<{ id: string }>(
+      `/api/threads${uid ? `?user_id=${uid}` : ""}`,
+      { method: "POST" },
+    );
+  },
+  getThread: (id: string) => {
+    const uid = getCurrentUserId();
+    return fetcher<Thread>(`/api/threads/${id}${uid ? `?user_id=${uid}` : ""}`);
+  },
+  deleteThread: (id: string) => {
+    const uid = getCurrentUserId();
+    return fetcher<{ deleted: boolean }>(
+      `/api/threads/${id}${uid ? `?user_id=${uid}` : ""}`,
+      { method: "DELETE" },
+    );
+  },
+  deleteAllThreads: () => {
+    const uid = getCurrentUserId();
+    return fetcher<{ deleted: number }>(
+      `/api/threads${uid ? `?user_id=${uid}` : ""}`,
+      { method: "DELETE" },
+    );
+  },
 
   // RAG
   ragIngest: (content: string, title: string, source = "") =>

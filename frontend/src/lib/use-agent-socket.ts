@@ -102,6 +102,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     ws.onerror = () => {
       setStatus("error");
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearReconnectTimer]);
 
   /** Manually reset backoff counter and reconnect */
@@ -136,12 +137,26 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
       }
       setStatus("connecting");
       setLiveEvents([]);
+
+      // Get user_id from localStorage
+      let userId = "";
+      try {
+        const stored = localStorage.getItem("ops-center-auth");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          userId = parsed?.state?.user?.user_id || "";
+        }
+      } catch {
+        /* ignore */
+      }
+
       ws.send(
         JSON.stringify({
           type: "chat",
           message,
           thread_id: threadId,
           pipeline_type: pipelineType,
+          user_id: userId,
         }),
       );
     },
