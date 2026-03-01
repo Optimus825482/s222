@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Thread, WSLiveEvent, AgentEvent } from "@/lib/types";
 import { getAgentInfo } from "@/lib/agents";
 import {
@@ -13,6 +13,7 @@ import {
   Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { DetailModal } from "./detail-modal";
 
 const INTER_AGENT_EVENTS = new Set([
   "routing_decision",
@@ -22,7 +23,6 @@ const INTER_AGENT_EVENTS = new Set([
   "pipeline_step",
 ]);
 
-/** Map agent roles to lucide icons instead of emoji */
 const AGENT_ROLE_ICONS: Record<string, LucideIcon> = {
   orchestrator: Brain,
   thinker: Microscope,
@@ -38,6 +38,12 @@ interface Props {
 
 export function InterAgentChat({ thread, liveEvents }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [selectedEvent, setSelectedEvent] = useState<{
+    title: string;
+    content: string;
+    color?: string;
+    badge?: string;
+  } | null>(null);
 
   const interEvents = (thread?.events ?? []).filter((e) =>
     INTER_AGENT_EVENTS.has(e.event_type),
@@ -81,40 +87,84 @@ export function InterAgentChat({ thread, liveEvents }: Props) {
           </div>
         )}
 
-        {/* Historical inter-agent messages */}
-        {interEvents.map((ev) => (
-          <AgentMessage key={ev.id} event={ev} />
-        ))}
+        {/* Historical */}
+        {interEvents.map((ev) => {
+          const role = ev.agent_role ?? "orchestrator";
+          const info = getAgentInfo(role);
+          return (
+            <AgentMessage
+              key={ev.id}
+              event={ev}
+              onClick={() =>
+                setSelectedEvent({
+                  title: `${info.name} — ${ev.event_type}`,
+                  content: ev.content,
+                  color: info.color,
+                })
+              }
+            />
+          );
+        })}
 
-        {/* Live inter-agent messages */}
-        {liveInterAgent.map((ev, i) => (
-          <LiveAgentMessage key={`live-${i}`} event={ev} />
-        ))}
+        {/* Live */}
+        {liveInterAgent.map((ev, i) => {
+          const info = getAgentInfo(ev.agent);
+          return (
+            <LiveAgentMessage
+              key={`live-${i}`}
+              event={ev}
+              onClick={() =>
+                setSelectedEvent({
+                  title: `${info.name} — ${ev.event_type}`,
+                  content: ev.content,
+                  color: info.color,
+                  badge: "LIVE",
+                })
+              }
+            />
+          );
+        })}
 
         <div ref={bottomRef} />
       </div>
+
+      {selectedEvent && (
+        <DetailModal
+          title={selectedEvent.title}
+          content={selectedEvent.content}
+          color={selectedEvent.color}
+          badge={selectedEvent.badge}
+          onClose={() => setSelectedEvent(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AgentMessage({ event }: { event: AgentEvent }) {
+const LABEL_MAP: Record<string, string> = {
+  routing_decision: "Yönlendirme",
+  agent_start: "Başladı",
+  agent_thinking: "Düşünüyor",
+  synthesis: "Sentez",
+  pipeline_step: "Adım",
+};
+
+function AgentMessage({
+  event,
+  onClick,
+}: {
+  event: AgentEvent;
+  onClick: () => void;
+}) {
   const role = event.agent_role ?? "orchestrator";
   const info = getAgentInfo(role);
   const isOrchestrator = role === "orchestrator";
-  const content = event.content.slice(0, 300);
   const RoleIcon = AGENT_ROLE_ICONS[role] ?? Settings;
 
-  const labelMap: Record<string, string> = {
-    routing_decision: "Yönlendirme",
-    agent_start: "Başladı",
-    agent_thinking: "Düşünüyor",
-    synthesis: "Sentez",
-    pipeline_step: "Adım",
-  };
-
   return (
-    <div
-      className={`flex gap-2 animate-fade-in ${isOrchestrator ? "" : "pl-4"}`}
+    <button
+      onClick={onClick}
+      className={`w-full flex gap-2 animate-fade-in text-left hover:bg-white/5 rounded-lg p-1 transition-colors cursor-pointer ${isOrchestrator ? "" : "pl-4"}`}
     >
       <div className="flex-shrink-0 mt-1">
         <div
@@ -134,24 +184,32 @@ function AgentMessage({ event }: { event: AgentEvent }) {
             {info.name}
           </span>
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-overlay text-slate-500">
-            {labelMap[event.event_type] ?? event.event_type}
+            {LABEL_MAP[event.event_type] ?? event.event_type}
           </span>
         </div>
-        <div className="text-[11px] text-slate-400 leading-snug whitespace-pre-wrap break-words">
-          {content}
+        <div className="text-[11px] text-slate-400 leading-snug whitespace-pre-wrap break-words line-clamp-3">
+          {event.content.slice(0, 300)}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
-function LiveAgentMessage({ event }: { event: WSLiveEvent }) {
+function LiveAgentMessage({
+  event,
+  onClick,
+}: {
+  event: WSLiveEvent;
+  onClick: () => void;
+}) {
   const info = getAgentInfo(event.agent);
-  const content = event.content.slice(0, 300);
   const RoleIcon = AGENT_ROLE_ICONS[event.agent] ?? Settings;
 
   return (
-    <div className="flex gap-2 animate-slide-up pl-2">
+    <button
+      onClick={onClick}
+      className="w-full flex gap-2 animate-slide-up pl-2 text-left hover:bg-white/5 rounded-lg p-1 transition-colors cursor-pointer"
+    >
       <div className="flex-shrink-0 mt-1">
         <div
           className="min-w-[28px] min-h-[28px] w-7 h-7 rounded-full flex items-center justify-center ring-1 ring-blue-500/30"
@@ -173,10 +231,10 @@ function LiveAgentMessage({ event }: { event: WSLiveEvent }) {
             LIVE
           </span>
         </div>
-        <div className="text-[11px] text-slate-300 leading-snug whitespace-pre-wrap break-words">
-          {content}
+        <div className="text-[11px] text-slate-300 leading-snug whitespace-pre-wrap break-words line-clamp-3">
+          {event.content.slice(0, 300)}
         </div>
       </div>
-    </div>
+    </button>
   );
 }

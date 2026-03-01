@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Thread, WSLiveEvent } from "@/lib/types";
 import { getAgentInfo, EVENT_ICONS } from "@/lib/agents";
 import {
@@ -20,6 +21,7 @@ import {
   FastForward,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { DetailModal } from "./detail-modal";
 
 const ACTIVITY_EVENTS = new Set([
   "routing_decision",
@@ -34,7 +36,6 @@ const ACTIVITY_EVENTS = new Set([
   "error",
 ]);
 
-/** Lucide icon overrides for EVENT_ICONS keys */
 const EVENT_LUCIDE: Record<string, LucideIcon> = {
   routing_decision: Compass,
   agent_start: Rocket,
@@ -53,7 +54,16 @@ interface Props {
   liveEvents: WSLiveEvent[];
 }
 
+interface ModalData {
+  title: string;
+  content: string;
+  color?: string;
+  badge?: string;
+}
+
 export function ActivityStream({ thread, liveEvents }: Props) {
+  const [selected, setSelected] = useState<ModalData | null>(null);
+
   const threadEvents = (thread?.events ?? []).filter((e) =>
     ACTIVITY_EVENTS.has(e.event_type),
   );
@@ -87,17 +97,15 @@ export function ActivityStream({ thread, liveEvents }: Props) {
         aria-label="Aktivite istatistikleri"
       >
         <span className="inline-flex items-center gap-1">
-          <Wrench className="w-3 h-3" aria-hidden="true" />
-          {toolCount}
+          <Wrench className="w-3 h-3" aria-hidden="true" /> {toolCount}
         </span>
         <span className="inline-flex items-center gap-1">
-          <Bot className="w-3 h-3" aria-hidden="true" />
-          {agentSet.size}
+          <Bot className="w-3 h-3" aria-hidden="true" /> {agentSet.size}
         </span>
         <span className="inline-flex items-center gap-1">
           {errorCount > 0 ? (
             <>
-              <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+              <AlertTriangle className="w-3 h-3" aria-hidden="true" />{" "}
               {errorCount}
             </>
           ) : (
@@ -107,25 +115,32 @@ export function ActivityStream({ thread, liveEvents }: Props) {
           )}
         </span>
         <span className="inline-flex items-center gap-1">
-          <BarChart3 className="w-3 h-3" aria-hidden="true" />
+          <BarChart3 className="w-3 h-3" aria-hidden="true" />{" "}
           {threadEvents.length}
         </span>
       </div>
 
-      {/* Live events (during execution) */}
+      {/* Live events */}
       {liveEvents.length > 0 && (
         <div className="px-3 py-2 border-b border-blue-900/30 bg-blue-950/20">
           <div className="text-[10px] text-blue-400 font-medium mb-1 inline-flex items-center gap-1">
-            <Zap className="w-3 h-3" aria-hidden="true" />
-            LIVE
+            <Zap className="w-3 h-3" aria-hidden="true" /> LIVE
           </div>
           {liveEvents.slice(-10).map((ev, i) => {
             const info = getAgentInfo(ev.agent);
             const AgentIcon = EVENT_LUCIDE[ev.event_type];
             return (
-              <div
+              <button
                 key={i}
-                className="flex items-start gap-1.5 py-0.5 text-[11px] animate-fade-in"
+                onClick={() =>
+                  setSelected({
+                    title: `${ev.agent} — ${ev.event_type}`,
+                    content: ev.content,
+                    color: info.color,
+                    badge: "LIVE",
+                  })
+                }
+                className="w-full flex items-start gap-1.5 py-0.5 text-[11px] animate-fade-in hover:bg-white/5 transition-colors cursor-pointer text-left rounded"
               >
                 {AgentIcon ? (
                   <AgentIcon
@@ -139,10 +154,10 @@ export function ActivityStream({ thread, liveEvents }: Props) {
                     aria-hidden="true"
                   />
                 )}
-                <span className="text-slate-400 truncate break-words">
+                <span className="text-slate-400 truncate">
                   {ev.content.slice(0, 100)}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -171,12 +186,17 @@ export function ActivityStream({ thread, liveEvents }: Props) {
             };
             const EvIcon = EVENT_LUCIDE[ev.event_type] ?? Pin;
             const info = getAgentInfo(ev.agent_role ?? "");
-            const content = ev.content.slice(0, 160);
-
             return (
-              <div
+              <button
                 key={ev.id}
-                className="rounded-lg p-2 text-[11px] border-l-2 bg-surface"
+                onClick={() =>
+                  setSelected({
+                    title: `${info.name} — ${evCfg.label}`,
+                    content: ev.content,
+                    color: evCfg.color,
+                  })
+                }
+                className="w-full rounded-lg p-2 text-[11px] border-l-2 bg-surface hover:bg-white/5 transition-colors cursor-pointer text-left"
                 style={{ borderColor: evCfg.color }}
               >
                 <div className="flex items-center justify-between">
@@ -200,13 +220,23 @@ export function ActivityStream({ thread, liveEvents }: Props) {
                     {info.name}
                   </span>
                 </div>
-                <div className="text-slate-400 mt-0.5 leading-snug break-words">
-                  {content}
+                <div className="text-slate-400 mt-0.5 leading-snug truncate">
+                  {ev.content.slice(0, 160)}
                 </div>
-              </div>
+              </button>
             );
           })}
       </div>
+
+      {selected && (
+        <DetailModal
+          title={selected.title}
+          content={selected.content}
+          color={selected.color}
+          badge={selected.badge}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

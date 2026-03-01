@@ -21,6 +21,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { DetailModal } from "./detail-modal";
 
 interface Props {
   events: WSLiveEvent[];
@@ -47,16 +48,18 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
 
 export function LiveEventLog({ events, status }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   if (events.length === 0) return null;
 
   const statusCfg = STATUS_ICONS[status];
-
   const statusLabel = statusCfg
     ? `${statusCfg.label} (${events.length} adım)`
     : `Son çalışma (${events.length} adım)`;
-
   const StatusIcon = statusCfg?.Icon ?? BarChart3;
+
+  // For modal: get selected event (tracks live updates)
+  const selectedEvent = selectedIdx !== null ? events[selectedIdx] : null;
 
   return (
     <div
@@ -93,9 +96,10 @@ export function LiveEventLog({ events, status }: Props) {
             const info = getAgentInfo(ev.agent);
             const EvIcon = TYPE_ICONS[ev.event_type] ?? Pin;
             return (
-              <div
+              <button
                 key={i}
-                className="flex items-center gap-1.5 text-[11px] text-slate-500 py-0.5 border-b border-border/50"
+                onClick={() => setSelectedIdx(i)}
+                className="w-full flex items-center gap-1.5 text-[11px] text-slate-500 py-0.5 border-b border-border/50 hover:bg-white/5 transition-colors cursor-pointer text-left"
               >
                 <EvIcon className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
                 <span
@@ -104,13 +108,21 @@ export function LiveEventLog({ events, status }: Props) {
                 >
                   {ev.agent}
                 </span>
-                <span className="truncate break-words">
-                  {ev.content.slice(0, 100)}
-                </span>
-              </div>
+                <span className="truncate">{ev.content.slice(0, 100)}</span>
+              </button>
             );
           })}
         </div>
+      )}
+
+      {selectedEvent && (
+        <DetailModal
+          title={`${selectedEvent.agent} — ${selectedEvent.event_type}`}
+          content={selectedEvent.content}
+          color={getAgentInfo(selectedEvent.agent).color}
+          badge={status === "running" ? "LIVE" : undefined}
+          onClose={() => setSelectedIdx(null)}
+        />
       )}
     </div>
   );

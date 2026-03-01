@@ -251,8 +251,11 @@ async def api_rag_query(req: RAGQueryRequest):
 
 @app.get("/api/rag/documents")
 async def api_rag_documents(user_id: str = ""):
-    from tools.rag import list_documents
-    return list_documents(user_id=user_id or None)
+    try:
+        from tools.rag import list_documents
+        return list_documents(user_id=user_id or None)
+    except Exception:
+        return []
 
 
 @app.get("/api/skills")
@@ -262,6 +265,27 @@ async def api_list_skills():
         return list_skills()
     except Exception:
         return []
+
+
+@app.get("/api/skills/auto")
+async def api_list_auto_skills():
+    """List auto-generated skills."""
+    try:
+        from tools.dynamic_skills import list_skills
+        return list_skills(source="auto-learned")
+    except Exception:
+        return []
+
+
+@app.post("/api/skills/migrate")
+async def api_migrate_skills():
+    """Trigger SQLite → PostgreSQL migration."""
+    try:
+        from tools.pg_connection import migrate_from_sqlite
+        result = migrate_from_sqlite()
+        return {"status": "ok", "migrated": result}
+    except Exception as e:
+        raise HTTPException(503, f"Migration error: {e}")
 
 
 @app.post("/api/skills")
@@ -405,27 +429,6 @@ async def api_delete_memory(memory_id: int):
     except Exception as e:
         raise HTTPException(503, str(e))
 
-
-# ── Auto-Skills Endpoints ────────────────────────────────────────
-
-@app.get("/api/skills/auto")
-async def api_list_auto_skills():
-    """List auto-generated skills."""
-    try:
-        from tools.dynamic_skills import list_skills
-        return list_skills(source="auto-learned")
-    except Exception:
-        return []
-
-@app.post("/api/skills/migrate")
-async def api_migrate_skills():
-    """Trigger SQLite → PostgreSQL migration."""
-    try:
-        from tools.pg_connection import migrate_from_sqlite
-        result = migrate_from_sqlite()
-        return result
-    except Exception as e:
-        raise HTTPException(503, str(e))
 
 @app.get("/api/db/health")
 async def api_db_health():

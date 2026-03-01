@@ -206,7 +206,7 @@ export function ExportButtons({ result, task }: Props) {
       {/* Idea-to-Project: prominent project export buttons */}
       {isIdeaProject &&
         projects.length > 0 &&
-        projects.map((p) => (
+        projects.slice(-1).map((p) => (
           <div key={p.name} className="flex gap-1.5">
             <button
               onClick={() => exportProjectMd(p.name)}
