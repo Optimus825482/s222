@@ -24,14 +24,6 @@ export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (!user) {
-      router.replace("/login");
-    }
-  }, [user, router]);
-
-  if (!user) return null;
-
   const [thread, setThread] = useState<Thread | null>(null);
   const [threadList, setThreadList] = useState<ThreadSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineType>("auto");
@@ -61,8 +53,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!user) {
+      router.replace("/login");
+    }
+  }, [user, router]);
+
+  useEffect(() => {
     loadThreadList();
   }, [loadThreadList]);
+
+  if (!user) return null;
 
   const handleSend = (message: string) => {
     sendMessage(message, thread?.id, pipeline);
