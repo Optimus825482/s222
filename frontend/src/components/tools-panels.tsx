@@ -146,12 +146,196 @@ interface Skill {
   description: string;
   category: string;
   source: string;
+  knowledge?: string;
+  keywords?: string[];
+  use_count?: number;
+  avg_score?: number;
+}
+
+// ── Skill Detail Modal ──────────────────────────────────────────
+
+function SkillDetailModal({
+  skillId,
+  onClose,
+  onDelete,
+}: {
+  skillId: string;
+  onClose: () => void;
+  onDelete: (id: string) => void;
+}) {
+  const [skill, setSkill] = useState<Skill | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api
+      .getSkill(skillId)
+      .then((s) => setSkill(s as Skill))
+      .catch(() => setSkill(null))
+      .finally(() => setLoading(false));
+  }, [skillId]);
+
+  const sourceColor: Record<string, string> = {
+    builtin: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+    user: "bg-green-500/15 text-green-400 border-green-500/30",
+    "auto-learned": "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  };
+  const sourceBadge =
+    sourceColor[skill?.source ?? ""] ??
+    "bg-slate-500/15 text-slate-400 border-slate-500/30";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Skill detayı"
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Modal */}
+      <div className="relative z-10 w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Puzzle
+              className="w-4 h-4 text-blue-400 shrink-0"
+              aria-hidden="true"
+            />
+            <span className="text-sm font-semibold text-slate-200 truncate">
+              {loading ? "Yükleniyor..." : (skill?.name ?? "Skill bulunamadı")}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Modalı kapat"
+            className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer shrink-0 rounded hover:bg-white/5 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
+            </div>
+          ) : !skill ? (
+            <div className="text-sm text-slate-500 text-center py-8">
+              Skill yüklenemedi
+            </div>
+          ) : (
+            <>
+              {/* Badges row */}
+              <div className="flex flex-wrap gap-1.5">
+                <span className="px-2 py-0.5 rounded border text-[10px] font-medium bg-teal-500/10 text-teal-400 border-teal-500/30">
+                  {skill.category}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded border text-[10px] font-medium ${sourceBadge}`}
+                >
+                  {skill.source === "auto-learned"
+                    ? "🤖 Otomatik"
+                    : skill.source === "builtin"
+                      ? "📦 Yerleşik"
+                      : "✏️ Kullanıcı"}
+                </span>
+                {skill.use_count != null && (
+                  <span className="px-2 py-0.5 rounded border text-[10px] bg-surface-raised border-border text-slate-400">
+                    {skill.use_count}x kullanıldı
+                  </span>
+                )}
+                {skill.avg_score != null && skill.avg_score > 0 && (
+                  <span className="px-2 py-0.5 rounded border text-[10px] bg-surface-raised border-border text-slate-400 flex items-center gap-1">
+                    <Star
+                      className="w-3 h-3 text-amber-400"
+                      aria-hidden="true"
+                    />
+                    {skill.avg_score.toFixed(1)}
+                  </span>
+                )}
+              </div>
+
+              {/* Description */}
+              {skill.description && (
+                <div>
+                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">
+                    Açıklama
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {skill.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Knowledge / Çalışma Metodu */}
+              {skill.knowledge && (
+                <div>
+                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <Brain className="w-3 h-3" aria-hidden="true" /> Çalışma
+                    Metodu
+                  </div>
+                  <div className="bg-surface rounded-lg border border-border p-3 max-h-48 overflow-y-auto">
+                    <pre className="text-[11px] text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+                      {skill.knowledge}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Keywords */}
+              {skill.keywords && skill.keywords.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5">
+                    Anahtar Kelimeler
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {skill.keywords.map((kw) => (
+                      <span
+                        key={kw}
+                        className="px-1.5 py-0.5 rounded bg-surface-raised border border-border text-[10px] text-slate-400"
+                      >
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {skill && (
+          <div className="px-5 py-3 border-t border-border shrink-0 flex justify-end">
+            <button
+              onClick={() => {
+                onDelete(skill.id);
+                onClose();
+              }}
+              aria-label={`${skill.name} skill'ini sil`}
+              className="flex items-center gap-1.5 px-3 min-h-[36px] rounded text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Sil
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function SkillsPanel() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [autoSkills, setAutoSkills] = useState<Skill[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [form, setForm] = useState({
     skill_id: "",
     name: "",
@@ -221,6 +405,16 @@ export function SkillsPanel() {
 
   return (
     <div className="space-y-3 px-3 lg:px-4">
+      {selectedSkillId && (
+        <SkillDetailModal
+          skillId={selectedSkillId}
+          onClose={() => setSelectedSkillId(null)}
+          onDelete={(id) => {
+            handleDelete(id);
+            setSelectedSkillId(null);
+          }}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
           <Puzzle className="w-4 h-4" aria-hidden="true" /> Skills
@@ -326,13 +520,17 @@ export function SkillsPanel() {
               key={s.id}
               className="flex items-center justify-between text-[10px] text-slate-400 py-0.5"
             >
-              <span className="flex items-center gap-1 min-w-0">
+              <button
+                onClick={() => setSelectedSkillId(s.id)}
+                aria-label={`${s.name} skill detayını görüntüle`}
+                className="flex items-center gap-1 min-w-0 flex-1 text-left cursor-pointer hover:text-slate-200 transition-colors min-h-[44px] pr-1"
+              >
                 <span className="text-teal-400 shrink-0">[{s.category}]</span>
                 <span className="truncate">{s.name}</span>
                 <span className="shrink-0 px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[9px] font-medium">
                   🤖 Otomatik
                 </span>
-              </span>
+              </button>
               <button
                 onClick={() => handleDelete(s.id)}
                 aria-label={`${s.name} skill'ini sil`}
@@ -357,9 +555,13 @@ export function SkillsPanel() {
               key={s.id}
               className="flex items-center justify-between text-[10px] text-slate-400 py-0.5"
             >
-              <span>
+              <button
+                onClick={() => setSelectedSkillId(s.id)}
+                aria-label={`${s.name} skill detayını görüntüle`}
+                className="flex items-center gap-1 min-w-0 flex-1 text-left cursor-pointer hover:text-slate-200 transition-colors min-h-[44px] pr-1"
+              >
                 <span className="text-teal-400">[{s.category}]</span> {s.name}
-              </span>
+              </button>
               <button
                 onClick={() => handleDelete(s.id)}
                 aria-label={`${s.name} skill'ini sil`}

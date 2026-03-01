@@ -133,10 +133,10 @@ export function Sidebar({
             }`}
           >
             {tab === "agents"
-              ? "Agents"
+              ? "Agentlar"
               : tab === "sessions"
-                ? "Sessions"
-                : "Tools"}
+                ? "Oturumlar"
+                : "Araçlar"}
           </button>
         ))}
       </div>

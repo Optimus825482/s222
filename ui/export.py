@@ -5,6 +5,7 @@ Export module — MD, Excel, PDF export for task results.
 from __future__ import annotations
 
 import io
+import os
 import time
 from typing import Any
 
@@ -61,7 +62,7 @@ def _export_markdown(result: str, task: Task | None) -> bytes:
         lines.append(f"**Query:** {task.user_input}\n")
         lines.append(f"**Pipeline:** {task.pipeline_type.value}\n")
         if task.sub_tasks:
-            lines.append(f"**Agents:** {', '.join(st.assigned_agent.value for st in task.sub_tasks)}\n")
+            lines.append(f"**Agents:** {', '.join(sub.assigned_agent.value for sub in task.sub_tasks)}\n")
         if task.total_latency_ms:
             lines.append(f"**Latency:** {task.total_latency_ms:.0f}ms\n")
         lines.append("---\n")
@@ -78,17 +79,15 @@ def _export_excel(result: str, task: Task | None) -> bytes:
     ws = wb.active
     ws.title = "Result"
 
-    # Header styling
     header_font = Font(bold=True, color="FFFFFF", size=12)
     header_fill = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
 
-    # Meta info
     row = 1
     if task:
         for label, value in [
             ("Query", task.user_input),
             ("Pipeline", task.pipeline_type.value),
-            ("Agents", ", ".join(st.assigned_agent.value for st in task.sub_tasks) if task.sub_tasks else "direct"),
+            ("Agents", ", ".join(sub.assigned_agent.value for sub in task.sub_tasks) if task.sub_tasks else "direct"),
             ("Latency", f"{task.total_latency_ms:.0f}ms" if task.total_latency_ms else "—"),
         ]:
             ws.cell(row=row, column=1, value=label).font = Font(bold=True)
@@ -96,12 +95,10 @@ def _export_excel(result: str, task: Task | None) -> bytes:
             row += 1
         row += 1
 
-    # Result header
     ws.cell(row=row, column=1, value="Result").font = header_font
     ws.cell(row=row, column=1).fill = header_fill
     row += 1
 
-    # Result content — split by lines
     for line in result.split("\n"):
         ws.cell(row=row, column=1, value=line)
         ws.cell(row=row, column=1).alignment = Alignment(wrap_text=True)
@@ -118,33 +115,48 @@ def _export_excel(result: str, task: Task | None) -> bytes:
 def _export_pdf(result: str, task: Task | None) -> bytes:
     """Generate professional research report PDF with Turkish character support."""
     from datetime import datetime, timezone
+    from pathlib import Path as _Path
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
-    from reportlab.lib.units import cm, mm
+    from reportlab.lib.units import cm
     from reportlab.lib.colors import HexColor
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+    from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable,
     )
+    import reportlab as _rl
 
     # ── Register a Unicode-capable font for Turkish chars ──
-    # Try system fonts that support Turkish, fallback to Helvetica
     _FONT = "Helvetica"
     _FONT_BOLD = "Helvetica-Bold"
+    _rl_fonts_dir = _Path(_rl.__file__).parent / "fonts"
     _font_candidates = [
-        ("DejaVuSans", "DejaVuSans.ttf", "DejaVuSans-Bold.ttf"),
-        ("NotoSans", "NotoSans-Regular.ttf", "NotoSans-Bold.ttf"),
-        ("Arial", "arial.ttf", "arialbd.ttf"),
-        ("Tahoma", "tahoma.ttf", "tahomabd.ttf"),
+        # reportlab bundled Vera — always available, full Unicode/Turkish
+        ("VeraUI", str(_rl_fonts_dir / "Vera.ttf"), str(_rl_fonts_dir / "VeraBd.ttf")),
+        # Windows
+        ("WinArial", "C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+        ("WinCalibri", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/calibrib.ttf"),
+        ("WinSegoe", "C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf"),
+        # Linux / Docker
+        ("DejaVuSans", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ("Liberation", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
     ]
     for fname, regular, bold in _font_candidates:
+        if not os.path.exists(regular):
+            continue
         try:
             pdfmetrics.registerFont(TTFont(fname, regular))
-            pdfmetrics.registerFont(TTFont(f"{fname}-Bold", bold))
+            bold_name = f"{fname}-Bold"
+            if os.path.exists(bold):
+                pdfmetrics.registerFont(TTFont(bold_name, bold))
+            else:
+                pdfmetrics.registerFont(TTFont(bold_name, regular))
             _FONT = fname
-            _FONT_BOLD = f"{fname}-Bold"
+            _FONT_BOLD = bold_name
             break
         except Exception:
             continue
@@ -159,7 +171,6 @@ def _export_pdf(result: str, task: Task | None) -> bytes:
         rightMargin=2.5 * cm,
     )
 
-    # ── Styles ──
     COLOR_PRIMARY = HexColor("#1e3a5f")
     COLOR_ACCENT = HexColor("#3b82f6")
     COLOR_TEXT = HexColor("#1f2937")
@@ -177,7 +188,6 @@ def _export_pdf(result: str, task: Task | None) -> bytes:
     s_section = ParagraphStyle(
         "SectionHead", fontName=_FONT_BOLD, fontSize=13, leading=18,
         textColor=COLOR_PRIMARY, spaceBefore=16, spaceAfter=8,
-        borderPadding=(0, 0, 4, 0),
     )
     s_meta_label = ParagraphStyle(
         "MetaLabel", fontName=_FONT_BOLD, fontSize=9, leading=12,
@@ -197,21 +207,16 @@ def _export_pdf(result: str, task: Task | None) -> bytes:
     )
 
     story = []
-
-    # ── Title Block ──
     story.append(Spacer(1, 1 * cm))
     story.append(Paragraph("Multi-Agent Araştırma Raporu", s_title))
 
     now_str = datetime.now(timezone.utc).strftime("%d %B %Y, %H:%M UTC")
     story.append(Paragraph(f"Oluşturulma: {now_str}", s_subtitle))
-
-    # Decorative line
     story.append(HRFlowable(
         width="100%", thickness=2, color=COLOR_ACCENT,
         spaceAfter=16, spaceBefore=4,
     ))
 
-    # ── Meta Info Table ──
     if task:
         agents_str = ", ".join(
             s.assigned_agent.value for s in task.sub_tasks
@@ -224,7 +229,6 @@ def _export_pdf(result: str, task: Task | None) -> bytes:
             [Paragraph("AGENT'LAR", s_meta_label), Paragraph(agents_str, s_meta_value)],
             [Paragraph("SÜRE", s_meta_label), Paragraph(latency_str, s_meta_value)],
         ]
-
         meta_table = Table(meta_data, colWidths=[3 * cm, 12.5 * cm])
         meta_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (0, -1), COLOR_LIGHT_BG),
@@ -234,30 +238,23 @@ def _export_pdf(result: str, task: Task | None) -> bytes:
             ("LEFTPADDING", (0, 0), (-1, -1), 8),
             ("RIGHTPADDING", (0, 0), (-1, -1), 8),
             ("LINEBELOW", (0, 0), (-1, -2), 0.5, HexColor("#e5e7eb")),
-            ("ROUNDEDCORNERS", [4, 4, 4, 4]),
             ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#d1d5db")),
         ]))
         story.append(meta_table)
         story.append(Spacer(1, 16))
 
-    # ── Report Body ──
     story.append(HRFlowable(
         width="100%", thickness=0.5, color=HexColor("#e5e7eb"),
         spaceAfter=12, spaceBefore=4,
     ))
     story.append(Paragraph("Analiz Sonuçları", s_section))
 
-    # Parse result into paragraphs, detect markdown-style headers
     for para in result.split("\n\n"):
         text = para.strip()
         if not text:
             continue
-
-        # Detect markdown headers → section style
-        if text.startswith("### ") or text.startswith("## ") or text.startswith("# "):
-            clean = text.lstrip("#").strip()
-            # Strip markdown bold markers
-            clean = clean.replace("**", "")
+        if text.startswith(("### ", "## ", "# ")):
+            clean = text.lstrip("#").strip().replace("**", "")
             story.append(Paragraph(_pdf_escape(clean), s_section))
         elif text.startswith("---"):
             story.append(HRFlowable(
@@ -265,12 +262,9 @@ def _export_pdf(result: str, task: Task | None) -> bytes:
                 spaceAfter=8, spaceBefore=8,
             ))
         else:
-            # Handle markdown bold within body text
-            processed = _pdf_escape(text)
-            processed = _md_bold_to_pdf(processed)
+            processed = _md_bold_to_pdf(_pdf_escape(text))
             story.append(Paragraph(processed, s_body))
 
-    # ── Footer ──
     story.append(Spacer(1, 2 * cm))
     story.append(HRFlowable(
         width="100%", thickness=0.5, color=HexColor("#e5e7eb"),

@@ -196,6 +196,20 @@ async def api_create_skill(req: SkillCreateRequest):
         raise HTTPException(503, f"Skills module error: {e}")
 
 
+@app.get("/api/skills/{skill_id}")
+async def api_get_skill(skill_id: str):
+    try:
+        from tools.dynamic_skills import get_skill
+        skill = get_skill(skill_id)
+        if not skill:
+            raise HTTPException(404, "Skill not found")
+        return skill
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"Skills module error: {e}")
+
+
 @app.delete("/api/skills/{skill_id}")
 async def api_delete_skill(skill_id: str):
     try:

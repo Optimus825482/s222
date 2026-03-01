@@ -56,6 +56,7 @@ export const api = {
     category?: string;
     keywords?: string[];
   }) => fetcher("/api/skills", { method: "POST", body: JSON.stringify(data) }),
+  getSkill: (id: string) => fetcher(`/api/skills/${id}`),
   deleteSkill: (id: string) =>
     fetcher(`/api/skills/${id}`, { method: "DELETE" }),
 

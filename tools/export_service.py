@@ -29,55 +29,55 @@ from reportlab.pdfbase.ttfonts import TTFont
 _FONT_REGISTERED = False
 
 def _register_fonts():
-    """Register a Unicode-capable font for Turkish characters."""
+    """Register a Unicode-capable font for Turkish characters.
+
+    Search order: reportlab bundled Vera (always available) → Windows system
+    fonts → Linux system fonts → Helvetica fallback (limited Turkish support).
+    """
     global _FONT_REGISTERED
     if _FONT_REGISTERED:
         return
 
-    # Try Windows system fonts first
-    font_paths = [
-        "C:/Windows/Fonts/arial.ttf",
-        "C:/Windows/Fonts/calibri.ttf",
-        "C:/Windows/Fonts/segoeui.ttf",
-        "C:/Windows/Fonts/tahoma.ttf",
-        # Linux fallbacks
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    import reportlab as _rl
+    _rl_fonts_dir = Path(_rl.__file__).parent / "fonts"
+
+    font_pairs = [
+        # 1. reportlab bundled Vera — always available, full Unicode/Turkish
+        (str(_rl_fonts_dir / "Vera.ttf"), str(_rl_fonts_dir / "VeraBd.ttf")),
+        # 2. Project /fonts directory (optional bundled DejaVu)
+        (str(Path(__file__).parent.parent / "fonts" / "DejaVuSans.ttf"),
+         str(Path(__file__).parent.parent / "fonts" / "DejaVuSans-Bold.ttf")),
+        # 3. Windows system fonts
+        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+        ("C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/calibrib.ttf"),
+        ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf"),
+        ("C:/Windows/Fonts/tahoma.ttf", "C:/Windows/Fonts/tahomabd.ttf"),
+        # 4. Linux / Docker system fonts
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+        ("/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+         "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf"),
+        # 5. macOS
+        ("/Library/Fonts/Arial.ttf", "/Library/Fonts/Arial Bold.ttf"),
     ]
 
-    bold_paths = [
-        "C:/Windows/Fonts/arialbd.ttf",
-        "C:/Windows/Fonts/calibrib.ttf",
-        "C:/Windows/Fonts/segoeuib.ttf",
-        "C:/Windows/Fonts/tahomabd.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    ]
+    for regular, bold in font_pairs:
+        if not os.path.exists(regular):
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont("TRFont", regular))
+            if os.path.exists(bold):
+                pdfmetrics.registerFont(TTFont("TRFontBold", bold))
+            else:
+                pdfmetrics.registerFont(TTFont("TRFontBold", regular))
+            _FONT_REGISTERED = True
+            return
+        except Exception:
+            continue
 
-    registered_regular = False
-    for fp in font_paths:
-        if os.path.exists(fp):
-            try:
-                pdfmetrics.registerFont(TTFont("TRFont", fp))
-                registered_regular = True
-                break
-            except Exception:
-                continue
-
-    registered_bold = False
-    for fp in bold_paths:
-        if os.path.exists(fp):
-            try:
-                pdfmetrics.registerFont(TTFont("TRFontBold", fp))
-                registered_bold = True
-                break
-            except Exception:
-                continue
-
-    if not registered_regular:
-        # Fallback — use Helvetica (limited Turkish support)
-        pass
-
+    # Final fallback: reportlab's built-in Helvetica (no Turkish ş/ğ/ı/ç/ö/ü)
     _FONT_REGISTERED = True
 
 
@@ -346,117 +346,6 @@ def generate_pdf(markdown_content: str, title: str = "Rapor") -> bytes:
 
     doc.build(flowables, onFirstPage=_header_footer, onLaterPages=_header_footer)
     return buffer.getvalue()
-
-def generate_presentation_pdf(pptx_path: str, title: str = "Sunum") -> bytes:
-    """
-    Read a PPTX file and generate a professional PDF with slide content.
-    Each slide becomes a section in the PDF with title + bullets.
-    """
-    from pptx import Presentation as PptxPresentation
-
-    _register_fonts()
-    styles = _build_styles()
-
-    # Add slide-specific styles
-    font = _get_font_name()
-    font_bold = _get_font_name(bold=True)
-    slide_title_style = ParagraphStyle(
-        "SlideTitle",
-        fontName=font_bold,
-        fontSize=14,
-        leading=20,
-        spaceBefore=16,
-        spaceAfter=8,
-        textColor=HexColor("#0f3460"),
-        borderWidth=0,
-        borderPadding=0,
-    )
-    slide_num_style = ParagraphStyle(
-        "SlideNum",
-        fontName=font_bold,
-        fontSize=9,
-        leading=12,
-        textColor=HexColor("#999999"),
-    )
-    slide_body_style = ParagraphStyle(
-        "SlideBody",
-        fontName=font,
-        fontSize=10,
-        leading=15,
-        spaceAfter=4,
-        leftIndent=15,
-        textColor=HexColor("#333333"),
-    )
-
-    prs = PptxPresentation(pptx_path)
-
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        topMargin=2 * cm,
-        bottomMargin=2.5 * cm,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        title=title,
-        author="Multi-Agent Ops Center",
-    )
-
-    flowables = []
-
-    # Title page
-    flowables.append(Spacer(1, 3 * cm))
-    flowables.append(Paragraph(_escape_xml(title), styles["title"]))
-    flowables.append(Spacer(1, 0.5 * cm))
-
-    from datetime import datetime
-    date_str = datetime.now().strftime("%d %B %Y, %H:%M")
-    flowables.append(Paragraph(f"Oluşturulma: {date_str}", styles["subtitle"]))
-    flowables.append(Paragraph(f"{len(prs.slides)} Slayt | AI Destekli Sunum", styles["subtitle"]))
-    flowables.append(Spacer(1, 1 * cm))
-    flowables.append(HRFlowable(width="60%", thickness=1, color=HexColor("#0f3460")))
-    flowables.append(PageBreak())
-
-    # Extract slides
-    for i, slide in enumerate(prs.slides, 1):
-        # Slide number
-        flowables.append(Paragraph(f"Slayt {i}/{len(prs.slides)}", slide_num_style))
-
-        # Extract all text from slide shapes
-        texts = []
-        slide_title_text = ""
-        for shape in slide.shapes:
-            if not shape.has_text_frame:
-                continue
-            for para in shape.text_frame.paragraphs:
-                text = para.text.strip()
-                if not text:
-                    continue
-                texts.append(text)
-
-        # First text is usually the title
-        if texts:
-            slide_title_text = texts[0]
-            body_texts = texts[1:]
-        else:
-            slide_title_text = f"Slayt {i}"
-            body_texts = []
-
-        flowables.append(Paragraph(_escape_xml(slide_title_text), slide_title_style))
-
-        # Body content
-        for text in body_texts:
-            escaped = _escape_xml(text)
-            flowables.append(Paragraph(f"• {escaped}", slide_body_style))
-
-        flowables.append(Spacer(1, 6))
-        flowables.append(HRFlowable(width="100%", thickness=0.3, color=HexColor("#e0e0e0")))
-        flowables.append(Spacer(1, 4))
-
-    doc.build(flowables, onFirstPage=_header_footer, onLaterPages=_header_footer)
-    return buffer.getvalue()
-
-
 
 def generate_presentation_pdf(pptx_path: str, title: str = "Sunum") -> bytes:
     """

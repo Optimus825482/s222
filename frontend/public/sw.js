@@ -1,4 +1,6 @@
-const CACHE_NAME = "agent-ops-v1";
+// Cache version — bump this to force update on all clients
+const CACHE_VERSION = "v3";
+const CACHE_NAME = `agent-ops-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
 const PRECACHE_URLS = ["/", "/offline.html"];
@@ -8,21 +10,25 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)),
   );
+  // Activate immediately without waiting for old SW to be released
   self.skipWaiting();
 });
 
-// Activate — clean old caches
+// Activate — clean old caches and claim clients immediately
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)),
+    Promise.all([
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(
+            keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)),
+          ),
         ),
-      ),
+      // Take control of all open clients immediately
+      self.clients.claim(),
+    ]),
   );
-  self.clients.claim();
 });
 
 // Fetch — network-first with offline fallback
@@ -40,7 +46,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache successful responses for static assets
+        // Cache successful responses for static assets only
         if (
           response.ok &&
           event.request.url.match(/\.(js|css|png|svg|ico|woff2?)$/)
@@ -66,4 +72,11 @@ self.addEventListener("fetch", (event) => {
         return new Response("Offline", { status: 503, statusText: "Offline" });
       }),
   );
+});
+
+// Listen for skip-waiting message from client (for update flow)
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });

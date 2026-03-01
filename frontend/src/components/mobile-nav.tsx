@@ -1,6 +1,6 @@
 "use client";
 
-/* Mobile bottom navigation */
+/* Mobile bottom navigation — SVG icons, 44px touch targets */
 interface Props {
   activeTab: "chat" | "activity" | "agents";
   onTabChange: (tab: "chat" | "activity" | "agents") => void;
@@ -8,46 +8,98 @@ interface Props {
   liveEventCount: number;
 }
 
+const ChatIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
+const ActivityIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);
+
+const AgentsIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="8" r="4" />
+    <path d="M6 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+  </svg>
+);
+
+const TABS = [
+  { id: "chat" as const, label: "Sohbet", Icon: ChatIcon },
+  { id: "activity" as const, label: "Akış", Icon: ActivityIcon },
+  { id: "agents" as const, label: "Agentlar", Icon: AgentsIcon },
+];
+
 export function MobileNav({
   activeTab,
   onTabChange,
   isProcessing,
   liveEventCount,
 }: Props) {
-  const tabs = [
-    { id: "chat" as const, label: "Sohbet", icon: "💬" },
-    { id: "activity" as const, label: "Akış", icon: "📡" },
-    { id: "agents" as const, label: "Agentlar", icon: "🤖" },
-  ];
-
   return (
     <nav
       className="lg:hidden flex border-t border-border bg-surface-raised safe-bottom"
       role="tablist"
       aria-label="Ana navigasyon"
     >
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.id;
+      {TABS.map(({ id, label, Icon }) => {
+        const isActive = activeTab === id;
         return (
           <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
+            key={id}
+            onClick={() => onTabChange(id)}
             role="tab"
             aria-selected={isActive}
-            aria-label={tab.label}
+            aria-label={label}
             className={`
-              flex-1 flex flex-col items-center justify-center gap-0.5
-              min-h-[56px] py-2 text-xs font-medium transition-colors
-              ${isActive ? "text-blue-400" : "text-slate-500"}
+              flex-1 flex flex-col items-center justify-center gap-1
+              min-h-[56px] py-2 text-xs font-medium transition-colors cursor-pointer
+              ${isActive ? "text-blue-400" : "text-slate-500 hover:text-slate-300"}
             `}
           >
-            <span className="text-lg relative">
-              {tab.icon}
-              {tab.id === "activity" && isProcessing && liveEventCount > 0 && (
-                <span className="absolute -top-1 -right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <span className="relative">
+              <Icon />
+              {id === "activity" && isProcessing && liveEventCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse"
+                  aria-label="Aktif"
+                />
               )}
             </span>
-            <span>{tab.label}</span>
+            <span>{label}</span>
           </button>
         );
       })}
