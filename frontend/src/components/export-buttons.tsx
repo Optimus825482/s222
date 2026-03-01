@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Task } from "@/lib/types";
-import { FileText, FileDown, FileJson, Loader2, Palette } from "lucide-react";
+import {
+  FileText,
+  FileDown,
+  FileJson,
+  Loader2,
+  Palette,
+  Code2,
+} from "lucide-react";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
@@ -161,6 +168,31 @@ export function ExportButtons({ result, task }: Props) {
     download(JSON.stringify(data, null, 2), "result.json", "application/json");
   }, [result, task]);
 
+  // ── HTML download ──
+  const exportHtml = useCallback(async () => {
+    setExporting("html");
+    try {
+      const title = task?.user_input?.slice(0, 60) || "Rapor";
+      const res = await fetch(`${BASE}/api/export/html`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markdown: result, title }),
+      });
+      if (!res.ok) throw new Error(`HTML export failed: ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "rapor.html";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("HTML export failed:", e);
+    } finally {
+      setExporting(null);
+    }
+  }, [result, task]);
+
   if (!result || result.trim().length < 10) return null;
 
   const isIdeaProject = task?.pipeline_type === "idea_to_project";
@@ -234,6 +266,13 @@ export function ExportButtons({ result, task }: Props) {
         label="JSON"
         ariaLabel="JSON olarak dışa aktar"
         onClick={exportJson}
+        disabled={exporting !== null}
+      />
+      <ExportBtn
+        icon={<Code2 className="w-4 h-4" />}
+        label="HTML"
+        ariaLabel="HTML raporu olarak dışa aktar"
+        onClick={exportHtml}
         disabled={exporting !== null}
       />
 

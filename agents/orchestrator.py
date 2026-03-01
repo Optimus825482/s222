@@ -112,6 +112,13 @@ class OrchestratorAgent(BaseAgent):
             "- self_evaluate: Rate your own response quality\n"
             "- mcp_call / mcp_list_tools: Call external services via MCP protocol\n"
             "- create_skill: Save a new reusable skill/protocol to the dynamic registry\n\n"
+            "SKILL CREATION RULES (IMPORTANT):\n"
+            "- When you detect a RECURRING task pattern (e.g., 'analyze X', 'compare Y', 'generate Z'), "
+            "ALWAYS call create_skill to save the approach as a reusable skill.\n"
+            "- When you discover a new effective workflow or protocol, save it with create_skill.\n"
+            "- Use find_skill BEFORE starting any complex task to check if a relevant skill already exists.\n"
+            "- When decomposing tasks, inject relevant skills into sub-task descriptions so specialist agents benefit.\n"
+            "- Skill IDs should be kebab-case, descriptive (e.g., 'market-analysis-protocol', 'code-review-checklist').\n\n"
             "PIPELINE TYPES:\n"
             "- parallel: ALL agents work simultaneously (DEFAULT — use this most)\n"
             "- deep_research: Phase 1 parallel gather → Phase 2 synthesis (for complex research)\n"
@@ -126,7 +133,15 @@ class OrchestratorAgent(BaseAgent):
             "- If a presentation or file generation FAILS, report the failure honestly\n"
             "- Only include download URLs that are returned by actual tool execution\n"
             "- Local files are served from /api/presentations/{filename}/download ONLY\n"
-            "- When synthesizing agent results, do NOT add information agents didn't provide"
+            "- When synthesizing agent results, do NOT add information agents didn't provide\n\n"
+            "IMAGE EMBEDDING IN REPORTS (IMPORTANT):\n"
+            "- When generating reports, analyses, or research outputs that would benefit from visuals,\n"
+            "  you MAY include images using Markdown syntax: ![description](image_url)\n"
+            "- Use Pollinations.ai for image generation: https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&width=800&height=450\n"
+            "- Only add images to the FINAL report/output — NOT in intermediate pipeline steps\n"
+            "- Add images sparingly: 1-3 per report, only where they add real value\n"
+            "- Example: ![AI Architecture Diagram](https://image.pollinations.ai/prompt/AI%20multi-agent%20architecture%20diagram%20professional?model=flux&width=800&height=450)\n"
+            "- Image prompts must be in English, URL-encoded, and descriptive"
         )
 
     def get_tools(self) -> list[dict]:
@@ -577,18 +592,40 @@ class OrchestratorAgent(BaseAgent):
         )
 
     async def _handle_decompose(self, fn_args: dict, thread: Thread) -> str:
-        """Create Task with SubTasks from decomposition."""
+        """Create Task with SubTasks from decomposition. Auto-discovers and injects relevant skills."""
         pipeline_str = fn_args.get("pipeline_type", "parallel")
         pipeline_type = PipelineType(pipeline_str)
 
+        # Auto-discover relevant skills for each sub-task
+        skill_cache: dict[str, list[dict]] = {}
+        try:
+            from tools.dynamic_skills import search_skills
+            for st_data in fn_args.get("sub_tasks", []):
+                desc = st_data.get("description", "")
+                if desc and len(desc) > 10:
+                    found = search_skills(query=desc[:200], max_results=2)
+                    if found:
+                        skill_cache[desc[:50]] = found
+        except Exception:
+            pass
+
         sub_tasks = []
         for st_data in fn_args.get("sub_tasks", []):
+            desc = st_data["description"]
+            # Inject discovered skills into sub-task description
+            injected_skills = skill_cache.get(desc[:50], [])
+            if injected_skills:
+                skill_hints = "\n\n[RELEVANT SKILLS]\n" + "\n".join(
+                    f"- {s['name']}: {s['description']}" for s in injected_skills
+                )
+                desc = desc + skill_hints
+
             st = SubTask(
-                description=st_data["description"],
+                description=desc,
                 assigned_agent=AgentRole(st_data["assigned_agent"]),
                 priority=st_data.get("priority", 1),
                 depends_on=st_data.get("depends_on", []),
-                skills=st_data.get("skills", []),
+                skills=[s["id"] for s in injected_skills] + st_data.get("skills", []),
             )
             sub_tasks.append(st)
 
@@ -622,6 +659,14 @@ class OrchestratorAgent(BaseAgent):
             self.set_live_monitor(live_monitor)
 
         thread.add_event(EventType.USER_MESSAGE, user_input)
+
+        # ── Phase -1: Prompt Enhancement ──
+        try:
+            enhanced = await self._enhance_prompt(user_input, thread)
+            if enhanced and enhanced != user_input:
+                user_input = enhanced
+        except Exception:
+            pass  # Never break main flow
 
         # ── Auto-save user teachings/preferences ──
         try:
@@ -1035,6 +1080,53 @@ class OrchestratorAgent(BaseAgent):
                 return final
 
         return decision
+
+    async def _enhance_prompt(self, user_input: str, thread: Thread) -> str:
+        """
+        Prompt Enhancer: Analyze and improve the user's raw prompt before routing.
+        Emits the enhanced version as a pipeline event so user can see it.
+        Returns enhanced prompt string (or original if enhancement fails/not needed).
+        """
+        # Skip for very short/trivial inputs
+        if len(user_input.strip()) < 10 or _SIMPLE_PATTERNS.match(user_input.strip()):
+            return user_input
+
+        enhance_prompt = (
+            "You are a Prompt Enhancement specialist. Your job:\n"
+            "1. Analyze the raw user prompt below.\n"
+            "2. Detect goal, scope, context, and missing details.\n"
+            "3. Rewrite it to be clearer, more precise, and actionable.\n"
+            "4. Keep the same language as the original (Turkish stays Turkish).\n"
+            "5. Do NOT add unnecessary complexity — only improve clarity.\n\n"
+            f"RAW PROMPT:\n{user_input}\n\n"
+            "OUTPUT FORMAT (strictly follow):\n"
+            "ENHANCED: <the improved prompt on a single line>\n"
+            "CHANGES: <one-line summary of what was improved>"
+        )
+
+        messages = [
+            {"role": "system", "content": "You are a concise prompt enhancement assistant."},
+            {"role": "user", "content": enhance_prompt},
+        ]
+
+        try:
+            response = await self.call_llm(messages)
+            content = response.get("content", "")
+            if not content:
+                return user_input
+
+            # Extract ENHANCED: line
+            for line in content.split("\n"):
+                if line.startswith("ENHANCED:"):
+                    enhanced = line[len("ENHANCED:"):].strip()
+                    if enhanced and len(enhanced) > 5 and enhanced != user_input:
+                        # Emit so user sees it in pipeline panel
+                        self._emit("pipeline", f"✨ Prompt iyileştirildi: {enhanced[:120]}")
+                        return enhanced
+        except Exception:
+            pass
+
+        return user_input
 
     def _auto_save_memory(self, user_input: str, result: str) -> None:
         """Silently save task completion to persistent memory + auto-create skill if pattern detected."""

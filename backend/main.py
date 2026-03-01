@@ -653,6 +653,26 @@ async def api_export_pdf(req: ExportPdfRequest):
     )
 
 
+class ExportHtmlRequest(BaseModel):
+    markdown: str
+    title: str = "Rapor"
+
+
+@app.post("/api/export/html")
+async def api_export_html(req: ExportHtmlRequest):
+    """Convert any markdown content to a standalone styled HTML report."""
+    from fastapi.responses import Response
+    from tools.export_service import generate_html
+
+    html_content = generate_html(req.markdown, title=req.title)
+    safe_name = re.sub(r'[^\w\-]', '_', req.title[:40].lower())
+    return Response(
+        content=html_content.encode("utf-8"),
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.html"'},
+    )
+
+
 # ── WebSocket: Real-time Agent Execution ─────────────────────────
 
 class WSLiveMonitor:

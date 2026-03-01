@@ -347,6 +347,203 @@ def generate_pdf(markdown_content: str, title: str = "Rapor") -> bytes:
     doc.build(flowables, onFirstPage=_header_footer, onLaterPages=_header_footer)
     return buffer.getvalue()
 
+def generate_html(markdown_content: str, title: str = "Rapor") -> str:
+    """
+    Convert markdown content to a standalone, styled HTML report.
+    Supports Turkish characters, images, tables, and code blocks.
+    Returns HTML string (UTF-8).
+    """
+    import html as html_lib
+    from datetime import datetime
+
+    date_str = datetime.now().strftime("%d %B %Y, %H:%M")
+
+    def md_to_html(text: str) -> str:
+        lines = text.split("\n")
+        out = []
+        in_code = False
+        code_lang = ""
+        code_buf: list[str] = []
+        in_table = False
+        table_buf: list[str] = []
+
+        def flush_table():
+            nonlocal in_table, table_buf
+            if not table_buf:
+                return
+            rows = [r for r in table_buf if r.strip()]
+            html_rows = []
+            for i, row in enumerate(rows):
+                cells = [c.strip() for c in row.strip("|").split("|")]
+                if i == 1 and all(set(c.replace("-", "").replace(":", "").replace(" ", "")) == set() for c in cells):
+                    continue  # separator row
+                tag = "th" if i == 0 else "td"
+                html_rows.append("<tr>" + "".join(f"<{tag}>{html_lib.escape(c)}</{tag}>" for c in cells) + "</tr>")
+            out.append('<div class="table-wrap"><table>' + "".join(html_rows) + "</table></div>")
+            table_buf = []
+            in_table = False
+
+        for line in lines:
+            stripped = line.strip()
+
+            # Code block
+            if stripped.startswith("```"):
+                if in_code:
+                    code_text = html_lib.escape("\n".join(code_buf))
+                    out.append(f'<pre><code class="language-{html_lib.escape(code_lang)}">{code_text}</code></pre>')
+                    code_buf = []
+                    in_code = False
+                    code_lang = ""
+                else:
+                    if in_table:
+                        flush_table()
+                    in_code = True
+                    code_lang = stripped[3:].strip()
+                continue
+
+            if in_code:
+                code_buf.append(line)
+                continue
+
+            # Table
+            if stripped.startswith("|"):
+                in_table = True
+                table_buf.append(stripped)
+                continue
+            elif in_table:
+                flush_table()
+
+            if not stripped:
+                out.append("<br>")
+                continue
+
+            if stripped in ("---", "***", "___"):
+                out.append("<hr>")
+                continue
+
+            # Image: ![alt](url)
+            img_match = re.match(r"!\[([^\]]*)\]\(([^)]+)\)", stripped)
+            if img_match:
+                alt, src = img_match.groups()
+                out.append(f'<figure><img src="{html_lib.escape(src)}" alt="{html_lib.escape(alt)}" loading="lazy"><figcaption>{html_lib.escape(alt)}</figcaption></figure>')
+                continue
+
+            def inline(t: str) -> str:
+                # Bold+italic
+                t = re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", t)
+                # Bold
+                t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
+                t = re.sub(r"__(.+?)__", r"<strong>\1</strong>", t)
+                # Italic
+                t = re.sub(r"\*(.+?)\*", r"<em>\1</em>", t)
+                t = re.sub(r"_(.+?)_", r"<em>\1</em>", t)
+                # Inline code
+                t = re.sub(r"`([^`]+)`", lambda m: f"<code>{html_lib.escape(m.group(1))}</code>", t)
+                # Links
+                t = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2" target="_blank">\1</a>', t)
+                return t
+
+            esc = html_lib.escape(stripped)
+
+            if stripped.startswith("#### "):
+                out.append(f"<h4>{inline(html_lib.escape(stripped[5:]))}</h4>")
+            elif stripped.startswith("### "):
+                out.append(f"<h3>{inline(html_lib.escape(stripped[4:]))}</h3>")
+            elif stripped.startswith("## "):
+                out.append(f"<h2>{inline(html_lib.escape(stripped[3:]))}</h2>")
+            elif stripped.startswith("# "):
+                out.append(f"<h1>{inline(html_lib.escape(stripped[2:]))}</h1>")
+            elif stripped.startswith(("- ", "* ", "• ")):
+                out.append(f"<li>{inline(html_lib.escape(stripped[2:]))}</li>")
+            elif re.match(r"^\d+\.\s", stripped):
+                m = re.match(r"^(\d+)\.\s+(.+)", stripped)
+                if m:
+                    out.append(f"<li>{inline(html_lib.escape(m.group(2)))}</li>")
+            elif stripped.startswith("> "):
+                out.append(f"<blockquote>{inline(html_lib.escape(stripped[2:]))}</blockquote>")
+            else:
+                out.append(f"<p>{inline(esc)}</p>")
+
+        if in_table:
+            flush_table()
+        if in_code and code_buf:
+            out.append(f'<pre><code>{html_lib.escape(chr(10).join(code_buf))}</code></pre>')
+
+        return "\n".join(out)
+
+    body = md_to_html(markdown_content)
+    safe_title = html_lib.escape(title)
+
+    return f"""<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{safe_title}</title>
+<style>
+  :root {{
+    --primary: #0f3460;
+    --accent: #533483;
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --text: #1a1a2e;
+    --muted: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+  }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }}
+  .container {{ max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }}
+  header {{ background: var(--primary); color: #fff; padding: 2.5rem 2rem; border-radius: 12px; margin-bottom: 2rem; }}
+  header h1 {{ font-size: 1.8rem; font-weight: 700; margin-bottom: 0.4rem; }}
+  header .meta {{ font-size: 0.85rem; opacity: 0.75; }}
+  .content {{ background: var(--surface); border-radius: 12px; padding: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }}
+  h1 {{ font-size: 1.6rem; color: var(--primary); margin: 1.5rem 0 0.75rem; border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; }}
+  h2 {{ font-size: 1.3rem; color: var(--primary); margin: 1.4rem 0 0.6rem; }}
+  h3 {{ font-size: 1.1rem; color: var(--accent); margin: 1.2rem 0 0.5rem; }}
+  h4 {{ font-size: 1rem; color: var(--muted); margin: 1rem 0 0.4rem; }}
+  p {{ margin: 0.6rem 0; }}
+  li {{ margin: 0.3rem 0 0.3rem 1.5rem; list-style: disc; }}
+  ol li {{ list-style: decimal; }}
+  blockquote {{ border-left: 4px solid var(--accent); padding: 0.5rem 1rem; margin: 1rem 0; background: #f3f0ff; border-radius: 0 8px 8px 0; color: var(--accent); font-style: italic; }}
+  code {{ background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 0.88em; color: #c7254e; }}
+  pre {{ background: #1e1e2e; color: #cdd6f4; padding: 1.2rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; }}
+  pre code {{ background: none; color: inherit; padding: 0; font-size: 0.85rem; }}
+  .table-wrap {{ overflow-x: auto; margin: 1rem 0; }}
+  table {{ border-collapse: collapse; width: 100%; font-size: 0.9rem; }}
+  th, td {{ border: 1px solid var(--border); padding: 0.6rem 0.9rem; text-align: left; }}
+  th {{ background: var(--primary); color: #fff; font-weight: 600; }}
+  tr:nth-child(even) td {{ background: #f5f7ff; }}
+  hr {{ border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }}
+  figure {{ margin: 1.5rem 0; text-align: center; }}
+  figure img {{ max-width: 100%; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.12); }}
+  figcaption {{ font-size: 0.82rem; color: var(--muted); margin-top: 0.4rem; }}
+  a {{ color: var(--accent); text-decoration: none; }}
+  a:hover {{ text-decoration: underline; }}
+  footer {{ text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }}
+  @media print {{
+    body {{ background: #fff; }}
+    .container {{ padding: 0; }}
+    header {{ border-radius: 0; }}
+    .content {{ box-shadow: none; }}
+  }}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>{safe_title}</h1>
+    <div class="meta">Oluşturulma: {date_str} &nbsp;|&nbsp; Multi-Agent Ops Center</div>
+  </header>
+  <div class="content">
+{body}
+  </div>
+  <footer>Multi-Agent Ops Center &copy; {datetime.now().year}</footer>
+</div>
+</body>
+</html>"""
+
+
 def generate_presentation_pdf(pptx_path: str, title: str = "Sunum") -> bytes:
     """
     Read a PPTX file and generate a professional PDF with slide content.
