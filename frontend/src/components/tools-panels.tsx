@@ -833,6 +833,7 @@ interface McpServer {
   name: string;
   url?: string;
   command?: string;
+  args?: string[];
   description?: string;
   tool_count?: number;
   active?: boolean;
@@ -959,9 +960,7 @@ export function McpPanel() {
               {s.command && (
                 <span className="text-slate-600 text-[9px] font-mono pl-4 truncate">
                   {s.command}{" "}
-                  {Array.isArray((s as any).args)
-                    ? (s as any).args.slice(0, 2).join(" ")
-                    : ""}
+                  {Array.isArray(s.args) ? s.args.slice(0, 2).join(" ") : ""}
                 </span>
               )}
             </div>
