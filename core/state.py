@@ -52,7 +52,7 @@ def list_threads(limit: int = 50, user_id: str | None = None) -> list[dict]:
     files = sorted(_threads_dir(user_id).glob("*.json"), key=os.path.getmtime, reverse=True)
     for f in files[:limit]:
         try:
-            data = json.loads(f.read_text(encoding="utf-8"))
+            data = json.loads(f.read_text(encoding="utf-8")) 
             first_msg = ""
             for ev in data.get("events", []):
                 if ev.get("event_type") == "user_message":
