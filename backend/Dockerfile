@@ -2,10 +2,19 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+# Backend requirements
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Root-level modules that backend/main.py imports
+COPY config.py .
+COPY agents/ ./agents/
+COPY core/ ./core/
+COPY tools/ ./tools/
+COPY pipelines/ ./pipelines/
+
+# Backend app files go directly to /app
+COPY backend/ ./
 
 EXPOSE 8000
 
