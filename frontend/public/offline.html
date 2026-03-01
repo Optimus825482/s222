@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Çevrimdışı — Agent Ops</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0a0e1a;
+        color: #e2e8f0;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .container {
+        text-align: center;
+        padding: 2rem;
+      }
+      .icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+      p {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        max-width: 320px;
+        margin: 0 auto;
+      }
+      button {
+        margin-top: 1.5rem;
+        padding: 0.75rem 1.5rem;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 0.75rem;
+        font-size: 0.875rem;
+        cursor: pointer;
+      }
+      button:active {
+        background: #2563eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">📡</div>
+      <h1>Bağlantı Yok</h1>
+      <p>
+        Agent Ops Center'a erişmek için internet bağlantısı gerekli.
+        Bağlantınızı kontrol edip tekrar deneyin.
+      </p>
+      <button onclick="window.location.reload()">Tekrar Dene</button>
+    </div>
+  </body>
+</html>

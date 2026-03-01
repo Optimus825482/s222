@@ -31,6 +31,13 @@ class PipelineEngine:
             AgentRole.RESEARCHER: ResearcherAgent(),
             AgentRole.REASONER: ReasonerAgent(),
         }
+        self._live_monitor = None
+
+    def set_live_monitor(self, monitor):
+        """Attach live monitor and propagate to all agents."""
+        self._live_monitor = monitor
+        for agent in self._agents.values():
+            agent.set_live_monitor(monitor)
 
     def get_agent(self, role: AgentRole) -> BaseAgent:
         return self._agents[role]
@@ -54,6 +61,12 @@ class PipelineEngine:
                     result = await self._consensus(task, thread)
                 case PipelineType.ITERATIVE:
                     result = await self._iterative(task, thread)
+                case PipelineType.DEEP_RESEARCH:
+                    result = await self._deep_research(task, thread)
+                case PipelineType.IDEA_TO_PROJECT:
+                    result = await self._idea_to_project(task, thread)
+                case PipelineType.BRAINSTORM:
+                    result = await self._brainstorm(task, thread)
                 case _:
                     result = await self._sequential(task, thread)
 
@@ -73,6 +86,11 @@ class PipelineEngine:
 
     async def _run_subtask(self, subtask: SubTask, context: str, thread: Thread) -> str:
         """Execute a single sub-task with its assigned agent, injecting skills if assigned."""
+        # Check stop
+        if self._live_monitor and self._live_monitor.should_stop():
+            subtask.status = TaskStatus.FAILED
+            return "[Stopped]"
+
         subtask.status = TaskStatus.RUNNING
         agent = self.get_agent(subtask.assigned_agent)
 
@@ -106,6 +124,22 @@ class PipelineEngine:
         subtask.latency_ms = (time.monotonic() - t0) * 1000
         subtask.status = TaskStatus.COMPLETED
         subtask.result = result
+
+        # Auto-evaluate agent output quality
+        try:
+            from tools.agent_eval import score_agent_output, detect_task_type
+            task_type = detect_task_type(subtask.description)
+            score_agent_output(
+                agent_role=subtask.assigned_agent.value,
+                task_type=task_type,
+                output=result,
+                tokens_used=subtask.token_usage,
+                latency_ms=subtask.latency_ms,
+                task_preview=subtask.description[:200],
+            )
+        except Exception:
+            pass  # Never break pipeline for evaluation
+
         return result
 
     # ── Sequential Pipeline ──────────────────────────────────────
@@ -211,3 +245,266 @@ class PipelineEngine:
         producer_task.result = draft
         reviewer_task.result = review
         return draft
+
+    # ── Deep Research Pipeline ───────────────────────────────────
+
+    async def _deep_research(self, task: Task, thread: Thread) -> str:
+        """
+        Deep Research: All agents work in parallel on the same query,
+        each from their specialty angle. Results are merged for synthesis.
+        """
+        thread.add_event(
+            EventType.PIPELINE_STEP,
+            f"🔬 Deep Research: {len(task.sub_tasks)} agents launching in parallel",
+        )
+
+        # Phase 1: All agents run simultaneously
+        coros = []
+        for subtask in task.sub_tasks:
+            enriched = (
+                f"DEEP RESEARCH MODE — You are one of {len(task.sub_tasks)} specialist agents "
+                f"working in parallel on this request.\n\n"
+                f"Original request: {task.user_input}\n\n"
+                f"Your specific task: {subtask.description}\n\n"
+                f"Be thorough. Your output will be combined with other agents' work."
+            )
+            coros.append(self._run_subtask(subtask, enriched, thread))
+
+        results = await asyncio.gather(*coros, return_exceptions=True)
+
+        # Phase 2: Merge results with agent labels
+        parts = []
+        for subtask, result in zip(task.sub_tasks, results):
+            agent_name = subtask.assigned_agent.value
+            if isinstance(result, Exception):
+                parts.append(f"[{agent_name}] Error: {result}")
+                subtask.status = TaskStatus.FAILED
+            else:
+                parts.append(f"[{agent_name}] {result}")
+
+        thread.add_event(
+            EventType.PIPELINE_STEP,
+            f"🔬 Deep Research complete: {sum(1 for r in results if not isinstance(r, Exception))}/{len(results)} agents succeeded",
+        )
+
+        return "\n\n---\n\n".join(parts)
+
+    # ── Idea-to-Project Pipeline ─────────────────────────────────
+
+    async def _idea_to_project(self, task: Task, thread: Thread) -> str:
+        """
+        Idea-to-Project: Sequential phases where each builds on previous.
+        Analyze → PRD → Architecture → Tasks → Scaffold.
+        """
+        from tools.idea_to_project import PHASES, get_phase_prompt, save_project_output
+
+        thread.add_event(
+            EventType.PIPELINE_STEP,
+            f"🚀 Idea-to-Project: {len(PHASES)} phases starting",
+        )
+
+        results = {}
+        prev_result = ""
+
+        for phase in PHASES:
+            prompt = get_phase_prompt(phase["id"], task.user_input, prev_result)
+            agent_role = AgentRole(phase["agent"])
+
+            subtask = SubTask(
+                description=f"[{phase['name']}] {phase['description']}",
+                assigned_agent=agent_role,
+                priority=1,
+            )
+
+            result = await self._run_subtask(subtask, prompt, thread)
+            results[phase["id"]] = result
+            prev_result = result
+
+            project_name = task.user_input[:50].strip()
+            save_project_output(project_name, phase["id"], result)
+
+        parts = [f"🚀 IDEA-TO-PROJECT COMPLETE\n"]
+        for phase in PHASES:
+            if phase["id"] in results:
+                parts.append(f"\n{'='*60}")
+                parts.append(f"📋 {phase['name'].upper()}")
+                parts.append(f"{'='*60}")
+                parts.append(results[phase["id"]])
+
+        return "\n".join(parts)
+
+    # ── Brainstorm Pipeline ──────────────────────────────────────
+
+    async def _brainstorm(self, task: Task, thread: Thread) -> str:
+        """
+        Multi-round debate: 4 agents argue from different angles,
+        cross-challenge each other, then SPEED synthesizes.
+
+        Round 1 (Parallel): Each agent gives initial perspective
+        Round 2 (Parallel): Each agent responds to others' arguments
+        Round 3 (Sequential): SPEED synthesizes the full debate
+        """
+        topic = task.user_input
+
+        # Agent perspectives — each gets a unique angle
+        perspectives: dict[AgentRole, str] = {
+            AgentRole.THINKER: (
+                "You are the STRATEGIC/ANALYTICAL voice in this brainstorm. "
+                "Analyze the topic from a high-level strategic perspective. "
+                "Consider long-term implications, trade-offs, and systemic effects. "
+                "Think big picture."
+            ),
+            AgentRole.RESEARCHER: (
+                "You are the DATA-DRIVEN/EVIDENCE-BASED voice in this brainstorm. "
+                "Ground your perspective in facts, research, real-world examples, and data. "
+                "Cite evidence where possible. Be the empirical anchor."
+            ),
+            AgentRole.REASONER: (
+                "You are the LOGICAL/CRITICAL voice — the devil's advocate. "
+                "Challenge assumptions, find logical flaws, identify risks and edge cases. "
+                "Push back on weak arguments. Be constructively skeptical."
+            ),
+            AgentRole.SPEED: (
+                "You are the PRACTICAL/IMPLEMENTATION voice in this brainstorm. "
+                "Focus on feasibility, actionable steps, quick wins, and real-world constraints. "
+                "How would this actually get done? Be pragmatic."
+            ),
+        }
+
+        agents_order = list(perspectives.keys())
+        all_parts = []
+
+        # ── Round 1: Initial Perspectives (Parallel) ────────────
+
+        thread.add_event(
+            EventType.PIPELINE_STEP,
+            "🧠 Brainstorm Round 1: Each agent shares their initial perspective",
+        )
+        if self._live_monitor:
+            self._live_monitor.emit(
+                "pipeline", "orchestrator",
+                "🧠 Brainstorm Round 1/3 — Initial perspectives",
+            )
+
+        round1_coros = []
+        for role in agents_order:
+            agent = self.get_agent(role)
+            prompt = (
+                f"{perspectives[role]}\n\n"
+                f"TOPIC: {topic}\n\n"
+                f"Share your initial perspective. Be concise but substantive. "
+                f"Take a clear position."
+            )
+            round1_coros.append(agent.execute(prompt, thread))
+
+        round1_results = await asyncio.gather(*round1_coros, return_exceptions=True)
+
+        round1_texts: dict[AgentRole, str] = {}
+        round1_section = ["## 🧠 ROUND 1 — Initial Perspectives\n"]
+
+        for role, result in zip(agents_order, round1_results):
+            if isinstance(result, Exception):
+                text = f"[Error: {result}]"
+            else:
+                text = result
+            round1_texts[role] = text
+            round1_section.append(f"### [{role.value.upper()}]\n{text}")
+
+        all_parts.append("\n\n".join(round1_section))
+
+        # ── Stop check between rounds ───────────────────────────
+
+        if self._live_monitor and self._live_monitor.should_stop():
+            thread.add_event(EventType.ERROR, "Brainstorm stopped by user after Round 1")
+            return "\n\n---\n\n".join(all_parts) + "\n\n[Stopped after Round 1]"
+
+        # ── Round 2: Cross-Challenge (Parallel) ─────────────────
+
+        thread.add_event(
+            EventType.PIPELINE_STEP,
+            "⚔️ Brainstorm Round 2: Agents respond to each other's arguments",
+        )
+        if self._live_monitor:
+            self._live_monitor.emit(
+                "pipeline", "orchestrator",
+                "⚔️ Brainstorm Round 2/3 — Cross-challenge & debate",
+            )
+
+        # Build the "other agents said" context for each agent
+        round2_coros = []
+        for role in agents_order:
+            others_context = "\n\n".join(
+                f"[{other_role.value.upper()}]: {other_text}"
+                for other_role, other_text in round1_texts.items()
+                if other_role != role
+            )
+            prompt = (
+                f"{perspectives[role]}\n\n"
+                f"TOPIC: {topic}\n\n"
+                f"Here is what the other agents said in Round 1:\n\n"
+                f"{others_context}\n\n"
+                f"Now respond to their arguments:\n"
+                f"- Challenge or support specific points from other agents\n"
+                f"- Add new insights sparked by the discussion\n"
+                f"- Strengthen or revise your own position\n"
+                f"Be direct. Reference other agents by name."
+            )
+            agent = self.get_agent(role)
+            round2_coros.append(agent.execute(prompt, thread))
+
+        round2_results = await asyncio.gather(*round2_coros, return_exceptions=True)
+
+        round2_section = ["## ⚔️ ROUND 2 — Cross-Challenge & Debate\n"]
+
+        for role, result in zip(agents_order, round2_results):
+            if isinstance(result, Exception):
+                text = f"[Error: {result}]"
+            else:
+                text = result
+            round2_section.append(f"### [{role.value.upper()}]\n{text}")
+
+        all_parts.append("\n\n".join(round2_section))
+
+        # ── Stop check before synthesis ─────────────────────────
+
+        if self._live_monitor and self._live_monitor.should_stop():
+            thread.add_event(EventType.ERROR, "Brainstorm stopped by user after Round 2")
+            return "\n\n---\n\n".join(all_parts) + "\n\n[Stopped after Round 2]"
+
+        # ── Round 3: Synthesis (SPEED agent) ────────────────────
+
+        thread.add_event(
+            EventType.PIPELINE_STEP,
+            "📋 Brainstorm Round 3: Synthesizing the debate",
+        )
+        if self._live_monitor:
+            self._live_monitor.emit(
+                "pipeline", "orchestrator",
+                "📋 Brainstorm Round 3/3 — Final synthesis",
+            )
+
+        full_debate = "\n\n---\n\n".join(all_parts)
+        synthesis_prompt = (
+            f"You are the synthesizer of a multi-agent brainstorm debate.\n\n"
+            f"ORIGINAL TOPIC: {topic}\n\n"
+            f"FULL DEBATE:\n{full_debate}\n\n"
+            f"Create a structured synthesis with these sections:\n"
+            f"1. **Key Agreements** — Points where agents converged\n"
+            f"2. **Key Disagreements** — Unresolved tensions and opposing views\n"
+            f"3. **Strongest Arguments** — The most compelling points from the debate\n"
+            f"4. **Final Recommendation** — Your balanced conclusion based on all perspectives\n\n"
+            f"Be concise and actionable. Reference which agent made which point."
+        )
+
+        synthesizer = self.get_agent(AgentRole.SPEED)
+        synthesis = await synthesizer.execute(synthesis_prompt, thread)
+
+        all_parts.append(f"## 📋 SYNTHESIS\n\n{synthesis}")
+
+        thread.add_event(
+            EventType.PIPELINE_STEP,
+            f"✅ Brainstorm complete: 3 rounds, {len(agents_order)} agents",
+        )
+
+        return "\n\n---\n\n".join(all_parts)
+

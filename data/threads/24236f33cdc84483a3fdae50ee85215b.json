@@ -1,0 +1,92 @@
+{
+  "id": "24236f33cdc84483a3fdae50ee85215b",
+  "events": [
+    {
+      "id": "2b8fd2d5baa9",
+      "timestamp": "2026-02-23T01:51:15.285546+00:00",
+      "event_type": "user_message",
+      "agent_role": null,
+      "content": "Multi-Agent_Sistem_Oluşturma_Kapsamlı_Proje_PlanI OLUŞTUR VE BUNU POWERPOINT SUNUSU OLARAK HAZIRLA 20SLAYT OLSUN GÖRSEL DESTEKLI OLSUN",
+      "metadata": {}
+    },
+    {
+      "id": "0f22f94a01a0",
+      "timestamp": "2026-02-23T01:51:15.298739+00:00",
+      "event_type": "routing_decision",
+      "agent_role": "orchestrator",
+      "content": "Presentation analysis triggered",
+      "metadata": {
+        "topic": "Multi-Agent_Sistem_Oluşturma_Kapsamlı_Proje_PlanI OLUŞTUR VE BUNU POWERPOINT SUNUSU OLARAK HAZIRLA 20SLAYT OLSUN GÖRSEL DESTEKLI OLSUN"
+      }
+    },
+    {
+      "id": "d5a3e5b206d8",
+      "timestamp": "2026-02-23T01:51:18.200424+00:00",
+      "event_type": "agent_response",
+      "agent_role": "orchestrator",
+      "content": "🔍 **Konu Analizi:** Multi-Agent_Sistem_Oluşturma_Kapsamlı_Proje_PlanI OLUŞTUR VE BUNU POWERPOINT SUNUSU OLARAK HAZIRLA 20SLAYT OLSUN GÖRSEL DESTEKLI OLSUN\n📊 **Bulunan Veri Noktası:** 7\n📌 **Keşfedilen Alt Konular:** SUNU HAZIRLAMA PROGRAMI: powerpoint, PowerPoint'te sunu oluşturma - Microsoft Desteği, PowerPoint | Çevrimiçi Sunular ve Slaytlar | Microsoft 365, Slayt Yapma Programı: Etkili Sunum Hazırlama, PowerPoint sunusu oluşturmak için temel görevler\n\n🎯 **Sunum Modu Seçenekleri:**\n\n⚡ **MINI** (5-7 slayt) — Özet sunum — ana noktalar ve temel veriler\n   🔬 5 araştırma sorgusu kullanılacak\n\n📊 **MIDI** (10-15 slayt) — Standart sunum — detaylı analiz, örnekler ve veriler\n   🔬 8 araştırma sorgusu kullanılacak\n\n🎯 **MAXI** (20-30 slayt) — Kapsamlı sunum — derinlemesine araştırma, vaka çalışmaları, karşılaştırmalar\n   🔬 12 araştırma sorgusu kullanılacak\n\n💬 **Seçimini yaz:** `MINI`, `MIDI` veya `MAXI`\n   (Veya doğrudan slayt sayısı belirtebilirsin: örn. `MIDI 15`)",
+      "metadata": {}
+    },
+    {
+      "id": "aad8ce5b7cb0",
+      "timestamp": "2026-02-23T01:51:31.548167+00:00",
+      "event_type": "user_message",
+      "agent_role": null,
+      "content": "MIDI 20",
+      "metadata": {}
+    },
+    {
+      "id": "851762704aa5",
+      "timestamp": "2026-02-23T01:51:31.556019+00:00",
+      "event_type": "routing_decision",
+      "agent_role": "orchestrator",
+      "content": "Presentation: topic=Multi-Agent_Sistem_Oluşturma_Kapsamlı_Proje_PlanI OLUŞTUR VE, mode=MIDI, slides=20, lang=tr",
+      "metadata": {}
+    },
+    {
+      "id": "57f544e7aee2",
+      "timestamp": "2026-02-23T01:51:43.183405+00:00",
+      "event_type": "agent_start",
+      "agent_role": "thinker",
+      "content": "Agent thinker starting: Create a professional, data-rich presentation about: Multi-Agent_Sistem_Oluşturma_Kapsamlı_Proje_Pla",
+      "metadata": {}
+    },
+    {
+      "id": "ca35c8b62ab0",
+      "timestamp": "2026-02-23T01:54:10.968757+00:00",
+      "event_type": "agent_response",
+      "agent_role": "thinker",
+      "content": "# MULTİ-AGENT SİSTEM OLUŞTURMA\n## Kapsamlı Proje Planı Sunusu\n\n---\n\n**SLIDE 1: Multi-Agent Sistemler — Giriş ve Vizyon**\n- Yapay zeka dünyasında en heyecan verici gelişme: Otonom agent sistemleri\n- 2025'te kurumsal AI benimseme oranı %72'ye ulaştı (Kaynak: Microsoft Research)\n- Multi-agent yaklaşımı: Tek bir modelden dağıtık zeka ekosistemine geçiş\n- Bu sunum: Sıfırdan enterprise-grade multi-agent sistem kurulum rehberi\n- Hedef: 20 haftalık kapsamlı proje planının detaylı yol haritası\n\nIMAGE: Futuristic visualization of interconnected AI agents working together, neural network style, blue and teal color palette\n\n---\n\n**SLIDE 2: Neden Multi-Agent Sistemler?**\n- Geleneksel tek model yaklaşımlarının sınırları aşılıyor\n- Görev uzmanlaşması: Her agent kendi alanında optimum performans\n- Paralel işlem: Eşzamanlı görev yürütme kapasitesi\n- Hata toleransı: Bir agent'ın başarısızlığı sistemi durdurmaz\n- Ölçeklenebilirlik: Dinamik kaynak tahsisi mümkün\n\nIMAGE: Comparison diagram showing single AI model vs multi-agent system, parallel processing visualization\n\n---\n\n**SLIDE 3: Küresel Pazar Büyüklüğü ve Projeksiyonlar**\n- Global AI pazarı 2025'te 190 milyar dolar (yıllık %37 büyüme)\n- Agent tabanlı sistemler segmenti 2024-2030 arası %45 CAGR bekleniyor\n- Enterprise AI bütçelerinin %34'ü agent sistemlere ayrılıyor (2025)\n- Türkiye'de AI startup ekosistemi 2024'te 180 milyon dolar yatırım çekti\n- 2027'ye kadar her 3 büyük kurumdan 1'i production'da agent sistem kullanacak\n\nIMAGE: Bar chart showing AI market growth 2020-2030, multi-agent segment highlighted, data visualization style\n\n---\n\n**SLIDE 4: Multi-Agent Sistemlerin Temel Bileşenleri**\n- **Agent**: Otonom karar verme birimi (araştırma, analiz, kod üretimi, planlama)\n- **Orchestrator**: Merkezi koordinasyon katmanı (görev dağılımı, önceliklendirme)\n- **Communication Layer**: Mesajlaşma protokolleri ve veri paylaşımı\n- **Memory System**: Kısa ve uzun vadeli bilgi depolama\n- **Tool Integration**: Dış API'ler ve sistemlerle entegrasyon\n\nIMAGE: Technical architecture diagram with labeled components, clean UI style, professional flowchart\n\n---\n\n**SLIDE 5: Agent Türleri ve Uzmanlaşma Alanları**\n- **Research Agent**: Web araştırması, veri toplama, kaynak doğrulama\n- **Coding Agent**: Kod üretimi, debugging, code review\n- **Analysis Agent**: Veri analizi, raporlama, içgörü çıkarımı\n- **Planning Agent**: Stratejik planlama, kaynak tahsisi\n- **Communication Agent**: Doğal dil işleme, müşteri etkileşimi\n- **Monitoring Agent**: Sistem sağlığı, performans takibi\n\nIMAGE: Hexagonal icons showing different agent types, color-coded, modern flat design\n\n---\n\n**SLIDE 6: İletişim Protokolleri ve Standartlar**\n- Agent-to-Agent (A2A) protokolü: Standart mesajlaşma formatı\n- Model Context Protocol (MCP): Bağlam yönetimi standardı\n- RESTful API ve gRPC entegrasyonları\n- Asenkron mesajlaşma: RabbitMQ, Apache Kafka altyapısı\n- Güvenlik: OAuth 2.0, mTLS şifreleme, rol tabanlı erişim kontrolü\n\nIMAGE: Communication flow diagram showing message exchange between agents, protocol layers illustrated\n\n---\n\n**SECTION: TEKNİK MİMARİ**\n\n---\n\n**SLIDE 7: Orchestration Patterns — Mimari Seçenekler**\n- **Hierarchical**: Merkezi yönetici agent alt agent'ları koordine eder\n- **Decentralized**: Agent'lar eşit statüde, oylama ile karar\n- **Sequential**: Görevler sıralı pipeline'da işlenir\n- **Parallel**: Bağımsız görevler eşzamanlı çalıştırılır\n- **Hybrid**: Duruma göre mod değiştiren adaptif yaklaşım\n\nIMAGE: Four architectural patterns illustrated with flowchart comparisons, clean minimal design\n\n---\n\n**SLIDE 8: Popüler Frameworkler ve Karşılaştırma**\n- **AutoGen (Microsoft)**: En olgun ekosistem, 25K+ GitHub yıldızı\n- **CrewAI**: Rol tabanlı agent organizasyonu, kolay kurulum\n- **LangGraph (LangChain)**: DAG tabanlı workflow, yüksek kontrol\n- **AgentGPT**: Browser tabanlı prototipleme, no-code yaklaşım\n- **Swarm (OpenAI)**: Basit koordinasyon, lightweight implementasyon\n\nIMAGE: Comparison table with framework logos, feature matrix, radar chart for capabilities\n\n---\n\n**SLIDE 9: Teknoloji Yığını ve Altyapı Gereksinimleri**\n- **LLM Provider**: OpenAI GPT-4o, Anthropic Claude 3.5, veya yerel model (Llama 3)\n- **Vector Database**: Pinecone, Weaviate, veya ChromaDB\n- **Cloud Infrastructure**: AWS Bedrock, Azure AI Studio, GCP Vertex AI\n- **Containerization**: Docker + Kubernetes (auto-scaling için)\n- **Monitoring**: LangSmith, Arize AI, veya custom observability stack\n\nIMAGE: Technology stack diagram with layers (LLM, Database, Cloud, Monitoring), professional IT architecture style\n\n---\n\n**SLIDE 10: Sistem Güvenliği ve Compliance**\n- Veri izolasyonu: Multi-tenant mimaride tenant-level encryption\n- Prompt injection saldırılarına karşı koruma katmanları\n- GDPR, KVKK uyumluluğu için veri retention politikaları\n- Audit logging: Her agent etkileşiminin kayıt altına alınması\n- Rate limiting ve quota management: Maliyet kontrolü ve kötüye kullanım önleme\n\nIMAGE: Security layer diagram showing protection mechanisms, shield icons, lock symbols\n\n---\n\n**SECTION: PROJE PLANI**\n\n---\n\n**SLIDE 11: Proje Takvimi — Faz 1 (Hafta 1-6)**\n- **Hafta 1-2**: Gereksinim analizi, stakeholder toplantıları, başarı kriterleri belirleme\n- **Hafta 3-4**: Framework seçimi, POC (Proof of Concept) geliştirme\n- **Hafta 5-6**: Mimari tasarım, teknik spesifikasyon, CI/CD pipeline kurulumu\n- Deliverable: Signed-off architecture document + working POC\n- Risk: Framework değişikliği ihtimali → Erken prototipleme ile minimize\n\nIMAGE: Gantt chart showing Phase 1 timeline, milestones marked, professional project management style\n\n---\n\n**SLIDE 12: Proje Takvimi — Faz 2 (Hafta 7-14)**\n- **Hafta 7-10**: Core agent geliştirme, unit test yazımı, CI/CD entegrasyonu\n- **Hafta 11-12**: Entegrasyon testleri, performance benchmarking\n- **Hafta 13-14**: Security audit, penetration testing, vulnerability assessment\n- Deliverable: Beta versiyonu, test raporları, security compliance belgesi\n- Risk: Agent hallucination oranı yüksekse → Retrieval-Augmented Generation (RAG) optimizasyonu\n\nIMAGE: Development workflow diagram showing iterations, testing cycles, feedback loops\n\n---\n\n**SLIDE 13: Proje Takvimi — Faz 3 (Hafta 15-20)**\n- **Hafta 15-17**: UAT (User Acceptance Testing), pilot kullanıcı grubu\n- **Hafta 18-19**: Production deployment, monitoring setup, incident response plan\n- **Hafta 20**: Go-live, documentation, training, handover\n- Deliverable: Production-ready system, operational runbook, training materials\n- Risk: Downtime → Blue-green deployment stratejisi ile risk azaltma\n\nIMAGE: Deployment pipeline visualization with staging, testing, production environments\n\n---\n\n**SLIDE 14: Kaynak Tahsisi ve Bütçe Planlaması**\n- **Personel**: 2 Senior ML Engineers, 1 DevOps, 1 Product Manager, 1 QA\n- **Altyapı**: Cloud compute (GPU instances), vector DB, monitoring tools\n- **Lisanslar**: API quota limits, premium model access\n- **Toplam Tahmini Bütçe (Enterprise)**: $150K-300K (20 haftalık proje için)\n- ROI Beklentisi: 6-12 ay içinde operasyonel verimlilik artışı\n\nIMAGE: Budget allocation pie chart with categories (personnel, infrastructure, tools, contingency)\n\n---\n\n**SECTION: KULLANIM ALANLARI**\n\n---\n\n**SLIDE 15: Enterprise Kullanım Senaryoları**\n- **Müşteri Destek**: Çoklu agent triyaj + routing + çözüm agent'ları\n- **Doküman İşleme**: OCR → Analiz → Özetleme → Depolama pipeline'ı\n- **Satış Entegrasyonu**: Lead scoring → Kişiselleştirilmiş öneri → CRM güncelleme\n- **HR Otomasyonu**: CV parsing → Aday matching → Mülakat scheduling\n- **Finansal Analiz**: Rapor toplama → Anomali tespiti → Risk değerlendirmesi\n\nIMAGE: Enterprise use case illustrations with icon-based visualization, corporate presentation style\n\n---\n\n**SLIDE 16: Geliştirici Araçları ve Developer Experience**\n- LangChain/LangGraph: Hızlı prototipleme için low-code yaklaşım\n- AutoGen Studio: Agent konfigürasyonu için görsel arayüz\n- VS Code Extension: Local debugging ve testing\n- SDK'lar: Python, TypeScript, REST API erişimi\n- Playground ortamı: Agent davranışı interaktif test\n\nIMAGE: Developer tools interface mockups showing IDE integration, debugging UI, monitoring dashboard\n\n---\n\n**SLIDE 17: Başarı Metrikleri ve KPI'lar**\n- **Performans**: Ortalama yanıt süresi < 3 saniye, throughput > 100 req/s\n- **Kalite**: Task completion rate > 95%, human-in-the-loop gerektiren oran < 5%\n- **Maliyet**: Per-query maliyet hedefi, ROI calculation modeli\n- **Kullanıcı Memnuniyeti**: NPS score, agent rating system\n- **Sistem Sağlığı**: Uptime > 99.9%, error rate < 0.1%\n\nIMAGE: KPI dashboard mockup with gauges, charts, green/yellow/red status indicators\n\n---\n\n**SECTION: GELECEK VE SONUÇ**\n\n---\n\n**SLIDE 18: Zorluklar ve Risk Yönetimi**\n- **Hallucination Kontrolü**: Retrieval-Augmented Generation ile gerçeklik doğrulama\n- **Güvenlik**: Prompt injection, data leakage, unauthorized access\n- **Ölçeklenebilirlik**: Artan talep ile performans degradasyonu\n- **Bakım**: Model güncellemeleri, agent drift, version management\n- **Regülasyon**: AI Act, KVKK uyumluluk gereksinimleri\n\nIMAGE: Risk matrix with probability vs impact chart, mitigation strategies listed\n\n---\n\n**SLIDE 19: Gelecek Trendleri (2026+)**\n- Agent-to-agent economy: Agent'lar arası mikro-transaction modeli\n- Multimodal agents: Metin, görsel, ses, video entegrasyonu\n- Self-improving agents: Reinforcement learning ile otomatik optimizasyon\n- Edge deployment: Cloud'dan edge device'lara yayılım\n- Regulatory frameworks: AI governance standartlarının olgunlaşması\n\nIMAGE: Future trend visualization with timeline, emerging technologies, forward-looking design\n\n---\n\n**SLIDE 20: Sonuç ve Bir Sonraki Adımlar**\n- Multi-agent sistemler enterprise AI stratejisinin merkezinde\n- Doğru planlama ve execution ile 20 haftada production-ready sistem mümkün\n- Framework seçimi kritik: AutoGen (enterprise), CrewAI (startup), LangGraph (custom)\n- Başarı için: Stakeholder alignment, phased rollout, continuous monitoring\n- **Hemen yapılacaklar**: Stakeholder workshop, POC kickoff, timeline finalization\n\nIMAGE: Roadmap visualization with key milestones, celebration graphic, call-to-action design\n\n---\n\n**KAYNAKLAR**\n- Microsoft PowerPoint Documentation (support.microsoft.com)\n- AutoGen Framework Documentation (microsoft.github.io/autogen)\n- CrewAI Official Documentation (docs.crewai.com)\n- Gartner AI Market Reports 2024-2025\n- McKinsey Global AI Survey 2024\n\n---\n\n**SONSLIDE: Teşekkürler**\n- Sorularınız için: [İletişim Bilgileri]\n- Detaylı dokümantasyon: [Internal Wiki Link]\n- Demo talebi: [Book a Meeting]\n\nIMAGE: Thank you slide with company logo, contact information, social media icons",
+      "metadata": {
+        "tokens": 8836,
+        "latency_ms": 147785.1348999993,
+        "step": 0
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "3bb401a117d8",
+      "user_input": "Multi-Agent_Sistem_Oluşturma_Kapsamlı_Proje_PlanI OLUŞTUR VE BUNU POWERPOINT SUNUSU OLARAK HAZIRLA 20SLAYT OLSUN GÖRSEL DESTEKLI OLSUN [MIDI]",
+      "pipeline_type": "deep_research",
+      "sub_tasks": [],
+      "status": "completed",
+      "final_result": "❌ Slayt içeriği oluşturulamadı. Lütfen tekrar deneyin.",
+      "total_tokens": 0,
+      "total_latency_ms": 0.0,
+      "created_at": "2026-02-23T01:54:10.976305Z",
+      "completed_at": null
+    }
+  ],
+  "agent_metrics": {
+    "thinker": {
+      "total_calls": 1,
+      "total_tokens": 8836,
+      "total_latency_ms": 147785.1348999993,
+      "success_count": 1,
+      "error_count": 0,
+      "last_active": "2026-02-23T01:54:10.968821Z"
+    }
+  },
+  "created_at": "2026-02-23T01:51:13.518092Z"
+}

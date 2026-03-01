@@ -155,9 +155,292 @@ USE_SKILL_TOOL = {
     },
 }
 
+# ── Code Execution Tool ─────────────────────────────────────────
+
+CODE_EXECUTE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "code_execute",
+        "description": (
+            "Execute code in a sandboxed environment. Supports Python, JavaScript, Bash. "
+            "Use for calculations, data processing, testing code snippets, or generating outputs. "
+            "Returns stdout, stderr, and execution status."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "The code to execute",
+                },
+                "language": {
+                    "type": "string",
+                    "enum": ["python", "javascript", "bash"],
+                    "description": "Programming language (default: python)",
+                },
+            },
+            "required": ["code"],
+        },
+    },
+}
+
+# ── RAG Document Tools ───────────────────────────────────────────
+
+RAG_INGEST_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "rag_ingest",
+        "description": (
+            "Ingest a document into the knowledge base for later retrieval. "
+            "Provide text content with a title. The document will be chunked, "
+            "embedded, and stored for semantic search."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "Document text content to ingest",
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Document title for identification",
+                },
+                "source": {
+                    "type": "string",
+                    "description": "Source URL or file path (optional)",
+                },
+            },
+            "required": ["content", "title"],
+        },
+    },
+}
+
+RAG_QUERY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "rag_query",
+        "description": (
+            "Search the document knowledge base for relevant information. "
+            "Returns matching document chunks ranked by semantic similarity. "
+            "Use when the user asks about previously ingested documents."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query",
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Max chunks to return (default 5)",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+}
+
+# ── Idea-to-Project Tool ────────────────────────────────────────
+
+IDEA_TO_PROJECT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "idea_to_project",
+        "description": (
+            "Transform a raw idea into a professional project plan. "
+            "Runs a multi-phase pipeline: Idea Analysis → PRD → Architecture → "
+            "Task Breakdown → Project Scaffold. Each phase builds on the previous. "
+            "Use when user describes a project idea they want to build."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "idea": {
+                    "type": "string",
+                    "description": "The user's project idea description",
+                },
+                "project_type": {
+                    "type": "string",
+                    "enum": ["web-app", "api-service", "mobile-app", "cli-tool", "ai-agent", "data-pipeline", "custom"],
+                    "description": "Project type (auto-detected if not specified)",
+                },
+                "phase": {
+                    "type": "string",
+                    "enum": ["analyze", "prd", "architecture", "tasks", "scaffold", "all"],
+                    "description": "Which phase to run (default: all)",
+                },
+            },
+            "required": ["idea"],
+        },
+    },
+}
+
+# ── Human Approval Tool ──────────────────────────────────────────
+
+REQUEST_APPROVAL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "request_approval",
+        "description": (
+            "Request human approval before performing a critical action. "
+            "Use for: code execution, file modifications, external API calls, "
+            "deployments, or any action with side effects. "
+            "Returns approval status and any user modifications."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "Type of action requiring approval",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Clear description of what will happen",
+                },
+                "details": {
+                    "type": "object",
+                    "description": "Additional details about the action",
+                },
+            },
+            "required": ["action", "description"],
+        },
+    },
+}
+
+# ── Self-Evaluate Tool ───────────────────────────────────────────
+
+SELF_EVALUATE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "self_evaluate",
+        "description": (
+            "Evaluate the quality of your own response before sending it. "
+            "Scores accuracy, completeness, clarity, actionability, and depth. "
+            "If score is below threshold, triggers self-improvement loop."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "string",
+                    "description": "The response to evaluate",
+                },
+                "question": {
+                    "type": "string",
+                    "description": "The original question/task",
+                },
+            },
+            "required": ["response", "question"],
+        },
+    },
+}
+
+# ── MCP Tool ──────────────────────────────────────────────────────
+
+MCP_CALL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "mcp_call",
+        "description": (
+            "Call a tool on an external MCP (Model Context Protocol) server. "
+            "Use to interact with external services like GitHub, Slack, databases, etc. "
+            "First use mcp_list_tools to discover available tools on a server."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "server_id": {
+                    "type": "string",
+                    "description": "MCP server ID (e.g. 'github', 'slack', 'postgres')",
+                },
+                "tool_name": {
+                    "type": "string",
+                    "description": "Tool name on the server",
+                },
+                "arguments": {
+                    "type": "object",
+                    "description": "Tool arguments as key-value pairs",
+                },
+            },
+            "required": ["server_id", "tool_name"],
+        },
+    },
+}
+
+MCP_LIST_TOOLS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "mcp_list_tools",
+        "description": (
+            "List available tools on MCP servers. "
+            "Returns tool names and descriptions for each registered server. "
+            "Use before mcp_call to discover what tools are available."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "server_id": {
+                    "type": "string",
+                    "description": "Specific server ID to list tools for (optional, lists all if omitted)",
+                },
+            },
+        },
+    },
+}
+
+# ── Dynamic Skill Management Tools ──────────────────────────────
+
+CREATE_SKILL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "create_skill",
+        "description": (
+            "Create a new custom skill in the dynamic skill registry. "
+            "Skills are reusable knowledge/protocol templates that agents can load. "
+            "Use when you discover a useful pattern that should be saved for future tasks."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "skill_id": {
+                    "type": "string",
+                    "description": "Unique skill ID (e.g. 'api-testing', 'react-hooks')",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Human-readable skill name",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "What this skill helps with",
+                },
+                "knowledge": {
+                    "type": "string",
+                    "description": "The actual protocol/instructions to inject into agent context",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Skill category (e.g. 'coding', 'research', 'analysis')",
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Keywords for search matching",
+                },
+            },
+            "required": ["skill_id", "name", "description", "knowledge"],
+        },
+    },
+}
+
 # ── Orchestrator Tools ───────────────────────────────────────────
 
 ORCHESTRATOR_TOOLS = [
+    WEB_SEARCH_TOOL,
+    WEB_FETCH_TOOL,
     SAVE_MEMORY_TOOL,
     RECALL_MEMORY_TOOL,
     {
@@ -196,8 +479,8 @@ ORCHESTRATOR_TOOLS = [
                     },
                     "pipeline_type": {
                         "type": "string",
-                        "enum": ["sequential", "parallel", "consensus", "iterative"],
-                        "description": "How to execute the sub-tasks",
+                        "enum": ["sequential", "parallel", "consensus", "iterative", "deep_research"],
+                        "description": "How to execute the sub-tasks. Use 'parallel' for most tasks, 'deep_research' for complex research.",
                     },
                     "reasoning": {"type": "string", "description": "Why this decomposition and pipeline"},
                 },
@@ -241,6 +524,45 @@ ORCHESTRATOR_TOOLS = [
     },
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    CODE_EXECUTE_TOOL,
+    RAG_INGEST_TOOL,
+    RAG_QUERY_TOOL,
+    IDEA_TO_PROJECT_TOOL,
+    REQUEST_APPROVAL_TOOL,
+    SELF_EVALUATE_TOOL,
+    MCP_CALL_TOOL,
+    MCP_LIST_TOOLS_TOOL,
+    CREATE_SKILL_TOOL,
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_presentation",
+            "description": (
+                "Generate a professional PPTX presentation with AI-generated visuals. "
+                "Researches the topic, creates structured slides, and generates images via Pollinations.ai. "
+                "Use when user asks for a presentation, sunum, slayt, or PPTX."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "Presentation topic",
+                    },
+                    "slide_count": {
+                        "type": "integer",
+                        "description": "Number of content slides (default 10)",
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": ["tr", "en"],
+                        "description": "Presentation language (default: tr)",
+                    },
+                },
+                "required": ["topic"],
+            },
+        },
+    },
 ]
 
 # ── Researcher Tools ─────────────────────────────────────────────
@@ -252,6 +574,7 @@ RESEARCHER_TOOLS = [
     SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    RAG_QUERY_TOOL,
 ]
 
 # ── Thinker Tools ────────────────────────────────────────────────
@@ -263,6 +586,7 @@ THINKER_TOOLS = [
     SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    RAG_QUERY_TOOL,
 ]
 
 # ── Speed Tools ──────────────────────────────────────────────────
@@ -274,6 +598,8 @@ SPEED_TOOLS = [
     SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    CODE_EXECUTE_TOOL,
+    RAG_QUERY_TOOL,
 ]
 
 # ── Reasoner Tools ───────────────────────────────────────────────
@@ -284,6 +610,8 @@ REASONER_TOOLS = [
     SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    CODE_EXECUTE_TOOL,
+    RAG_QUERY_TOOL,
 ]
 
 # ── Agent → Tools Mapping ────────────────────────────────────────

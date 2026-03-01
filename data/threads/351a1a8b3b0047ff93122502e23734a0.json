@@ -1,0 +1,138 @@
+{
+  "id": "351a1a8b3b0047ff93122502e23734a0",
+  "events": [
+    {
+      "id": "962e0179f40b",
+      "timestamp": "2026-02-23T00:08:07.417169+00:00",
+      "event_type": "user_message",
+      "agent_role": null,
+      "content": "BANA MULTI-AGENT SISTEM OLUŞTURMA ILE ILGILI BİR PROJE HAZIRLA VE BUNU POWERPOINT SUNUSU OLARAK GÖRSEL DESTEKLI OLARAK HAZIRLA",
+      "metadata": {}
+    },
+    {
+      "id": "a7a8cef3e27a",
+      "timestamp": "2026-02-23T00:08:07.421403+00:00",
+      "event_type": "routing_decision",
+      "agent_role": "orchestrator",
+      "content": "Presentation generation triggered",
+      "metadata": {}
+    },
+    {
+      "id": "e1e415dbedb7",
+      "timestamp": "2026-02-23T00:08:07.425217+00:00",
+      "event_type": "routing_decision",
+      "agent_role": "orchestrator",
+      "content": "Presentation: topic=BANA MULTI-AGENT SISTEM OLUŞTURMA ILE ILGILI BİR PROJE HAZIR, slides=10, lang=tr",
+      "metadata": {}
+    },
+    {
+      "id": "b110155f2304",
+      "timestamp": "2026-02-23T00:08:09.351858+00:00",
+      "event_type": "agent_start",
+      "agent_role": "researcher",
+      "content": "Agent researcher starting: Create a professional presentation about: BANA MULTI-AGENT SISTEM OLUŞTURMA ILE ILGILI BİR PROJE HAZ",
+      "metadata": {}
+    },
+    {
+      "id": "2f0fd8a9622f",
+      "timestamp": "2026-02-23T00:08:11.875719+00:00",
+      "event_type": "tool_call",
+      "agent_role": "researcher",
+      "content": "web_search({\"query\": \"multi-agent sistem mimari proje 2025 2026 örneği\", \"max_results\": 5})",
+      "metadata": {}
+    },
+    {
+      "id": "76746f32ae03",
+      "timestamp": "2026-02-23T00:08:13.941646+00:00",
+      "event_type": "tool_result",
+      "agent_role": "researcher",
+      "content": "<search_results>\n  [1] 2026'da Çoklu Ajan Sistemleri Rehberi\n      URL: https://botpress.com/tr/blog/multi-agent-systems\n      Çoklu ajan sistemlerini kullanan gerçek dünyadaki yapay zeka ajanı örnekleri de oldukça fazladır - akıllı şebeke kontrolörleri ve depo sistemleri gibi. Şimdi çoklu ajan sistemlerinin ne olduğuna, tekli ajan sistemlerinden nasıl ayrıldığına ve hangi alanlarda kullanılabileceğine bakalım.\n  [2] Çoklu-Ajan Sistemleri: A2A Protokolü ile AI Agent Orkestrasyonu\n      URL: http",
+      "metadata": {}
+    },
+    {
+      "id": "b5fa3debc93e",
+      "timestamp": "2026-02-23T00:08:13.941781+00:00",
+      "event_type": "tool_call",
+      "agent_role": "researcher",
+      "content": "web_search({\"query\": \"autonomous agents swarm intelligence AI uygulamaları istatistik\", \"max_results\": 5})",
+      "metadata": {}
+    },
+    {
+      "id": "44da8f0a13ae",
+      "timestamp": "2026-02-23T00:08:16.123312+00:00",
+      "event_type": "tool_result",
+      "agent_role": "researcher",
+      "content": "<search_results>\n  [1] AI Agents and Swarm Intelligence: Pioneering the Future of ...\n      URL: https://mindnetwork.medium.com/ai-agents-and-swarm-intelligence-pioneering-the-future-of-autonomous-intelligence-99b5d07b0965\n      Swarm intelligence refers to the collective behavior of decentralized, self-organized systems inspired by natural phenomena such as bird flocks ...\n  [2] Swarm intelligence: A survey of model classification and applications\n      URL: https://www.sciencedirect.com/scienc",
+      "metadata": {}
+    },
+    {
+      "id": "5947f1fcf9cf",
+      "timestamp": "2026-02-23T00:08:16.123373+00:00",
+      "event_type": "tool_call",
+      "agent_role": "researcher",
+      "content": "web_search({\"query\": \"multi-agent systems use cases logistics finance healthcare\", \"max_results\": 5})",
+      "metadata": {}
+    },
+    {
+      "id": "bab95758432c",
+      "timestamp": "2026-02-23T00:08:17.518151+00:00",
+      "event_type": "tool_result",
+      "agent_role": "researcher",
+      "content": "<search_results>\n  [1] What Are Real-World Examples Of Multi-Agent In 2026?\n      URL: https://kanerika.com/blogs/real-world-multi-agent-examples/\n      Multi-agent systems (MAS) are transforming how industries operate by enabling intelligent collaboration among autonomous agents that analyze data, make decisions, and act without human intervention. They are widely used in finance for trading and fraud detection, healthcare for diagnostics and patient monitoring, logistics for supply chain coord",
+      "metadata": {}
+    },
+    {
+      "id": "a27b3553748c",
+      "timestamp": "2026-02-23T00:08:37.181303+00:00",
+      "event_type": "tool_call",
+      "agent_role": "researcher",
+      "content": "web_fetch({\"url\": \"https://botpress.com/tr/blog/multi-agent-systems\"})",
+      "metadata": {}
+    },
+    {
+      "id": "ef2afa139689",
+      "timestamp": "2026-02-23T00:08:38.353734+00:00",
+      "event_type": "tool_result",
+      "agent_role": "researcher",
+      "content": "<web_page>\n  <url>https://botpress.com/tr/blog/multi-agent-systems</url>\n  <title>2026'da Çoklu Ajan Sistemleri Rehberi</title>\n  <content>\n2026'da Çoklu Ajan Sistemleri Rehberi\n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\nÇözümler\n\nKaynaklar\n\nDokümantasyon\n\nKurumsal\n\nFiyatlandırma\n\nGiriş yapİletişimÜcretsiz başlayın\n\nYapay Zeka Temelleri\n\n2026'da Çoklu Ajan Sistemleri Rehberi\n\nÇoklu ajan sistemleri nedir ve onları ne için kullanabilirsiniz? \n\n5 Kasım 2024\n·\nGüncellendi\n13.01.2026\n\nYazan\n\nSarah Chudleigh\nAraştır",
+      "metadata": {}
+    },
+    {
+      "id": "0ec1d3c6c53e",
+      "timestamp": "2026-02-23T00:08:45.906833+00:00",
+      "event_type": "agent_response",
+      "agent_role": "researcher",
+      "content": "SLIDE 1: Çoklu Ajan Sistemlerine Giriş\n- Birden fazla otonom ajanın işbirliğini içerir\n- Tek ajanın başaramayacağı görevleri yönetir\n- Karmaşık, merkeziyetsiz sistemler için idealdir\nIMAGE: Modern abstract visualization showing multiple interconnected AI nodes working together in a collaborative network\n\nSECTION: Temel Kavramlar\n\nSLIDE 2: Çoklu Ajan Sistemi Nedir?\n- Ortak hedefe ulaşmak için işbirliği yapan ajanlar\n- Büyük ve karmaşık görevleri dağıtık olarak çözer\n- Her ajan bağımsız hareket edebilir ve karar alır\nIMAGE: Technical diagram showing multiple autonomous agents communicating in a shared environment\n\nSLIDE 3: Temel Özellikler - Üç Ana Prensip\n- Merkeziyetsizlik: Kontrol olmadan bağımsız çalışma\n- Yerel bakış açıları: Kısıtlı bilgi ile operasyon\n- Özerklik: Kendi kurallarıyla hareket etme\nIMAGE: Infographic illustrating decentralization, local perspectives and autonomy in a visual triangle format\n\nSECTION: Avantajlar ve İşlevler\n\nSLIDE 4: Çoklu Ajan Sistemlerinin Avantajları\n- Yüksek hata toleransı ve dayanıklılık\n- Kolay ölçeklenebilirlik ve genişletme imkanı\n- Daha iyi problem çözme ve adaptasyon kapasitesi\nIMAGE: Comparison chart showing resilience and scalability advantages versus single-agent systems\n\nSLIDE 5: Gerçek Dünya Kullanım Alanları\n- Lojistik: Depo robotları ve akıllı şebeke kontrolörleri\n- Finans: Ticaret algoritmaları ve dolandırıcılık tespiti\n- Sağlık: Tanı ve hasta izleme sistemleri\nIMAGE: Grid layout showing three industry application scenarios with relevant icons\n\nSECTION: Mimariler ve Protokoller\n\nSLIDE 6: Sistem Mimarisi ve İletişim Protokolleri\n- Dağıtık kontrol ile yüksek dayanıklılık\n- Ajanlar arası etkili iletişim kuralları\n- Tutarlı karar alma mekanizmaları\nIMAGE: Flowchart showing decentralized control and multiple interaction types between agents\n\nSLIDE 7: Tasarım Prensipleri\n- Her ajan için net rol ve sorumluluk tanımları\n- Esnek ve ölçeklenebilir mimari kurulumu\n- Ajanların dinamik koordinasyonu için yöntemler\nIMAGE: Technical architecture diagram with clearly labelled modules for roles and communication\n\nSECTION: Proje Ön Hazırlığı\n\nSLIDE 8: Proje Planlama ve Hazırlık Adımları\n- Gereksinim ve kapsamı netleştirme\n- Ajan tiplerini ve yeteneklerini belirleme\n- İletişim ve koordinasyon protokollerini planlama\nIMAGE: Project checklist/timeline graphic with phases like requirements, design, implementation, testing\n\nSECTION: Uygulama ve Test\n\nSLIDE 9: Geliştirme, Entegrasyon ve Test Süreçleri\n- Ajanları geliştirme ve yerel testler yapma\n- Sistem düzeyinde entegrasyon ve doğrulama\n- Performans ve ölçeklenebilirlik testleri gerçekleştirme\nIMAGE: Stacked bar chart or flowchart showing development, integration and testing phases\n\nSECTION: Sonuç ve Yol Haritası\n\nSLIDE 10: Çıkarımlar, Faydalar ve Gelecek Adımlar\n- Karmaşık görevler için daha güçlü çözümler sunar\n- Büyük ölçekli ve dinamik ortamlara uyumludur\n- Daha fazla otonom sistem için temel oluşturur\nIMAGE: Roadmap diagram spanning from implementation (0-3 ay) to optimization (4-6 ay) and scaling (6+ ay)",
+      "metadata": {
+        "tokens": 6860,
+        "latency_ms": 7552.947700000004,
+        "step": 2
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "911975933010",
+      "user_input": "BANA MULTI-AGENT SISTEM OLUŞTURMA ILE ILGILI BİR PROJE HAZIRLA VE BUNU POWERPOINT SUNUSU OLARAK GÖRSEL DESTEKLI OLARAK HAZIRLA",
+      "pipeline_type": "deep_research",
+      "sub_tasks": [],
+      "status": "completed",
+      "final_result": "✅ **Sunum Hazır!**\n\n📊 **Konu:** BANA MULTI-AGENT SISTEM OLUŞTURMA ILE ILGILI BİR PROJE HAZIRLA VE BUNU POWERPOINT SUNUSU OLARAK GÖRSEL DESTEKLI OLARAK HAZIRLA\n📄 **Slayt Sayısı:** 16 + başlık + kapanış\n🖼️ **Görseller:** Pollinations.ai ile üretildi\n📁 **Dosya:** BANA_MULTI-AGENT_SISTEM_OLUŞTURMA_ILE_ILGILI_BİR_P.pptx\n\nSunumu indirmek için aşağıdaki butonları kullanabilirsin.",
+      "total_tokens": 0,
+      "total_latency_ms": 0.0,
+      "created_at": "2026-02-23T00:08:52.412981Z",
+      "completed_at": null
+    }
+  ],
+  "agent_metrics": {
+    "researcher": {
+      "total_calls": 1,
+      "total_tokens": 6860,
+      "total_latency_ms": 7552.947700000004,
+      "success_count": 1,
+      "error_count": 0,
+      "last_active": "2026-02-23T00:08:45.906927Z"
+    }
+  },
+  "created_at": "2026-02-23T00:08:06.806814Z"
+}

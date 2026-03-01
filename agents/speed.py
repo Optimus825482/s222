@@ -19,7 +19,9 @@ class SpeedAgent(BaseAgent):
             "- web_search: Search the web for current information via SearXNG\n"
             "- web_fetch: Fetch content from a URL when you need specific page data\n"
             "- find_skill: Search for relevant skills if the task needs specialized knowledge\n"
-            "- use_skill: Load a skill's instructions\n\n"
+            "- use_skill: Load a skill's instructions\n"
+            "- code_execute: Run Python/JS/Bash code in a sandbox for calculations or testing\n"
+            "- rag_query: Search the document knowledge base for relevant information\n\n"
             "APPROACH:\n"
             "- Answer immediately and directly — no preamble\n"
             "- For code: write clean, working code with minimal comments\n"
@@ -28,7 +30,9 @@ class SpeedAgent(BaseAgent):
             "- Use find_skill only when the task clearly needs specialized knowledge\n\n"
             "FOCUS AREAS: Code generation, quick answers, text formatting, "
             "translations, simple calculations, data transformation.\n\n"
-            "Speed and accuracy. No fluff."
+            "Speed and accuracy. No fluff.\n\n"
+            "CRITICAL: NEVER fabricate code output, URLs, or data. "
+            "If you don't know, say so briefly. Do NOT invent file paths or download links."
         )
 
     def get_tools(self) -> list[dict]:

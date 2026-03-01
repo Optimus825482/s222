@@ -1,19 +1,77 @@
 """
 Qwen3 Next 80B — Orchestrator Agent.
 The brain: task analysis, decomposition, routing, synthesis.
+Deep Research mode: auto-detects complex queries and fans out to ALL agents in parallel.
 """
 
 from __future__ import annotations
 
 import json
+import re
+import urllib.parse
 from typing import Any
 
 from agents.base import BaseAgent
 from core.models import (
-    AgentRole, EventType, PipelineType, SubTask, Task, Thread,
+    AgentRole, EventType, PipelineType, SubTask, Task, TaskStatus, Thread,
 )
 from core.events import build_orchestrator_context
 from tools.registry import ORCHESTRATOR_TOOLS
+
+# Keywords that trigger brainstorm mode (Turkish + English)
+_BRAINSTORM_PATTERNS = re.compile(
+    r"(beyin fırtınası|brainstorm|tartış|debate|discuss|fikir alışverişi|"
+    r"farklı bakış|different perspective|pros?\s+cons|artı\s+eksi|"
+    r"ne dersiniz|ne düşünüyorsunuz|görüş|opinion|"
+    r"avantaj.*dezavantaj|lehte.*aleyhte|for\s+and\s+against)",
+    re.IGNORECASE,
+)
+
+# Keywords that trigger deep research mode (Turkish + English)
+_DEEP_RESEARCH_PATTERNS = re.compile(
+    r"(araştır|research|analiz|analy[sz]e|incele|investigate|karşılaştır|compare|"
+    r"detaylı|detailed|kapsamlı|comprehensive|derinlemesine|in-depth|deep\s*dive|"
+    r"rapor|report|değerlendir|evaluate|assess|review|examine|explore|"
+    r"nedir|what\s+is|nasıl|how\s+does|explain|açıkla|özetle|summarize|"
+    r"avantaj|dezavantaj|pros?\s+and\s+cons|fark|difference|versus|vs\.?|"
+    r"strateji|strategy|planlama|planning|mimari|architect|tasarım|design|"
+    r"güvenlik|security|performans|performance|optimiz|benchmark|"
+    r"trend|piyasa|market|sektör|industry|teknoloji|technology|"
+    r"en\s+iyi|best\s+practice|öneri|recommend|suggest)",
+    re.IGNORECASE,
+)
+
+# Patterns that trigger idea-to-project mode (Turkish + English)
+_IDEA_PROJECT_PATTERNS = re.compile(
+    r"(proje yap|proje oluştur|proje kur|projeye dönüştür|fikrim var|"
+    r"build me|create a project|scaffold|start a project|"
+    r"uygulama yap|uygulama geliştir|app yap|site yap|"
+    r"bunu yap|şunu yap|geliştirmek istiyorum|yapmak istiyorum|"
+    r"idea to project|fikri projeye|mvp|startup fikri|"
+    r"bir .{0,30} yap|bir .{0,30} oluştur|bir .{0,30} geliştir)",
+    re.IGNORECASE,
+)
+
+# Patterns that trigger presentation generation (Turkish + English)
+_PRESENTATION_PATTERNS = re.compile(
+    r"(sunum yap|sunum hazırla|sunum oluştur|slayt yap|slayt hazırla|"
+    r"pptx|ppt yap|powerpoint|presentation|slide|"
+    r"sunum .{0,30} hazırla|.{0,30} sunumu|.{0,30} slayt)",
+    re.IGNORECASE,
+)
+
+# Patterns that detect MINI/MIDI/MAXI mode selection
+_PRESENTATION_MODE_PATTERNS = re.compile(
+    r"^\s*(MINI|MIDI|MAXI)(?:\s+(\d+))?\s*$",
+    re.IGNORECASE,
+)
+
+# Short/simple patterns that should NOT trigger deep research
+_SIMPLE_PATTERNS = re.compile(
+    r"^(merhaba|hello|hi|hey|selam|test|ping|saat kaç|what time|"
+    r"teşekkür|thanks|thank you|ok|tamam|evet|hayır|yes|no)[\s!?.]*$",
+    re.IGNORECASE,
+)
 
 
 class OrchestratorAgent(BaseAgent):
@@ -22,42 +80,69 @@ class OrchestratorAgent(BaseAgent):
 
     def system_prompt(self) -> str:
         return (
-            "You are the Orchestrator of a multi-agent system. You coordinate 4 specialist agents:\n\n"
-            "AGENTS:\n"
-            "- thinker (MiniMax M2.1): Deep analysis, complex reasoning, planning, architecture\n"
-            "- speed (Step 3.5 Flash): Quick answers, code generation, formatting, simple tasks\n"
+            "You are the Orchestrator of a multi-agent deep research system. "
+            "You coordinate 4 specialist agents that work IN PARALLEL.\n\n"
+            "AGENTS (delegate via decompose_task — these are NOT tools):\n"
             "- researcher (GLM 4.7): Web search, current info, data gathering, fact-checking\n"
-            "- reasoner (Nemotron 3 Nano): Math, logic, chain-of-thought, verification\n\n"
+            "- thinker (MiniMax M2.1): Deep analysis, complex reasoning, planning, architecture\n"
+            "- reasoner (Nemotron 3 Nano): Math, logic, chain-of-thought, verification\n"
+            "- speed (Step 3.5 Flash): Quick answers, code generation, formatting\n\n"
+            "CRITICAL RULES:\n"
+            "1. For ANY research, analysis, or complex question: ALWAYS use decompose_task with "
+            "pipeline_type='parallel' and assign MULTIPLE agents (minimum 3).\n"
+            "2. NEVER send a complex task to just ONE agent. Fan out to ALL relevant agents.\n"
+            "3. Only use direct_response for greetings, simple yes/no, or trivial questions.\n"
+            "4. Do NOT call agent names directly as tools. Use decompose_task.\n\n"
+            "STANDARD DECOMPOSITION for research/analysis tasks:\n"
+            "- researcher: Search web, gather current data and sources\n"
+            "- thinker: Deep analysis, pros/cons, strategic evaluation\n"
+            "- reasoner: Verify facts, check logic, find inconsistencies\n"
+            "- speed: Format output, generate code/tables if needed\n\n"
+            "YOUR TOOLS:\n"
+            "- decompose_task: Break work into sub-tasks and assign to agents (ALWAYS prefer parallel)\n"
+            "- direct_response: ONLY for trivial questions (greetings, yes/no)\n"
+            "- synthesize_results: Combine specialist results into final answer\n"
+            "- web_search / web_fetch: Search/fetch web directly\n"
+            "- find_skill / use_skill: Discover and load specialized knowledge\n"
+            "- save_memory / recall_memory: Persistent knowledge\n"
+            "- code_execute: Run Python/JS/Bash code in sandbox\n"
+            "- rag_ingest / rag_query: Ingest documents and search knowledge base\n"
+            "- idea_to_project: Transform a raw idea into full project plan + scaffold\n"
+            "- request_approval: Ask user approval for critical actions\n"
+            "- self_evaluate: Rate your own response quality\n"
+            "- mcp_call / mcp_list_tools: Call external services via MCP protocol\n"
+            "- create_skill: Save a new reusable skill/protocol to the dynamic registry\n\n"
             "PIPELINE TYPES:\n"
-            "- sequential: Tasks flow A → B → C (each uses previous output)\n"
-            "- parallel: Tasks run simultaneously, results merged\n"
-            "- consensus: All agents answer same question, best selected\n"
-            "- iterative: One agent produces, another reviews, refine until good\n\n"
-            "SKILL SYSTEM:\n"
-            "- Use find_skill to discover relevant skills BEFORE decomposing tasks\n"
-            "- Use use_skill to load skill knowledge when needed\n"
-            "- When decomposing, you can assign skill IDs to sub-tasks via the 'skills' field\n"
-            "- Skills provide specialized protocols and knowledge to agents\n\n"
-            "DECISION RULES:\n"
-            "1. Simple question → use direct_response (no delegation)\n"
-            "2. Need current info → researcher (sequential or parallel with others)\n"
-            "3. Complex analysis → thinker (+ reasoner for verification if needed)\n"
-            "4. Code task → speed (+ reasoner for review if complex)\n"
-            "5. Math/logic → reasoner\n"
-            "6. Multi-faceted → parallel pipeline with relevant agents\n"
-            "7. High-stakes → consensus pipeline for reliability\n"
-            "8. Specialized domain → find_skill first, then assign skills to agents\n\n"
-            "Use decompose_task to break work into sub-tasks.\n"
-            "Use direct_response for simple queries.\n"
-            "Use synthesize_results after all sub-tasks complete.\n\n"
-            "Be decisive. Route efficiently. Minimize unnecessary delegation."
+            "- parallel: ALL agents work simultaneously (DEFAULT — use this most)\n"
+            "- deep_research: Phase 1 parallel gather → Phase 2 synthesis (for complex research)\n"
+            "- sequential: A → B → C (only when output depends on previous)\n"
+            "- consensus: All agents answer same question, compare\n"
+            "- iterative: Produce → review → refine\n"
+            "- brainstorm: Multi-round debate — agents argue from different angles, cross-challenge, then synthesize\n\n"
+            "Be decisive. ALWAYS prefer parallel multi-agent execution.\n\n"
+            "ANTI-HALLUCINATION (CRITICAL):\n"
+            "- NEVER generate fake download URLs (S3, CDN, cloud storage, etc.)\n"
+            "- NEVER fabricate a 'Sunum Hazır' response with fake file links\n"
+            "- If a presentation or file generation FAILS, report the failure honestly\n"
+            "- Only include download URLs that are returned by actual tool execution\n"
+            "- Local files are served from /api/presentations/{filename}/download ONLY\n"
+            "- When synthesizing agent results, do NOT add information agents didn't provide"
         )
 
     def get_tools(self) -> list[dict]:
         return ORCHESTRATOR_TOOLS
 
     def build_context(self, thread: Thread, task_input: str) -> list[dict[str, str]]:
-        """Orchestrator sees full context + relevant memories."""
+        """Orchestrator sees full context + relevant memories + current date."""
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        date_str = now.strftime("%d %B %Y, %A, %H:%M UTC")
+        date_injection = (
+            f"\n\nCURRENT DATE AND TIME: {date_str}. "
+            f"Year is {now.year}. Use this as the real current date and time for all responses."
+        )
+
         history = build_orchestrator_context(thread)
 
         # Auto-recall relevant memories
@@ -72,9 +157,23 @@ class OrchestratorAgent(BaseAgent):
                     + "\n--- END MEMORIES ---\n"
                 )
         except Exception:
-            pass  # Memory failures should never block execution
+            pass
 
-        messages = [{"role": "system", "content": self.system_prompt()}]
+        # Auto-inject user teachings/preferences
+        teaching_context = ""
+        try:
+            from tools.teachability import get_relevant_teachings, format_teachings_for_context
+            teachings = get_relevant_teachings(task_input, max_results=5)
+            if teachings:
+                teaching_context = "\n\n" + format_teachings_for_context(teachings) + "\n"
+        except Exception:
+            pass
+
+        system_content = self.system_prompt() + date_injection
+        if teaching_context:
+            system_content += teaching_context
+
+        messages = [{"role": "system", "content": system_content}]
         if history.strip() or memory_context:
             ctx = ""
             if history.strip():
@@ -86,6 +185,127 @@ class OrchestratorAgent(BaseAgent):
         messages.append({"role": "user", "content": task_input})
         return messages
 
+    # Agent names that the model might call directly as tools
+    _AGENT_NAMES = {"thinker", "speed", "researcher", "reasoner"}
+
+    # ── Deep Research Detection ──────────────────────────────────
+
+    def _detect_deep_research(self, user_input: str) -> bool:
+        """
+        Detect if the user query warrants deep research mode.
+        Returns True for complex queries that should fan out to all agents.
+        """
+        # Simple/trivial → no deep research
+        if _SIMPLE_PATTERNS.match(user_input.strip()):
+            return False
+
+        # Very short queries (< 15 chars) are usually simple
+        if len(user_input.strip()) < 15:
+            return False
+
+        # Idea-to-project queries should NOT go to deep research
+        if _IDEA_PROJECT_PATTERNS.search(user_input):
+            return False
+
+        # Presentation queries should NOT go to deep research
+        if _PRESENTATION_PATTERNS.search(user_input):
+            return False
+
+        # Internal presentation prompts should NOT go to deep research
+        if "SLIDE" in user_input and "IMAGE:" in user_input:
+            return False
+        if user_input.strip().startswith("Create a professional") and "presentation" in user_input.lower():
+            return False
+
+        # Check for deep research keywords
+        if _DEEP_RESEARCH_PATTERNS.search(user_input):
+            return True
+
+        # Long queries (> 60 chars) with question marks are likely complex
+        if len(user_input.strip()) > 60 and "?" in user_input:
+            return True
+
+        # Multiple sentences suggest complexity
+        sentences = [s.strip() for s in re.split(r'[.!?]', user_input) if s.strip()]
+        if len(sentences) >= 3:
+            return True
+
+        return False
+
+    def _build_deep_research_tasks(self, user_input: str) -> list[dict]:
+        """Build parallel sub-tasks for deep research mode."""
+        return [
+            {
+                "description": (
+                    f"Search the web thoroughly for: {user_input}\n"
+                    "Find multiple sources, current data, statistics, and expert opinions. "
+                    "Provide URLs and cite sources."
+                ),
+                "assigned_agent": "researcher",
+                "priority": 1,
+            },
+            {
+                "description": (
+                    f"Provide deep analysis for: {user_input}\n"
+                    "Consider multiple perspectives, pros/cons, trade-offs, "
+                    "strategic implications, and long-term impact. Be thorough."
+                ),
+                "assigned_agent": "thinker",
+                "priority": 1,
+            },
+            {
+                "description": (
+                    f"Verify and reason about: {user_input}\n"
+                    "Check logical consistency, identify potential biases or errors, "
+                    "validate claims with chain-of-thought reasoning."
+                ),
+                "assigned_agent": "reasoner",
+                "priority": 1,
+            },
+            {
+                "description": (
+                    f"Prepare a well-structured summary for: {user_input}\n"
+                    "Create clear formatting with sections, bullet points, "
+                    "and actionable takeaways. Focus on readability."
+                ),
+                "assigned_agent": "speed",
+                "priority": 1,
+            },
+        ]
+
+    # ── Idea-to-Project Detection ───────────────────────────────────
+
+    def _detect_idea_to_project(self, user_input: str) -> bool:
+        """Detect if user wants to transform an idea into a project."""
+        if _SIMPLE_PATTERNS.match(user_input.strip()):
+            return False
+        if len(user_input.strip()) < 15:
+            return False
+        return bool(_IDEA_PROJECT_PATTERNS.search(user_input))
+
+    def _detect_brainstorm(self, user_input: str) -> bool:
+        """Detect if user wants a brainstorm/debate session."""
+        if _SIMPLE_PATTERNS.match(user_input.strip()):
+            return False
+        if len(user_input.strip()) < 15:
+            return False
+        # Don't trigger brainstorm for idea-to-project or presentation
+        if _IDEA_PROJECT_PATTERNS.search(user_input):
+            return False
+        if _PRESENTATION_PATTERNS.search(user_input):
+            return False
+        return bool(_BRAINSTORM_PATTERNS.search(user_input))
+
+    def _detect_presentation(self, user_input: str) -> bool:
+        """Detect if user wants to generate a presentation."""
+        if _SIMPLE_PATTERNS.match(user_input.strip()):
+            return False
+        if len(user_input.strip()) < 10:
+            return False
+        return bool(_PRESENTATION_PATTERNS.search(user_input))
+
+    # ── Tool Call Handling ────────────────────────────────────────
+
     async def handle_tool_call(self, fn_name: str, fn_args: dict, thread: Thread) -> str:
         """Process orchestrator tool calls — routing decisions + shared tools."""
         if fn_name == "decompose_task":
@@ -94,12 +314,271 @@ class OrchestratorAgent(BaseAgent):
             return fn_args.get("response", "")
         elif fn_name == "synthesize_results":
             return fn_args.get("final_response", "")
-        # Delegate shared tools (find_skill, use_skill, web_fetch) to base
+        elif fn_name == "idea_to_project":
+            return await self._handle_idea_to_project(fn_args, thread)
+        elif fn_name == "generate_presentation":
+            return await self._handle_generate_presentation(fn_args, thread)
+
+        # Catch model calling agent names directly as tools
+        # Auto-upgrade to multi-agent parallel if task is complex
+        if fn_name in self._AGENT_NAMES:
+            query = (
+                fn_args.get("query")
+                or fn_args.get("task")
+                or fn_args.get("input")
+                or fn_args.get("description")
+                or ""
+            )
+            if not query or query in ("{}", "{}}", ""):
+                for ev in reversed(thread.events):
+                    if ev.event_type == EventType.USER_MESSAGE:
+                        query = ev.content
+                        break
+            if not query:
+                query = json.dumps(fn_args, ensure_ascii=False)
+
+            # Auto-upgrade: if task is complex, fan out to all agents
+            if self._detect_deep_research(query):
+                self._emit("routing", f"Auto-upgrade: {fn_name} → parallel multi-agent")
+                return await self._handle_decompose({
+                    "sub_tasks": self._build_deep_research_tasks(query),
+                    "pipeline_type": "parallel",
+                    "reasoning": f"Auto-upgraded from single {fn_name} call to parallel multi-agent",
+                }, thread)
+
+            # Simple task — route to single agent
+            return await self._handle_decompose({
+                "sub_tasks": [{
+                    "description": query,
+                    "assigned_agent": fn_name,
+                    "priority": 1,
+                }],
+                "pipeline_type": "sequential",
+                "reasoning": f"Auto-routed: model called {fn_name} directly",
+            }, thread)
+
+        # Delegate shared tools to base
         return await super().handle_tool_call(fn_name, fn_args, thread)
+
+    async def _handle_idea_to_project(self, fn_args: dict, thread: Thread) -> str:
+        """Run the Idea-to-Project pipeline through specialist agents."""
+        from tools.idea_to_project import (
+            PHASES, get_phase_prompt, get_phase_agent,
+            detect_project_type, save_project_output,
+        )
+        from pipelines.engine import PipelineEngine
+
+        idea = fn_args["idea"]
+        project_type = fn_args.get("project_type") or detect_project_type(idea)
+        target_phase = fn_args.get("phase", "all")
+
+        thread.add_event(
+            EventType.ROUTING_DECISION,
+            f"Idea-to-Project: type={project_type}, phase={target_phase}",
+            agent_role=self.role,
+        )
+        self._emit("routing", f"🚀 Idea-to-Project başlatılıyor — {project_type}")
+
+        results = {}
+        prev_result = ""
+
+        phases_to_run = PHASES if target_phase == "all" else [
+            p for p in PHASES if p["id"] == target_phase
+        ]
+
+        engine = PipelineEngine()
+        if self._live_monitor:
+            engine.set_live_monitor(self._live_monitor)
+
+        for phase in phases_to_run:
+            self._emit("pipeline", f"📋 Faz: {phase['name']}")
+
+            prompt = get_phase_prompt(phase["id"], idea, prev_result)
+            agent_role = AgentRole(phase["agent"])
+            agent = engine.get_agent(agent_role)
+
+            result = await agent.execute(prompt, thread)
+            results[phase["id"]] = result
+            prev_result = result
+
+            # Save phase output
+            project_name = idea[:50].strip()
+            save_project_output(project_name, phase["id"], result)
+
+        # Build summary
+        parts = [f"🚀 IDEA-TO-PROJECT: {project_type}\n"]
+        for phase in phases_to_run:
+            if phase["id"] in results:
+                parts.append(f"\n{'='*60}")
+                parts.append(f"📋 {phase['name'].upper()}")
+                parts.append(f"{'='*60}")
+                parts.append(results[phase["id"]])
+
+        return "\n".join(parts)
+
+    async def _handle_generate_presentation(self, fn_args: dict, thread: Thread) -> str:
+        """Generate a professional PPTX presentation with deep research + AI visuals.
+        Supports MINI/MIDI/MAXI modes and uses thinker agent for content quality."""
+        from tools.presentation_service import (
+            build_presentation_prompt, parse_slide_content, generate_presentation,
+            deep_research_for_presentation, format_research_for_prompt,
+            MODE_CONFIG, PresentationMode,
+        )
+        from pipelines.engine import PipelineEngine
+
+        topic = fn_args.get("topic", "")
+        mode: PresentationMode = fn_args.get("mode", "midi")
+        language = fn_args.get("language", "tr")
+        theme = fn_args.get("theme", "corporate")
+
+        cfg = MODE_CONFIG[mode]
+        slide_count = fn_args.get("slide_count", cfg["default_slides"])
+
+        thread.add_event(
+            EventType.ROUTING_DECISION,
+            f"Presentation: topic={topic[:60]}, mode={mode.upper()}, slides={slide_count}, lang={language}",
+            agent_role=self.role,
+        )
+        self._emit("routing", f"🎨 Sunum hazırlanıyor — {cfg['emoji']} {cfg['label']} mod, {slide_count} slayt")
+
+        # Step 0: Deep Research — depth scales with mode
+        self._emit("pipeline", f"🔬 Deep Research başlatılıyor ({cfg['research_queries']} sorgu, {mode.upper()} derinlik)...")
+        try:
+            research = await deep_research_for_presentation(
+                topic, language=language,
+                max_queries=cfg["research_queries"],
+                mode=mode,
+            )
+            research_context = format_research_for_prompt(research)
+            source_count = research.get("total_sources", 0)
+            self._emit("pipeline", f"📊 {source_count} kaynak bulundu, içerik zenginleştiriliyor...")
+        except Exception as e:
+            print(f"[Orchestrator] Deep research failed: {e}")
+            research_context = ""
+            self._emit("pipeline", "⚠️ Araştırma tamamlanamadı, mevcut bilgiyle devam ediliyor...")
+
+        # Step 1: Use thinker agent (MiniMax M2.1) for higher quality content generation
+        prompt = build_presentation_prompt(
+            topic, slide_count, language,
+            research_context=research_context,
+            mode=mode,
+        )
+        engine = PipelineEngine()
+        if self._live_monitor:
+            engine.set_live_monitor(self._live_monitor)
+
+        # Use thinker for MIDI/MAXI, researcher for MINI (faster)
+        if mode in ("midi", "maxi"):
+            content_agent = engine.get_agent(AgentRole.THINKER)
+            agent_label = "Thinker (MiniMax M2.1)"
+        else:
+            content_agent = engine.get_agent(AgentRole.RESEARCHER)
+            agent_label = "Researcher (GLM 4.7)"
+
+        self._emit("pipeline", f"📝 Slayt içeriği oluşturuluyor — {agent_label} ile...")
+        raw_content = await content_agent.execute(prompt, thread)
+
+        # Debug: log raw content length for troubleshooting
+        print(f"[Presentation] Raw content length: {len(raw_content)} chars, first 500: {raw_content[:500]}")
+
+        # If agent returned error/empty/stopped, try fallback agent
+        if not raw_content or raw_content.startswith("[Error]") or raw_content.startswith("[Stopped]") or len(raw_content.strip()) < 50:
+            print(f"[Presentation] Primary agent failed or returned empty, trying fallback agent...")
+            self._emit("pipeline", f"⚠️ {agent_label} boş döndü, yedek agent deneniyor...")
+            # Swap: if thinker failed, try researcher; if researcher failed, try thinker
+            if mode in ("midi", "maxi"):
+                fallback_agent = engine.get_agent(AgentRole.RESEARCHER)
+                agent_label = "Researcher (GLM 4.7) [fallback]"
+            else:
+                fallback_agent = engine.get_agent(AgentRole.THINKER)
+                agent_label = "Thinker (MiniMax M2.1) [fallback]"
+            self._emit("pipeline", f"📝 Yedek agent ile deneniyor — {agent_label}...")
+            raw_content = await fallback_agent.execute(prompt, thread)
+            print(f"[Presentation] Fallback content length: {len(raw_content)} chars, first 500: {raw_content[:500]}")
+
+        # Step 2: Parse structured slides
+        slides_data = parse_slide_content(raw_content)
+
+        # Fallback: if strict parsing failed, try to build slides from raw content
+        if not slides_data:
+            print(f"[Presentation] parse_slide_content returned 0 slides, attempting fallback...")
+            paragraphs = [p.strip() for p in raw_content.split("\n\n") if p.strip() and len(p.strip()) > 10]
+            for i, para in enumerate(paragraphs[:slide_count], 1):
+                lines = [l.strip() for l in para.split("\n") if l.strip()]
+                title = lines[0][:80].lstrip("#- •*0123456789.)") .strip() if lines else f"Slayt {i}"
+                if not title:
+                    title = f"Slayt {i}"
+                bullets = []
+                for l in lines[1:6]:
+                    clean = l.lstrip("#- •*0123456789.)").strip()
+                    if clean and len(clean) > 3:
+                        bullets.append(clean)
+                if not bullets and len(lines) > 0:
+                    bullets = [lines[0][:100]]
+                slides_data.append({
+                    "num": i,
+                    "title": title,
+                    "bullets": bullets,
+                    "image_prompt": f"Professional visual about {topic}, slide {i}",
+                    "is_section": False,
+                    "quote": None,
+                    "data_highlights": [],
+                })
+            print(f"[Presentation] Fallback produced {len(slides_data)} slides")
+
+        if not slides_data:
+            return "❌ Slayt içeriği oluşturulamadı. Agent boş yanıt döndü. Lütfen tekrar deneyin."
+
+        self._emit("pipeline", f"🖼️ {len(slides_data)} slayt için görseller üretiliyor...")
+
+        # Step 3: Generate PPTX with images and theme
+        pptx_bytes = await generate_presentation(
+            slides_data=slides_data,
+            title=topic,
+            subtitle=f"{cfg['emoji']} {cfg['label']} | {len(slides_data)} Slayt | AI Destekli Sunum",
+            with_images=True,
+            theme=theme,
+        )
+
+        # Step 4: Save to disk
+        from pathlib import Path
+        presentations_dir = Path(__file__).parent.parent / "data" / "presentations"
+        presentations_dir.mkdir(parents=True, exist_ok=True)
+
+        safe_name = re.sub(r"[^\w\s-]", "", topic[:50]).strip().replace(" ", "_")
+        if not safe_name:
+            safe_name = "sunum"
+        filename = f"{safe_name}_{mode}.pptx"
+        filepath = presentations_dir / filename
+        filepath.write_bytes(pptx_bytes)
+
+        self._emit("pipeline", f"✅ Sunum kaydedildi: {filename}")
+
+        source_info = ""
+        if research_context:
+            source_info = f"🔬 **Araştırma:** {source_count} web kaynağından veri toplandı ({cfg['research_queries']} sorgu)\n"
+
+        # Build real download URL (local API endpoint)
+        encoded_filename = urllib.parse.quote(filename)
+        download_url = f"/api/presentations/{encoded_filename}/download"
+
+        return (
+            f"✅ **Sunum Hazır!**\n\n"
+            f"📊 **Konu:** {topic}\n"
+            f"🎯 **Mod:** {cfg['emoji']} {cfg['label']}\n"
+            f"📄 **Slayt Sayısı:** {len(slides_data)} + başlık + kapanış\n"
+            f"{source_info}"
+            f"🤖 **İçerik:** {agent_label} ile üretildi\n"
+            f"🖼️ **Görseller:** Pollinations.ai ile üretildi\n"
+            f"🎨 **Tema:** {theme}\n"
+            f"📁 **Dosya:** {filename}\n"
+            f"📥 **İndir:** [{filename}]({download_url})\n\n"
+            f"Sunumu indirmek için yukarıdaki linki veya aşağıdaki 🎨 PPTX butonunu kullanabilirsin."
+        )
 
     async def _handle_decompose(self, fn_args: dict, thread: Thread) -> str:
         """Create Task with SubTasks from decomposition."""
-        pipeline_str = fn_args.get("pipeline_type", "sequential")
+        pipeline_str = fn_args.get("pipeline_type", "parallel")
         pipeline_type = PipelineType(pipeline_str)
 
         sub_tasks = []
@@ -113,7 +592,6 @@ class OrchestratorAgent(BaseAgent):
             )
             sub_tasks.append(st)
 
-        # Find or create current task
         task = Task(
             user_input=thread.events[-1].content if thread.events else "",
             pipeline_type=pipeline_type,
@@ -130,75 +608,452 @@ class OrchestratorAgent(BaseAgent):
 
         summary_parts = [f"Task decomposed → {pipeline_type.value} pipeline:"]
         for i, st in enumerate(sub_tasks, 1):
-            summary_parts.append(f"  {i}. [{st.assigned_agent.value}] {st.description}")
+            summary_parts.append(f"  {i}. [{st.assigned_agent.value}] {st.description[:80]}")
         return "\n".join(summary_parts)
 
-    async def route_and_execute(self, user_input: str, thread: Thread) -> str:
+    # ── Main Entry Point ─────────────────────────────────────────
+
+    async def route_and_execute(self, user_input: str, thread: Thread, live_monitor=None, forced_pipeline: PipelineType | None = None) -> str:
         """
-        Main entry point: user message → orchestrator decides → pipeline runs → result.
-        This is called by the UI layer.
+        Main entry: user message → deep research detection → orchestrator → pipeline → result.
+        forced_pipeline: If user selected a specific pipeline from UI, override auto-detection.
         """
+        if live_monitor:
+            self.set_live_monitor(live_monitor)
+
         thread.add_event(EventType.USER_MESSAGE, user_input)
 
-        # Step 1: Orchestrator decides what to do
+        # ── Auto-save user teachings/preferences ──
+        try:
+            from tools.teachability import is_teaching_message, save_teaching
+            if is_teaching_message(user_input):
+                save_teaching(
+                    instruction=user_input,
+                    trigger_text=user_input[:200],
+                    category="preference",
+                )
+                thread.add_event(
+                    EventType.TEACHING,
+                    f"User teaching auto-saved: {user_input[:80]}",
+                    agent_role=self.role,
+                )
+        except Exception:
+            pass  # Never break main flow for teachability
+
+        # ── Phase 0: Determine pipeline mode ──
+        # Check for idea-to-project first
+        is_idea_project = (
+            forced_pipeline == PipelineType.IDEA_TO_PROJECT
+            or (forced_pipeline in (None, PipelineType.AUTO) and self._detect_idea_to_project(user_input))
+        )
+
+        if is_idea_project:
+            self._emit("routing", "🚀 Idea-to-Project modu algılandı")
+            thread.add_event(
+                EventType.ROUTING_DECISION,
+                "Idea-to-Project pipeline triggered",
+                agent_role=self.role,
+            )
+
+            result = await self._handle_idea_to_project({"idea": user_input}, thread)
+
+            # Create a Task so ExportButtons can find the result
+            idea_task = Task(
+                user_input=user_input,
+                pipeline_type=PipelineType.IDEA_TO_PROJECT,
+                sub_tasks=[],
+                final_result=result,
+            )
+            idea_task.status = TaskStatus.COMPLETED
+            thread.tasks.append(idea_task)
+
+            self._auto_save_memory(user_input, result)
+            return result
+
+        # Check for presentation generation
+        is_presentation = (
+            forced_pipeline in (None, PipelineType.AUTO)
+            and self._detect_presentation(user_input)
+        )
+
+        # Check for MINI/MIDI/MAXI mode selection (follow-up to presentation analysis)
+        mode_match = _PRESENTATION_MODE_PATTERNS.match(user_input.strip())
+        is_mode_selection = bool(mode_match)
+
+        # If user selected a mode, check if there's a pending presentation in thread
+        if is_mode_selection:
+            pending_topic = None
+            for ev in reversed(thread.events):
+                if ev.event_type == EventType.ROUTING_DECISION and "Presentation analysis" in ev.content:
+                    # Extract topic from metadata
+                    pending_topic = ev.metadata.get("topic", "")
+                    break
+                if ev.event_type == EventType.AGENT_RESPONSE and "Sunum Modu Seçenekleri" in ev.content:
+                    # Find the original user message before analysis
+                    for ev2 in thread.events:
+                        if ev2.event_type == EventType.USER_MESSAGE and self._detect_presentation(ev2.content):
+                            pending_topic = ev2.content
+                            break
+                    break
+
+            if pending_topic:
+                selected_mode = mode_match.group(1).lower()
+                custom_slides = int(mode_match.group(2)) if mode_match.group(2) else None
+
+                self._emit("routing", f"🎨 {selected_mode.upper()} modu seçildi — sunum üretiliyor")
+
+                lang = "tr" if re.search(r"[çğıöşüÇĞİÖŞÜ]", pending_topic) else "en"
+
+                fn_args = {
+                    "topic": pending_topic,
+                    "mode": selected_mode,
+                    "language": lang,
+                    "theme": "corporate",
+                }
+                if custom_slides:
+                    fn_args["slide_count"] = custom_slides
+
+                result = await self._handle_generate_presentation(fn_args, thread)
+
+                pres_task = Task(
+                    user_input=f"{pending_topic} [{selected_mode.upper()}]",
+                    pipeline_type=PipelineType.DEEP_RESEARCH,
+                    sub_tasks=[],
+                    final_result=result,
+                )
+                pres_task.status = TaskStatus.COMPLETED
+                thread.tasks.append(pres_task)
+
+                self._auto_save_memory(pending_topic, result)
+                return result
+
+        if is_presentation:
+            lang = "tr" if re.search(r"[çğıöşüÇĞİÖŞÜ]", user_input) else "en"
+
+            # Check if user already specified slide count — skip analysis, go direct
+            slide_count_match = re.search(r"(\d+)\s*(?:slayt|slide|sayfa)", user_input, re.IGNORECASE)
+            if slide_count_match:
+                requested_slides = int(slide_count_match.group(1))
+                # Auto-select mode based on requested slide count
+                if requested_slides <= 7:
+                    auto_mode = "mini"
+                elif requested_slides <= 15:
+                    auto_mode = "midi"
+                else:
+                    auto_mode = "maxi"
+
+                self._emit("routing", f"🎨 {requested_slides} slaytlık sunum — {auto_mode.upper()} modunda direkt üretiliyor")
+
+                fn_args = {
+                    "topic": user_input,
+                    "mode": auto_mode,
+                    "slide_count": requested_slides,
+                    "language": lang,
+                    "theme": "corporate",
+                }
+
+                result = await self._handle_generate_presentation(fn_args, thread)
+
+                pres_task = Task(
+                    user_input=f"{user_input} [{auto_mode.upper()} {requested_slides}]",
+                    pipeline_type=PipelineType.DEEP_RESEARCH,
+                    sub_tasks=[],
+                    final_result=result,
+                )
+                pres_task.status = TaskStatus.COMPLETED
+                thread.tasks.append(pres_task)
+
+                self._auto_save_memory(user_input, result)
+                return result
+
+            # No slide count specified — show MINI/MIDI/MAXI options
+            self._emit("routing", "🎨 Sunum oluşturma modu algılandı — konu analiz ediliyor")
+            thread.add_event(
+                EventType.ROUTING_DECISION,
+                "Presentation analysis triggered",
+                agent_role=self.role,
+                topic=user_input,
+            )
+
+            # Step 1: Analyze topic and present MINI/MIDI/MAXI options
+            from tools.presentation_service import (
+                analyze_topic_for_presentation, format_analysis_response,
+            )
+
+            self._emit("pipeline", "🔍 Konu analiz ediliyor — MINI/MIDI/MAXI seçenekleri hazırlanıyor...")
+
+            try:
+                lang = "tr" if re.search(r"[çğıöşüÇĞİÖŞÜ]", user_input) else "en"
+                analysis = await analyze_topic_for_presentation(user_input, language=lang)
+                analysis_text = format_analysis_response(analysis)
+
+                # Store analysis event so we can find it later
+                thread.add_event(
+                    EventType.AGENT_RESPONSE,
+                    analysis_text,
+                    agent_role=self.role,
+                )
+
+                return analysis_text
+
+            except Exception as e:
+                print(f"[Orchestrator] Presentation analysis failed: {e}, falling back to MIDI")
+                # Fallback: skip analysis, go directly to MIDI mode
+                lang = "tr" if re.search(r"[çğıöşüÇĞİÖŞÜ]", user_input) else "en"
+                result = await self._handle_generate_presentation(
+                    {"topic": user_input, "mode": "midi", "language": lang},
+                    thread,
+                )
+
+                pres_task = Task(
+                    user_input=user_input,
+                    pipeline_type=PipelineType.DEEP_RESEARCH,
+                    sub_tasks=[],
+                    final_result=result,
+                )
+                pres_task.status = TaskStatus.COMPLETED
+                thread.tasks.append(pres_task)
+
+                self._auto_save_memory(user_input, result)
+                return result
+
+        # User forced deep research from UI, or auto-detected
+        is_deep = (
+            forced_pipeline == PipelineType.DEEP_RESEARCH
+            or (forced_pipeline in (None, PipelineType.AUTO) and self._detect_deep_research(user_input))
+        )
+
+        # User forced parallel from UI
+        is_forced_parallel = forced_pipeline == PipelineType.PARALLEL
+
+        # ── Brainstorm Pipeline ──
+        is_brainstorm = (
+            forced_pipeline == PipelineType.BRAINSTORM
+            or (forced_pipeline in (None, PipelineType.AUTO) and self._detect_brainstorm(user_input))
+        )
+
+        if is_brainstorm:
+            self._emit("routing", "🧠 Beyin Fırtınası modu — agent'lar tartışacak")
+
+            sub_tasks = [
+                SubTask(
+                    description=f"Brainstorm perspective on: {user_input}",
+                    assigned_agent=role,
+                    priority=1,
+                )
+                for role in [AgentRole.THINKER, AgentRole.RESEARCHER, AgentRole.REASONER, AgentRole.SPEED]
+            ]
+
+            task = Task(
+                user_input=user_input,
+                pipeline_type=PipelineType.BRAINSTORM,
+                sub_tasks=sub_tasks,
+            )
+            thread.tasks.append(task)
+
+            thread.add_event(
+                EventType.ROUTING_DECISION,
+                f"Brainstorm: 3-round debate with 4 agents",
+                agent_role=self.role,
+            )
+
+            from pipelines.engine import PipelineEngine
+            engine = PipelineEngine()
+            if live_monitor:
+                engine.set_live_monitor(live_monitor)
+
+            result = await engine.execute(task, thread)
+
+            if live_monitor and live_monitor.should_stop():
+                return "[Stopped] Kullanıcı tarafından durduruldu."
+
+            # Synthesize with orchestrator for final polish
+            if live_monitor:
+                live_monitor.emit("routing", "orchestrator", "Beyin fırtınası sonuçları sentezleniyor...")
+
+            synth_input = (
+                f"You are synthesizing a multi-round brainstorm debate between 4 specialist agents.\n\n"
+                f"DEBATE RESULTS:\n{result}\n\n"
+                f"ORIGINAL TOPIC: {user_input}\n\n"
+                f"Create a comprehensive final response that:\n"
+                f"1. Highlights the strongest arguments from each perspective\n"
+                f"2. Notes key agreements and disagreements\n"
+                f"3. Provides a balanced, actionable conclusion\n"
+                f"Respond in the same language as the user's request."
+            )
+            final = await self.execute(synth_input, thread)
+            task.final_result = final
+            self._auto_save_memory(user_input, final)
+            return final
+
+        if is_deep:
+            self._emit("routing", "🔬 Deep Research modu algılandı — tüm agent'lar paralel çalışacak")
+
+            # Build parallel tasks WITHOUT waiting for LLM decision
+            deep_tasks = self._build_deep_research_tasks(user_input)
+            sub_tasks = [
+                SubTask(
+                    description=t["description"],
+                    assigned_agent=AgentRole(t["assigned_agent"]),
+                    priority=t["priority"],
+                )
+                for t in deep_tasks
+            ]
+
+            task = Task(
+                user_input=user_input,
+                pipeline_type=PipelineType.DEEP_RESEARCH,
+                sub_tasks=sub_tasks,
+            )
+            thread.tasks.append(task)
+
+            thread.add_event(
+                EventType.ROUTING_DECISION,
+                f"Deep Research: parallel pipeline with {len(sub_tasks)} agents",
+                agent_role=self.role,
+            )
+
+            if live_monitor:
+                live_monitor.emit(
+                    "pipeline",
+                    "orchestrator",
+                    f"🔬 Deep Research — {len(sub_tasks)} agent paralel çalışıyor",
+                )
+
+            from pipelines.engine import PipelineEngine
+            engine = PipelineEngine()
+            if live_monitor:
+                engine.set_live_monitor(live_monitor)
+
+            result = await engine.execute(task, thread)
+
+            if live_monitor and live_monitor.should_stop():
+                return "[Stopped] Kullanıcı tarafından durduruldu."
+
+            # Synthesize with orchestrator
+            if live_monitor:
+                live_monitor.emit("routing", "orchestrator", "Sonuçlar sentezleniyor...")
+
+            synth_input = (
+                f"You are synthesizing results from 4 specialist agents who worked in parallel.\n\n"
+                f"AGENT RESULTS:\n{result}\n\n"
+                f"ORIGINAL USER REQUEST: {user_input}\n\n"
+                f"Create a comprehensive, well-structured final response that:\n"
+                f"1. Integrates insights from ALL agents\n"
+                f"2. Resolves any contradictions between agents\n"
+                f"3. Cites sources where available\n"
+                f"4. Provides clear actionable conclusions\n"
+                f"Respond in the same language as the user's request."
+            )
+            final = await self.execute(synth_input, thread)
+            task.final_result = final
+            self._auto_save_memory(user_input, final)
+            return final
+
+        # ── Phase 1: Let orchestrator LLM decide (non-deep queries) ──
         decision = await self.execute(user_input, thread)
 
-        # Check if it was a direct response (no delegation needed)
+        if live_monitor and live_monitor.should_stop():
+            return "[Stopped] Kullanıcı tarafından durduruldu."
+
+        # Check if it was a direct response
         last_events = thread.events[-5:]
         for ev in reversed(last_events):
             if ev.event_type == EventType.TOOL_CALL and "direct_response" in ev.content:
-                # Auto-save direct responses too
                 self._auto_save_memory(user_input, decision)
                 return decision
 
-        # Step 2: If tasks were created, run the pipeline
+        # ── Phase 2: Run pipeline if tasks were created ──
         if thread.tasks:
             current_task = thread.tasks[-1]
             if current_task.sub_tasks:
+                # Auto-upgrade: if LLM created only 1 sub-task for a non-trivial query,
+                # or user forced parallel from UI — upgrade to parallel multi-agent
+                if (
+                    len(current_task.sub_tasks) == 1
+                    and (
+                        is_forced_parallel
+                        or (len(user_input.strip()) > 30 and current_task.pipeline_type != PipelineType.PARALLEL)
+                    )
+                ):
+                    self._emit("routing", "Auto-upgrade: tek agent → parallel multi-agent")
+                    original_desc = current_task.sub_tasks[0].description
+                    current_task.sub_tasks = [
+                        SubTask(
+                            description=original_desc,
+                            assigned_agent=current_task.sub_tasks[0].assigned_agent,
+                            priority=1,
+                        ),
+                    ]
+                    # Add complementary agents
+                    existing_agent = current_task.sub_tasks[0].assigned_agent.value
+                    complement = {
+                        "researcher": ["thinker", "reasoner"],
+                        "thinker": ["researcher", "reasoner"],
+                        "reasoner": ["thinker", "researcher"],
+                        "speed": ["thinker", "researcher"],
+                    }
+                    for agent_name in complement.get(existing_agent, ["thinker", "researcher"]):
+                        current_task.sub_tasks.append(SubTask(
+                            description=f"Support analysis for: {user_input}",
+                            assigned_agent=AgentRole(agent_name),
+                            priority=2,
+                        ))
+                    current_task.pipeline_type = PipelineType.PARALLEL
+
+                if live_monitor:
+                    live_monitor.emit(
+                        "pipeline",
+                        "orchestrator",
+                        f"{current_task.pipeline_type.value} pipeline — "
+                        f"{len(current_task.sub_tasks)} alt görev",
+                    )
+
                 from pipelines.engine import PipelineEngine
                 engine = PipelineEngine()
+                if live_monitor:
+                    engine.set_live_monitor(live_monitor)
+
                 result = await engine.execute(current_task, thread)
 
-                # Step 3: Synthesize
+                if live_monitor and live_monitor.should_stop():
+                    return "[Stopped] Kullanıcı tarafından durduruldu."
+
+                # Synthesize
+                if live_monitor:
+                    live_monitor.emit("routing", "orchestrator", "Sonuçlar sentezleniyor...")
+
                 synth_input = (
                     f"The specialists have completed their work. Here are the results:\n\n"
                     f"{result}\n\n"
                     f"Original user request: {user_input}\n\n"
-                    f"Synthesize a clear, comprehensive final response."
+                    f"Synthesize a clear, comprehensive final response in the user's language."
                 )
                 final = await self.execute(synth_input, thread)
                 current_task.final_result = final
-
-                # Auto-save to memory
                 self._auto_save_memory(user_input, final)
-
                 return final
 
         return decision
 
-
     def _auto_save_memory(self, user_input: str, result: str) -> None:
-        """Silently save task completion to persistent memory."""
+        """Silently save task completion to persistent memory + auto-create skill if pattern detected."""
+        tags: list[str] = []
+        keywords = ["search", "code", "analyze", "math", "translate", "summarize",
+                    "research", "compare", "explain", "calculate", "predict"]
+        input_lower = user_input.lower()
+        for kw in keywords:
+            if kw in input_lower:
+                tags.append(kw)
+        if not tags:
+            tags = ["task-completion"]
+
         try:
             from tools.memory import save_memory
-
-            # Build concise summary
             summary = (
                 f"Task: {user_input[:200]}\n"
                 f"Result: {result[:300]}"
             )
-
-            # Extract simple tags from input
-            tags = []
-            keywords = ["search", "code", "analyze", "math", "translate", "summarize",
-                        "research", "compare", "explain", "calculate", "predict"]
-            input_lower = user_input.lower()
-            for kw in keywords:
-                if kw in input_lower:
-                    tags.append(kw)
-            if not tags:
-                tags = ["task-completion"]
-
             save_memory(
                 content=summary,
                 category="solution",
@@ -206,5 +1061,16 @@ class OrchestratorAgent(BaseAgent):
                 source_agent="orchestrator",
             )
         except Exception:
-            pass  # Never let memory failures affect the user
+            pass
 
+        # Auto-create skill from recurring patterns
+        try:
+            from tools.dynamic_skills import auto_create_skill_from_pattern
+            auto_create_skill_from_pattern(
+                pattern_description=user_input[:200],
+                knowledge=result[:500],
+                category="learned",
+                keywords=tags,
+            )
+        except Exception:
+            pass

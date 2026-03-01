@@ -213,6 +213,97 @@ SKILL_REGISTRY: list[dict[str, Any]] = [
             "7. Document before/after metrics"
         ),
     },
+    # ── Domain-Specific Skills ───────────────────────────────────
+    {
+        "id": "financial-analysis",
+        "name": "Financial Analysis",
+        "category": "finance",
+        "description": "Stock analysis, portfolio evaluation, financial modeling, market research",
+        "keywords": ["finance", "stock", "portfolio", "investment", "market", "finans", "hisse", "yatırım", "borsa", "piyasa"],
+        "knowledge": (
+            "FINANCIAL ANALYSIS PROTOCOL:\n"
+            "1. Identify the financial instrument/market being analyzed\n"
+            "2. Gather fundamental data (P/E, EPS, revenue growth, debt ratios)\n"
+            "3. Perform technical analysis if applicable (trends, support/resistance)\n"
+            "4. Compare with sector peers and benchmarks\n"
+            "5. Assess risk factors (market, credit, liquidity, operational)\n"
+            "6. Provide clear buy/hold/sell reasoning with confidence level\n"
+            "7. DISCLAIMER: This is analysis, not financial advice\n"
+            "8. Always cite data sources and dates"
+        ),
+    },
+    {
+        "id": "sql-database",
+        "name": "SQL & Database Query",
+        "category": "database",
+        "description": "SQL query writing, database schema design, query optimization",
+        "keywords": ["sql", "database", "query", "table", "schema", "veritabanı", "sorgu", "tablo", "postgres", "mysql"],
+        "knowledge": (
+            "SQL DATABASE PROTOCOL:\n"
+            "1. Understand the data model and relationships\n"
+            "2. Write clear, readable SQL with proper formatting\n"
+            "3. Use appropriate JOINs (INNER/LEFT/RIGHT based on need)\n"
+            "4. Add WHERE clauses for filtering, avoid SELECT *\n"
+            "5. Consider indexing for frequently queried columns\n"
+            "6. Use CTEs for complex queries (readability)\n"
+            "7. Always consider NULL handling\n"
+            "8. Test with EXPLAIN ANALYZE for performance"
+        ),
+    },
+    {
+        "id": "legal-analysis",
+        "name": "Legal Document Analysis",
+        "category": "legal",
+        "description": "Contract review, legal document analysis, compliance checking",
+        "keywords": ["legal", "contract", "law", "compliance", "hukuk", "sözleşme", "mevzuat", "uyum", "yasal"],
+        "knowledge": (
+            "LEGAL ANALYSIS PROTOCOL:\n"
+            "1. Identify document type (contract, policy, regulation)\n"
+            "2. Extract key terms, obligations, and deadlines\n"
+            "3. Identify potential risks and ambiguities\n"
+            "4. Check for missing standard clauses\n"
+            "5. Flag unusual or one-sided terms\n"
+            "6. Summarize rights and obligations per party\n"
+            "7. DISCLAIMER: This is analysis, not legal advice — consult a lawyer\n"
+            "8. Note jurisdiction-specific considerations"
+        ),
+    },
+    {
+        "id": "medical-info",
+        "name": "Medical Information",
+        "category": "medical",
+        "description": "Medical literature review, symptom analysis, health information",
+        "keywords": ["medical", "health", "symptom", "disease", "tıp", "sağlık", "semptom", "hastalık", "tedavi"],
+        "knowledge": (
+            "MEDICAL INFORMATION PROTOCOL:\n"
+            "1. Gather symptoms/conditions described\n"
+            "2. Search medical literature and trusted sources\n"
+            "3. Present differential diagnoses if applicable\n"
+            "4. Cite medical references (PubMed, WHO, etc.)\n"
+            "5. CRITICAL DISCLAIMER: This is informational only, NOT medical advice\n"
+            "6. Always recommend consulting a healthcare professional\n"
+            "7. Note when information may be outdated\n"
+            "8. Avoid definitive diagnoses — present possibilities"
+        ),
+    },
+    {
+        "id": "project-planning",
+        "name": "Project Planning & Management",
+        "category": "planning",
+        "description": "Project scoping, sprint planning, task estimation, roadmap creation",
+        "keywords": ["project", "plan", "sprint", "roadmap", "estimate", "proje", "planlama", "tahmin", "yol haritası"],
+        "knowledge": (
+            "PROJECT PLANNING PROTOCOL:\n"
+            "1. Define project scope and objectives clearly\n"
+            "2. Break into milestones with measurable deliverables\n"
+            "3. Decompose milestones into sprint-sized tasks\n"
+            "4. Estimate using T-shirt sizing or story points\n"
+            "5. Identify dependencies and critical path\n"
+            "6. Allocate buffer for unknowns (20-30%)\n"
+            "7. Define acceptance criteria for each task\n"
+            "8. Plan for testing, documentation, and deployment"
+        ),
+    },
 ]
 
 

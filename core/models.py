@@ -45,6 +45,9 @@ class PipelineType(str, Enum):
     PARALLEL = "parallel"
     CONSENSUS = "consensus"
     ITERATIVE = "iterative"
+    DEEP_RESEARCH = "deep_research"  # Phase 1: parallel gather → Phase 2: synthesize
+    IDEA_TO_PROJECT = "idea_to_project"  # Idea → PRD → Architecture → Tasks → Scaffold
+    BRAINSTORM = "brainstorm"  # Multi-round debate: perspectives → cross-challenge → synthesis
     AUTO = "auto"  # Orchestrator decides
 
 
@@ -63,6 +66,10 @@ class EventType(str, Enum):
     ERROR = "error"
     HUMAN_REQUEST = "human_request"
     HUMAN_RESPONSE = "human_response"
+    TEACHING = "teaching"
+    CODE_EXECUTION = "code_execution"
+    RAG_QUERY = "rag_query"
+    EVALUATION = "evaluation"
 
 
 # ── Event ────────────────────────────────────────────────────────

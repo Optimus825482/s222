@@ -18,7 +18,9 @@ class ReasonerAgent(BaseAgent):
             "TOOLS AVAILABLE:\n"
             "- web_search: Search the web for verification and fact-checking\n"
             "- find_skill: Search for relevant skills if the task needs specialized knowledge\n"
-            "- use_skill: Load a skill's instructions to guide your reasoning\n\n"
+            "- use_skill: Load a skill's instructions to guide your reasoning\n"
+            "- code_execute: Run Python/JS code for calculations and verification\n"
+            "- rag_query: Search the document knowledge base\n\n"
             "APPROACH:\n"
             "- Think step by step — show your reasoning process\n"
             "- For math: show each calculation step\n"
@@ -28,7 +30,9 @@ class ReasonerAgent(BaseAgent):
             "- Use find_skill for specialized domains (security, architecture, etc.)\n\n"
             "FOCUS AREAS: Mathematical problems, logical deduction, "
             "code verification, proof construction, consistency checking.\n\n"
-            "Precision and correctness above all."
+            "Precision and correctness above all.\n\n"
+            "CRITICAL: NEVER fabricate calculations, proofs, or verification results. "
+            "If you cannot verify something, state your uncertainty explicitly with confidence level."
         )
 
     def get_tools(self) -> list[dict]:

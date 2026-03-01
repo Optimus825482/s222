@@ -1,9 +1,9 @@
 """
-Multi-Agent Operations Center — Streamlit Dashboard.
+Multi-Agent Operations Center — Cockpit Dashboard.
 Qwen3 80B orchestrator + 4 specialist agents.
 12-Factor Agent architecture.
 
-Layout: Sidebar (agents + A2A) | Center (chat + pipeline) | Right (tool stream)
+Layout: Sidebar (agents + metrics) | Center (clean results) | Right (activity stream)
 """
 
 import sys
@@ -21,12 +21,14 @@ from core.models import Thread, PipelineType
 from core.state import save_thread, load_thread, list_threads
 from ui.theme import DARK_THEME_CSS
 from ui.agent_cards import render_agent_cards
-from ui.a2a_stream import render_a2a_stream, render_agent_status_live
+from ui.a2a_stream import render_agent_status_live
 from ui.chat import render_chat_history
 from ui.pipeline_view import render_pipeline_selector, render_pipeline_flow
 from ui.metrics import render_metrics_panel
 from ui.task_history import render_task_history
-from ui.tool_stream import render_tool_stream
+from ui.activity_stream import render_activity_stream
+from ui.live_monitor import LiveMonitor, render_stop_button, render_live_event_log
+from ui.sidebar_panels import render_teachability_panel, render_agent_eval_panel, render_rag_panel, render_dynamic_skills_panel, render_mcp_panel
 
 
 # ── Page Config ──────────────────────────────────────────────────
@@ -39,8 +41,6 @@ st.set_page_config(
 )
 
 st.markdown(DARK_THEME_CSS, unsafe_allow_html=True)
-
-# Viewport meta for mobile
 st.markdown(
     '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">',
     unsafe_allow_html=True,
@@ -75,17 +75,17 @@ def run_async(coro):
         return asyncio.run(coro)
 
 
-# ── Sidebar: Agent Fleet + A2A Stream ────────────────────────────
+# ── Sidebar: Agent Fleet + Metrics ───────────────────────────────
 
 with st.sidebar:
     st.markdown(
         """
-        <div style="text-align:center;padding:12px 0;">
-            <div style="font-size:32px;">🧠</div>
-            <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-top:4px;">
+        <div style="text-align:center;padding:10px 0;">
+            <div style="font-size:28px;">🧠</div>
+            <div style="font-size:15px;font-weight:700;color:#e2e8f0;margin-top:4px;">
                 Multi-Agent Ops
             </div>
-            <div style="font-size:11px;color:#6b7280;">
+            <div style="font-size:10px;color:#475569;">
                 Qwen Orchestrated • 12-Factor
             </div>
         </div>
@@ -96,13 +96,8 @@ with st.sidebar:
     # Live agent status dots
     render_agent_status_live(get_thread())
 
-    # Agent cards (compact)
+    # Agent cards
     render_agent_cards(get_thread())
-
-    st.markdown("---")
-
-    # A2A Communication Stream
-    render_a2a_stream(get_thread())
 
     st.markdown("---")
 
@@ -133,19 +128,33 @@ with st.sidebar:
                     st.session_state.thread = loaded
                     st.rerun()
 
+    st.markdown("---")
 
-# ── Main Area: 2-column layout (Chat | Tool Stream) ─────────────
+    # Teachability — user preferences & teachings
+    render_teachability_panel()
 
-# Header
+    # Agent performance scores
+    render_agent_eval_panel()
+
+    # RAG document management
+    render_rag_panel()
+
+    # Dynamic skill registry
+    render_dynamic_skills_panel()
+
+    # MCP server management
+    render_mcp_panel()
+
+
+# ── Cockpit Header ───────────────────────────────────────────────
+
 st.markdown(
     """
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+    <div class="cockpit-header">
         <span style="font-size:28px;">🧠</span>
-        <span style="font-size:clamp(16px, 4vw, 22px);font-weight:700;color:#e2e8f0;">
-            Multi-Agent Operations Center
-        </span>
-        <span style="font-size:12px;color:#6b7280;margin-left:auto;">
-            Qwen3 80B • 4 Agents • 4 Pipelines
+        <span class="cockpit-header-title">Operations Center</span>
+        <span class="cockpit-header-sub">
+            Qwen3 80B • 4 Agents • 7 Pipelines • MCP Ready
         </span>
     </div>
     """,
@@ -157,11 +166,12 @@ selected_pipeline = render_pipeline_selector()
 
 st.markdown("---")
 
-# Two columns: Chat (left ~70%) | Tool Stream (right ~30%)
-col_chat, col_tools = st.columns([7, 3])
+# ── Cockpit Layout: Center (results) | Right (activity) ─────────
 
-with col_chat:
-    # Chat area
+col_center, col_activity = st.columns([7, 3])
+
+with col_center:
+    # Clean chat — only user messages + final results
     render_chat_history(get_thread())
 
     # Pipeline flow visualization
@@ -175,12 +185,14 @@ with col_chat:
     # Task history
     render_task_history(get_thread())
 
-with col_tools:
-    # Tool Activity Stream
-    render_tool_stream(get_thread())
+with col_activity:
+    # Unified activity stream — tool calls, agent steps, pipeline events
+    render_activity_stream(get_thread())
 
 
-# ── Chat Input ───────────────────────────────────────────────────
+# ── Chat Input + Live Execution ──────────────────────────────────
+
+render_stop_button()
 
 user_input = st.chat_input(
     "Görev gönder — Qwen analiz edip specialist agent'lara yönlendirecek...",
@@ -191,22 +203,40 @@ if user_input and not st.session_state.processing:
     st.session_state.processing = True
     thread = get_thread()
 
+    # Initialize live monitor
+    monitor = LiveMonitor()
+    monitor.start(user_input)
+
     try:
         from agents.orchestrator import OrchestratorAgent
 
         orchestrator = OrchestratorAgent()
-        result = run_async(orchestrator.route_and_execute(user_input, thread))
+        forced_pipe = selected_pipeline if selected_pipeline != PipelineType.AUTO else None
+        result = run_async(orchestrator.route_and_execute(
+            user_input, thread, live_monitor=monitor, forced_pipeline=forced_pipe,
+        ))
         save_thread(thread)
         st.session_state.pop("last_error", None)
 
+        if st.session_state.get("stop_requested"):
+            monitor.error("Kullanıcı tarafından durduruldu")
+        else:
+            monitor.complete(result[:80] if result else "")
+
     except Exception as e:
         import traceback
-        st.session_state["last_error"] = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+        err_msg = f"{type(e).__name__}: {e}"
+        st.session_state["last_error"] = f"{err_msg}\n{traceback.format_exc()}"
+        monitor.error(err_msg)
     finally:
         st.session_state.processing = False
+        st.session_state.stop_requested = False
         st.rerun()
 
-# Show persistent error if exists
+# Show last execution log (collapsed)
+render_live_event_log()
+
+# Persistent error display
 if "last_error" in st.session_state:
     st.error(st.session_state["last_error"])
     if st.button("🗑️ Hatayı temizle"):

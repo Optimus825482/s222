@@ -68,3 +68,16 @@ def delete_thread(thread_id: str) -> bool:
         path.unlink()
         return True
     return False
+
+
+def delete_all_threads() -> int:
+    """Delete all thread files. Returns count of deleted threads."""
+    _ensure_dirs()
+    count = 0
+    for f in THREADS_DIR.glob("*.json"):
+        try:
+            f.unlink()
+            count += 1
+        except OSError:
+            continue
+    return count

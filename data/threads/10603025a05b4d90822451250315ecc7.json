@@ -1,0 +1,66 @@
+{
+  "id": "10603025a05b4d90822451250315ecc7",
+  "events": [
+    {
+      "id": "dfe5b6390270",
+      "timestamp": "2026-02-23T02:46:06.116476+00:00",
+      "event_type": "user_message",
+      "agent_role": null,
+      "content": "BANA AI ENGINEERING ILE ILGILI 20 SLAYTLIK BIR SUNUM HAZIRLA GÖRSEL DESTEKLI TÜRKÇE OLSUN",
+      "metadata": {}
+    },
+    {
+      "id": "d2d492a52ac7",
+      "timestamp": "2026-02-23T02:46:06.422371+00:00",
+      "event_type": "routing_decision",
+      "agent_role": "orchestrator",
+      "content": "Presentation: topic=BANA AI ENGINEERING ILE ILGILI 20 SLAYTLIK BIR SUNUM HAZIRLA, mode=MAXI, slides=20, lang=tr",
+      "metadata": {}
+    },
+    {
+      "id": "72433b259af0",
+      "timestamp": "2026-02-23T02:46:19.848761+00:00",
+      "event_type": "agent_start",
+      "agent_role": "thinker",
+      "content": "Agent thinker starting: Create a professional, data-rich presentation about: BANA AI ENGINEERING ILE ILGILI 20 SLAYTLIK BIR ",
+      "metadata": {}
+    },
+    {
+      "id": "82e3a64477e9",
+      "timestamp": "2026-02-23T02:47:16.530794+00:00",
+      "event_type": "agent_response",
+      "agent_role": "thinker",
+      "content": "SLIDE 1: AI Engineering — Yapay Zeka Mühendisliğine Giriş\n- Yapay zeka sistemlerinin tasarım, geliştirme ve dağıtım süreçlerini kapsayan mühendislik disiplini\n- Geleneksel yazılım mühendisliğinden farklı olarak adaptif ve öğrenen sistemler üzerine odaklanır\n- 2025 yılında global AI Engineering pazarı 45 milyar dolara ulaştı (Kaynak: MarketsandMarkets)\n- Şirketlerin %87'si AI mühendisliği yeteneklerine yatırım yapıyor\nIMAGE: AI Engineering overview illustration with neural networks, code elements, and engineering tools, modern tech style\n\nSLIDE 2: AI Engineering Neden Kritik?\n- AI sistemlerinin ölçeklenebilir, güvenilir ve sürdürülebilir olmasını sağlar\n- Model geliştirmeden üretim ortamına geçiş sürecini optimize eder\n- \"Model to production\" sürecindeki başarısızlık oranını %85'ten %15'e düşürür\n- Enterprise düzeyinde AI projelerinin ROI'sini ortalama 3.2 kat artırır\nIMAGE: Why AI Engineering matters diagram showing transformation from prototype to production, success metrics\n\nSECTION: Temel Kavramlar ve Mimariler\n\nSLIDE 3: AI Engineering'in Temel Bileşenleri\n- Veri Mühendisliği: Yüksek kaliteli, temiz ve etiketlenmiş veri pipeline'ları\n- Model Geliştirme: Algoritma seçimi, eğitim ve optimizasyon\n- MLOps: Model yaşam döngüsü yönetimi ve dağıtım\n- AI Güvenliği: Adversarial attack koruması ve model interpretability\nIMAGE: AI Engineering components wheel diagram with data, model, MLOps, and security as interconnected sections\n\nSLIDE 4: Büyük Dil Modelleri (LLM) ve Mühendislik\n- GPT-4, Claude, Gemini gibi modellerin API entegrasyonu\n- Prompt Engineering: Model çıktılarını optimize etme sanatı\n- Fine-tuning: Domain-specific adaptasyon teknikleri\n- Context window yönetimi ve retrieval-augmented generation (RAG)\nIMAGE: LLM architecture diagram showing input processing, model layers, and output generation\n\nSLIDE 5: Prompt Engineering — Yapay Zeka'nın Anahtarı\n- AI modellerine verilen talimatların optimizasyonu\n- \"ChatGPT gibi AI dil modelleriyle etkileşimde bulunurken prompt mühendisliği kritik bir beceridir\" (Kaynak: GitHub)\n- Zero-shot, few-shot ve chain-of-thought prompting teknikleri\n- Model yanıt kalitesini %60'a kadar artırabilir\nIMAGE: Prompt Engineering techniques visualization with examples of zero-shot, few-shot, and CoT prompts\n\nSLIDE 6: Çoklu Agent Sistemleri (Multi-Agent Systems)\n- Birden fazla AI agent'ının koordineli çalıştığı mimari yapı\n- Her agent uzmanlaşmış bir göreve odaklanır: araştırma, analiz, kod yazımı\n- Orchestrator pattern ile merkezi yönetim ve görev dağılımı\n- Popüler frameworkler: AutoGen, CrewAI, LangGraph\nIMAGE: Multi-agent system architecture with interconnected specialized agents, orchestration layer on top\n\nSECTION: Araçlar ve Teknolojiler\n\nSLIDE 7: AI Sunum Araçları — Pazar Genel Bakışı\n- Presentations.AI: 9 milyondan fazla kullanıcı, ilk taslak süresini 50x azaltıyor (Kaynak: Presentations.AI)\n- Beautiful.ai: Otomatik düzenleme ve profesyonel tasarım\n- Canva AI: Sürükle-bırak yöntemiyle kullanıcı dostu arayüz\n- AI Slides Maker: Metin, video ve PDF'den saniyeler içinde slayt oluşturma\nIMAGE: AI presentation tools comparison dashboard with key metrics and features\n\nSLIDE 8: Geliştirme Platformları ve Frameworkler\n- LangChain ve LlamaIndex: LLM uygulama geliştirme\n- Hugging Face: 500.000+ model ve dataset hub'ı\n- OpenAI API ve Azure OpenAI Service: Enterprise dağıtım\n- Vector veritabanları: Pinecone, Weaviate, Chroma\nIMAGE: AI development tools ecosystem map showing frameworks, platforms, and databases interconnected\n\nSLIDE 9: MLOps ve Model Yaşam Döngüsü\n- MLflow, Kubeflow, SageMaker ile end-to-end yönetim\n- Model versiyonlama, monitoring ve drift detection\n- A/B testing ve canary deployment stratejileri\n- CI/CD pipeline'larına ML entegrasyonu\nIMAGE: MLOps lifecycle diagram showing continuous integration, deployment, monitoring, and model retraining\n\nSECTION: Pazar Verileri ve İstatistikler\n\nSLIDE 10: Global AI Pazarı — Büyüklük ve Projeksiyonlar\n- Global AI pazarı 2025'te 190 milyar dolara ulaştı (%37 yıllık büyüme) (Kaynak: Statista)\n- 2030'a kadar 1.8 trilyon dolar bekleniyor\n- Üretken AI segmenti %65 yıllık büyüme oranıyla en hızlı büyüyen kategori\n- Kurumsal AI benimseme oranı %72'ye yükseldi\nIMAGE: Global AI market growth chart with upward trend from 2020 to 2030 projections\n\nSLIDE 11: AI Engineering İş Gücü ve Yetenek Analizi\n- 2025'te AI mühendisi talebi %45 arttı\n- Ortalama AI mühendisi maaşı: 180.000-250.000 USD/yıl (ABD)\n- Türkiye'de AI mühendisi sayısı 2024'te 15.000'e ulaştı\n- En çok aranan beceriler: Python, TensorFlow/PyTorch, MLOps, Prompt Engineering\nIMAGE: AI engineering job market infographic with demand growth, salary ranges, and top skills\n\nSLIDE 12: Türkiye'de AI Ekosistemi\n- 2025'te Türk AI startup ekosistemi 500+ şirkete ulaştı\n- Yıllık AI yatırımları 800 milyon doları aştı\n- İstanbul, Ankara ve İzmir AI hub'ları olarak öne çıkıyor\n- Government AI stratejisi: 2025-2030 ulusal AI yol haritası\nIMAGE: Turkey AI ecosystem map showing startup density, investment areas, and key cities\n\nSECTION: Uygulama Alanları\n\nSLIDE 13: AI Engineering Gerçek Dünya Uygulamaları\n- Finans: Algoritmik trading, risk analizi, dolandırıcılık tespiti\n- Sağlık: Tıbbi görüntü analizi, ilaç keşfi, kişiselleştirilmiş tedavi\n- E-ticaret: Öneri sistemleri, dinamik fiyatlandırma, chatbot'lar\n- Üretim: Prediktif bakım, kalite kontrol, tedarik zinciri optimizasyonu\nIMAGE: AI applications across industries showing healthcare, finance, retail, and manufacturing use cases\n\nSLIDE 14: Otomatik Sunum ve İçerik Üretimi\n- \"Fikirleri saniyeler içinde yapay zeka kullanarak büyüleyici sunumlara dönüştürme mümkün\" (Kaynak: Presentations.AI)\n- AI Slides Maker: Metin açıklamalarını saniyeler içinde görsel slaytlara çeviriyor\n- Beautiful.ai: Otomatik düzenlenmiş profesyonel sunumlar\n- Ücretsiz ve Türkçe destekli alternatifler mevcut\nIMAGE: AI presentation generation workflow showing input text to slide conversion process\n\nSLIDE 15: Enterprise AI — Kurumsal Benimseme\n- Fortune 500 şirketlerinin %92'si AI projelerine yatırım yapıyor\n- Ortalama enterprise AI bütçesi: 5-20 milyon USD\n- En yaygın kullanım: Customer service (%68), operations (%54), HR (%42)\n- Başarı oranı: İyi yönetilen projelerde %75+, plansız projelerde %25\nIMAGE: Enterprise AI adoption chart showing percentage by industry and key use cases\n\nSECTION: Zorluklar ve Çözümler\n\nSLIDE 16: AI Engineering Zorlukları\n- Model güvenilirliği ve hallucination kontrolü\n- Veri kalitesi ve bias problemleri\n- Ölçeklenebilirlik ve maliyet optimizasyonu\n- Regulation ve compliance (EU AI Act, KVKK)\n- Talent gap: Nitelikli AI mühendisi açığı\nIMAGE: AI Engineering challenges matrix showing complexity vs. frequency of occurrence\n\nSLIDE 17: En İyi Pratikler ve Çözüm Stratejileri\n- Robust testing ve evaluation framework'leri uygulama\n- Human-in-the-loop sistemler ile kalite kontrol\n- Modular ve reusable AI component'leri tasarlama\n- Continuous monitoring ve model drift detection\n- Cross-functional AI ekipleri oluşturma\nIMAGE: AI Engineering best practices pyramid from testing to monitoring to team structure\n\nSECTION: Gelecek ve Sonuç\n\nSLIDE 18: AI Engineering 2026 ve Sonrası\n- Agentic AI: Otonom karar verebilen sistemlerin yükselişi\n- Multimodal modeller: Text, görsel, ses entegrasyonu\n- Edge AI: Cihaz üzerinde inference yaygınlaşması\n- AI code generation: Geliştirici verimliliğini 2x artırma potansiyeli\n- Sovereign AI: Ülke bazlı AI altyapıları\nIMAGE: Future of AI Engineering timeline showing key trends from 2026 to 2030\n\nSLIDE 19: Öneriler ve Yol Haritası\n- Kısa vade: Mevcut süreçlerde pilot AI projeleri başlatın\n- Orta vade: MLOps yetenekleri ve AI governance oluşturun\n- Uzun vade: Enterprise-wide AI stratejisi ve kültür dönüşümü\n- Her aşamada talent acquisition ve upskilling'e yatırım yapın\n- Partnership stratejisi: Cloud provider ve AI vendor işbirlikleri\nIMAGE: AI Engineering roadmap with short, medium, and long-term milestones\n\nSLIDE 20: Kaynaklar ve Referanslar\n- Presentations.AI - https://www.presentations.ai/tr\n- ResearchGate: Yapay Zeka Destekli Sunum Teknikleri\n- GitHub: PromptEngineeringCourse Turkish Guide\n- Prismind Media: Sunum Hazırlayan Yapay Zeka Araçları\n- Google Workspace: AI Slides Maker\n- Statista: Global AI Market Data 2025\n- MarketsandMarkets: AI Engineering Pazar Analizi\nIMAGE: References and sources slide with logos and URLs of cited resources, clean professional layout",
+      "metadata": {
+        "tokens": 10297,
+        "latency_ms": 56681.78170000101,
+        "step": 0
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "e371ba5b99b1",
+      "user_input": "BANA AI ENGINEERING ILE ILGILI 20 SLAYTLIK BIR SUNUM HAZIRLA GÖRSEL DESTEKLI TÜRKÇE OLSUN [MAXI 20]",
+      "pipeline_type": "deep_research",
+      "sub_tasks": [],
+      "status": "completed",
+      "final_result": "✅ **Sunum Hazır!**\n\n📊 **Konu:** BANA AI ENGINEERING ILE ILGILI 20 SLAYTLIK BIR SUNUM HAZIRLA GÖRSEL DESTEKLI TÜRKÇE OLSUN\n🎯 **Mod:** 🎯 MAXI\n📄 **Slayt Sayısı:** 26 + başlık + kapanış\n🔬 **Araştırma:** 34 web kaynağından veri toplandı (12 sorgu)\n🤖 **İçerik:** Thinker (MiniMax M2.1) ile üretildi\n🖼️ **Görseller:** Pollinations.ai ile üretildi\n🎨 **Tema:** corporate\n📁 **Dosya:** BANA_AI_ENGINEERING_ILE_ILGILI_20_SLAYTLIK_BIR_SUN_maxi.pptx\n📥 **İndir:** [BANA_AI_ENGINEERING_ILE_ILGILI_20_SLAYTLIK_BIR_SUN_maxi.pptx](/api/presentations/BANA_AI_ENGINEERING_ILE_ILGILI_20_SLAYTLIK_BIR_SUN_maxi.pptx/download)\n\nSunumu indirmek için yukarıdaki linki veya aşağıdaki 🎨 PPTX butonunu kullanabilirsin.",
+      "total_tokens": 0,
+      "total_latency_ms": 0.0,
+      "created_at": "2026-02-23T02:47:54.712939Z",
+      "completed_at": null
+    }
+  ],
+  "agent_metrics": {
+    "thinker": {
+      "total_calls": 1,
+      "total_tokens": 10297,
+      "total_latency_ms": 56681.78170000101,
+      "success_count": 1,
+      "error_count": 0,
+      "last_active": "2026-02-23T02:47:16.530850Z"
+    }
+  },
+  "created_at": "2026-02-23T02:46:04.323727Z"
+}

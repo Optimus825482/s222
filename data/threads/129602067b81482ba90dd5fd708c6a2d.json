@@ -1,0 +1,310 @@
+{
+  "id": "129602067b81482ba90dd5fd708c6a2d",
+  "events": [
+    {
+      "id": "cbda4daca99b",
+      "timestamp": "2026-02-22T16:58:52.560789+00:00",
+      "event_type": "user_message",
+      "agent_role": null,
+      "content": "bana turizm sektöründeki dünya genelince bu hafta olan öneli olayları araştır ve raporla",
+      "metadata": {}
+    },
+    {
+      "id": "45b6f755e272",
+      "timestamp": "2026-02-22T16:58:52.560831+00:00",
+      "event_type": "agent_start",
+      "agent_role": "orchestrator",
+      "content": "Agent orchestrator starting: bana turizm sektöründeki dünya genelince bu hafta olan öneli olayları araştır ve raporla",
+      "metadata": {}
+    },
+    {
+      "id": "a9c7930ddb08",
+      "timestamp": "2026-02-22T16:59:02.729668+00:00",
+      "event_type": "tool_call",
+      "agent_role": "orchestrator",
+      "content": "researcher({})",
+      "metadata": {}
+    },
+    {
+      "id": "07ee93b208ef",
+      "timestamp": "2026-02-22T16:59:02.729738+00:00",
+      "event_type": "routing_decision",
+      "agent_role": "orchestrator",
+      "content": "Pipeline: sequential | Sub-tasks: 1 | Auto-routed: model called researcher directly",
+      "metadata": {}
+    },
+    {
+      "id": "4196cf41695d",
+      "timestamp": "2026-02-22T16:59:02.729752+00:00",
+      "event_type": "tool_result",
+      "agent_role": "orchestrator",
+      "content": "Task decomposed → sequential pipeline:\n  1. [researcher] {}",
+      "metadata": {}
+    },
+    {
+      "id": "2c0ac0ff2080",
+      "timestamp": "2026-02-22T16:59:08.204888+00:00",
+      "event_type": "tool_call",
+      "agent_role": "orchestrator",
+      "content": "web_search({\"query\": \"küresel turizm sektörü bu hafta önemli olaylar 2025\", \"max_results\": 5})",
+      "metadata": {}
+    },
+    {
+      "id": "542dbb000533",
+      "timestamp": "2026-02-22T16:59:11.568912+00:00",
+      "event_type": "tool_result",
+      "agent_role": "orchestrator",
+      "content": "<search_results>\n  [1] 2025 yılı turizm geliri 65 milyar 231 milyon dolar\n      URL: https://www.ekonomim.com/ekonomi/2025-yili-turizm-geliri-65-milyar-231-milyon-dolar-haberi-872678\n      1 Şub 2026 — Türkiye'ye 2025 yılında en çok ziyaretçi gönderen ilk üç ülke 6,90 milyon ile Rusya Federasyonu, 6,75 milyon ile Almanya, 4,27 milyon ile ...\n  [2] Küresel turizm 2025'i rekorla kapattı! - Gündem - Turizm News\n      URL: https://www.turizmnews.com/kuresel-turizm-2025-i-rekorla-kapatti/38253/\n     ",
+      "metadata": {}
+    },
+    {
+      "id": "a59561b53e6c",
+      "timestamp": "2026-02-22T16:59:17.276624+00:00",
+      "event_type": "tool_call",
+      "agent_role": "orchestrator",
+      "content": "web_fetch({\"url\": \"https://www.turizmnews.com/kuresel-turizm-2025-i-rekorla-kapatti/38253/\"})",
+      "metadata": {}
+    },
+    {
+      "id": "406a67000dae",
+      "timestamp": "2026-02-22T16:59:19.335468+00:00",
+      "event_type": "tool_result",
+      "agent_role": "orchestrator",
+      "content": "<web_page>\n  <url>https://www.turizmnews.com/kuresel-turizm-2025-i-rekorla-kapatti/38253/</url>\n  <title>Küresel turizm 2025'i rekorla kapattı! - Gündem - Turizm News</title>\n  <content>\nKüresel turizm 2025'i rekorla kapattı! - Gündem - Turizm News \n \n \n \n \n \n \n\n \n \n\n \n\n \n \n \n Bugün \n \n Video Galeri Yazarlar \n \n A \nBüyüt A \nKüçült \nYorumlar \n \n \n \n \n \n \n \n Gündem \n Yayınlanma: 20 Ocak 2026 - 00:00 \n Güncelleme: 21 Ocak 2026 - 20:15 \n Küresel turizm 2025'i rekorla kapattı! \nKüresel turizm sektörü",
+      "metadata": {}
+    },
+    {
+      "id": "abaeac74c368",
+      "timestamp": "2026-02-22T16:59:21.241009+00:00",
+      "event_type": "tool_call",
+      "agent_role": "orchestrator",
+      "content": "web_fetch({\"url\": \"https://www.ekonomim.com/ekonomi/2025-yili-turizm-geliri-65-milyar-231-milyon-dolar-haberi-872678\"})",
+      "metadata": {}
+    },
+    {
+      "id": "293337a941a7",
+      "timestamp": "2026-02-22T16:59:22.739844+00:00",
+      "event_type": "tool_result",
+      "agent_role": "orchestrator",
+      "content": "<web_page>\n  <url>https://www.ekonomim.com/ekonomi/2025-yili-turizm-geliri-65-milyar-231-milyon-dolar-haberi-872678</url>\n  <title>2025 yılı turizm geliri 65 milyar 231 milyon dolar - Ekonomim</title>\n  <content>\n2025 yılı turizm geliri 65 milyar 231 milyon dolar - Ekonomim\n \n \n \n \n\n \n\n \n\n \n\n \n\n \n \n \n \n\n \n\n \n\n \n\n \n \n \n \n \n \n \n \n \n \n\n \n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n\n \n \n \n \n\n \n \n\n \n \n\n \n\n \n\n \n \n \n\n \n \n \r\n\r\n\r\n\r\n\r\n\n\r\n\r\n\r\n\r\n\r\n\r\n\n\r\n\n \r\n\r\n\r\n\r\n \r\n\n \n\n \n\n \n \n\n \n\n \n\n \n\n \n \n \n \n\n \n\n \n \n \n \n ",
+      "metadata": {}
+    },
+    {
+      "id": "59c1e2357687",
+      "timestamp": "2026-02-22T16:59:24.476580+00:00",
+      "event_type": "tool_call",
+      "agent_role": "orchestrator",
+      "content": "web_fetch({\"url\": \"https://tr.linkedin.com/pulse/seyahat-ve-turizmde-d%C3%B6n%C3%BC%C5%9F%C3%BCm-zaman%C4%B1-d%C3%BCnya-ekonomik-nysxc\"})",
+      "metadata": {}
+    },
+    {
+      "id": "bd8ab63c5b0a",
+      "timestamp": "2026-02-22T16:59:25.406723+00:00",
+      "event_type": "tool_result",
+      "agent_role": "orchestrator",
+      "content": "<web_page>\n  <url>https://tr.linkedin.com/pulse/seyahat-ve-turizmde-d%C3%B6n%C3%BC%C5%9F%C3%BCm-zaman%C4%B1-d%C3%BCnya-ekonomik-nysxc</url>\n  <title>Seyahat ve Turizmde Dönüşüm Zamanı: WEF Raporu</title>\n  <content>\nSeyahat ve Turizmde Dönüşüm Zamanı: WEF Raporu\n \n\n \n \n \n \n\n \n \n \n \n \n \n\n \n \n \n \n \n \n \n \n \n \n\n \n \n \n \n \n \n \n \n \n \n\n \n \n \n\n \n \n \n \n \n \n \n \n \n\n \n\n \n\n Kabul Et ve LinkedIn’e Katıl\n \n \n \n \n \n \n\n Devam’ı tıklayarak veya oturum açarak LinkedIn Kullanıcı Anlaşması’nı, Gizlilik Politikası’nı ",
+      "metadata": {}
+    },
+    {
+      "id": "c570ad491d0b",
+      "timestamp": "2026-02-22T16:59:29.395880+00:00",
+      "event_type": "tool_call",
+      "agent_role": "orchestrator",
+      "content": "web_fetch({\"url\": \"https://www.tourismtoday.net/TR/2025/2710/2025-Turkiye-turizm-sektorunun-dort-ayaginda-gerceklerden-suzulen-yasanmisliklar\"})",
+      "metadata": {}
+    },
+    {
+      "id": "739c9cc92719",
+      "timestamp": "2026-02-22T16:59:30.817091+00:00",
+      "event_type": "tool_result",
+      "agent_role": "orchestrator",
+      "content": "<web_page>\n  <url>https://www.tourismtoday.net/TR/2025/2710/2025-Turkiye-turizm-sektorunun-dort-ayaginda-gerceklerden-suzulen-yasanmisliklar</url>\n  <title>2025 T&#xFC;rkiye turizm sekt&#xF6;r&#xFC;n&#xFC;n d&#xF6;rt aya&#x11F;&#x131;nda ger&#xE7;eklerden s&#xFC;z&#xFC;len ya&#x15F;anm&#x131;&#x15F;l&#x131;klar</title>\n  <content>\n2025 T&#xFC;rkiye turizm sekt&#xF6;r&#xFC;n&#xFC;n d&#xF6;rt aya&#x11F;&#x131;nda ger&#xE7;eklerden s&#xFC;z&#xFC;len ya&#x15F;anm&#x131;&#x15F;l&#x131;klar\r\n \r\n \r\n\r\n ",
+      "metadata": {}
+    },
+    {
+      "id": "7422a88ea7f6",
+      "timestamp": "2026-02-22T16:59:32.511024+00:00",
+      "event_type": "tool_call",
+      "agent_role": "orchestrator",
+      "content": "reasoner({})",
+      "metadata": {}
+    },
+    {
+      "id": "723a0738903d",
+      "timestamp": "2026-02-22T16:59:32.511137+00:00",
+      "event_type": "routing_decision",
+      "agent_role": "orchestrator",
+      "content": "Pipeline: sequential | Sub-tasks: 1 | Auto-routed: model called reasoner directly",
+      "metadata": {}
+    },
+    {
+      "id": "081b0b3c8800",
+      "timestamp": "2026-02-22T16:59:32.511164+00:00",
+      "event_type": "tool_result",
+      "agent_role": "orchestrator",
+      "content": "Task decomposed → sequential pipeline:\n  1. [reasoner] {}",
+      "metadata": {}
+    },
+    {
+      "id": "258df04fe828",
+      "timestamp": "2026-02-22T16:59:54.161379+00:00",
+      "event_type": "tool_call",
+      "agent_role": "orchestrator",
+      "content": "synthesize_results({\"final_response\": \"Bu hafta küresel turizm sektöründe yaşanan önemli olaylar, 2025 yılının rekor performansı ve sektörün sürdürülebilirlik yolundaki dönüşümü üzerine odaklanmaktadır. İşte ana bulgula)",
+      "metadata": {}
+    },
+    {
+      "id": "4920ced6baaf",
+      "timestamp": "2026-02-22T16:59:54.162675+00:00",
+      "event_type": "tool_result",
+      "agent_role": "orchestrator",
+      "content": "Bu hafta küresel turizm sektöründe yaşanan önemli olaylar, 2025 yılının rekor performansı ve sektörün sürdürülebilirlik yolundaki dönüşümü üzerine odaklanmaktadır. İşte ana bulgular:\n\n### 1. **Küresel Turizm 2025’i Rekorla Kapattı**\n- Dünya Seyahat ve Turizm Konseyi (WTTC) verilerine göre, 2025 yılında küresel turizm sektörü, 10 trilyon euro ekonomik katkı ile tarihinin en güçlü yılını tamamladı. Bu katkı, dünya GSYİH’sının %10,3’ünü oluşturdu.\n- Uluslararası seyahat sayısı 1,5 milyarın üzerine ",
+      "metadata": {}
+    },
+    {
+      "id": "046f17bb8f5d",
+      "timestamp": "2026-02-22T17:00:29.395280+00:00",
+      "event_type": "agent_response",
+      "agent_role": "orchestrator",
+      "content": "Bu hafta küresel turizm sektöründe yaşanan önemli olaylar, 2025 yılının rekor performansı ve sektörün sürdürülebilirlik yolundaki dönüşümü üzerine odaklanmaktadır. İşte ana bulgular:\n\n### 1. **Küresel Turizm 2025’i Rekorla Kapattı**\n- Dünya Seyahat ve Turizm Konseyi (WTTC) verilerine göre, 2025 yılında küresel turizm sektörü, 10 trilyon euro ekonomik katkı ile tarihinin en güçlü yılını tamamladı. Bu katkı, dünya GSYİH’sının %10,3’ünü oluşturdu.\n- Uluslararası seyahat sayısı 1,5 milyarın üzerine çıktı (2024’e göre +80 milyon). Günlük ortalama 219 bin uluslararası varış kaydedildi.\n- Sektör, pandemi sonrası tamamen toparlanarak 2019 seviyelerinin %11,6 üzerinde büyüdü.\n\n### 2. **Avrupa ve İspanya: Yeni Rekorlar**\n- Avrupa, turizmin ekonomik katkısıyla 2,5 trilyon euroya ulaştı ve GSYİH’sının yaklaşık %10’unu oluşturdu.\n- İspanya, 96,5 milyon uluslararası turist ağırlayarak yeni bir rekor kırarak, turizmin doğrudan ve dolaylı ekonomik etkisini 260 milyar euroya çıkardı. Sektör, ülke ekonomisinin %16’sını oluşturdu ve 3,2 milyon kişiye istihdam sağladı.\n\n### 3. **ABD: Tek Düşüş**\n- Küresel büyüme trendinin aksine, ABD 2025’te uluslararası turist harcamalarında yaklaşık 16,3 milyar euro azalma yaşadı. Bu, ABD’nin küresel turizmdeki tek negatif performansı oldu.\n\n### 4. **Türkiye: Rekor Gelir ve Ziyaretçi Sayısı**\n- Türkiye, 2025 yılında 65,2 milyar dolar turizm geliri elde ederek tüm yılların rekorunu kırdı. 64 milyon ziyaretçi ağırladı (2024: 62,3 milyon).\n- Ziyaretçi sayısı açısından en büyük kaynak ülkeler: Rusya (6,9 milyon), Almanya (6,75 milyon), Birleşik Krallık (4,27 milyon).\n- Kişi başı ortalama gecelik harcama 100 dolara ulaştı (2024: 96,5 dolar).\n- “Mini dizi” kampanyaları (örn. \"An Istanbul Story\") 32 milyon izlenme ile küresel etki yarattı.\n\n### 5. **Sürdürülebilirlik ve Dönüşüm: WEF Raporu**\n- Dünya Ekonomik Forumu (WEF), Temmuz 2025’te yayımlanan raporda, turizmin 2034’e kadar küresel GSYİH’ya 16 trilyon dolar katkı sağlayabileceğini, ancak bu büyümenin iklim, işgücü ve toplumsal gerilimlerle dengelenmesi gerektiğini vurguladı.\n- Turizm, küresel sera gazı emisyonlarının %8’ini oluşturuyor; bunun %40’ı ulaşım kaynaklı.\n- WEF, 10 temel ilke önerdi: Kişiselleştirilmiş deneyimler, yerel ekonomilere yatırım, sürdürülebilir altyapı, kriz dayanıklılığı ve doğayı yenileyen (regenerative) uygulamalar.\n- Anti-turizm protestoları (Barcelona, İtalya, Portekiz) sektörün sosyal sürdürülebilirlik sorunlarını vurguladı.\n\n### 6. **Türkiye’de Dönüşüm: Deneyim Odaklı Turizm**\n- Türkiye’de 2025, klasik paket turun yerini kişiselleştirilmiş, kültür, ekoturizm ve gastronomi odaklı deneyimlerin aldığı bir yıl oldu.\n- Bireysel tur harcamaları 16 milyar dolara ulaştı; paket tur harcamaları %33,6’ya indi.\n- Gecelik harcama 106 dolara yükseldi; kalış süresi 10 geceye düşse de, harcama verimliliği arttı.\n- “Geleceğe Miras” ve gece müzeciliği gibi yenilikler, Türkiye’yi küresel turizmde öncü konuma getirdi.\n\n### Sonuç:\n2025, turizm sektörü için hem ekonomik rekorların hem de sürdürülebilirlik çağrısının zirvesi oldu. Türkiye ve İspanya gibi ülkeler, deneyim odaklı ve kültürel zenginlikle büyüdüler; ancak küresel düzeyde, iklim krizi, aşırı turizm ve işgücü eksikliği gibi sorunlar, sektörün geleceğini şekillendirmek için acil eylem gerektiriyor. WTTC ve WEF gibi kurumlar, sektörün sadece büyümesini değil, dönüşümünü talep ediyor.",
+      "metadata": {
+        "tokens": 18100,
+        "latency_ms": 35232.02689999016,
+        "step": 8
+      }
+    },
+    {
+      "id": "50b88bdbd559",
+      "timestamp": "2026-02-22T17:00:31.554044+00:00",
+      "event_type": "pipeline_start",
+      "agent_role": null,
+      "content": "Starting sequential pipeline with 1 sub-tasks",
+      "metadata": {}
+    },
+    {
+      "id": "8a4c89260327",
+      "timestamp": "2026-02-22T17:00:31.554108+00:00",
+      "event_type": "pipeline_step",
+      "agent_role": "reasoner",
+      "content": "[reasoner] {}",
+      "metadata": {}
+    },
+    {
+      "id": "17a169f33365",
+      "timestamp": "2026-02-22T17:00:31.554122+00:00",
+      "event_type": "agent_start",
+      "agent_role": "reasoner",
+      "content": "Agent reasoner starting: Original request: reasoner({})\n\nPrevious context:\nreasoner({})\n\nYour task: {}",
+      "metadata": {}
+    },
+    {
+      "id": "d121d1390b12",
+      "timestamp": "2026-02-22T17:00:31.557825+00:00",
+      "event_type": "error",
+      "agent_role": "reasoner",
+      "content": "LLM call failed: RuntimeError: cannot schedule new futures after shutdown",
+      "metadata": {}
+    },
+    {
+      "id": "8e9faefff7d3",
+      "timestamp": "2026-02-22T17:00:31.558009+00:00",
+      "event_type": "pipeline_complete",
+      "agent_role": null,
+      "content": "Pipeline sequential completed: completed",
+      "metadata": {
+        "latency_ms": 3.916599991498515
+      }
+    },
+    {
+      "id": "103da9e39b67",
+      "timestamp": "2026-02-22T17:00:31.558032+00:00",
+      "event_type": "agent_start",
+      "agent_role": "orchestrator",
+      "content": "Agent orchestrator starting: The specialists have completed their work. Here are the results:\n\n[reasoner] [Error] LLM call failed",
+      "metadata": {}
+    },
+    {
+      "id": "8b16a36f69f1",
+      "timestamp": "2026-02-22T17:00:50.437587+00:00",
+      "event_type": "agent_response",
+      "agent_role": "orchestrator",
+      "content": "Bu hafta küresel turizm sektöründe yaşanan önemli olaylar, 2025 yılının rekor performansı ve sektörün sürdürülebilirlik yolundaki dönüşümü üzerine odaklanmaktadır. İşte ana bulgular:\n\n---\n\n### **1. Küresel Turizm 2025’i Rekorla Kapattı**\n- **Dünya Seyahat ve Turizm Konseyi (WTTC)** verilerine göre, 2025 yılında küresel turizm sektörü, **10 trilyon euro** ekonomik katkı ile tarihinin en güçlü yılını tamamladı. Bu katkı, dünya GSYİH’sının %10,3’ünü oluşturdu.\n- Uluslararası seyahat sayısı **1,5 milyarın** üzerine çıktı (2024’e göre +80 milyon). Günlük ortalama **219 bin** uluslararası varış kaydedildi.\n- Sektör, pandemi sonrası tamamen toparlanarak **2019 seviyelerinin %11,6 üzerinde** büyüdü.\n\n---\n\n### **2. Avrupa ve İspanya: Yeni Rekorlar**\n- **Avrupa**, turizmin ekonomik katkısıyla **2,5 trilyon euro**ya ulaştı ve GSYİH’sının yaklaşık %10’unu oluşturdu.\n- **İspanya**, 96,5 milyon uluslararası turist ağırlayarak yeni bir rekor kırarak, turizmin doğrudan ve dolaylı ekonomik etkisini **260 milyar euro**ya çıkardı. Sektör, ülke ekonomisinin %16’sını oluşturdu ve **3,2 milyon kişiye istihdam** sağladı.\n\n---\n\n### **3. ABD: Tek Düşüş**\n- Küresel büyüme trendinin aksine, **ABD** 2025’te uluslararası turist harcamalarında yaklaşık **16,3 milyar euro azalma** yaşadı. Bu, ABD’nin küresel turizmdeki tek negatif performansı oldu. Nedenleri arasında döviz kuru dalgalanmaları, güvenlik endişeleri ve rekabetçi alternatif destinasyonlar (Türkiye, Türkiye, Güneydoğu Asya) sayılabilir.\n\n---\n\n### **4. Türkiye: Rekor Gelir ve Ziyaretçi Sayısı**\n- Türkiye, 2025 yılında **65,2 milyar dolar** turizm geliri elde ederek tüm yılların rekorunu kırdı. **64 milyon** ziyaretçi ağırladı (2024: 62,3 milyon).\n- Ziyaretçi sayısı açısından en büyük kaynak ülkeler:  \n  - **Rusya** (6,9 milyon)  \n  - **Almanya** (6,75 milyon)  \n  - **Birleşik Krallık** (4,27 milyon)\n- Kişi başı ortalama gecelik harcama **100 dolara** ulaştı (2024: 96,5 dolar).\n- “Mini dizi” kampanyaları (örn. *An Istanbul Story*) **32 milyon izlenme** ile küresel etki yarattı ve Türkiye’yi dijital pazarlamada öncü konuma getirdi.\n\n---\n\n### **5. Sürdürülebilirlik ve Dönüşüm: WEF Raporu**\n- **Dünya Ekonomik Forumu (WEF)**, Temmuz 2025’te yayımlanan raporda, turizmin 2034’e kadar küresel GSYİH’ya **16 trilyon dolar** katkı sağlayabileceğini, ancak bu büyümenin iklim, işgücü ve toplumsal gerilimlerle dengelenmesi gerektiğini vurguladı.\n- Turizm, küresel sera gazı emisyonlarının **%8’ini** oluşturuyor; bunun **%40’ı ulaşım kaynaklı**.\n- WEF, 10 temel ilke önerdi:  \n  - Kişiselleştirilmiş deneyimler  \n  - Yerel ekonomilere yatırım  \n  - Sürdürülebilir altyapı  \n  - Kriz dayanıklılığı  \n  - Doğayı yenileyen (regenerative) uygulamalar\n- Anti-turizm protestoları (Barcelona, İtalya, Portekiz) sektörün **sosyal sürdürülebilirlik sorunlarını** vurguladı.\n\n---\n\n### **6. Türkiye’de Dönüşüm: Deneyim Odaklı Turizm**\n- Türkiye’de 2025, klasik paket turun yerini **kişiselleştirilmiş, kültür, ekoturizm ve gastronomi odaklı deneyimlerin** aldığı bir yıl oldu.\n- Bireysel tur harcamaları **16 milyar dolara** ulaştı; paket tur harcamaları %33,6’ya indi.\n- Gecelik harcama 106 dolara yükseldi; kalış süresi 10 geceye düşse de, **harcama verimliliği arttı**.\n- “Geleceğe Miras” ve gece müzeciliği gibi yenilikler, Türkiye’yi küresel turizmde öncü konuma getirdi.\n\n---\n\n### **Sonuç**\n2025, turizm sektörü için hem **ekonomik rekorların** hem de **sürdürülebilirlik çağrısının zirvesi** oldu. Türkiye ve İspanya gibi ülkeler, deneyim odaklı ve kültürel zenginlikle büyüdüler; ancak küresel düzeyde, **iklim krizi, aşırı turizm ve işgücü eksikliği** gibi sorunlar, sektörün geleceğini şekillendirmek için **acil eylem gerektiriyor**. WTTC ve WEF gibi kurumlar, sektörün sadece büyümesini değil, **dönüşümünü** talep ediyor.\n\n> ✅ **Özetle:** *Turizm artık sadece sayı değil, kalite, sorumluluk ve deneyimdir. 2025, bu dönüşümün başlangıcı oldu.*\n\n---  \n*Kaynaklar: WTTC, WEF, Turizm News, Ekonomim, Tourism Today (2025 verileri)*",
+      "metadata": {
+        "tokens": 6955,
+        "latency_ms": 18865.99049999495,
+        "step": 0
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "102b1640b7b7",
+      "user_input": "researcher({})",
+      "pipeline_type": "sequential",
+      "sub_tasks": [
+        {
+          "id": "5abe412425e9",
+          "description": "{}",
+          "assigned_agent": "researcher",
+          "priority": 1,
+          "depends_on": [],
+          "skills": [],
+          "status": "pending",
+          "result": null,
+          "token_usage": 0,
+          "latency_ms": 0.0
+        }
+      ],
+      "status": "pending",
+      "final_result": null,
+      "total_tokens": 0,
+      "total_latency_ms": 0.0,
+      "created_at": "2026-02-22T16:59:02.729726Z",
+      "completed_at": null
+    },
+    {
+      "id": "2a55c56ee36a",
+      "user_input": "reasoner({})",
+      "pipeline_type": "sequential",
+      "sub_tasks": [
+        {
+          "id": "f4473ef7f1f4",
+          "description": "{}",
+          "assigned_agent": "reasoner",
+          "priority": 1,
+          "depends_on": [],
+          "skills": [],
+          "status": "completed",
+          "result": "[Error] LLM call failed: RuntimeError: cannot schedule new futures after shutdown",
+          "token_usage": 0,
+          "latency_ms": 3.8389000110328197
+        }
+      ],
+      "status": "completed",
+      "final_result": "Bu hafta küresel turizm sektöründe yaşanan önemli olaylar, 2025 yılının rekor performansı ve sektörün sürdürülebilirlik yolundaki dönüşümü üzerine odaklanmaktadır. İşte ana bulgular:\n\n---\n\n### **1. Küresel Turizm 2025’i Rekorla Kapattı**\n- **Dünya Seyahat ve Turizm Konseyi (WTTC)** verilerine göre, 2025 yılında küresel turizm sektörü, **10 trilyon euro** ekonomik katkı ile tarihinin en güçlü yılını tamamladı. Bu katkı, dünya GSYİH’sının %10,3’ünü oluşturdu.\n- Uluslararası seyahat sayısı **1,5 milyarın** üzerine çıktı (2024’e göre +80 milyon). Günlük ortalama **219 bin** uluslararası varış kaydedildi.\n- Sektör, pandemi sonrası tamamen toparlanarak **2019 seviyelerinin %11,6 üzerinde** büyüdü.\n\n---\n\n### **2. Avrupa ve İspanya: Yeni Rekorlar**\n- **Avrupa**, turizmin ekonomik katkısıyla **2,5 trilyon euro**ya ulaştı ve GSYİH’sının yaklaşık %10’unu oluşturdu.\n- **İspanya**, 96,5 milyon uluslararası turist ağırlayarak yeni bir rekor kırarak, turizmin doğrudan ve dolaylı ekonomik etkisini **260 milyar euro**ya çıkardı. Sektör, ülke ekonomisinin %16’sını oluşturdu ve **3,2 milyon kişiye istihdam** sağladı.\n\n---\n\n### **3. ABD: Tek Düşüş**\n- Küresel büyüme trendinin aksine, **ABD** 2025’te uluslararası turist harcamalarında yaklaşık **16,3 milyar euro azalma** yaşadı. Bu, ABD’nin küresel turizmdeki tek negatif performansı oldu. Nedenleri arasında döviz kuru dalgalanmaları, güvenlik endişeleri ve rekabetçi alternatif destinasyonlar (Türkiye, Türkiye, Güneydoğu Asya) sayılabilir.\n\n---\n\n### **4. Türkiye: Rekor Gelir ve Ziyaretçi Sayısı**\n- Türkiye, 2025 yılında **65,2 milyar dolar** turizm geliri elde ederek tüm yılların rekorunu kırdı. **64 milyon** ziyaretçi ağırladı (2024: 62,3 milyon).\n- Ziyaretçi sayısı açısından en büyük kaynak ülkeler:  \n  - **Rusya** (6,9 milyon)  \n  - **Almanya** (6,75 milyon)  \n  - **Birleşik Krallık** (4,27 milyon)\n- Kişi başı ortalama gecelik harcama **100 dolara** ulaştı (2024: 96,5 dolar).\n- “Mini dizi” kampanyaları (örn. *An Istanbul Story*) **32 milyon izlenme** ile küresel etki yarattı ve Türkiye’yi dijital pazarlamada öncü konuma getirdi.\n\n---\n\n### **5. Sürdürülebilirlik ve Dönüşüm: WEF Raporu**\n- **Dünya Ekonomik Forumu (WEF)**, Temmuz 2025’te yayımlanan raporda, turizmin 2034’e kadar küresel GSYİH’ya **16 trilyon dolar** katkı sağlayabileceğini, ancak bu büyümenin iklim, işgücü ve toplumsal gerilimlerle dengelenmesi gerektiğini vurguladı.\n- Turizm, küresel sera gazı emisyonlarının **%8’ini** oluşturuyor; bunun **%40’ı ulaşım kaynaklı**.\n- WEF, 10 temel ilke önerdi:  \n  - Kişiselleştirilmiş deneyimler  \n  - Yerel ekonomilere yatırım  \n  - Sürdürülebilir altyapı  \n  - Kriz dayanıklılığı  \n  - Doğayı yenileyen (regenerative) uygulamalar\n- Anti-turizm protestoları (Barcelona, İtalya, Portekiz) sektörün **sosyal sürdürülebilirlik sorunlarını** vurguladı.\n\n---\n\n### **6. Türkiye’de Dönüşüm: Deneyim Odaklı Turizm**\n- Türkiye’de 2025, klasik paket turun yerini **kişiselleştirilmiş, kültür, ekoturizm ve gastronomi odaklı deneyimlerin** aldığı bir yıl oldu.\n- Bireysel tur harcamaları **16 milyar dolara** ulaştı; paket tur harcamaları %33,6’ya indi.\n- Gecelik harcama 106 dolara yükseldi; kalış süresi 10 geceye düşse de, **harcama verimliliği arttı**.\n- “Geleceğe Miras” ve gece müzeciliği gibi yenilikler, Türkiye’yi küresel turizmde öncü konuma getirdi.\n\n---\n\n### **Sonuç**\n2025, turizm sektörü için hem **ekonomik rekorların** hem de **sürdürülebilirlik çağrısının zirvesi** oldu. Türkiye ve İspanya gibi ülkeler, deneyim odaklı ve kültürel zenginlikle büyüdüler; ancak küresel düzeyde, **iklim krizi, aşırı turizm ve işgücü eksikliği** gibi sorunlar, sektörün geleceğini şekillendirmek için **acil eylem gerektiriyor**. WTTC ve WEF gibi kurumlar, sektörün sadece büyümesini değil, **dönüşümünü** talep ediyor.\n\n> ✅ **Özetle:** *Turizm artık sadece sayı değil, kalite, sorumluluk ve deneyimdir. 2025, bu dönüşümün başlangıcı oldu.*\n\n---  \n*Kaynaklar: WTTC, WEF, Turizm News, Ekonomim, Tourism Today (2025 verileri)*",
+      "total_tokens": 0,
+      "total_latency_ms": 3.916599991498515,
+      "created_at": "2026-02-22T16:59:32.511112Z",
+      "completed_at": null
+    }
+  ],
+  "agent_metrics": {
+    "orchestrator": {
+      "total_calls": 2,
+      "total_tokens": 25055,
+      "total_latency_ms": 54098.01739998511,
+      "success_count": 2,
+      "error_count": 0,
+      "last_active": "2026-02-22T17:00:50.437607Z"
+    },
+    "reasoner": {
+      "total_calls": 1,
+      "total_tokens": 0,
+      "total_latency_ms": 0.0,
+      "success_count": 0,
+      "error_count": 1,
+      "last_active": "2026-02-22T17:00:31.557916Z"
+    }
+  },
+  "created_at": "2026-02-22T16:58:31.935243Z"
+}

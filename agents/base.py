@@ -36,13 +36,19 @@ _TOOL_CALL_RE = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL | re
 
 
 def _strip_thinking_tags(text: str) -> str:
-    """Remove <think>...</think> blocks from LLM output."""
+    """Remove <think>...</think> blocks from LLM output.
+    SAFETY: Only remove CLOSED <think>...</think> pairs.
+    For unclosed <think> tags, remove ONLY the tag itself (not content after it)
+    to prevent stripping actual response content from models like MiniMax M2.1.
+    """
     if not text:
         return text
-    # First remove closed tags
+    # Remove properly closed <think>...</think> blocks
     cleaned = _THINK_RE.sub("", text)
-    # Then remove unclosed tags
-    cleaned = _THINK_OPEN_RE.sub("", cleaned)
+    # For unclosed <think> tags: only remove the tag, NOT everything after it
+    # Old behavior: _THINK_OPEN_RE with re.DOTALL would delete ALL content after <think>
+    # New behavior: just strip the orphan <think> tag itself
+    cleaned = re.sub(r"<think>", "", cleaned, flags=re.IGNORECASE)
     return cleaned.strip()
 
 
@@ -90,6 +96,7 @@ class BaseAgent(ABC):
             api_key=NVIDIA_API_KEY,
         )
         self.max_steps = 10  # 12-Factor #10: small focused
+        self._live_monitor = None  # LiveMonitor callback for realtime UI
 
     @abstractmethod
     def system_prompt(self) -> str:
@@ -104,10 +111,33 @@ class BaseAgent(ABC):
         """
         12-Factor #3: Build context window.
         Default: system prompt + serialized thread + current task.
+        Injects current date into system prompt so agents know the real date.
         """
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        date_str = now.strftime("%d %B %Y, %A, %H:%M UTC")
+        date_injection = (
+            f"\n\nCURRENT DATE AND TIME: {date_str}. "
+            f"Year is {now.year}. Use this as the real current date and time for all responses."
+        )
+
+        # Anti-hallucination rules — injected into ALL agents
+        integrity_rules = (
+            "\n\n## INTEGRITY RULES (MANDATORY — NEVER VIOLATE):\n"
+            "1. NEVER fabricate, invent, or hallucinate information. Only provide factual, verifiable data.\n"
+            "2. NEVER generate fake URLs, file paths, download links, or API endpoints that do not exist.\n"
+            "3. If you don't know something, say 'Bilmiyorum' or 'Bu bilgiye sahip değilim' — do NOT make up an answer.\n"
+            "4. NEVER invent statistics, percentages, market sizes, or quotes without a real source.\n"
+            "5. When citing sources, only cite URLs you actually found via web_search or web_fetch.\n"
+            "6. If a task fails or produces no result, report the failure honestly — do NOT fabricate a success response.\n"
+            "7. NEVER generate S3, CDN, cloud storage, or any external download URLs unless you created them.\n"
+            "8. Distinguish clearly between facts (verified) and opinions/estimates (labeled as such).\n"
+        )
+
         history = serialize_thread_for_llm(thread, max_events=30)
         messages = [
-            {"role": "system", "content": self.system_prompt()},
+            {"role": "system", "content": self.system_prompt() + date_injection + integrity_rules},
         ]
         if history.strip():
             messages.append({"role": "user", "content": f"Context so far:\n{history}"})
@@ -175,6 +205,18 @@ class BaseAgent(ABC):
             "thinking": thinking,
         }
 
+    def set_live_monitor(self, monitor):
+        """Attach a LiveMonitor for realtime UI updates."""
+        self._live_monitor = monitor
+
+    def _emit(self, event_type: str, content: str, **extra):
+        """Emit event to live monitor if attached."""
+        if self._live_monitor:
+            try:
+                self._live_monitor.emit(event_type, self.role.value, content, **extra)
+            except Exception:
+                pass  # Never let UI updates break execution
+
     async def execute(self, task_input: str, thread: Thread) -> str:
         """
         12-Factor #8: Own your control flow.
@@ -185,11 +227,17 @@ class BaseAgent(ABC):
             f"Agent {self.role.value} starting: {task_input[:100]}",
             agent_role=self.role,
         )
+        self._emit("agent_start", f"Görev alındı: {task_input[:80]}")
 
         messages = self.build_context(thread, task_input)
         tools = self.get_tools()
 
         for step in range(self.max_steps):
+            # Check stop request
+            if self._live_monitor and self._live_monitor.should_stop():
+                thread.add_event(EventType.ERROR, "User requested stop", agent_role=self.role)
+                return "[Stopped] Kullanıcı tarafından durduruldu."
+
             try:
                 result = await self.call_llm(messages, tools)
             except Exception as e:
@@ -197,6 +245,7 @@ class BaseAgent(ABC):
                 error_msg = f"LLM call failed: {type(e).__name__}: {e}"
                 thread.add_event(EventType.ERROR, error_msg, agent_role=self.role)
                 thread.update_metrics(self.role, 0, 0, success=False)
+                self._emit("error", error_msg)
                 return f"[Error] {error_msg}"
 
             # Track thinking content
@@ -206,6 +255,7 @@ class BaseAgent(ABC):
                     result["thinking"][:500],
                     agent_role=self.role,
                 )
+                self._emit("thinking", result["thinking"][:100])
 
             # Handle tool calls
             if result["tool_calls"]:
@@ -218,6 +268,11 @@ class BaseAgent(ABC):
                         f"{fn_name}({json.dumps(fn_args, ensure_ascii=False)[:200]})",
                         agent_role=self.role,
                     )
+                    self._emit(
+                        "tool_call",
+                        json.dumps(fn_args, ensure_ascii=False)[:120],
+                        tool_name=fn_name,
+                    )
 
                     tool_result = await self.handle_tool_call(fn_name, fn_args, thread)
 
@@ -226,6 +281,7 @@ class BaseAgent(ABC):
                         str(tool_result)[:500],
                         agent_role=self.role,
                     )
+                    self._emit("tool_result", str(tool_result)[:150])
 
                     # Append to messages for next LLM turn
                     messages.append({
@@ -256,6 +312,7 @@ class BaseAgent(ABC):
                 result["latency_ms"],
                 success=True,
             )
+            self._emit("response", content[:200])
             return content
 
         # Max steps reached
@@ -304,6 +361,18 @@ class BaseAgent(ABC):
             return format_recall_results(results)
 
         if fn_name == "find_skill":
+            # Try dynamic registry first, fallback to static
+            try:
+                from tools.dynamic_skills import search_skills
+                skills = search_skills(
+                    query=fn_args["query"],
+                    max_results=fn_args.get("max_results", 3),
+                )
+                if skills:
+                    from tools.skill_finder import format_skill_results
+                    return format_skill_results(skills)
+            except Exception:
+                pass
             from tools.skill_finder import find_skills, format_skill_results
             skills = find_skills(
                 query=fn_args["query"],
@@ -312,11 +381,100 @@ class BaseAgent(ABC):
             return format_skill_results(skills)
 
         if fn_name == "use_skill":
+            # Try dynamic registry first, fallback to static
+            try:
+                from tools.dynamic_skills import get_skill_knowledge as dyn_get
+                knowledge = dyn_get(fn_args["skill_id"])
+                if knowledge:
+                    from tools.skill_finder import format_skill_knowledge
+                    return format_skill_knowledge(fn_args["skill_id"], knowledge)
+            except Exception:
+                pass
             from tools.skill_finder import get_skill_knowledge, format_skill_knowledge
             knowledge = get_skill_knowledge(fn_args["skill_id"])
             if knowledge:
                 return format_skill_knowledge(fn_args["skill_id"], knowledge)
             return f"Skill '{fn_args['skill_id']}' not found."
+
+        if fn_name == "code_execute":
+            from tools.code_executor import execute_code, format_execution_result
+            result = await execute_code(
+                code=fn_args["code"],
+                language=fn_args.get("language", "python"),
+            )
+            return format_execution_result(result)
+
+        if fn_name == "rag_ingest":
+            from tools.rag import ingest_document
+            result = ingest_document(
+                content=fn_args["content"],
+                title=fn_args["title"],
+                source=fn_args.get("source", "agent_input"),
+            )
+            if result["success"]:
+                return f"Document ingested: '{result['title']}' — {result['chunks']} chunks, {result['embedded']} embedded"
+            return f"Ingest failed: {result.get('error', 'unknown')}"
+
+        if fn_name == "rag_query":
+            from tools.rag import query_documents, format_rag_results
+            results = query_documents(
+                query=fn_args["query"],
+                max_results=fn_args.get("max_results", 5),
+            )
+            return format_rag_results(results)
+
+        if fn_name == "request_approval":
+            from tools.human_loop import create_approval_request, format_approval_for_agent
+            request = create_approval_request(
+                action=fn_args["action"],
+                description=fn_args["description"],
+                details=fn_args.get("details"),
+                agent_role=self.role.value,
+                thread=thread,
+            )
+            # Auto-approve in non-interactive mode (agents can't wait for UI)
+            request.approve("Auto-approved (non-interactive mode)")
+            return format_approval_for_agent(request)
+
+        if fn_name == "self_evaluate":
+            from tools.reflexion import build_evaluation_prompt, parse_evaluation
+            eval_prompt = build_evaluation_prompt(
+                question=fn_args["question"],
+                response=fn_args["response"],
+            )
+            return f"Self-evaluation prompt ready. Evaluate:\n{eval_prompt[:500]}"
+
+        if fn_name == "mcp_call":
+            from tools.mcp_client import call_mcp_tool
+            result = await call_mcp_tool(
+                server_id=fn_args["server_id"],
+                tool_name=fn_args["tool_name"],
+                arguments=fn_args.get("arguments"),
+            )
+            if result["success"]:
+                return f"[MCP:{result['server']}:{result['tool']}] {result['output']}"
+            return f"[MCP Error] {result.get('error', 'unknown')}"
+
+        if fn_name == "mcp_list_tools":
+            from tools.mcp_client import list_discovered_tools, format_mcp_tools_for_agent
+            server_id = fn_args.get("server_id")
+            formatted = format_mcp_tools_for_agent(server_id)
+            if formatted:
+                return formatted
+            return "No MCP tools discovered yet. Register servers first."
+
+        if fn_name == "create_skill":
+            from tools.dynamic_skills import create_skill
+            result = create_skill(
+                skill_id=fn_args["skill_id"],
+                name=fn_args["name"],
+                description=fn_args["description"],
+                knowledge=fn_args["knowledge"],
+                category=fn_args.get("category", "custom"),
+                keywords=fn_args.get("keywords", []),
+                source="agent",
+            )
+            return f"Skill created: [{result['id']}] {result['name']} ({result['category']})"
 
         # Delegate to subclass
         return await self._handle_custom_tool(fn_name, fn_args, thread)

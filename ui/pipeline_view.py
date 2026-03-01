@@ -14,14 +14,16 @@ def render_pipeline_selector() -> PipelineType:
     """Pipeline type selector buttons — responsive layout."""
     options = [
         ("🔄 Auto", PipelineType.AUTO),
-        ("➡️ Seq", PipelineType.SEQUENTIAL),
+        ("🔬 Deep", PipelineType.DEEP_RESEARCH),
         ("⚡ Par", PipelineType.PARALLEL),
+        ("➡️ Seq", PipelineType.SEQUENTIAL),
         ("🗳️ Con", PipelineType.CONSENSUS),
         ("🔁 Iter", PipelineType.ITERATIVE),
+        ("🚀 I2P", PipelineType.IDEA_TO_PROJECT),
     ]
 
     selected = st.session_state.get("pipeline_type", PipelineType.AUTO)
-    cols = st.columns(5)
+    cols = st.columns(7)
 
     for col, (label, ptype) in zip(cols, options):
         with col:
@@ -41,7 +43,7 @@ def render_pipeline_flow(task: Task | None) -> None:
 
     st.markdown(f"**Pipeline:** `{task.pipeline_type.value}` — {len(task.sub_tasks)} sub-tasks")
 
-    if task.pipeline_type in (PipelineType.PARALLEL, PipelineType.CONSENSUS):
+    if task.pipeline_type in (PipelineType.PARALLEL, PipelineType.CONSENSUS, PipelineType.DEEP_RESEARCH, PipelineType.IDEA_TO_PROJECT):
         _render_parallel_flow(task)
     elif task.pipeline_type == PipelineType.ITERATIVE:
         _render_iterative_flow(task)

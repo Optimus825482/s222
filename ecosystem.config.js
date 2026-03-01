@@ -1,0 +1,42 @@
+module.exports = {
+  apps: [
+    {
+      name: "backend",
+      cwd: "./backend",
+      script: "python",
+      args: "-m uvicorn main:app --host 0.0.0.0 --port 8001 --reload",
+      interpreter: "none",
+      windowsHide: true,
+      pmx: false,
+      env: {
+        PYTHONUNBUFFERED: "1",
+      },
+      watch: false,
+      autorestart: true,
+      max_restarts: 5,
+      out_file: "../logs/backend-out.log",
+      error_file: "../logs/backend-error.log",
+      merge_logs: true,
+    },
+    {
+      name: "frontend",
+      cwd: "./frontend",
+      script: "node",
+      args: "node_modules/next/dist/bin/next dev --port 3000",
+      interpreter: "none",
+      windowsHide: true,
+      pmx: false,
+      env: {
+        NODE_ENV: "development",
+        NEXT_PUBLIC_API_URL: "http://localhost:8001",
+        NEXT_PUBLIC_WS_URL: "ws://localhost:8001/ws/chat",
+      },
+      watch: false,
+      autorestart: true,
+      max_restarts: 5,
+      out_file: "../logs/frontend-out.log",
+      error_file: "../logs/frontend-error.log",
+      merge_logs: true,
+    },
+  ],
+};
