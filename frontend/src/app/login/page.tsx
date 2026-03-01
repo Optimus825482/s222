@@ -62,7 +62,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="erkan veya yigit"
+                placeholder=""
                 autoComplete="username"
                 required
                 className="w-full bg-[#0a0a0f] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-colors"
@@ -110,6 +110,13 @@ export default function LoginPage() {
         {/* Users hint */}
         <div className="mt-4 text-center">
           <p className="text-xs text-slate-600">Erkan Erdem · Yiğit Avcı</p>
+        </div>
+
+        {/* Copyright */}
+        <div className="mt-3 text-center">
+          <p className="text-xs text-slate-700">
+            © {new Date().getFullYear()} Code by Erkan Erdem &amp; Yiğit Avcı
+          </p>
         </div>
       </div>
     </div>
