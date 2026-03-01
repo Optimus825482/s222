@@ -455,15 +455,17 @@ async def api_list_projects():
     if not PROJECTS_DIR.exists():
         return []
     projects = []
-    for d in sorted(PROJECTS_DIR.iterdir()):
-        if d.is_dir():
-            phases_done = [f.stem for f in d.glob("*.md")]
-            projects.append({
-                "name": d.name,
-                "phases": phases_done,
-                "phase_count": len(phases_done),
-                "total_phases": len(PHASES),
-            })
+    # Sort by creation time (oldest first) so the last element is the newest
+    dirs = [d for d in PROJECTS_DIR.iterdir() if d.is_dir()]
+    dirs.sort(key=lambda d: d.stat().st_ctime)
+    for d in dirs:
+        phases_done = [f.stem for f in d.glob("*.md")]
+        projects.append({
+            "name": d.name,
+            "phases": phases_done,
+            "phase_count": len(phases_done),
+            "total_phases": len(PHASES),
+        })
     return projects
 
 
