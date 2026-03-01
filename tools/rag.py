@@ -101,6 +101,7 @@ def ingest_document(
     title: str,
     source: str = "direct_input",
     source_type: str = "text",
+    user_id: str | None = None,
 ) -> dict[str, Any]:
     """Ingest a document: chunk, embed, store in PostgreSQL."""
     if not content.strip():
@@ -111,7 +112,8 @@ def ingest_document(
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, title FROM documents WHERE doc_hash = %s", (doc_hash,)
+                "SELECT id, title FROM documents WHERE doc_hash = %s AND (user_id = %s OR user_id IS NULL)",
+                (doc_hash, user_id),
             )
             existing = cur.fetchone()
             if existing:
@@ -123,10 +125,10 @@ def ingest_document(
             chunks = chunk_text(content)
 
             cur.execute(
-                """INSERT INTO documents (title, source, source_type, content, doc_hash, chunk_count)
-                   VALUES (%s, %s, %s, %s, %s, %s)
+                """INSERT INTO documents (title, source, source_type, content, doc_hash, chunk_count, user_id)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
                    RETURNING id""",
-                (title, source, source_type, content[:10000], doc_hash, len(chunks)),
+                (title, source, source_type, content[:10000], doc_hash, len(chunks), user_id),
             )
             doc_id = cur.fetchone()["id"]
 
@@ -156,7 +158,7 @@ def ingest_document(
         release_conn(conn)
 
 
-def ingest_file(filepath: str, title: str | None = None) -> dict[str, Any]:
+def ingest_file(filepath: str, title: str | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Ingest a file from disk."""
     path = Path(filepath)
     if not path.exists():
@@ -171,6 +173,7 @@ def ingest_file(filepath: str, title: str | None = None) -> dict[str, Any]:
         title=title or path.name,
         source=str(path),
         source_type=source_type,
+        user_id=user_id,
     )
 
 
@@ -178,32 +181,40 @@ def query_documents(
     query: str,
     max_results: int = 5,
     min_similarity: float = 0.3,
+    user_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Semantic search across all ingested documents via pgvector."""
     embedding = _get_embedding(query)
     if not embedding:
-        return _keyword_search(query, max_results)
+        return _keyword_search(query, max_results, user_id=user_id)
 
     emb_str = str(embedding)
     conn = get_conn()
     try:
         with conn.cursor() as cur:
+            user_filter = "AND (d.user_id = %s OR d.user_id IS NULL)" if user_id else ""
+            params: list[Any] = [emb_str, emb_str, min_similarity, emb_str]
+            if user_id:
+                params.append(user_id)
+            params.append(max_results)
+
             cur.execute(
-                """SELECT c.id, c.doc_id, c.chunk_index, c.content,
+                f"""SELECT c.id, c.doc_id, c.chunk_index, c.content,
                           1 - (c.embedding <=> %s::vector) AS similarity,
                           d.title, d.source
                    FROM chunks c
                    JOIN documents d ON c.doc_id = d.id
                    WHERE c.embedding IS NOT NULL
                      AND 1 - (c.embedding <=> %s::vector) >= %s
+                     {user_filter}
                    ORDER BY c.embedding <=> %s::vector
                    LIMIT %s""",
-                (emb_str, emb_str, min_similarity, emb_str, max_results),
+                params,
             )
             rows = cur.fetchall()
 
         if not rows:
-            return _keyword_search(query, max_results)
+            return _keyword_search(query, max_results, user_id=user_id)
 
         return [
             {
@@ -221,7 +232,7 @@ def query_documents(
         release_conn(conn)
 
 
-def _keyword_search(query: str, max_results: int = 5) -> list[dict[str, Any]]:
+def _keyword_search(query: str, max_results: int = 5, user_id: str | None = None) -> list[dict[str, Any]]:
     """Fallback keyword search."""
     words = [w for w in query.lower().split() if len(w) > 2]
     if not words:
@@ -229,6 +240,10 @@ def _keyword_search(query: str, max_results: int = 5) -> list[dict[str, Any]]:
 
     like_parts = [f"LOWER(c.content) LIKE %s" for _ in words[:8]]
     params: list[Any] = [f"%{w}%" for w in words[:8]]
+
+    user_filter = "AND (d.user_id = %s OR d.user_id IS NULL)" if user_id else ""
+    if user_id:
+        params.append(user_id)
 
     conn = get_conn()
     try:
@@ -238,6 +253,7 @@ def _keyword_search(query: str, max_results: int = 5) -> list[dict[str, Any]]:
                     FROM chunks c
                     JOIN documents d ON c.doc_id = d.id
                     WHERE {' OR '.join(like_parts)}
+                    {user_filter}
                     ORDER BY c.created_at DESC
                     LIMIT %s""",
                 params + [max_results],
@@ -260,27 +276,42 @@ def _keyword_search(query: str, max_results: int = 5) -> list[dict[str, Any]]:
         release_conn(conn)
 
 
-def list_documents(limit: int = 20) -> list[dict[str, Any]]:
+def list_documents(limit: int = 20, user_id: str | None = None) -> list[dict[str, Any]]:
     """List all ingested documents."""
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """SELECT id, title, source, source_type, chunk_count, created_at
-                   FROM documents ORDER BY created_at DESC LIMIT %s""",
-                (limit,),
-            )
+            if user_id:
+                cur.execute(
+                    """SELECT id, title, source, source_type, chunk_count, created_at
+                       FROM documents
+                       WHERE (user_id = %s OR user_id IS NULL)
+                       ORDER BY created_at DESC LIMIT %s""",
+                    (user_id, limit),
+                )
+            else:
+                cur.execute(
+                    """SELECT id, title, source, source_type, chunk_count, created_at
+                       FROM documents ORDER BY created_at DESC LIMIT %s""",
+                    (limit,),
+                )
             return [dict(r) for r in cur.fetchall()]
     finally:
         release_conn(conn)
 
 
-def delete_document(doc_id: int) -> bool:
+def delete_document(doc_id: int, user_id: str | None = None) -> bool:
     """Delete a document and its chunks (CASCADE handles chunks)."""
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
+            if user_id:
+                cur.execute(
+                    "DELETE FROM documents WHERE id = %s AND (user_id = %s OR user_id IS NULL)",
+                    (doc_id, user_id),
+                )
+            else:
+                cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
             deleted = cur.rowcount > 0
         conn.commit()
         return deleted

@@ -237,6 +237,14 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Footer — desktop only */}
+        <footer className="hidden lg:flex items-center justify-center border-t border-border/40 bg-surface/50 h-8 shrink-0">
+          <span className="text-[10px] text-slate-600 select-none">
+            Multi-Agent Ops Center &nbsp;·&nbsp; © 2026 Erkan Erdem &amp; Yiğit
+            Avcı
+          </span>
+        </footer>
+
         {/* Mobile bottom navigation */}
         <MobileNav
           activeTab={mobileTab}
@@ -244,6 +252,16 @@ export default function Home() {
           isProcessing={isProcessing}
           liveEventCount={liveEvents.length}
         />
+
+        {/* Desktop footer */}
+        <div className="hidden lg:flex items-center justify-center h-8 shrink-0 border-t border-border/40 bg-surface/50 px-4">
+          <span className="text-[10px] text-slate-600">
+            © 2026 Multi-Agent Ops Center · Code by{" "}
+            <span className="text-slate-500">Erkan Erdem</span>
+            {" & "}
+            <span className="text-slate-500">Yiğit Avcı</span>
+          </span>
+        </div>
       </main>
     </div>
   );

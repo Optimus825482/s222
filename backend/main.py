@@ -126,11 +126,13 @@ class RAGIngestRequest(BaseModel):
     content: str
     title: str
     source: str = ""
+    user_id: str = ""
 
 
 class RAGQueryRequest(BaseModel):
     query: str
     max_results: int = 5
+    user_id: str = ""
 
 
 class MCPServerRequest(BaseModel):
@@ -235,22 +237,22 @@ async def api_delete_all_threads(user_id: str = ""):
 
 @app.post("/api/rag/ingest")
 async def api_rag_ingest(req: RAGIngestRequest):
-    from tools.rag import rag_ingest
-    result = rag_ingest(req.content, req.title, req.source)
+    from tools.rag import ingest_document
+    result = ingest_document(req.content, req.title, req.source, user_id=req.user_id or None)
     return result
 
 
 @app.post("/api/rag/query")
 async def api_rag_query(req: RAGQueryRequest):
-    from tools.rag import rag_query
-    results = rag_query(req.query, req.max_results)
+    from tools.rag import query_documents
+    results = query_documents(req.query, req.max_results, user_id=req.user_id or None)
     return results
 
 
 @app.get("/api/rag/documents")
-async def api_rag_documents():
+async def api_rag_documents(user_id: str = ""):
     from tools.rag import list_documents
-    return list_documents()
+    return list_documents(user_id=user_id or None)
 
 
 @app.get("/api/skills")

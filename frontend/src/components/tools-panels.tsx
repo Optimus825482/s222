@@ -336,6 +336,7 @@ export function SkillsPanel() {
   const [autoSkills, setAutoSkills] = useState<Skill[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [form, setForm] = useState({
     skill_id: "",
     name: "",
@@ -416,9 +417,13 @@ export function SkillsPanel() {
         />
       )}
       <div className="flex items-center justify-between">
-        <div className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+        <button
+          onClick={() => setShowSkillsModal(true)}
+          className="text-xs font-medium text-slate-300 flex items-center gap-1.5 cursor-pointer hover:text-slate-200 transition-colors"
+          aria-label="Skills listesini aç"
+        >
           <Puzzle className="w-4 h-4" aria-hidden="true" /> Skills
-        </div>
+        </button>
         <button
           onClick={() => setShowForm(!showForm)}
           aria-label={showForm ? "Skill formunu kapat" : "Yeni skill ekle"}
@@ -508,76 +513,123 @@ export function SkillsPanel() {
 
       {msg && <div className="text-[10px] text-slate-400">{msg}</div>}
 
-      {/* Auto-learned skills */}
-      {autoSkills.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-[10px] text-slate-500 flex items-center gap-1">
-            <Bot className="w-3 h-3 text-amber-400" aria-hidden="true" />
-            <span>Otomatik: {autoSkills.length}</span>
-          </div>
-          {autoSkills.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center justify-between text-[10px] text-slate-400 py-0.5"
-            >
-              <button
-                onClick={() => setSelectedSkillId(s.id)}
-                aria-label={`${s.name} skill detayını görüntüle`}
-                className="flex items-center gap-1 min-w-0 flex-1 text-left cursor-pointer hover:text-slate-200 transition-colors min-h-[44px] pr-1"
-              >
-                <span className="text-teal-400 shrink-0">[{s.category}]</span>
-                <span className="truncate">{s.name}</span>
-                <span className="shrink-0 px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[9px] font-medium">
-                  🤖 Otomatik
-                </span>
-              </button>
-              <button
-                onClick={() => handleDelete(s.id)}
-                aria-label={`${s.name} skill'ini sil`}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-400 hover:text-red-300 cursor-pointer shrink-0"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Custom skills */}
-      {custom.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-[10px] text-slate-500 flex items-center gap-1">
-            <Wrench className="w-3 h-3" aria-hidden="true" /> Özel:{" "}
-            {custom.length}
-          </div>
-          {custom.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center justify-between text-[10px] text-slate-400 py-0.5"
-            >
-              <button
-                onClick={() => setSelectedSkillId(s.id)}
-                aria-label={`${s.name} skill detayını görüntüle`}
-                className="flex items-center gap-1 min-w-0 flex-1 text-left cursor-pointer hover:text-slate-200 transition-colors min-h-[44px] pr-1"
-              >
-                <span className="text-teal-400">[{s.category}]</span> {s.name}
-              </button>
-              <button
-                onClick={() => handleDelete(s.id)}
-                aria-label={`${s.name} skill'ini sil`}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-400 hover:text-red-300 cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="text-[10px] text-slate-600 flex items-center gap-1">
-        <Package className="w-3 h-3" aria-hidden="true" /> Yerleşik:{" "}
-        {builtin.length} · Toplam: {skills.length + autoSkills.length}
+      <div className="text-[10px] text-slate-500 flex flex-wrap gap-2">
+        <span className="flex items-center gap-1">
+          <Package className="w-3 h-3" /> Yerleşik: {builtin.length}
+        </span>
+        <span className="flex items-center gap-1">
+          <Wrench className="w-3 h-3" /> Özel: {custom.length}
+        </span>
+        {autoSkills.length > 0 && (
+          <span className="flex items-center gap-1">
+            <Bot className="w-3 h-3 text-amber-400" /> Otomatik:{" "}
+            {autoSkills.length}
+          </span>
+        )}
       </div>
+
+      {showSkillsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Skills listesi"
+        >
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowSkillsModal(false)}
+            aria-hidden="true"
+          />
+          <div className="relative z-10 w-full max-w-3xl max-h-[85vh] flex flex-col rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div className="flex items-center gap-2">
+                <Puzzle className="w-4 h-4 text-blue-400" aria-hidden="true" />
+                <span className="text-sm font-semibold text-slate-200">
+                  Skills
+                </span>
+                <span className="text-[10px] text-slate-500 bg-surface-raised px-2 py-0.5 rounded border border-border">
+                  {skills.length + autoSkills.length} toplam
+                </span>
+              </div>
+              <button
+                onClick={() => setShowSkillsModal(false)}
+                aria-label="Modalı kapat"
+                className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer rounded hover:bg-white/5 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Table */}
+            <div className="flex-1 overflow-y-auto">
+              <table className="w-full text-[11px]">
+                <thead className="sticky top-0 bg-[#1a1f2e] border-b border-border">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                      İsim
+                    </th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                      Kategori
+                    </th>
+                    <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                      Kaynak
+                    </th>
+                    <th className="text-right px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                      Kullanım
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {[...skills, ...autoSkills].map((s) => (
+                    <tr
+                      key={s.id}
+                      onClick={() => {
+                        setSelectedSkillId(s.id);
+                        setShowSkillsModal(false);
+                      }}
+                      className="hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-2.5 text-slate-200 font-medium">
+                        {s.name}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[9px]">
+                          {s.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`px-1.5 py-0.5 rounded border text-[9px] font-medium ${
+                            s.source === "builtin"
+                              ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                              : s.source === "auto-learned"
+                                ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                : "bg-green-500/10 text-green-400 border-green-500/20"
+                          }`}
+                        >
+                          {s.source === "auto-learned"
+                            ? "🤖 Otomatik"
+                            : s.source === "builtin"
+                              ? "📦 Yerleşik"
+                              : "✏️ Özel"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-500">
+                        {s.use_count ?? 0}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {skills.length === 0 && autoSkills.length === 0 && (
+                <div className="text-center py-8 text-[11px] text-slate-600">
+                  Henüz skill yok
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -844,6 +896,7 @@ export function McpPanel() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ server_id: "", url: "", name: "" });
   const [msg, setMsg] = useState("");
+  const [expandedServer, setExpandedServer] = useState<string | null>(null);
 
   const loadServers = useCallback(async () => {
     try {
@@ -932,39 +985,78 @@ export function McpPanel() {
       {msg && <div className="text-[10px] text-slate-400">{msg}</div>}
 
       {servers.length > 0 ? (
-        <div className="space-y-1.5">
-          {servers.map((s) => (
-            <div
-              key={s.id}
-              className="text-[10px] text-slate-400 flex flex-col gap-0.5 p-2 rounded bg-surface-raised border border-border/50"
-            >
-              <div className="flex items-center gap-1.5">
-                <Circle
-                  className="w-2.5 h-2.5 fill-green-400 text-green-400 shrink-0"
-                  aria-hidden="true"
-                />
-                <span className="text-slate-200 font-medium text-[11px]">
-                  {s.name || s.id}
-                </span>
-                {s.tool_count != null && s.tool_count > 0 && (
-                  <span className="ml-auto text-[9px] text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded">
-                    {s.tool_count} tool
+        <div className="space-y-1">
+          {servers.map((s) => {
+            const isOpen = expandedServer === s.id;
+            return (
+              <div
+                key={s.id}
+                className="rounded border border-border/50 overflow-hidden"
+              >
+                {/* Accordion Header */}
+                <button
+                  onClick={() => setExpandedServer(isOpen ? null : s.id)}
+                  aria-expanded={isOpen}
+                  aria-controls={`mcp-${s.id}`}
+                  className="w-full flex items-center gap-1.5 px-2 py-2 bg-surface-raised hover:bg-white/5 transition-colors cursor-pointer text-left"
+                >
+                  <Circle
+                    className="w-2 h-2 fill-green-400 text-green-400 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="text-[11px] text-slate-200 font-medium flex-1 truncate">
+                    {s.name || s.id}
                   </span>
+                  {s.tool_count != null && s.tool_count > 0 && (
+                    <span className="text-[9px] text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded shrink-0">
+                      {s.tool_count} tool
+                    </span>
+                  )}
+                  <svg
+                    className={`w-3 h-3 text-slate-500 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+                {/* Accordion Body */}
+                {isOpen && (
+                  <div
+                    id={`mcp-${s.id}`}
+                    className="px-3 py-2 bg-surface border-t border-border/50 space-y-1"
+                  >
+                    {s.description && (
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        {s.description}
+                      </p>
+                    )}
+                    {s.command && (
+                      <div className="text-[9px] font-mono text-slate-500 bg-surface-raised rounded px-2 py-1 truncate">
+                        {s.command}{" "}
+                        {Array.isArray(s.args) ? s.args.join(" ") : ""}
+                      </div>
+                    )}
+                    {s.url && (
+                      <div className="text-[9px] text-slate-500 truncate">
+                        {s.url}
+                      </div>
+                    )}
+                    {!s.description && !s.command && !s.url && (
+                      <div className="text-[9px] text-slate-600">Detay yok</div>
+                    )}
+                  </div>
                 )}
               </div>
-              {s.description && (
-                <span className="text-slate-500 text-[9px] leading-relaxed pl-4">
-                  {s.description}
-                </span>
-              )}
-              {s.command && (
-                <span className="text-slate-600 text-[9px] font-mono pl-4 truncate">
-                  {s.command}{" "}
-                  {Array.isArray(s.args) ? s.args.slice(0, 2).join(" ") : ""}
-                </span>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-[10px] text-slate-600">Henüz MCP sunucusu yok</div>

@@ -86,17 +86,24 @@ export const api = {
   },
 
   // RAG
-  ragIngest: (content: string, title: string, source = "") =>
-    fetcher("/api/rag/ingest", {
+  ragIngest: (content: string, title: string, source = "") => {
+    const user_id = getCurrentUserId();
+    return fetcher("/api/rag/ingest", {
       method: "POST",
-      body: JSON.stringify({ content, title, source }),
-    }),
-  ragQuery: (query: string, max_results = 5) =>
-    fetcher("/api/rag/query", {
+      body: JSON.stringify({ content, title, source, user_id }),
+    });
+  },
+  ragQuery: (query: string, max_results = 5) => {
+    const user_id = getCurrentUserId();
+    return fetcher("/api/rag/query", {
       method: "POST",
-      body: JSON.stringify({ query, max_results }),
-    }),
-  ragDocuments: () => fetcher("/api/rag/documents"),
+      body: JSON.stringify({ query, max_results, user_id }),
+    });
+  },
+  ragDocuments: () => {
+    const user_id = getCurrentUserId();
+    return fetcher(`/api/rag/documents${user_id ? `?user_id=${user_id}` : ""}`);
+  },
 
   // Skills
   listSkills: () => fetcher("/api/skills"),

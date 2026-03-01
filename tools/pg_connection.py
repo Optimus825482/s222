@@ -111,11 +111,14 @@ CREATE TABLE IF NOT EXISTS documents (
     source      TEXT NOT NULL,
     source_type TEXT NOT NULL DEFAULT 'text',
     content     TEXT NOT NULL,
-    doc_hash    TEXT UNIQUE NOT NULL,
+    doc_hash    TEXT NOT NULL,
     chunk_count INTEGER NOT NULL DEFAULT 0,
+    user_id     TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_hash_user ON documents(doc_hash, COALESCE(user_id, ''));
 CREATE INDEX IF NOT EXISTS idx_docs_hash ON documents(doc_hash);
+CREATE INDEX IF NOT EXISTS idx_docs_user ON documents(user_id);
 
 CREATE TABLE IF NOT EXISTS chunks (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -153,6 +156,13 @@ def init_database() -> None:
     with db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(_SCHEMA_SQL)
+            # Migration: add user_id to documents if missing
+            cur.execute("""
+                ALTER TABLE documents ADD COLUMN IF NOT EXISTS user_id TEXT
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_docs_user ON documents(user_id)
+            """)
         conn.commit()
     logger.info("Database schema initialized")
 
