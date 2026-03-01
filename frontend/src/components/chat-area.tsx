@@ -59,7 +59,7 @@ function WelcomeScreen() {
           Multi-Agent Ops Center
         </h1>
         <p className="text-sm text-slate-500 mb-6">
-          Görev gönder — orchestrator analiz edip specialist agent'lara
+          Görev gönder — orchestrator analiz edip specialist agent&apos;lara
           yönlendirsin.
         </p>
         <div className="flex gap-2 justify-center flex-wrap">
