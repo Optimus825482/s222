@@ -39,6 +39,16 @@ async def lifespan(app: FastAPI):
         print("[Backend] PostgreSQL initialized successfully")
     except Exception as e:
         print(f"[Backend] PostgreSQL init failed (SQLite fallback): {e}")
+
+    # Seed default MCP servers for orchestration
+    try:
+        from tools.mcp_client import seed_default_servers
+        seeded = seed_default_servers()
+        if seeded:
+            print(f"[Backend] Seeded {seeded} default MCP servers")
+    except Exception as e:
+        print(f"[Backend] MCP seed failed (non-critical): {e}")
+
     yield
 
 
@@ -235,6 +245,21 @@ async def api_add_mcp_server(req: MCPServerRequest):
         return register_server(req.server_id, req.url, req.name)
     except Exception as e:
         raise HTTPException(503, f"MCP module error: {e}")
+
+
+@app.post("/api/mcp/seed")
+async def api_mcp_seed(overwrite: bool = False):
+    """Re-seed default MCP servers. Use overwrite=true to reset configs."""
+    try:
+        from tools.mcp_client import seed_default_servers, DEFAULT_MCP_SERVERS
+        count = seed_default_servers(overwrite=overwrite)
+        return {
+            "seeded": count,
+            "total_defaults": len(DEFAULT_MCP_SERVERS),
+            "message": f"{count} server kaydedildi" if count else "Tüm server'lar zaten kayıtlı",
+        }
+    except Exception as e:
+        raise HTTPException(503, f"MCP seed error: {e}")
 
 
 @app.get("/api/mcp/servers/{server_id}/tools")

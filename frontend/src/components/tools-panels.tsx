@@ -833,7 +833,9 @@ interface McpServer {
   name: string;
   url?: string;
   command?: string;
+  description?: string;
   tool_count?: number;
+  active?: boolean;
 }
 
 export function McpPanel() {
@@ -929,21 +931,38 @@ export function McpPanel() {
       {msg && <div className="text-[10px] text-slate-400">{msg}</div>}
 
       {servers.length > 0 ? (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {servers.map((s) => (
             <div
               key={s.id}
-              className="text-[10px] text-slate-400 flex items-center gap-1"
+              className="text-[10px] text-slate-400 flex flex-col gap-0.5 p-2 rounded bg-surface-raised border border-border/50"
             >
-              <Circle
-                className="w-3 h-3 fill-green-400 text-green-400 shrink-0"
-                aria-hidden="true"
-              />
-              <span className="text-slate-300 font-medium">
-                {s.name || s.id}
-              </span>
-              {s.tool_count != null && (
-                <span className="text-slate-600">· {s.tool_count} tool</span>
+              <div className="flex items-center gap-1.5">
+                <Circle
+                  className="w-2.5 h-2.5 fill-green-400 text-green-400 shrink-0"
+                  aria-hidden="true"
+                />
+                <span className="text-slate-200 font-medium text-[11px]">
+                  {s.name || s.id}
+                </span>
+                {s.tool_count != null && s.tool_count > 0 && (
+                  <span className="ml-auto text-[9px] text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded">
+                    {s.tool_count} tool
+                  </span>
+                )}
+              </div>
+              {s.description && (
+                <span className="text-slate-500 text-[9px] leading-relaxed pl-4">
+                  {s.description}
+                </span>
+              )}
+              {s.command && (
+                <span className="text-slate-600 text-[9px] font-mono pl-4 truncate">
+                  {s.command}{" "}
+                  {Array.isArray((s as any).args)
+                    ? (s as any).args.slice(0, 2).join(" ")
+                    : ""}
+                </span>
               )}
             </div>
           ))}

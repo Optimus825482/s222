@@ -110,7 +110,9 @@ COLORS = THEMES["corporate"]
 
 # ── Image Generation (Pollinations.ai — authenticated with API key) ──
 
-POLLINATIONS_BASE = "https://image.pollinations.ai/prompt"
+POLLINATIONS_BASE = "https://gen.pollinations.ai/image"
+POLLINATIONS_MODEL = "zimage"
+POLLINATIONS_API_KEY = "sk_IPFPaqTQv7Jpw4SDTTOKtF8qwN4SFZgZ"
 
 
 # ── Deep Research for Presentations ──────────────────────────────
@@ -276,41 +278,43 @@ def format_research_for_prompt(research: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-def _get_pollinations_token() -> str | None:
-    """Load Pollinations API key from environment."""
+def _get_pollinations_token() -> str:
+    """Load Pollinations API key — env override veya hardcoded key."""
     import os
-    return os.environ.get("POLLINATIONS_API_KEY") or os.environ.get("Pollinations_api_key")
+    return (
+        os.environ.get("POLLINATIONS_API_KEY")
+        or os.environ.get("Pollinations_api_key")
+        or POLLINATIONS_API_KEY
+    )
 
 
 def _build_image_url(prompt: str, width: int, height: int) -> str:
-    """Build Pollinations image URL with auth token and quality params."""
+    """Build Pollinations gen API URL with zimage model."""
     encoded = urllib.parse.quote(prompt)
     params = {
+        "model": POLLINATIONS_MODEL,
         "width": str(width),
         "height": str(height),
-        "model": "flux",
         "nologo": "true",
-        "private": "true",
         "enhance": "true",
     }
-    token = _get_pollinations_token()
-    if token:
-        params["token"] = token
     qs = urllib.parse.urlencode(params)
     return f"{POLLINATIONS_BASE}/{encoded}?{qs}"
 
 
 async def generate_image(prompt: str, width: int = 1280, height: int = 720) -> bytes | None:
     """
-    Generate an image using Pollinations.ai with retry and fallback.
+    Generate an image using Pollinations gen API (zimage model) with retry and fallback.
     Returns image bytes or None on failure.
     """
-    # Try up to 2 times with Pollinations
+    token = _get_pollinations_token()
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+
     for attempt in range(2):
         url = _build_image_url(prompt, width, height)
         try:
             async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-                resp = await client.get(url)
+                resp = await client.get(url, headers=headers)
                 if resp.status_code == 200 and len(resp.content) > 1000:
                     return resp.content
                 print(f"[PresentationService] Image attempt {attempt+1}: status={resp.status_code}, size={len(resp.content)}")
@@ -321,12 +325,12 @@ async def generate_image(prompt: str, width: int = 1280, height: int = 720) -> b
         if attempt == 0:
             prompt = prompt[:100] + ", professional, clean design"
 
-    # Fallback: try Pexels-style stock photo search via Pollinations with simpler prompt
+    # Fallback: simpler prompt ile tekrar dene
     try:
         simple = re.sub(r"[^\w\s]", "", prompt.split(",")[0])[:50]
-        fallback_url = _build_image_url(f"stock photo {simple}", width, height)
+        fallback_url = _build_image_url(f"professional photo {simple}", width, height)
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
-            resp = await client.get(fallback_url)
+            resp = await client.get(fallback_url, headers=headers)
             if resp.status_code == 200 and len(resp.content) > 1000:
                 return resp.content
     except Exception:
@@ -337,11 +341,13 @@ async def generate_image(prompt: str, width: int = 1280, height: int = 720) -> b
 
 def _generate_image_sync(prompt: str, width: int = 1280, height: int = 720) -> bytes | None:
     """Sync version of image generation with retry."""
+    token = _get_pollinations_token()
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
     for attempt in range(2):
         url = _build_image_url(prompt, width, height)
         try:
             with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-                resp = client.get(url)
+                resp = client.get(url, headers=headers)
                 if resp.status_code == 200 and len(resp.content) > 1000:
                     return resp.content
                 print(f"[PresentationService] Sync image attempt {attempt+1}: status={resp.status_code}")

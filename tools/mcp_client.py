@@ -113,12 +113,23 @@ def register_server(
 
 
 def list_servers(active_only: bool = True) -> list[dict[str, Any]]:
-    """List registered MCP servers."""
+    """List registered MCP servers with discovered tool counts."""
     conn = _get_conn()
     query = "SELECT * FROM mcp_servers"
     if active_only:
         query += " WHERE active = 1"
     rows = conn.execute(query).fetchall()
+
+    # Get tool counts per server in one query
+    tool_counts: dict[str, int] = {}
+    try:
+        tc_rows = conn.execute(
+            "SELECT server_id, COUNT(*) as cnt FROM mcp_tools GROUP BY server_id"
+        ).fetchall()
+        tool_counts = {r["server_id"]: r["cnt"] for r in tc_rows}
+    except Exception:
+        pass
+
     return [
         {
             "id": r["id"],
@@ -127,6 +138,7 @@ def list_servers(active_only: bool = True) -> list[dict[str, Any]]:
             "args": json.loads(r["args"]),
             "description": r["description"],
             "active": bool(r["active"]),
+            "tool_count": tool_counts.get(r["id"], 0),
         }
         for r in rows
     ]
@@ -422,6 +434,133 @@ def get_call_history(server_id: str | None = None, limit: int = 20) -> list[dict
         }
         for r in rows
     ]
+
+
+# ── Default Server Seeding ───────────────────────────────────────
+
+DEFAULT_MCP_SERVERS: list[dict] = [
+    # ── Arama & İçerik ───────────────────────────────────────────
+    {
+        "id": "brave-search",
+        "name": "Brave Search",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+        "env": {"BRAVE_API_KEY": ""},
+        "description": "Brave Search API — SearXNG'e ek olarak ikinci web arama motoru",
+    },
+    {
+        "id": "fetch",
+        "name": "Web Fetch",
+        "command": "uvx",
+        "args": ["mcp-server-fetch"],
+        "env": {},
+        "description": "URL içerik çekme — JS gerektirmeyen sayfalar, API yanıtları, ham HTML",
+    },
+    {
+        "id": "puppeteer",
+        "name": "Puppeteer (Browser)",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+        "env": {},
+        "description": "Headless browser — JS gerektiren sayfalar, SPA'lar, screenshot, form doldurma",
+    },
+    # ── Akademik & Bilgi ─────────────────────────────────────────
+    {
+        "id": "arxiv",
+        "name": "arXiv Research",
+        "command": "uvx",
+        "args": ["mcp-server-arxiv"],
+        "env": {},
+        "description": "arXiv akademik makale arama — AI/ML/CS araştırmaları için thinker/researcher agent'a kritik",
+    },
+    {
+        "id": "wikipedia",
+        "name": "Wikipedia",
+        "command": "uvx",
+        "args": ["mcp-server-wikipedia-search"],
+        "env": {},
+        "description": "Wikipedia arama ve içerik çekme — genel bilgi, tanımlar, tarihsel veriler",
+    },
+    # ── Veri & Finans ────────────────────────────────────────────
+    {
+        "id": "yahoo-finance",
+        "name": "Yahoo Finance",
+        "command": "uvx",
+        "args": ["mcp-yahoo-finance"],
+        "env": {},
+        "description": "Hisse senedi fiyatları, finansal veriler, piyasa haberleri — finans analizleri için",
+    },
+    {
+        "id": "time-mcp",
+        "name": "Time & Timezone",
+        "command": "uvx",
+        "args": ["mcp-server-time"],
+        "env": {},
+        "description": "Gerçek zamanlı saat ve timezone dönüşümleri — agent'ların tarih/saat hesaplamaları için",
+    },
+    # ── Dosya & Veri İşleme ──────────────────────────────────────
+    {
+        "id": "filesystem",
+        "name": "Filesystem",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "./data"],
+        "env": {},
+        "description": "Yerel dosya sistemi okuma/yazma — data/ dizinine erişim, proje dosyaları",
+    },
+    {
+        "id": "sequential-thinking",
+        "name": "Sequential Thinking",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+        "env": {},
+        "description": "Adım adım düşünme zinciri — karmaşık problem çözme, reasoner agent için ideal",
+    },
+    # ── Veritabanı ───────────────────────────────────────────────
+    {
+        "id": "postgres",
+        "name": "PostgreSQL",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-postgres"],
+        "env": {"POSTGRES_CONNECTION_STRING": ""},
+        "description": "Direkt PostgreSQL sorguları — veritabanı analizi, şema keşfi, veri sorgulama",
+    },
+    {
+        "id": "sqlite",
+        "name": "SQLite",
+        "command": "uvx",
+        "args": ["mcp-server-sqlite", "--db-path", "./data/memory.db"],
+        "env": {},
+        "description": "SQLite veritabanı sorguları — yerel DB analizi, data/ klasöründeki DB'lere erişim",
+    },
+]
+
+
+def seed_default_servers(overwrite: bool = False) -> int:
+    """
+    Register default MCP servers for orchestration on first startup.
+    Skips servers already registered unless overwrite=True.
+    Returns count of newly registered servers.
+    """
+    conn = _get_conn()
+    count = 0
+    for srv in DEFAULT_MCP_SERVERS:
+        existing = conn.execute(
+            "SELECT id FROM mcp_servers WHERE id = ?", (srv["id"],)
+        ).fetchone()
+        if existing and not overwrite:
+            continue
+        register_server(
+            server_id=srv["id"],
+            name=srv["name"],
+            command=srv["command"],
+            args=srv["args"],
+            env=srv["env"],
+            description=srv["description"],
+        )
+        count += 1
+    if count:
+        logger.info(f"Seeded {count} default MCP servers")
+    return count
 
 
 # ── Format for Agent Context ─────────────────────────────────────

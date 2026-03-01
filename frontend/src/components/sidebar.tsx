@@ -319,13 +319,13 @@ function SessionList({
       {threadList.map((t) => (
         <div
           key={t.id}
-          className="group relative flex items-stretch rounded-lg bg-surface hover:bg-surface-overlay transition-colors border border-border"
+          className="group flex items-stretch rounded-lg bg-surface hover:bg-surface-overlay transition-colors border border-border"
         >
           <button
             onClick={() => onLoad(t.id)}
-            className="flex-1 text-left p-3 min-h-[44px]"
+            className="flex-1 text-left p-3 min-h-[44px] min-w-0"
           >
-            <div className="text-xs text-slate-300 truncate pr-6">
+            <div className="text-xs text-slate-300 truncate">
               {t.preview || "(boş)"}
             </div>
             <div className="text-[10px] text-slate-500 mt-1">
@@ -337,7 +337,7 @@ function SessionList({
               e.stopPropagation();
               onDelete(t.id);
             }}
-            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity px-2 flex items-center justify-center text-red-400 hover:text-red-300 min-w-[36px]"
+            className="shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity px-2.5 flex items-center justify-center text-red-400 hover:text-red-300 min-w-[36px]"
             aria-label="Oturumu sil"
           >
             <Trash2 className="w-3.5 h-3.5" />
