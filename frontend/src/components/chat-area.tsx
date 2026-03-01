@@ -46,15 +46,28 @@ function renderMarkdown(text: string): React.ReactNode[] {
 
       if (first === firstImg && img) {
         if (img[1]) parts.push(img[1]);
+        const imgSrc = img[3];
+        const imgAlt = img[2];
         parts.push(
-          <img
-            key={i++}
-            src={img[3]}
-            alt={img[2]}
-            loading="lazy"
-            className="inline-block max-w-full rounded border border-slate-700 my-1"
-            style={{ maxHeight: "300px" }}
-          />,
+          <span key={i++} className="inline-block relative group">
+            <img
+              src={imgSrc}
+              alt={imgAlt}
+              loading="lazy"
+              className="inline-block max-w-full rounded border border-slate-700 my-1"
+              style={{ maxHeight: "300px" }}
+            />
+            <a
+              href={imgSrc}
+              download={`image-${Date.now()}.png`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+              title="İndir"
+            >
+              ⬇ İndir
+            </a>
+          </span>,
         );
         remaining = img[4];
       } else if (first === firstBold && bold) {
@@ -210,7 +223,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       const imgMatch = stripped.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
       if (imgMatch) {
         nodes.push(
-          <figure key={key++} className="my-3 text-center">
+          <figure key={key++} className="my-3 text-center relative group">
             <img
               src={imgMatch[2]}
               alt={imgMatch[1]}
@@ -218,6 +231,16 @@ function renderMarkdown(text: string): React.ReactNode[] {
               className="max-w-full rounded-lg border border-slate-700 mx-auto"
               style={{ maxHeight: "400px" }}
             />
+            <a
+              href={imgMatch[2]}
+              download={`image-${Date.now()}.png`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white text-xs px-3 py-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+              title="Görseli indir"
+            >
+              ⬇ İndir
+            </a>
             {imgMatch[1] && (
               <figcaption className="text-[11px] text-slate-500 mt-1">
                 {imgMatch[1]}
@@ -260,7 +283,38 @@ export function ChatArea({ thread }: Props) {
     return <WelcomeScreen />;
   }
 
-  const chatEvents = thread.events.filter((e) => CHAT_EVENTS.has(e.event_type));
+  // Build clean chat: user messages + errors + ONLY the final report per round.
+  // A "round" = everything between two user_messages.
+  // Within each round, keep only the LAST long orchestrator response (the synthesis).
+  const allChat = thread.events.filter((e) => CHAT_EVENTS.has(e.event_type));
+  const chatEvents: AgentEvent[] = [];
+  let pendingResponses: AgentEvent[] = [];
+
+  const flushResponses = () => {
+    if (pendingResponses.length === 0) return;
+    // Find the last orchestrator response that's substantial (>100 chars = final report)
+    const finalReport = [...pendingResponses]
+      .reverse()
+      .find((e) => e.agent_role === "orchestrator" && e.content.length > 100);
+    if (finalReport) {
+      chatEvents.push(finalReport);
+    } else {
+      // Fallback: no long orchestrator response — show the very last response
+      chatEvents.push(pendingResponses[pendingResponses.length - 1]);
+    }
+    pendingResponses = [];
+  };
+
+  for (const ev of allChat) {
+    if (ev.event_type === "user_message" || ev.event_type === "error") {
+      flushResponses();
+      chatEvents.push(ev);
+    } else {
+      // agent_response — buffer it
+      pendingResponses.push(ev);
+    }
+  }
+  flushResponses();
 
   return (
     <div

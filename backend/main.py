@@ -680,6 +680,26 @@ async def api_download_presentation(filename: str):
     )
 
 
+@app.get("/api/images/{filename}/download")
+async def api_download_image(filename: str):
+    """Download a generated image file."""
+    from fastapi.responses import FileResponse
+    images_dir = Path(__file__).parent.parent / "data" / "images"
+    filepath = images_dir / filename
+    if not filepath.exists():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Image not found")
+    # Determine media type
+    suffix = filepath.suffix.lower()
+    media_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+    media_type = media_types.get(suffix, "image/jpeg")
+    return FileResponse(
+        path=str(filepath),
+        media_type=media_type,
+        filename=filename,
+    )
+
+
 @app.get("/api/presentations/{filename}/pdf")
 async def api_presentation_pdf(filename: str):
     """Export a PPTX presentation as a professional PDF with slide content."""

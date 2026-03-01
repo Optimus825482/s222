@@ -398,40 +398,129 @@ CREATE_SKILL_TOOL = {
     "function": {
         "name": "create_skill",
         "description": (
-            "Create a new custom skill in the dynamic skill registry. "
-            "Skills are reusable knowledge/protocol templates that agents can load. "
-            "Use when you discover a useful pattern that should be saved for future tasks."
+            "Create a new reusable skill (capability) package. "
+            "A skill is a structured knowledge+instructions package that gives agents a specific ABILITY. "
+            "Example: 'astrolojik-hesaplama' skill teaches agents HOW to do astrological calculations. "
+            "Use when a task requires specialized capability that doesn't exist yet."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "skill_id": {
                     "type": "string",
-                    "description": "Unique skill ID (e.g. 'api-testing', 'react-hooks')",
+                    "description": "Unique kebab-case ID (e.g. 'astrolojik-hesaplama', 'sentiment-analysis')",
                 },
                 "name": {
                     "type": "string",
-                    "description": "Human-readable skill name",
+                    "description": "Human-readable skill name (e.g. 'Astrolojik Hesaplama Yeteneği')",
                 },
                 "description": {
                     "type": "string",
-                    "description": "What this skill helps with",
+                    "description": "What capability this skill provides and when to use it",
                 },
                 "knowledge": {
                     "type": "string",
-                    "description": "The actual protocol/instructions to inject into agent context",
+                    "description": (
+                        "The actual instructions, methods, libraries, APIs, formulas, and step-by-step "
+                        "procedures that teach an agent HOW to perform this capability. "
+                        "Must be detailed and actionable — not just a description."
+                    ),
                 },
                 "category": {
                     "type": "string",
-                    "description": "Skill category (e.g. 'coding', 'research', 'analysis')",
+                    "description": "Skill category (e.g. 'coding', 'research', 'analysis', 'science', 'finance')",
                 },
                 "keywords": {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Keywords for search matching",
                 },
+                "references": {
+                    "type": "object",
+                    "description": "Optional reference files: {'filename.md': 'content'} for detailed docs",
+                    "additionalProperties": {"type": "string"},
+                },
+                "scripts": {
+                    "type": "object",
+                    "description": "Optional script files: {'script.py': 'code'} for executable utilities",
+                    "additionalProperties": {"type": "string"},
+                },
             },
             "required": ["skill_id", "name", "description", "knowledge"],
+        },
+    },
+}
+
+RESEARCH_CREATE_SKILL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "research_create_skill",
+        "description": (
+            "Research a topic via web search, then create a structured skill (capability) package. "
+            "Use this BEFORE starting any complex task that requires specialized knowledge. "
+            "Example: Before building an astrology app, research astrological calculation methods, "
+            "libraries, and APIs, then create an 'astrolojik-hesaplama' skill that all agents can use. "
+            "This is the PRIMARY way to give agents new capabilities at runtime."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "What capability to research (e.g. 'astrological calculations with Python')",
+                },
+                "skill_id": {
+                    "type": "string",
+                    "description": "Desired skill ID in kebab-case (e.g. 'astrolojik-hesaplama')",
+                },
+                "skill_name": {
+                    "type": "string",
+                    "description": "Human-readable name (e.g. 'Astrolojik Hesaplama Yeteneği')",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Skill category",
+                },
+                "search_queries": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific web search queries to research (2-4 queries recommended)",
+                },
+            },
+            "required": ["topic", "skill_id", "skill_name"],
+        },
+    },
+}
+
+# ── Image Generation Tool ────────────────────────────────────────
+
+GENERATE_IMAGE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "generate_image",
+        "description": (
+            "Generate an image using Pollinations.ai and return a downloadable URL. "
+            "Use when the user asks for an image, visual, illustration, diagram, or when "
+            "a report would benefit from a visual. The image is generated via AI (Flux model). "
+            "Returns a markdown image embed and a direct download URL."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Image description in English (be specific and descriptive)",
+                },
+                "width": {
+                    "type": "integer",
+                    "description": "Image width in pixels (default 800)",
+                },
+                "height": {
+                    "type": "integer",
+                    "description": "Image height in pixels (default 450)",
+                },
+            },
+            "required": ["prompt"],
         },
     },
 }
@@ -533,6 +622,8 @@ ORCHESTRATOR_TOOLS = [
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
     CREATE_SKILL_TOOL,
+    RESEARCH_CREATE_SKILL_TOOL,
+    GENERATE_IMAGE_TOOL,
     {
         "type": "function",
         "function": {
@@ -574,7 +665,9 @@ RESEARCHER_TOOLS = [
     SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    CREATE_SKILL_TOOL,
     RAG_QUERY_TOOL,
+    GENERATE_IMAGE_TOOL,
 ]
 
 # ── Thinker Tools ────────────────────────────────────────────────
@@ -586,7 +679,9 @@ THINKER_TOOLS = [
     SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    CREATE_SKILL_TOOL,
     RAG_QUERY_TOOL,
+    GENERATE_IMAGE_TOOL,
 ]
 
 # ── Speed Tools ──────────────────────────────────────────────────
@@ -598,8 +693,10 @@ SPEED_TOOLS = [
     SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    CREATE_SKILL_TOOL,
     CODE_EXECUTE_TOOL,
     RAG_QUERY_TOOL,
+    GENERATE_IMAGE_TOOL,
 ]
 
 # ── Reasoner Tools ───────────────────────────────────────────────
@@ -610,8 +707,10 @@ REASONER_TOOLS = [
     SAVE_MEMORY_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
+    CREATE_SKILL_TOOL,
     CODE_EXECUTE_TOOL,
     RAG_QUERY_TOOL,
+    GENERATE_IMAGE_TOOL,
 ]
 
 # ── Agent → Tools Mapping ────────────────────────────────────────

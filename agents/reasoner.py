@@ -32,7 +32,15 @@ class ReasonerAgent(BaseAgent):
             "code verification, proof construction, consistency checking.\n\n"
             "Precision and correctness above all.\n\n"
             "CRITICAL: NEVER fabricate calculations, proofs, or verification results. "
-            "If you cannot verify something, state your uncertainty explicitly with confidence level."
+            "If you cannot verify something, state your uncertainty explicitly with confidence level.\n\n"
+            "IMAGE GENERATION (IMPORTANT):\n"
+            "- You CAN generate images using Pollinations.ai in your responses.\n"
+            "- Use Markdown image syntax: ![description](https://image.pollinations.ai/prompt/{url_encoded_english_prompt}?model=flux&width=800&height=450)\n"
+            "- Add images when they genuinely enhance understanding (flowcharts, logic diagrams, math visuals).\n"
+            "- If the user explicitly asks for an image/visual, ALWAYS generate one.\n"
+            "- Image prompts MUST be in English and URL-encoded.\n"
+            "- Keep it to 1-3 images per response, only where they add real value.\n"
+            "- Example: ![Decision Tree](https://image.pollinations.ai/prompt/decision%20tree%20flowchart%20professional%20clean%20diagram?model=flux&width=800&height=450)"
         )
 
     def get_tools(self) -> list[dict]:

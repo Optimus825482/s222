@@ -111,7 +111,7 @@ class BaseAgent(ABC):
         """
         12-Factor #3: Build context window.
         Default: system prompt + serialized thread + current task.
-        Injects current date into system prompt so agents know the real date.
+        Injects current date + activated skills into system prompt.
         """
         from datetime import datetime, timezone
 
@@ -135,15 +135,65 @@ class BaseAgent(ABC):
             "8. Distinguish clearly between facts (verified) and opinions/estimates (labeled as such).\n"
         )
 
+        # Auto-inject activated skills from sub-task assignments
+        skill_injection = self._build_skill_injection(task_input, thread)
+
+        # Image generation capability — injected into ALL agents
+        image_capability = (
+            "\n\n## IMAGE GENERATION CAPABILITY:\n"
+            "You can generate images using the `generate_image` tool.\n"
+            "- Use when the user asks for a visual, image, illustration, diagram, or infographic.\n"
+            "- Use in reports when a visual would add value (architecture diagrams, concept illustrations, etc.).\n"
+            "- Prompt must be in ENGLISH, descriptive, and specific.\n"
+            "- The tool returns a markdown image embed and a downloadable link.\n"
+            "- For reports: embed images inline using ![description](url) markdown syntax.\n"
+            "- Add images sparingly: 1-3 per report, only where they genuinely help.\n"
+            "- Example prompt: 'Professional diagram showing microservices architecture with API gateway'\n"
+        )
+
         history = serialize_thread_for_llm(thread, max_events=30)
+        system_content = self.system_prompt() + date_injection + integrity_rules + image_capability
+        if skill_injection:
+            system_content += skill_injection
+
         messages = [
-            {"role": "system", "content": self.system_prompt() + date_injection + integrity_rules},
+            {"role": "system", "content": system_content},
         ]
         if history.strip():
             messages.append({"role": "user", "content": f"Context so far:\n{history}"})
             messages.append({"role": "assistant", "content": "Understood. I have the context."})
         messages.append({"role": "user", "content": task_input})
         return messages
+
+    def _build_skill_injection(self, task_input: str, thread: Thread) -> str:
+        """Extract skill IDs from current sub-task and inject their knowledge."""
+        skill_ids: list[str] = []
+
+        # Find skill IDs from the current sub-task assigned to this agent
+        for task in reversed(thread.tasks):
+            for st in task.sub_tasks:
+                if st.assigned_agent == self.role and st.skills:
+                    skill_ids.extend(st.skills)
+
+        if not skill_ids:
+            return ""
+
+        try:
+            from tools.dynamic_skills import get_full_skill_context
+            parts = []
+            seen = set()
+            for sid in skill_ids:
+                if sid in seen:
+                    continue
+                seen.add(sid)
+                ctx = get_full_skill_context(sid)
+                if ctx:
+                    parts.append(f'<skill id="{sid}">\n{ctx}\n</skill>')
+            if parts:
+                return "\n\n## ACTIVATED SKILLS:\n" + "\n\n".join(parts) + "\n"
+        except Exception:
+            pass
+        return ""
 
     async def call_llm(self, messages: list[dict], tools: list[dict] | None = None) -> dict[str, Any]:
         """Single LLM call with metrics tracking."""
@@ -381,13 +431,29 @@ class BaseAgent(ABC):
             return format_skill_results(skills)
 
         if fn_name == "use_skill":
-            # Try dynamic registry first, fallback to static
+            # Try disk-based Kiro skill package first, then DB, then static
             try:
-                from tools.dynamic_skills import get_skill_knowledge as dyn_get
-                knowledge = dyn_get(fn_args["skill_id"])
-                if knowledge:
+                from tools.dynamic_skills import load_skill_package, get_full_skill_context
+                pkg = load_skill_package(fn_args["skill_id"])
+                if pkg:
+                    knowledge = pkg.get("knowledge", "")
+                    # Enrich with reference files
+                    ref_ctx = ""
+                    if pkg.get("references"):
+                        from tools.dynamic_skills import load_skill_reference
+                        for ref_name in pkg["references"][:5]:
+                            ref_text = load_skill_reference(fn_args["skill_id"], ref_name)
+                            if ref_text:
+                                ref_ctx += f"\n\n## Reference: {ref_name}\n{ref_text[:3000]}"
+                    full_knowledge = knowledge + ref_ctx if ref_ctx else knowledge
+                    if full_knowledge:
+                        from tools.skill_finder import format_skill_knowledge
+                        return format_skill_knowledge(fn_args["skill_id"], full_knowledge)
+                # Fallback: full context from DB + disk references
+                ctx = get_full_skill_context(fn_args["skill_id"])
+                if ctx:
                     from tools.skill_finder import format_skill_knowledge
-                    return format_skill_knowledge(fn_args["skill_id"], knowledge)
+                    return format_skill_knowledge(fn_args["skill_id"], ctx)
             except Exception:
                 pass
             from tools.skill_finder import get_skill_knowledge, format_skill_knowledge
@@ -463,18 +529,69 @@ class BaseAgent(ABC):
                 return formatted
             return "No MCP tools discovered yet. Register servers first."
 
+        if fn_name == "generate_image":
+            import urllib.parse
+            import httpx
+            import os
+            prompt = fn_args["prompt"]
+            width = fn_args.get("width", 800)
+            height = fn_args.get("height", 450)
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&width={width}&height={height}"
+            # Download image to data/images/
+            images_dir = os.path.join("data", "images")
+            os.makedirs(images_dir, exist_ok=True)
+            filename = f"img_{uuid.uuid4().hex[:10]}.jpg"
+            filepath = os.path.join(images_dir, filename)
+            try:
+                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                    resp = await client.get(image_url)
+                    if resp.status_code == 200:
+                        with open(filepath, "wb") as f:
+                            f.write(resp.content)
+                        download_url = f"/api/images/{filename}/download"
+                        return (
+                            f"Image generated successfully.\n\n"
+                            f"![{prompt}]({image_url})\n\n"
+                            f"**Download:** [{filename}]({download_url})\n\n"
+                            f"Direct URL: {image_url}"
+                        )
+                    else:
+                        return (
+                            f"Image generated (direct URL only, download failed with status {resp.status_code}).\n\n"
+                            f"![{prompt}]({image_url})\n\n"
+                            f"Direct URL: {image_url}"
+                        )
+            except Exception as e:
+                return (
+                    f"Image URL generated but download failed: {e}\n\n"
+                    f"![{prompt}]({image_url})\n\n"
+                    f"Direct URL: {image_url}"
+                )
+
         if fn_name == "create_skill":
-            from tools.dynamic_skills import create_skill
-            result = create_skill(
+            from tools.dynamic_skills import create_skill_package
+            result = create_skill_package(
                 skill_id=fn_args["skill_id"],
                 name=fn_args["name"],
                 description=fn_args["description"],
                 knowledge=fn_args["knowledge"],
-                category=fn_args.get("category", "custom"),
+                category=fn_args.get("category", "capability"),
                 keywords=fn_args.get("keywords", []),
-                source="agent",
+                references=fn_args.get("references"),
+                scripts=fn_args.get("scripts"),
+                source=f"agent:{self.role.value}",
             )
-            return f"Skill created: [{result['id']}] {result['name']} ({result['category']})"
+            parts = [
+                f"Skill package created: [{result['id']}] {result['name']} ({result['category']})",
+                f"Path: {result.get('path', 'data/skills/' + result['id'])}",
+            ]
+            if result.get("has_references"):
+                parts.append("References: included")
+            if result.get("has_scripts"):
+                parts.append("Scripts: included")
+            parts.append(f"Inject into sub-tasks by adding '{result['id']}' to the skills list.")
+            return "\n".join(parts)
 
         # Delegate to subclass
         return await self._handle_custom_tool(fn_name, fn_args, thread)

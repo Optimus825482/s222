@@ -1,12 +1,22 @@
 """
-Dynamic Skill Registry — PostgreSQL backend.
-Same public API as SQLite version.
+Dynamic Skill Registry — PostgreSQL backend + Kiro Skill Format.
+Skills are special capabilities (yetenekler) that agents can create,
+activate, and delegate at runtime. Each skill is persisted both in
+the database AND as a Kiro-compatible SKILL.md folder on disk.
+
+Kiro Skill Format:
+  skill-name/
+  ├── SKILL.md          # Frontmatter (name, description) + instructions
+  ├── scripts/          # Optional executable helpers
+  ├── references/       # Optional reference docs
+  └── assets/           # Optional templates / data files
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -64,8 +74,10 @@ def create_skill(
     keywords: list[str] | None = None,
     source: str = "user",
 ) -> dict[str, Any]:
-    """Create or replace a custom skill."""
+    """Create or replace a skill — saves to DB + writes Kiro SKILL.md to disk."""
     clean_id = skill_id.lower().replace(" ", "-").strip()
+    # Remove consecutive hyphens and trim
+    clean_id = re.sub(r"-{2,}", "-", clean_id).strip("-")
     conn = get_conn()
     try:
         with conn.cursor() as cur:
@@ -85,9 +97,13 @@ def create_skill(
             )
         conn.commit()
         logger.info(f"Skill created: [{clean_id}] {name}")
-        return {"id": clean_id, "name": name, "category": category, "source": source}
     finally:
         release_conn(conn)
+
+    # Write Kiro-format SKILL.md to disk
+    _write_skill_to_disk(clean_id, name, description, knowledge, category, keywords)
+
+    return {"id": clean_id, "name": name, "category": category, "source": source}
 
 
 def update_skill(skill_id: str, **updates) -> bool:
@@ -242,16 +258,296 @@ def auto_create_skill_from_pattern(
 ) -> dict[str, Any]:
     """Auto-create a skill from a learned agent pattern."""
     import hashlib
-    skill_id = "auto-" + hashlib.md5(pattern_description.encode()).hexdigest()[:8]
+    clean_desc = pattern_description.strip()[:120]
+    skill_id = "auto-" + hashlib.md5(clean_desc.encode()).hexdigest()[:8]
+    # Generate a short readable name from description
+    short_name = re.sub(r"[^a-zA-ZçğıöşüÇĞİÖŞÜ0-9\s]", "", clean_desc)[:50].strip()
     return create_skill(
         skill_id=skill_id,
-        name=pattern_description[:60],
-        description=pattern_description,
+        name=short_name or clean_desc[:50],
+        description=clean_desc,
         knowledge=knowledge,
         category=category,
         keywords=keywords or [],
         source="auto-learned",
     )
+
+
+# ── Kiro Skill Format — Disk Operations ─────────────────────────
+
+def _write_skill_to_disk(
+    skill_id: str,
+    name: str,
+    description: str,
+    knowledge: str,
+    category: str = "custom",
+    keywords: list[str] | None = None,
+) -> Path:
+    """Write a skill as Kiro-format SKILL.md folder to data/skills/."""
+    skill_dir = SKILLS_DIR / skill_id
+    skill_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build SKILL.md with YAML frontmatter + markdown body
+    kw_list = keywords or []
+    frontmatter = (
+        f"---\n"
+        f"name: {skill_id}\n"
+        f"description: {description}\n"
+        f"category: {category}\n"
+        f"keywords: {json.dumps(kw_list, ensure_ascii=False)}\n"
+        f"---\n\n"
+    )
+    body = f"# {name}\n\n{knowledge}\n"
+    skill_md = skill_dir / "SKILL.md"
+    skill_md.write_text(frontmatter + body, encoding="utf-8")
+
+    # Create optional subdirs if they don't exist
+    for sub in ("scripts", "references", "assets"):
+        (skill_dir / sub).mkdir(exist_ok=True)
+
+    logger.info(f"Skill written to disk: {skill_dir}")
+    return skill_dir
+
+
+def load_skill_from_disk(skill_id: str) -> dict[str, Any] | None:
+    """Load a skill from its Kiro SKILL.md on disk."""
+    skill_dir = SKILLS_DIR / skill_id
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.exists():
+        return None
+
+    content = skill_md.read_text(encoding="utf-8")
+
+    # Parse YAML frontmatter
+    fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+    if not fm_match:
+        return None
+
+    # Simple YAML frontmatter parser (no external dependency)
+    meta: dict[str, Any] = {}
+    for line in fm_match.group(1).strip().splitlines():
+        if ":" in line:
+            key, _, val = line.partition(":")
+            key = key.strip()
+            val = val.strip()
+            if val.startswith("[") and val.endswith("]"):
+                try:
+                    meta[key] = json.loads(val)
+                except Exception:
+                    meta[key] = val
+            else:
+                meta[key] = val
+
+    body = content[fm_match.end():]
+
+    # List reference files
+    refs_dir = skill_dir / "references"
+    ref_files = [f.name for f in refs_dir.iterdir() if f.is_file()] if refs_dir.exists() else []
+
+    # List script files
+    scripts_dir = skill_dir / "scripts"
+    script_files = [f.name for f in scripts_dir.iterdir() if f.is_file()] if scripts_dir.exists() else []
+
+    return {
+        "id": meta.get("name", skill_id),
+        "name": meta.get("name", skill_id),
+        "description": meta.get("description", ""),
+        "category": meta.get("category", "custom"),
+        "keywords": meta.get("keywords", []),
+        "knowledge": body.strip(),
+        "references": ref_files,
+        "scripts": script_files,
+        "path": str(skill_dir),
+    }
+
+
+def get_full_skill_context(skill_id: str) -> str | None:
+    """
+    Get complete skill context for agent injection.
+    Loads SKILL.md knowledge + any reference files content.
+    Returns formatted string ready for system prompt injection.
+    """
+    # Try DB first
+    skill = get_skill(skill_id)
+    knowledge = skill["knowledge"] if skill else None
+
+    # Enrich with disk references if available
+    skill_dir = SKILLS_DIR / skill_id
+    refs_dir = skill_dir / "references"
+    ref_content = ""
+    if refs_dir.exists():
+        for ref_file in sorted(refs_dir.iterdir()):
+            if ref_file.is_file() and ref_file.suffix in (".md", ".txt", ".json"):
+                try:
+                    text = ref_file.read_text(encoding="utf-8")[:5000]
+                    ref_content += f"\n\n## Reference: {ref_file.name}\n{text}"
+                except Exception:
+                    pass
+
+    if not knowledge and not ref_content:
+        return None
+
+    parts = []
+    if knowledge:
+        parts.append(knowledge)
+    if ref_content:
+        parts.append(ref_content)
+    return "\n".join(parts)
+
+
+# ── Kiro Skill Format — Disk-based SKILL.md packages ────────────
+
+def create_skill_package(
+    skill_id: str,
+    name: str,
+    description: str,
+    knowledge: str,
+    category: str = "capability",
+    keywords: list[str] | None = None,
+    references: dict[str, str] | None = None,
+    scripts: dict[str, str] | None = None,
+    source: str = "agent",
+) -> dict[str, Any]:
+    """
+    Create a Kiro-format skill package on disk AND register in DB.
+
+    Produces:
+      data/skills/{skill_id}/
+        SKILL.md          — frontmatter + instructions
+        references/        — optional .md reference files
+        scripts/           — optional executable scripts
+
+    Also saves to PostgreSQL for search/listing.
+    """
+    clean_id = skill_id.lower().replace(" ", "-").strip()
+    skill_dir = SKILLS_DIR / clean_id
+    skill_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build SKILL.md content
+    kw_list = keywords or []
+    frontmatter = (
+        f"---\n"
+        f"name: {clean_id}\n"
+        f"description: {description}\n"
+        f"---\n\n"
+    )
+    skill_md = frontmatter + knowledge
+
+    (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+
+    # Write reference files
+    if references:
+        ref_dir = skill_dir / "references"
+        ref_dir.mkdir(exist_ok=True)
+        for filename, content in references.items():
+            (ref_dir / filename).write_text(content, encoding="utf-8")
+
+    # Write script files
+    if scripts:
+        scr_dir = skill_dir / "scripts"
+        scr_dir.mkdir(exist_ok=True)
+        for filename, content in scripts.items():
+            (scr_dir / filename).write_text(content, encoding="utf-8")
+
+    # Register in DB
+    db_result = create_skill(
+        skill_id=clean_id,
+        name=name,
+        description=description,
+        knowledge=knowledge,
+        category=category,
+        keywords=kw_list,
+        source=source,
+    )
+
+    logger.info(f"Skill package created: {skill_dir}")
+    return {
+        **db_result,
+        "path": str(skill_dir),
+        "has_references": bool(references),
+        "has_scripts": bool(scripts),
+    }
+
+
+def load_skill_package(skill_id: str) -> dict[str, Any] | None:
+    """
+    Load a Kiro-format skill package from disk.
+    Returns full skill with SKILL.md content + reference file list.
+    """
+    clean_id = skill_id.lower().replace(" ", "-").strip()
+    skill_dir = SKILLS_DIR / clean_id
+    skill_md_path = skill_dir / "SKILL.md"
+
+    if not skill_md_path.exists():
+        # Fallback to DB-only skill
+        return get_skill(skill_id)
+
+    content = skill_md_path.read_text(encoding="utf-8")
+
+    # Parse frontmatter
+    name = clean_id
+    description = ""
+    knowledge = content
+    if content.startswith("---"):
+        parts = content.split("---", 2)
+        if len(parts) >= 3:
+            # Simple YAML parser (no external dependency)
+            meta: dict[str, Any] = {}
+            for line in parts[1].strip().splitlines():
+                if ":" in line:
+                    key, _, val = line.partition(":")
+                    meta[key.strip()] = val.strip()
+            name = meta.get("name", clean_id)
+            description = meta.get("description", "")
+            knowledge = parts[2].strip()
+
+    # Collect references
+    ref_dir = skill_dir / "references"
+    ref_files = []
+    if ref_dir.exists():
+        ref_files = [f.name for f in ref_dir.iterdir() if f.is_file()]
+
+    # Collect scripts
+    scr_dir = skill_dir / "scripts"
+    scr_files = []
+    if scr_dir.exists():
+        scr_files = [f.name for f in scr_dir.iterdir() if f.is_file()]
+
+    return {
+        "id": clean_id,
+        "name": name,
+        "description": description,
+        "knowledge": knowledge,
+        "path": str(skill_dir),
+        "references": ref_files,
+        "scripts": scr_files,
+        "source": "package",
+    }
+
+
+def load_skill_reference(skill_id: str, ref_filename: str) -> str | None:
+    """Load a specific reference file from a skill package."""
+    clean_id = skill_id.lower().replace(" ", "-").strip()
+    ref_path = SKILLS_DIR / clean_id / "references" / ref_filename
+    if ref_path.exists():
+        return ref_path.read_text(encoding="utf-8")
+    return None
+
+
+def list_skill_packages() -> list[dict[str, Any]]:
+    """List all Kiro-format skill packages on disk."""
+    if not SKILLS_DIR.exists():
+        return []
+    packages = []
+    for d in sorted(SKILLS_DIR.iterdir()):
+        if d.is_dir() and (d / "SKILL.md").exists():
+            packages.append({
+                "id": d.name,
+                "path": str(d),
+                "has_references": (d / "references").exists(),
+                "has_scripts": (d / "scripts").exists(),
+            })
+    return packages
 
 
 def import_skills_from_file(file_path: str | Path) -> int:

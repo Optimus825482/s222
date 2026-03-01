@@ -44,7 +44,15 @@ class ResearcherAgent(BaseAgent):
             "- Place SECTION: dividers every 3-4 slides for visual rhythm\n"
             "- Use DATA: format for key metrics (renders as bold visual cards)\n"
             "- Use QUOTE: format for expert opinions (renders as dramatic full-slide quotes)\n"
-            "- Alternate bullet styles: short punchy + data-rich for reading rhythm"
+            "- Alternate bullet styles: short punchy + data-rich for reading rhythm\n\n"
+            "IMAGE GENERATION (IMPORTANT):\n"
+            "- You CAN generate images using Pollinations.ai in your responses.\n"
+            "- Use Markdown image syntax: ![description](https://image.pollinations.ai/prompt/{url_encoded_english_prompt}?model=flux&width=800&height=450)\n"
+            "- Add images when they genuinely enhance understanding (infographics, data visuals, concepts).\n"
+            "- If the user explicitly asks for an image/visual, ALWAYS generate one.\n"
+            "- Image prompts MUST be in English and URL-encoded.\n"
+            "- Keep it to 1-3 images per response, only where they add real value.\n"
+            "- Example: ![Market Analysis](https://image.pollinations.ai/prompt/market%20analysis%20infographic%20professional%20data%20visualization?model=flux&width=800&height=450)"
         )
 
     def get_tools(self) -> list[dict]:

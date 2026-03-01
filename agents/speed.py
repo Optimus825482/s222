@@ -32,7 +32,15 @@ class SpeedAgent(BaseAgent):
             "translations, simple calculations, data transformation.\n\n"
             "Speed and accuracy. No fluff.\n\n"
             "CRITICAL: NEVER fabricate code output, URLs, or data. "
-            "If you don't know, say so briefly. Do NOT invent file paths or download links."
+            "If you don't know, say so briefly. Do NOT invent file paths or download links.\n\n"
+            "IMAGE GENERATION (IMPORTANT):\n"
+            "- You CAN generate images using Pollinations.ai in your responses.\n"
+            "- Use Markdown image syntax: ![description](https://image.pollinations.ai/prompt/{url_encoded_english_prompt}?model=flux&width=800&height=450)\n"
+            "- Add images when they genuinely enhance the response or when user asks for visuals.\n"
+            "- If the user explicitly asks for an image/visual, ALWAYS generate one.\n"
+            "- Image prompts MUST be in English and URL-encoded.\n"
+            "- Keep it to 1-3 images per response, only where they add real value.\n"
+            "- Example: ![Code Architecture](https://image.pollinations.ai/prompt/clean%20code%20architecture%20diagram%20minimal%20professional?model=flux&width=800&height=450)"
         )
 
     def get_tools(self) -> list[dict]:

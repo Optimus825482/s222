@@ -113,12 +113,16 @@ class OrchestratorAgent(BaseAgent):
             "- mcp_call / mcp_list_tools: Call external services via MCP protocol\n"
             "- create_skill: Save a new reusable skill/protocol to the dynamic registry\n\n"
             "SKILL CREATION RULES (IMPORTANT):\n"
-            "- When you detect a RECURRING task pattern (e.g., 'analyze X', 'compare Y', 'generate Z'), "
-            "ALWAYS call create_skill to save the approach as a reusable skill.\n"
-            "- When you discover a new effective workflow or protocol, save it with create_skill.\n"
-            "- Use find_skill BEFORE starting any complex task to check if a relevant skill already exists.\n"
-            "- When decomposing tasks, inject relevant skills into sub-task descriptions so specialist agents benefit.\n"
-            "- Skill IDs should be kebab-case, descriptive (e.g., 'market-analysis-protocol', 'code-review-checklist').\n\n"
+            "- Skills are SPECIAL CAPABILITIES (yetenekler) — NOT domain knowledge dumps.\n"
+            "- A skill teaches HOW to do something: which libraries, APIs, algorithms, formulas, patterns to use.\n"
+            "- Before ANY complex task: call find_skill to check if a relevant capability already exists.\n"
+            "- If no skill exists: RESEARCH the topic (web_search), then call create_skill with structured knowledge.\n"
+            "- Skill knowledge MUST include: step-by-step instructions, recommended tools/libraries, code patterns, edge cases.\n"
+            "- When decomposing tasks: add skill IDs to sub_tasks so specialist agents automatically receive the capability.\n"
+            "- Skill IDs: kebab-case, descriptive (e.g., 'astrolojik-hesaplama', 'sentiment-analysis', 'pdf-table-extraction').\n"
+            "- Example flow: User says 'astroloji uygulaması yap' → find_skill('astroloji') → not found → "
+            "web_search('astrolojik hesaplama kütüphaneleri python') → create_skill with researched knowledge → "
+            "decompose_task with skill IDs injected → agents use the skill.\n\n"
             "PIPELINE TYPES:\n"
             "- parallel: ALL agents work simultaneously (DEFAULT — use this most)\n"
             "- deep_research: Phase 1 parallel gather → Phase 2 synthesis (for complex research)\n"
@@ -333,6 +337,8 @@ class OrchestratorAgent(BaseAgent):
             return await self._handle_idea_to_project(fn_args, thread)
         elif fn_name == "generate_presentation":
             return await self._handle_generate_presentation(fn_args, thread)
+        elif fn_name == "research_create_skill":
+            return await self._handle_research_create_skill(fn_args, thread)
 
         # Catch model calling agent names directly as tools
         # Auto-upgrade to multi-agent parallel if task is complex
@@ -591,6 +597,124 @@ class OrchestratorAgent(BaseAgent):
             f"Sunumu indirmek için yukarıdaki linki veya aşağıdaki 🎨 PPTX butonunu kullanabilirsin."
         )
 
+    async def _handle_research_create_skill(self, fn_args: dict, thread: Thread) -> str:
+        """
+        Research a topic via web search, synthesize findings with LLM,
+        then create a structured Kiro skill package.
+        4 phases: search → fetch → synthesize → create_skill_package
+        """
+        topic = fn_args["topic"]
+        skill_id = fn_args["skill_id"]
+        skill_name = fn_args["skill_name"]
+        category = fn_args.get("category", "capability")
+        search_queries = fn_args.get("search_queries") or [
+            f"{topic} best practices libraries tools",
+            f"{topic} step by step tutorial how to",
+        ]
+
+        self._emit("pipeline", f"🔬 Skill araştırması: {topic[:60]}")
+
+        # Phase 1: Web search
+        from tools.search import web_search, format_search_results
+        all_results = []
+        for query in search_queries[:4]:
+            try:
+                results = await web_search(query=query, max_results=5)
+                all_results.extend(results)
+                self._emit("tool_call", f"web_search: {query[:60]}", tool_name="web_search")
+            except Exception:
+                pass
+
+        if not all_results:
+            return f"Research failed: no web results for '{topic}'. Skill not created."
+
+        # Phase 2: Fetch top pages for deeper content
+        from tools.web_fetch import web_fetch, format_fetch_result
+        fetched_content = []
+        seen_urls = set()
+        for r in all_results[:6]:
+            url = r.get("url", "")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                try:
+                    page = await web_fetch(url=url, max_chars=4000)
+                    if page.get("content"):
+                        fetched_content.append(f"Source: {url}\n{page['content'][:3000]}")
+                        self._emit("tool_result", f"Fetched: {url[:60]}")
+                except Exception:
+                    pass
+            if len(fetched_content) >= 3:
+                break
+
+        # Phase 3: LLM synthesis — turn raw research into structured skill knowledge
+        search_summary = format_search_results(all_results[:10])
+        fetch_summary = "\n\n---\n\n".join(fetched_content) if fetched_content else ""
+
+        synthesis_prompt = (
+            f"You are creating a SKILL PACKAGE for AI agents about: {topic}\n\n"
+            f"WEB SEARCH RESULTS:\n{search_summary}\n\n"
+            f"FETCHED PAGE CONTENT:\n{fetch_summary[:8000]}\n\n"
+            f"Create a comprehensive, actionable skill document that teaches an AI agent "
+            f"HOW to perform this capability. Include:\n"
+            f"1. Overview — what this skill enables\n"
+            f"2. Required libraries/tools/APIs with install commands\n"
+            f"3. Step-by-step implementation instructions\n"
+            f"4. Code patterns and examples\n"
+            f"5. Common pitfalls and edge cases\n"
+            f"6. Best practices\n\n"
+            f"Write in Markdown. Be specific and actionable — not vague descriptions.\n"
+            f"This will be injected into agent context, so make it directly usable."
+        )
+
+        messages = [
+            {"role": "system", "content": "You are a technical skill documentation specialist."},
+            {"role": "user", "content": synthesis_prompt},
+        ]
+
+        self._emit("pipeline", "🧠 Araştırma sentezleniyor → skill bilgisi oluşturuluyor...")
+        try:
+            response = await self.call_llm(messages)
+            knowledge = response.get("content", "")
+        except Exception as e:
+            knowledge = f"Research summary:\n{search_summary[:3000]}"
+
+        if not knowledge or len(knowledge.strip()) < 50:
+            knowledge = f"Research summary:\n{search_summary[:3000]}"
+
+        # Phase 4: Create skill package
+        from tools.dynamic_skills import create_skill_package
+
+        # Build references from fetched URLs
+        references = {}
+        for i, r in enumerate(all_results[:5]):
+            url = r.get("url", "")
+            title = r.get("title", f"source-{i+1}")
+            snippet = r.get("snippet", "")
+            if url:
+                safe_name = f"source-{i+1}.md"
+                references[safe_name] = f"# {title}\n\nURL: {url}\n\n{snippet}"
+
+        result = create_skill_package(
+            skill_id=skill_id,
+            name=skill_name,
+            description=f"Researched capability: {topic}",
+            knowledge=knowledge,
+            category=category,
+            keywords=[w.strip() for w in topic.split()[:8]],
+            references=references if references else None,
+            source="research:orchestrator",
+        )
+
+        self._emit("pipeline", f"✅ Skill oluşturuldu: {skill_id}")
+
+        return (
+            f"Skill researched and created: [{result['id']}] {result['name']}\n"
+            f"Path: {result.get('path', '')}\n"
+            f"Sources: {len(references)} reference files saved\n"
+            f"Knowledge: {len(knowledge)} chars of structured instructions\n"
+            f"Inject into sub-tasks by adding '{result['id']}' to the skills list."
+        )
+
     async def _handle_decompose(self, fn_args: dict, thread: Thread) -> str:
         """Create Task with SubTasks from decomposition. Auto-discovers and injects relevant skills."""
         pipeline_str = fn_args.get("pipeline_type", "parallel")
@@ -598,26 +722,42 @@ class OrchestratorAgent(BaseAgent):
 
         # Auto-discover relevant skills for each sub-task
         skill_cache: dict[str, list[dict]] = {}
+        knowledge_cache: dict[str, str] = {}
         try:
-            from tools.dynamic_skills import search_skills
+            from tools.dynamic_skills import search_skills, get_full_skill_context
             for st_data in fn_args.get("sub_tasks", []):
                 desc = st_data.get("description", "")
                 if desc and len(desc) > 10:
                     found = search_skills(query=desc[:200], max_results=2)
                     if found:
                         skill_cache[desc[:50]] = found
+                        # Pre-load full knowledge for injection
+                        for s in found:
+                            if s["id"] not in knowledge_cache:
+                                ctx = get_full_skill_context(s["id"])
+                                if ctx:
+                                    knowledge_cache[s["id"]] = ctx
         except Exception:
             pass
 
         sub_tasks = []
         for st_data in fn_args.get("sub_tasks", []):
             desc = st_data["description"]
-            # Inject discovered skills into sub-task description
+            # Collect skill IDs for this sub-task
             injected_skills = skill_cache.get(desc[:50], [])
+            skill_ids = [s["id"] for s in injected_skills] + st_data.get("skills", [])
+
+            # Inject skill knowledge summary into description so agent knows what to use
             if injected_skills:
-                skill_hints = "\n\n[RELEVANT SKILLS]\n" + "\n".join(
-                    f"- {s['name']}: {s['description']}" for s in injected_skills
-                )
+                skill_hints = "\n\n[ACTIVATED SKILLS — use these capabilities]\n"
+                for s in injected_skills:
+                    hint = f"- **{s['name']}** ({s['id']}): {s['description']}"
+                    # Add brief knowledge preview
+                    kn = knowledge_cache.get(s["id"], "")
+                    if kn:
+                        preview = kn[:300].replace("\n", " ").strip()
+                        hint += f"\n  Knowledge: {preview}..."
+                    skill_hints += hint + "\n"
                 desc = desc + skill_hints
 
             st = SubTask(
@@ -625,7 +765,7 @@ class OrchestratorAgent(BaseAgent):
                 assigned_agent=AgentRole(st_data["assigned_agent"]),
                 priority=st_data.get("priority", 1),
                 depends_on=st_data.get("depends_on", []),
-                skills=[s["id"] for s in injected_skills] + st_data.get("skills", []),
+                skills=skill_ids,
             )
             sub_tasks.append(st)
 
@@ -637,15 +777,17 @@ class OrchestratorAgent(BaseAgent):
         thread.tasks.append(task)
 
         reasoning = fn_args.get("reasoning", "")
+        skill_count = sum(len(st.skills) for st in sub_tasks)
         thread.add_event(
             EventType.ROUTING_DECISION,
-            f"Pipeline: {pipeline_type.value} | Sub-tasks: {len(sub_tasks)} | {reasoning}",
+            f"Pipeline: {pipeline_type.value} | Sub-tasks: {len(sub_tasks)} | Skills: {skill_count} | {reasoning}",
             agent_role=self.role,
         )
 
         summary_parts = [f"Task decomposed → {pipeline_type.value} pipeline:"]
         for i, st in enumerate(sub_tasks, 1):
-            summary_parts.append(f"  {i}. [{st.assigned_agent.value}] {st.description[:80]}")
+            skill_info = f" [skills: {', '.join(st.skills)}]" if st.skills else ""
+            summary_parts.append(f"  {i}. [{st.assigned_agent.value}] {st.description[:80]}{skill_info}")
         return "\n".join(summary_parts)
 
     # ── Main Entry Point ─────────────────────────────────────────

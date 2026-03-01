@@ -13,7 +13,6 @@ import { ChatArea } from "@/components/chat-area";
 import { ActivityStream } from "@/components/activity-stream";
 import { ChatInput } from "@/components/chat-input";
 import { LiveEventLog } from "@/components/live-event-log";
-import { PipelineFlow } from "@/components/pipeline-flow";
 import { TaskHistory } from "@/components/task-history";
 import { ExportButtons } from "@/components/export-buttons";
 import { InterAgentChat } from "@/components/inter-agent-chat";
@@ -155,15 +154,8 @@ export default function Home() {
           >
             <ChatArea thread={thread} />
 
-            {/* Desktop: show all panels inline */}
+            {/* Desktop: export buttons + history (no pipeline agent cards) */}
             <div className="hidden lg:block">
-              <PipelineFlow
-                task={
-                  thread?.tasks?.length
-                    ? thread.tasks[thread.tasks.length - 1]
-                    : null
-                }
-              />
               {(() => {
                 const lastTask = thread?.tasks?.length
                   ? thread.tasks[thread.tasks.length - 1]
@@ -236,14 +228,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        {/* Footer — desktop only */}
-        <footer className="hidden lg:flex items-center justify-center border-t border-border/40 bg-surface/50 h-8 shrink-0">
-          <span className="text-[10px] text-slate-600 select-none">
-            Multi-Agent Ops Center &nbsp;·&nbsp; © 2026 Erkan Erdem &amp; Yiğit
-            Avcı
-          </span>
-        </footer>
 
         {/* Mobile bottom navigation */}
         <MobileNav

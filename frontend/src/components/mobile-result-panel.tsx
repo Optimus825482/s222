@@ -3,14 +3,12 @@
 /* Collapsible mobile result panel */
 import { useState } from "react";
 import type { Thread, WSLiveEvent } from "@/lib/types";
-import { PipelineFlow } from "@/components/pipeline-flow";
 import { ExportButtons } from "@/components/export-buttons";
 import { TaskHistory } from "@/components/task-history";
 import { LiveEventLog } from "@/components/live-event-log";
 import {
   ChevronUp,
   ChevronDown,
-  GitBranch,
   Download,
   ClipboardList,
   Radio,
@@ -22,7 +20,7 @@ interface Props {
   status: "idle" | "connecting" | "running" | "complete" | "error";
 }
 
-type PanelTab = "pipeline" | "export" | "history" | "live";
+type PanelTab = "export" | "history" | "live";
 
 export function MobileResultPanel({ thread, liveEvents, status }: Props) {
   const [activeTab, setActiveTab] = useState<PanelTab | null>(null);
@@ -31,22 +29,20 @@ export function MobileResultPanel({ thread, liveEvents, status }: Props) {
     ? thread.tasks[thread.tasks.length - 1]
     : null;
 
-  const hasPipeline = lastTask && lastTask.sub_tasks.length > 0;
   const hasResult =
     lastTask?.final_result && lastTask.final_result.trim().length >= 10;
   const hasHistory = thread?.tasks && thread.tasks.length > 0;
   const hasLive = liveEvents.length > 0;
 
   // Nothing to show
-  if (!hasPipeline && !hasResult && !hasHistory && !hasLive) return null;
+  if (!hasResult && !hasHistory && !hasLive) return null;
 
   const tabs: {
     id: PanelTab;
     label: string;
-    Icon: typeof GitBranch;
+    Icon: typeof Download;
     show: boolean;
   }[] = [
-    { id: "pipeline", label: "Akış", Icon: GitBranch, show: !!hasPipeline },
     { id: "export", label: "İndir", Icon: Download, show: !!hasResult },
     { id: "history", label: "Geçmiş", Icon: ClipboardList, show: !!hasHistory },
     { id: "live", label: "Canlı", Icon: Radio, show: hasLive },
@@ -100,16 +96,6 @@ export function MobileResultPanel({ thread, liveEvents, status }: Props) {
       </div>
 
       {/* Panel content */}
-      {activeTab === "pipeline" && hasPipeline && (
-        <div
-          id="mobile-panel-pipeline"
-          role="tabpanel"
-          className="animate-fade-in"
-        >
-          <PipelineFlow task={lastTask} />
-        </div>
-      )}
-
       {activeTab === "export" && hasResult && (
         <div
           id="mobile-panel-export"
