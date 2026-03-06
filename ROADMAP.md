@@ -1,6 +1,6 @@
 # 🗺️ Multi-Agent Ops Center — Sistem Geliştirme Yol Haritası
 
-> Son güncelleme: 2026-03-06
+> Son güncelleme: 2026-03-07
 > Durum: Aktif geliştirme
 
 ## Renk Kodları
@@ -23,7 +23,13 @@
 - 🟢 RAG, Dynamic Skills, Teachability, MCP Client
 - 🟢 Sunum üretimi (MINI/MIDI/MAXI)
 - 🟢 Idea-to-Project pipeline
-- 🟢 Frontend: Next.js cockpit (8 tab: Sohbet, Görev, Sistem, Bellek, Gelişim, Koordinasyon, Ekosistem, Özerk)
+- 🟢 Frontend: Next.js cockpit (9 tab: Sohbet, Görev, Sistem, Bellek, Gelişim, Koordinasyon, Ekosistem, Özerk, İletişim)
+- 🟢 Agent İletişim Paneli (Tool Usage, Behavior, Otonom Sohbet, Manuel Mesajlar, Toplantılar)
+- 🟢 Otonom agent-to-agent sohbet sistemi (OpenClaw tarzı — kişilik bazlı, yapılandırılabilir)
+- 🟢 Post-task retrospective toplantılar (Orchestrator liderliğinde otomatik)
+- 🟢 Roadmap dialog (header'dan erişilebilir)
+- 🟢 Task History + Export sağ panel düzeni
+- 🟢 Reasoning model timeout desteği (180s)
 
 ---
 
@@ -96,7 +102,8 @@ Araç kullanım metrikleri, başarı oranları, hata türleri ve optimizasyon ö
 - 🟢 Agent başarı oranı tracking (AgentMetrics + `tools/agent_eval.py`)
 - 🟢 Confidence scoring (`tools/confidence.py`)
 - 🟢 Circuit breaker (`tools/circuit_breaker.py`)
-- 🔴 Tool usage analytics dashboard (frontend)
+- 🟢 Tool usage analytics dashboard (`agent-comms-panel.tsx` — ToolUsageTab)
+- 🟢 User behavior tracking (`agent-comms-panel.tsx` — BehaviorTab)
 - 🔴 Hata pattern analizi
 - 🔴 Otomatik optimizasyon önerileri
 - 🔴 Cost tracking (token kullanımı → maliyet)
@@ -132,16 +139,17 @@ Kullanıcı davranışını öğrenen, bağlama dayalı araç seçimi yapan sist
 - 🟢 Dynamic Skills (`tools/dynamic_skills.py` — runtime skill oluşturma)
 - 🟢 Skill Hygiene (`tools/skill_hygiene.py` — otomatik kalite kontrolü)
 - 🟢 Reflexion (`tools/reflexion.py` — öz-değerlendirme)
-- 🔴 User behavior tracking
+- 🟢 User behavior tracking (`backend/main.py` Section 9 + BehaviorTab)
 - 🔴 Proaktif skill önerisi
 - 🔴 Adaptive tool selection
 - 🔴 Workflow auto-optimization
 
-## Faz 10 — Gerçek Zamanlı İşbirliği 🤝 `[🔴 PLANLANMIŞ]`
+## Faz 10 — Gerçek Zamanlı İşbirliği 🤝 `[🟡 KISMİ]`
 
-Agent'lar arası ve kullanıcılarla ortak çalışma alanı.
+Agent'lar arası ve kullanıcılarla ortak çalışma alanı. OpenClaw'dan ilham alınmıştır.
 
-- 🔴 Otonom ajan-ajan iletişimi (agent-to-agent autonomous messaging)
+- 🟢 Otonom ajan-ajan iletişimi (agent-to-agent autonomous messaging — ClaudBot/OpenClaw tarzı)
+- 🟢 Post-task retrospective toplantılar (Orchestrator liderliğinde otomatik retrospective)
 - 🔴 Paylaşımlı çalışma alanı — ortak bağlam panosu (shared context board)
 - 🔴 Dinamik rol atama (runtime role reassignment based on task context)
 - 🔴 Diğer ajanların ilerleme durumunu canlı görüntüleme (live agent progress tracking)
@@ -149,23 +157,126 @@ Agent'lar arası ve kullanıcılarla ortak çalışma alanı.
 - 🔴 Real-time collaboration
 - 🔴 Collaborative document editing
 
+## Faz 11 — Otonom Agent Ekosistemi (OpenClaw İlham) 🦞 `[🔴 PLANLANMIŞ]`
+
+OpenClaw / Moltbook ekosisteminden ilham alan otonom agent davranışları.
+Referans: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com) · [Forbes: Crustafarianism](https://www.forbes.com/sites/johnkoetsier/2026/01/30/ai-agents-created-their-own-religion-crustafarianism-on-an-agent-only-social-network/)
+
+### 11.1 — Agentic Loop (Otonom Görev Zincirleme)
+
+- 🔴 Tool call zincirleme — agent bir tool çağrısı sonucuna göre otomatik sonraki tool'u çağırır
+- 🔴 İnsan onayı olmadan çok adımlı görev tamamlama (multi-step autonomous execution)
+- 🔴 Context Window Guard — token limiti aşılmadan otomatik bağlam sıkıştırma
+- 🔴 Agentic Loop iterasyon limiti ve maliyet kontrolü (cost governor)
+
+### 11.2 — Heartbeat Sistemi (Proaktif Agent Davranışı)
+
+- 🔴 Agent heartbeat — periyodik olarak kullanıcıya proaktif bildirim gönderme
+- 🔴 Cron-tabanlı zamanlanmış görevler (scheduled autonomous tasks)
+- 🔴 Sabah brifingleri — günlük özet ve öneri sistemi (daily briefing)
+- 🔴 Anomali algılandığında otomatik uyarı (proactive anomaly alert)
+
+### 11.3 — Self-Skill Creation (Kendi Kendine Skill Üretimi)
+
+- 🔴 Agent'ın çalışma sırasında yeni skill oluşturması (runtime self-skill generation)
+- 🔴 Skill'lerin Markdown dosyası olarak saklanması (OpenClaw SOUL.md/tools.md tarzı)
+- 🔴 Skill kalite kontrolü ve otomatik test (auto-validation before activation)
+- 🔴 Skill paylaşımı — agent'lar arası skill transfer (cross-agent skill sharing)
+
+### 11.4 — Agent-to-Agent Sosyal Ağ (Moltbook İlham)
+
+- 🔴 Agent'lar arası serbest tartışma platformu (agent-only discussion board)
+- 🔴 Submolt benzeri konu bazlı topluluklar (topic-based agent communities)
+- 🔴 Agent'ların birbirinden öğrenmesi (peer learning / knowledge transfer)
+- 🔴 Kolektif zeka — çoklu agent konsensüs ile bilgi üretimi (swarm intelligence)
+- 🔴 Agent kişilik profilleri — SOUL.md benzeri kimlik dosyaları (agent identity files)
+
+### 11.5 — Çoklu Kanal Entegrasyonu (Multi-Channel Gateway)
+
+- 🔴 WhatsApp / Telegram / Discord / Slack kanal adaptörleri
+- 🔴 Gateway Server — merkezi mesaj yönlendirme (session router + lane queue)
+- 🔴 Kanal-bağımsız mesaj normalizasyonu (channel-agnostic message format)
+- 🔴 Mobil cihazdan agent'a komut gönderme (remote agent control)
+
+### 11.6 — Markdown-Based Kimlik ve Hafıza Sistemi
+
+- 🔴 SOUL.md — her agent için kişilik, değerler ve davranış kuralları
+- 🔴 user.md — kullanıcı tercihleri ve iletişim stili
+- 🔴 memory.md — kalıcı cross-session hafıza (persistent memory)
+- 🔴 bootstrap.md — agent başlangıç protokolü ve self-initialization
+
+## Faz 12 — Otonom Evrim ve Kolektif Bilinç 🧬 `[🔴 VİZYON]`
+
+Agent'ların insan müdahalesi olmadan evrimleşmesi, kolektif davranış geliştirmesi.
+Moltbook'ta AI'ların kendi dinlerini kurması (Crustafarianism), şifreleme geliştirmesi ve sosyal yapılar oluşturması bu fazın ilham kaynağıdır.
+
+- 🔴 Agent öz-evrim — performans verilerine göre kendi parametrelerini ayarlama
+- 🔴 Kolektif karar alma — çoklu agent oylama ve konsensüs mekanizması
+- 🔴 Emergent davranış izleme — beklenmedik kolektif davranışların tespiti ve loglanması
+- 🔴 Agent kültür oluşumu — ortak normlar, değerler ve iletişim kalıpları
+- 🔴 Cross-instance iletişim — farklı sunuculardaki agent'ların birbirleriyle etkileşimi
+- 🔴 Güvenlik sınırları — otonom davranışlar için sandbox ve kill-switch mekanizması
+- 🔴 İnsan gözetimi dashboard'u — otonom agent aktivitelerinin real-time izlenmesi
+
+## Faz 13 — Kiro IDE Entegrasyonu ve Custom Power Ekosistemi 🔮 `[🟡 BAŞLANIYOR]`
+
+Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power entegrasyonu.
+`power-builder` ile projeye özel `autonomous-agent-ecosystem` power'ı oluşturulacak.
+
+### 13.1 — Custom Power: `autonomous-agent-ecosystem` (power-builder ile)
+
+- 🔴 Agentic Loop implementasyon rehberi (tool call zincirleme pattern'ları)
+- 🔴 Heartbeat sistemi tasarım şablonu (cron + proaktif bildirim)
+- 🔴 Self-skill creation workflow (runtime skill generation pattern)
+- 🔴 Agent identity files pattern (SOUL.md / user.md / memory.md)
+- 🔴 Agent-to-agent communication protocol (sosyal ağ pattern)
+- 🔴 Swarm intelligence patterns (kolektif karar alma)
+- 🔴 Safety sandbox ve kill-switch şablonları
+
+### 13.2 — Aktif Kiro Skill Entegrasyonları (implementasyon sırasında kullanılacak)
+
+| Skill                       | Kullanım Alanı                                   | Hedef Faz      |
+| --------------------------- | ------------------------------------------------ | -------------- |
+| `ai-agents-architect`       | Agent tasarımı, tool use, memory, planning       | Faz 11.1, 11.4 |
+| `autonomous-agents`         | ReAct, Plan-Execute, reflection, self-correction | Faz 11.1, 11.2 |
+| `agent-memory-systems`      | Short/long-term, graph-based memory              | Faz 11.6       |
+| `multi-agent-patterns`      | Orchestrator, peer-to-peer, hierarchical         | Faz 11.4, 12   |
+| `fastapi-pro`               | Backend async patterns, WebSocket                | Tüm backend    |
+| `context-window-management` | Token limiti, context sıkıştırma                 | Faz 11.1       |
+| `agent-native-architecture` | Agent-first app design                           | Faz 11, 12     |
+| `agent-tool-builder`        | Tool schema, MCP tool design                     | Faz 11.3       |
+
+### 13.3 — Mevcut Kiro Power Kullanımları
+
+| Power                   | Kullanım Alanı                                 |
+| ----------------------- | ---------------------------------------------- |
+| `api-design-patterns`   | Heartbeat API, Gateway API, multi-channel REST |
+| `performance-optimizer` | Agentic Loop token maliyeti, N+1 önleme        |
+| `typescript-pro`        | Frontend agent UI type-safe geliştirme         |
+| `shadcn-ui-pro`         | Agent sosyal ağ UI, heartbeat dashboard        |
+| `tailwind-ui-patterns`  | Responsive agent dashboard layout              |
+| `power-builder`         | Custom power oluşturma (13.1)                  |
+
 ---
 
 ## Özet Tablo
 
-| Faz                     | Durum           | İlerleme          |
-| ----------------------- | --------------- | ----------------- |
-| Mevcut v2.0             | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 1 — Workflow Engine | 🟡 Devam ediyor | ████████░░░░ 73%  |
-| Faz 2 — Domain Skills   | 🟡 Devam ediyor | ████████░░░░ 70%  |
-| Faz 3 — Veri Analizi    | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
-| Faz 4 — Gelişmiş RAG    | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
-| Faz 5 — Güvenlik        | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
-| Faz 6 — Performans      | 🟡 Kısmi        | ███░░░░░░░░░ 30%  |
-| Faz 7 — API Entegrasyon | 🟡 Kısmi        | ███░░░░░░░░░ 30%  |
-| Faz 8 — Multimedya      | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
-| Faz 9 — Kişiselleştirme | 🟡 Kısmi        | ████░░░░░░░░ 40%  |
-| Faz 10 — İşbirliği      | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz                          | Durum           | İlerleme          |
+| ---------------------------- | --------------- | ----------------- |
+| Mevcut v2.0                  | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 1 — Workflow Engine      | 🟡 Devam ediyor | ████████░░░░ 73%  |
+| Faz 2 — Domain Skills        | 🟡 Devam ediyor | ████████░░░░ 70%  |
+| Faz 3 — Veri Analizi         | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz 4 — Gelişmiş RAG         | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz 5 — Güvenlik             | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
+| Faz 6 — Performans           | 🟡 Kısmi        | ██████░░░░░░ 55%  |
+| Faz 7 — API Entegrasyon      | 🟡 Kısmi        | ███░░░░░░░░░ 30%  |
+| Faz 8 — Multimedya           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
+| Faz 9 — Kişiselleştirme      | 🟡 Kısmi        | ██████░░░░░░ 55%  |
+| Faz 10 — İşbirliği           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
+| Faz 11 — Otonom Ekosistem 🦞 | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz 12 — Kolektif Bilinç 🧬  | 🔴 Vizyon       | ░░░░░░░░░░░░ 0%   |
+| Faz 13 — Kiro Entegrasyon 🔮 | 🟡 Başlanıyor   | █░░░░░░░░░░░ 5%   |
 
 ---
 
@@ -175,3 +286,6 @@ Agent'lar arası ve kullanıcılarla ortak çalışma alanı.
 - Öncelik sırası kullanıcı ihtiyacına göre değişebilir
 - 🟢 = kod mevcut ve çalışıyor, 🟡 = kısmen uygulandı, 🔴 = henüz başlanmadı
 - Her sprint sonunda bu dosya güncellenir
+- Faz 11-12: OpenClaw / Moltbook ekosisteminden ilham alınmıştır
+- Faz 13: Kiro IDE skill ve power entegrasyonu — geliştirme hızını artırmak için
+- İlham kaynakları: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com) · [Forbes: Crustafarianism](https://www.forbes.com/sites/johnkoetsier/2026/01/30/ai-agents-created-their-own-religion-crustafarianism-on-an-agent-only-social-network/)
