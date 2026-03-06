@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAgentSocket } from "@/lib/use-agent-socket";
@@ -17,6 +17,7 @@ import { ExportButtons } from "@/components/export-buttons";
 import { MobileNav } from "@/components/mobile-nav";
 import { MobileResultPanel } from "@/components/mobile-result-panel";
 import { OrchestratorChatDrawer } from "@/components/orchestrator-chat-drawer";
+import { TaskFlowMonitor } from "@/components/task-flow-monitor";
 import type { OrchestratorChatMessage } from "@/components/orchestrator-chat-drawer";
 
 const Sidebar = dynamic(() => import("@/components/sidebar").then((m) => ({ default: m.Sidebar })), {
@@ -24,22 +25,13 @@ const Sidebar = dynamic(() => import("@/components/sidebar").then((m) => ({ defa
   loading: () => <div className="w-72 h-full bg-surface/50 animate-pulse" aria-hidden />,
 });
 
-const ActivityStream = dynamic(
-  () => import("@/components/activity-stream").then((m) => ({ default: m.ActivityStream })),
-  { ssr: false, loading: () => <div className="flex-1 min-h-[120px] bg-surface/30 animate-pulse rounded-lg" aria-hidden /> },
-);
-
-const InterAgentChat = dynamic(
-  () => import("@/components/inter-agent-chat").then((m) => ({ default: m.InterAgentChat })),
-  { ssr: false, loading: () => <div className="flex-1 min-h-[120px] bg-surface/30 animate-pulse rounded-lg" aria-hidden /> },
-);
-
 export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
 
   /** Only true after token validated with backend (avoids 401 + WS close on stale token). */
   const [authValidated, setAuthValidated] = useState(false);
+  const lastValidatedTokenRef = useRef<string | null>(null);
   const [thread, setThread] = useState<Thread | null>(null);
   const [threadList, setThreadList] = useState<ThreadSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineType>("auto");
@@ -48,7 +40,7 @@ export default function Home() {
   const [orchestratorChatMessages, setOrchestratorChatMessages] = useState<OrchestratorChatMessage[]>([]);
   // Mobile state
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"chat" | "activity" | "agents">(
+  const [mobileTab, setMobileTab] = useState<"chat" | "monitor">(
     "chat",
   );
 
@@ -81,21 +73,56 @@ export default function Home() {
       router.replace("/login");
       return;
     }
+
+    const token = user.token?.trim();
+    if (!token) {
+      setAuthValidated(false);
+      router.replace("/login");
+      return;
+    }
+
+    // Avoid repeated /api/auth/me calls for the same token during the same browser session.
+    if (lastValidatedTokenRef.current === token) {
+      setAuthValidated(true);
+      return;
+    }
+
+    const sessionKey = "auth:validated-token";
+    if (typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === token) {
+      lastValidatedTokenRef.current = token;
+      setAuthValidated(true);
+      return;
+    }
+
     // Validate token before opening WS / loading threads (avoids 401 + "WS closed before connect")
     let cancelled = false;
-    api
-      .me()
-      .then(() => {
-        if (!cancelled) setAuthValidated(true);
-      })
-      .catch(() => {
-        if (!cancelled) setAuthValidated(false);
-        // clearAuthOn401 already ran; user will become null and redirect
-      });
+
+    const validate = async () => {
+      try {
+        await api.me();
+      } catch {
+        // Retry once for transient auth races (seen during concurrent websocket/chat interactions).
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        await api.me();
+      }
+
+      if (cancelled) return;
+      lastValidatedTokenRef.current = token;
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(sessionKey, token);
+      }
+      setAuthValidated(true);
+    };
+
+    validate().catch(() => {
+      if (!cancelled) setAuthValidated(false);
+      // clearAuthOn401 already ran; user will become null and redirect
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [router, user]);
 
   useEffect(() => {
     if (authValidated && user) loadThreadList();
@@ -172,7 +199,7 @@ export default function Home() {
         />
       )}
 
-      {/* Left column: Sidebar + Activity Stream (sol alt) — hidden on mobile, drawer on tablet */}
+      {/* Left column: Sidebar */}
       <div
         className={`
           fixed inset-y-0 left-0 z-50 w-72 flex flex-col transform transition-transform duration-200 ease-out
@@ -192,12 +219,6 @@ export default function Home() {
             isProcessing={isProcessing}
             onClose={() => setSidebarOpen(false)}
           />
-        </div>
-        {/* Activity Stream: sol alt (sadece desktop) — kaybolan blok buraya alındı */}
-        <div className="hidden lg:block shrink-0 border-t border-border min-h-0 overflow-hidden" style={{ maxHeight: "38vh" }}>
-          <div className="h-full overflow-y-auto p-2">
-            <ActivityStream thread={thread} liveEvents={liveEvents} />
-          </div>
         </div>
       </div>
 
@@ -275,32 +296,14 @@ export default function Home() {
             />
           </div>
 
-          {/* Right panel: Sadece Agent Konuşmaları (Activity Stream sol alta taşındı) — hidden on mobile */}
+          {/* Right panel: Dinamik görev akışı monitörü */}
           <div
             className={`
-              w-full lg:w-72 lg:shrink-0 flex flex-col min-h-0
-              ${mobileTab === "activity" ? "flex" : "hidden lg:flex"}
+              w-full lg:w-[26rem] lg:shrink-0 flex flex-col min-h-0
+              ${mobileTab === "monitor" ? "flex" : "hidden lg:flex"}
             `}
           >
-            {/* Activity Stream: sadece mobil "activity" sekmesinde */}
-            <div className="flex-1 overflow-y-auto border-b border-border lg:hidden">
-              <ActivityStream thread={thread} liveEvents={liveEvents} />
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <InterAgentChat thread={thread} liveEvents={liveEvents} />
-            </div>
-          </div>
-
-          {/* Mobile agents tab */}
-          <div
-            className={`
-              w-full flex flex-col min-h-0
-              ${mobileTab === "agents" ? "flex lg:hidden" : "hidden"}
-            `}
-          >
-            <div className="flex-1 overflow-y-auto p-3">
-              <ActivityStream thread={thread} liveEvents={liveEvents} />
-            </div>
+            <TaskFlowMonitor thread={thread} liveEvents={liveEvents} />
           </div>
         </div>
 

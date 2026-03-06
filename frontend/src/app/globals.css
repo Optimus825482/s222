@@ -92,8 +92,8 @@ body {
 /* Mobile drawer overlay */
 .drawer-overlay {
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 /* PWA standalone mode adjustments */
@@ -123,4 +123,20 @@ body {
 }
 .skip-link:focus {
   top: 0;
+}
+
+@keyframes dynamicLogEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dynamic-log-enter {
+  animation: dynamicLogEnter 260ms ease-out;
 }

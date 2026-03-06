@@ -2,8 +2,8 @@
 
 /* Mobile bottom navigation — SVG icons, 44px touch targets */
 interface Props {
-  activeTab: "chat" | "activity" | "agents";
-  onTabChange: (tab: "chat" | "activity" | "agents") => void;
+  activeTab: "chat" | "monitor";
+  onTabChange: (tab: "chat" | "monitor") => void;
   isProcessing: boolean;
   liveEventCount: number;
 }
@@ -40,7 +40,7 @@ const ActivityIcon = () => (
   </svg>
 );
 
-const AgentsIcon = () => (
+const MonitorIcon = () => (
   <svg
     width="20"
     height="20"
@@ -59,8 +59,7 @@ const AgentsIcon = () => (
 
 const TABS = [
   { id: "chat" as const, label: "Sohbet", Icon: ChatIcon },
-  { id: "activity" as const, label: "Akış", Icon: ActivityIcon },
-  { id: "agents" as const, label: "Agentlar", Icon: AgentsIcon },
+  { id: "monitor" as const, label: "Akış", Icon: MonitorIcon },
 ];
 
 export function MobileNav({
@@ -72,7 +71,6 @@ export function MobileNav({
   return (
     <nav
       className="lg:hidden flex border-t border-border bg-surface-raised safe-bottom"
-      role="tablist"
       aria-label="Ana navigasyon"
     >
       {TABS.map(({ id, label, Icon }) => {
@@ -81,8 +79,7 @@ export function MobileNav({
           <button
             key={id}
             onClick={() => onTabChange(id)}
-            role="tab"
-            aria-selected={isActive}
+            aria-current={isActive ? "page" : undefined}
             aria-label={label}
             className={`
               flex-1 flex flex-col items-center justify-center gap-1
@@ -92,7 +89,7 @@ export function MobileNav({
           >
             <span className="relative">
               <Icon />
-              {id === "activity" && isProcessing && liveEventCount > 0 && (
+              {id === "monitor" && isProcessing && liveEventCount > 0 && (
                 <span
                   className="absolute -top-1 -right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse"
                   aria-label="Aktif"

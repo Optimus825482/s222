@@ -12,6 +12,9 @@ if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -88,6 +91,66 @@ USERS = {
 
 # In-memory token store: token -> user_id
 _active_tokens: dict[str, str] = {}
+_revoked_tokens: set[str] = set()
+
+_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", str(7 * 24 * 60 * 60)))
+_TOKEN_SECRET = os.getenv("AUTH_TOKEN_SECRET", "dev-insecure-change-me")
+
+
+def _issue_signed_token(user_id: str, ttl_seconds: int = _TOKEN_TTL_SECONDS) -> str:
+    """Create stateless signed token: v1.<b64(user_id)>.exp.signature"""
+    exp = int(time.time()) + int(ttl_seconds)
+    user_b64 = (
+        base64.urlsafe_b64encode(user_id.encode("utf-8")).decode("ascii").rstrip("=")
+    )
+    body = f"{user_b64}.{exp}"
+    sig = hmac.new(
+        _TOKEN_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    return f"v1.{body}.{sig}"
+
+
+def _validate_signed_token(token: str) -> str | None:
+    """Return user_id if token is valid and not expired/revoked, otherwise None."""
+    if not token or token in _revoked_tokens:
+        return None
+    if not token.startswith("v1."):
+        return None
+
+    parts = token.split(".")
+    if len(parts) != 4:
+        return None
+
+    _, user_b64, exp_raw, sig = parts
+    body = f"{user_b64}.{exp_raw}"
+    expected_sig = hmac.new(
+        _TOKEN_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected_sig):
+        return None
+
+    try:
+        exp = int(exp_raw)
+    except ValueError:
+        return None
+    if exp < int(time.time()):
+        return None
+
+    # Restore base64 padding before decode.
+    padded = user_b64 + "=" * (-len(user_b64) % 4)
+    try:
+        user_id = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
+    except Exception:
+        return None
+
+    return user_id if user_id in USERS else None
+
+
+def _extract_bearer_token(authorization: str | None) -> str:
+    raw = (authorization or "").strip()
+    if raw.lower().startswith("bearer "):
+        return raw[7:].strip()
+    return ""
 
 
 class LoginRequest(BaseModel):
@@ -96,7 +159,16 @@ class LoginRequest(BaseModel):
 
 
 def _get_user_from_token(token: str) -> dict | None:
+    if not token:
+        return None
+
+    # Backward-compatibility: old in-memory session tokens.
     user_id = _active_tokens.get(token)
+    if user_id:
+        return USERS.get(user_id)
+
+    # Preferred: stateless signed token.
+    user_id = _validate_signed_token(token)
     if not user_id:
         return None
     return USERS.get(user_id)
@@ -104,10 +176,9 @@ def _get_user_from_token(token: str) -> dict | None:
 
 def get_current_user(authorization: str | None = Header(None, alias="Authorization")) -> dict:
     """Extract Bearer token, resolve user from _active_tokens + USERS; raise 401 if invalid."""
-    raw = (authorization or "").strip()
-    if not raw.lower().startswith("bearer "):
+    token = _extract_bearer_token(authorization)
+    if not token:
         raise HTTPException(401, "Missing or invalid Authorization header")
-    token = raw[7:].strip()
     user = _get_user_from_token(token)
     if not user:
         raise HTTPException(401, "Invalid or expired token")
@@ -177,7 +248,8 @@ async def api_login(req: LoginRequest):
         ok = hashlib.sha256(req.password.encode()).hexdigest() == stored
     if not ok:
         raise HTTPException(401, "Şifre hatalı")
-    token = secrets.token_hex(32)
+    token = _issue_signed_token(user["user_id"])
+    # Keep compatibility with old lookup path (also supports explicit logout revocation workflows).
     _active_tokens[token] = user["user_id"]
     return {
         "token": token,
@@ -188,14 +260,16 @@ async def api_login(req: LoginRequest):
 
 @app.post("/api/auth/logout")
 async def api_logout(authorization: str | None = Header(None, alias="Authorization")):
-    token = (authorization or "").replace("Bearer ", "").strip()
+    token = _extract_bearer_token(authorization)
     _active_tokens.pop(token, None)
+    if token:
+        _revoked_tokens.add(token)
     return {"ok": True}
 
 
 @app.get("/api/auth/me")
 async def api_me(authorization: str | None = Header(None, alias="Authorization")):
-    token = (authorization or "").replace("Bearer ", "").strip()
+    token = _extract_bearer_token(authorization)
     user = _get_user_from_token(token)
     if not user:
         raise HTTPException(401, "Geçersiz token")
