@@ -151,20 +151,20 @@ export function AgentHealthPanel() {
               <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
                 <span>Başarı Oranı</span>
                 <span className="text-slate-300">
-                  {agent.success_rate.toFixed(1)}%
+                  {(agent.success_rate ?? 0).toFixed(1)}%
                 </span>
               </div>
               <div
                 className="h-1 rounded-full bg-slate-700 overflow-hidden"
                 role="progressbar"
-                aria-valuenow={agent.success_rate}
+                aria-valuenow={agent.success_rate ?? 0}
                 aria-valuemin={0}
                 aria-valuemax={100}
               >
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{
-                    width: `${Math.min(agent.success_rate, 100)}%`,
+                    width: `${Math.min(agent.success_rate ?? 0, 100)}%`,
                     backgroundColor: ROLE_COLOR[agent.role],
                   }}
                 />
@@ -176,7 +176,7 @@ export function AgentHealthPanel() {
               <div>
                 <div className="text-[10px] text-slate-500">Gecikme</div>
                 <div className="text-xs text-slate-300">
-                  {agent.avg_latency_ms.toFixed(0)}ms
+                  {(agent.avg_latency_ms ?? 0).toFixed(0)}ms
                 </div>
               </div>
               <div>
@@ -282,16 +282,16 @@ export function LeaderboardPanel() {
                 </span>
               </span>
               <span className="text-right font-bold text-slate-200">
-                {entry.score.toFixed(0)}
+                {(entry.score ?? 0).toFixed(0)}
               </span>
               <span className="text-right text-slate-300">
-                {entry.success_rate.toFixed(0)}%
+                {(entry.success_rate ?? 0).toFixed(0)}%
               </span>
               <span className="text-right text-slate-400">
-                {entry.avg_latency_ms.toFixed(0)}ms
+                {(entry.avg_latency_ms ?? 0).toFixed(0)}ms
               </span>
               <span className="text-right text-slate-400">
-                {entry.efficiency.toFixed(1)}
+                {(entry.efficiency ?? 0).toFixed(1)}
               </span>
             </div>
           );
@@ -360,7 +360,7 @@ export function SystemStatsPanel() {
     {
       icon: "💾",
       label: "Bellek",
-      value: `${stats.memory_usage_mb.toFixed(0)} MB`,
+      value: `${(stats.memory_usage_mb ?? 0).toFixed(0)} MB`,
     },
     {
       icon: dbOk ? "🟢" : "🔴",
@@ -536,13 +536,13 @@ export function AnomalyPanel() {
                 <span>
                   Değer:{" "}
                   <span className="text-slate-300">
-                    {anomaly.metric_value.toFixed(1)}
+                    {(anomaly.metric_value ?? 0).toFixed(1)}
                   </span>
                 </span>
                 <span>
                   Eşik:{" "}
                   <span className="text-slate-300">
-                    {anomaly.threshold.toFixed(1)}
+                    {(anomaly.threshold ?? 0).toFixed(1)}
                   </span>
                 </span>
               </div>

@@ -278,8 +278,8 @@
 | -------------------------------------------------------- | --------------------------------------- |
 | `backend/main.py`                                        | ✅ 50+ endpoint, güvenlik, rate limiter |
 | `frontend/src/lib/types.ts`                              | ✅ 30+ tip tanımı                       |
-| `frontend/src/lib/api.ts`                                | ✅ 18+ API metodu                       |
-| `frontend/src/app/page.tsx`                              | ✅ 6'lı tab, lazy import                |
+| `frontend/src/lib/api.ts`                                | ✅ 21+ API metodu                       |
+| `frontend/src/app/page.tsx`                              | ✅ 7'li tab, lazy import                |
 | `frontend/src/components/task-flow-monitor.tsx`          | ✅ ~1070 satır, 7 bölüm                 |
 | `frontend/src/components/monitoring-panels.tsx`          | ✅ 4 panel bileşeni                     |
 | `frontend/src/components/memory-panels.tsx`              | ✅ Timeline + Correlation               |

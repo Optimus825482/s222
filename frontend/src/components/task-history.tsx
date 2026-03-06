@@ -70,7 +70,7 @@ function TaskRow({ task }: { task: Task }) {
   const StatusIcon = st.Icon;
   const pColor = PIPELINE_COLORS[task.pipeline_type] ?? "#6b7280";
   const latency = task.total_latency_ms
-    ? `${task.total_latency_ms.toFixed(0)}ms`
+    ? `${(task.total_latency_ms ?? 0).toFixed(0)}ms`
     : "—";
 
   return (
@@ -129,7 +129,7 @@ function TaskRow({ task }: { task: Task }) {
                   <span className="text-slate-400">{sub.assigned_agent}</span>
                   <span>{sub.status}</span>
                   <span className="font-mono">
-                    {sub.token_usage} tok · {sub.latency_ms.toFixed(0)}ms
+                    {sub.token_usage} tok · {(sub.latency_ms ?? 0).toFixed(0)}ms
                   </span>
                 </div>
               ))}

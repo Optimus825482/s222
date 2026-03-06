@@ -94,7 +94,7 @@ function AgentPerformanceChart() {
             key={entry.role}
             className="group relative"
             role="listitem"
-            aria-label={`${entry.name}: skor ${entry.score.toFixed(0)}`}
+            aria-label={`${entry.name}: skor ${(entry.score ?? 0).toFixed(0)}`}
           >
             {/* Agent label row */}
             <div className="flex items-center justify-between mb-1">
@@ -115,7 +115,7 @@ function AgentPerformanceChart() {
                 )}
               </div>
               <span className="text-xs font-bold text-slate-200 tabular-nums">
-                {entry.score.toFixed(0)}
+                {(entry.score ?? 0).toFixed(0)}
               </span>
             </div>
 
@@ -140,19 +140,19 @@ function AgentPerformanceChart() {
               <span>
                 Başarı:{" "}
                 <span className="text-slate-300">
-                  {entry.success_rate.toFixed(1)}%
+                  {(entry.success_rate ?? 0).toFixed(1)}%
                 </span>
               </span>
               <span>
                 Gecikme:{" "}
                 <span className="text-slate-300">
-                  {entry.avg_latency_ms.toFixed(0)}ms
+                  {(entry.avg_latency_ms ?? 0).toFixed(0)}ms
                 </span>
               </span>
               <span>
                 Verim:{" "}
                 <span className="text-slate-300">
-                  {entry.efficiency.toFixed(2)}
+                  {(entry.efficiency ?? 0).toFixed(2)}
                 </span>
               </span>
             </div>
@@ -241,7 +241,7 @@ function SkillRecommendations() {
                   {skill.name}
                 </h4>
                 <span className="flex-shrink-0 text-[10px] font-bold tabular-nums text-emerald-400">
-                  %{(skill.relevance_score * 100).toFixed(0)}
+                  %{((skill.relevance_score ?? 0) * 100).toFixed(0)}
                 </span>
               </div>
 
@@ -279,7 +279,7 @@ function SkillRecommendations() {
                   aria-valuenow={skill.relevance_score * 100}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-label={`Uygunluk: %${(skill.relevance_score * 100).toFixed(0)}`}
+                  aria-label={`Uygunluk: %${((skill.relevance_score ?? 0) * 100).toFixed(0)}`}
                 />
               </div>
             </article>

@@ -320,7 +320,7 @@ export function MemoryCorrelationPanel() {
                     <div className="flex items-center gap-2 shrink-0">
                       {cluster.avg_similarity != null && (
                         <span className="text-[10px] text-slate-400">
-                          %{(cluster.avg_similarity * 100).toFixed(0)}
+                          %{((cluster.avg_similarity ?? 0) * 100).toFixed(0)}
                         </span>
                       )}
                       <span className="text-[10px] text-slate-500">
@@ -365,7 +365,7 @@ export function MemoryCorrelationPanel() {
                               {member.similarity != null && (
                                 <span>
                                   benzerlik: %
-                                  {(member.similarity * 100).toFixed(0)}
+                                  {((member.similarity ?? 0) * 100).toFixed(0)}
                                 </span>
                               )}
                             </div>

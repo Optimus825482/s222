@@ -109,7 +109,7 @@ function PipelineNode({ subtask }: { subtask: SubTask }) {
       </div>
       {subtask.token_usage > 0 && (
         <div className="text-[9px] text-slate-600 mt-1">
-          {subtask.token_usage} tok · {subtask.latency_ms.toFixed(0)}ms
+          {subtask.token_usage} tok · {(subtask.latency_ms ?? 0).toFixed(0)}ms
         </div>
       )}
     </div>

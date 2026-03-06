@@ -284,12 +284,7 @@ export function ChatArea({ thread, isProcessing, status }: Props) {
   }, [thread?.events?.length]);
 
   if (!thread || !thread.events.length) {
-    return (
-      <WelcomeScreen
-        isProcessing={isProcessing}
-        status={status}
-      />
-    );
+    return <WelcomeScreen isProcessing={isProcessing} status={status} />;
   }
 
   // Build clean chat: user messages + errors + ONLY the final report per round.
@@ -370,7 +365,10 @@ function WelcomeScreen({
           role="status"
           aria-live="polite"
         >
-          <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" aria-hidden />
+          <span
+            className="h-2 w-2 rounded-full bg-blue-400 animate-pulse"
+            aria-hidden
+          />
           {statusLabel}
         </div>
       )}
@@ -479,7 +477,7 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
             {lastTask.total_latency_ms > 0 && (
               <span className="inline-flex items-center gap-0.5">
                 <Clock className="w-3 h-3" aria-hidden="true" />
-                {(lastTask.total_latency_ms / 1000).toFixed(1)}s
+                {((lastTask.total_latency_ms ?? 0) / 1000).toFixed(1)}s
               </span>
             )}
             {lastTask.sub_tasks?.length > 0 && (

@@ -62,22 +62,31 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     if (!enabled) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    let wsUrl =
+    // Build base URL (never includes query params)
+    let baseUrl =
       currentWsUrlRef.current ||
       process.env.NEXT_PUBLIC_WS_URL ||
       "ws://localhost:8001/ws/chat";
-    if (wsUrl.includes("/ws/chat") && !wsUrl.includes("/api/ws/chat")) {
-      wsUrl = wsUrl.replace("/ws/chat", "/api/ws/chat");
+
+    // Strip any existing query params from base
+    const qIdx = baseUrl.indexOf("?");
+    if (qIdx !== -1) baseUrl = baseUrl.slice(0, qIdx);
+
+    // Ensure /api/ws/chat path (only if not already present)
+    if (baseUrl.includes("/ws/chat") && !baseUrl.includes("/api/ws/chat")) {
+      baseUrl = baseUrl.replace("/ws/chat", "/api/ws/chat");
     }
+
+    // Store clean base URL (no token, no query params)
+    currentWsUrlRef.current = baseUrl;
+
+    // Build connection URL with token
+    let connectUrl = baseUrl;
     const token = getToken();
     if (token) {
-      wsUrl +=
-        (wsUrl.includes("?") ? "&" : "?") +
-        "token=" +
-        encodeURIComponent(token);
+      connectUrl += "?token=" + encodeURIComponent(token);
     }
-    currentWsUrlRef.current = wsUrl;
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(connectUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -154,7 +163,9 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
       // Fallback for reverse proxies that expose websocket under /api/ws/chat.
       if (
         reconnectAttempts.current === 0 &&
-        currentWsUrlRef.current?.includes("/ws/chat")
+        currentWsUrlRef.current &&
+        currentWsUrlRef.current.includes("/ws/chat") &&
+        !currentWsUrlRef.current.includes("/api/ws/chat")
       ) {
         currentWsUrlRef.current = currentWsUrlRef.current.replace(
           "/ws/chat",

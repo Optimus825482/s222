@@ -258,7 +258,7 @@ function SkillDetailModal({
                       className="w-3 h-3 text-amber-400"
                       aria-hidden="true"
                     />
-                    {skill.avg_score.toFixed(1)}
+                    {(skill.avg_score ?? 0).toFixed(1)}
                   </span>
                 )}
               </div>
@@ -1175,8 +1175,14 @@ export function EvalPanel() {
   } | null>(null);
 
   useEffect(() => {
-    api.evalStats().then((s) => setStats(s as EvalStat[])).catch(() => {});
-    api.evalBaseline().then(setBaseline).catch(() => setBaseline(null));
+    api
+      .evalStats()
+      .then((s) => setStats(s as EvalStat[]))
+      .catch(() => {});
+    api
+      .evalBaseline()
+      .then(setBaseline)
+      .catch(() => setBaseline(null));
   }, []);
 
   return (
@@ -1198,7 +1204,7 @@ export function EvalPanel() {
             </dd>
             <dt className="text-slate-500">Satisfaction (1–10)</dt>
             <dd className="font-medium text-right text-slate-200">
-              {baseline.user_satisfaction_score.toFixed(1)}
+              {(baseline.user_satisfaction_score ?? 0).toFixed(1)}
             </dd>
             <dt className="text-slate-500">Avg latency</dt>
             <dd className="font-medium text-right text-slate-200">
@@ -1233,7 +1239,7 @@ export function EvalPanel() {
                   </span>
                   <span className="text-slate-500 flex items-center gap-1">
                     <Star className="w-3 h-3" aria-hidden="true" />{" "}
-                    {s.avg_score.toFixed(1)}/5 · {s.total_tasks} görev
+                    {(s.avg_score ?? 0).toFixed(1)}/5 · {s.total_tasks} görev
                   </span>
                 </div>
                 <div
@@ -1242,7 +1248,7 @@ export function EvalPanel() {
                   aria-valuenow={s.avg_score}
                   aria-valuemin={0}
                   aria-valuemax={5}
-                  aria-label={`${s.agent_role} skoru: ${s.avg_score.toFixed(1)}/5`}
+                  aria-label={`${s.agent_role} skoru: ${(s.avg_score ?? 0).toFixed(1)}/5`}
                 >
                   <div
                     className="h-full rounded-full transition-all"

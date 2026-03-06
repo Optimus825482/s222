@@ -139,7 +139,7 @@ function ImprovementPlanView() {
                         : "text-red-400"
                   }`}
                 >
-                  {plan.overall_score.toFixed(0)}
+                  {(plan.overall_score ?? 0).toFixed(0)}
                 </span>
                 <span className="text-[10px] text-slate-500">/100</span>
               </div>
@@ -366,7 +366,7 @@ function FailureLearningView() {
                 />
               </div>
               <span className="text-[10px] font-bold text-slate-300 tabular-nums w-10 text-right">
-                %{(learning.learning_rate * 100).toFixed(0)}
+                %{((learning.learning_rate ?? 0) * 100).toFixed(0)}
               </span>
             </div>
           </div>

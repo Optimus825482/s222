@@ -1296,12 +1296,15 @@ def _utcnow() -> datetime:
 
 @app.get("/api/agents/health")
 async def get_agents_health(user: dict = Depends(get_current_user)):
-    """Return health status for all 5 agents with real-time metrics."""
+    """Return health status for all agents matching frontend AgentHealth interface."""
     _audit("agents_health_check", user["user_id"])
     try:
-        from tools.agent_eval import get_agent_stats
+        from tools.agent_eval import get_agent_stats, get_performance_baseline
 
-        stats_list = get_agent_stats()
+        try:
+            stats_list = get_agent_stats()
+        except Exception:
+            stats_list = []
         stats_by_role = {s["agent_role"]: s for s in stats_list}
 
         now = _utcnow()
@@ -1309,11 +1312,20 @@ async def get_agents_health(user: dict = Depends(get_current_user)):
 
         for role in _AGENT_ROLES:
             stat = stats_by_role.get(role, {})
-            total = int(stat.get("total_tasks", 0))
-            avg_score = float(stat.get("avg_score", 0))
-            avg_latency = float(stat.get("avg_latency", 0))
-            total_tokens = int(stat.get("total_tokens", 0))
+            avg_score = float(stat.get("avg_score", 0) or 0)
+            avg_latency = float(stat.get("avg_latency", 0) or 0)
+            total_tokens = int(stat.get("total_tokens", 0) or 0)
             success_rate = round((avg_score / 5.0) * 100, 1) if avg_score else 0.0
+
+            # Get baseline for total_calls and error_count
+            try:
+                baseline = get_performance_baseline(role)
+                total_calls = int(baseline.get("total_tasks", 0))
+                success_count = int(baseline.get("success_count", 0))
+                error_count = max(0, total_calls - success_count)
+            except Exception:
+                total_calls = int(stat.get("total_tasks", 0))
+                error_count = 0
 
             # Determine status from thread metrics (last_active)
             last_active = None
@@ -1321,11 +1333,14 @@ async def get_agents_health(user: dict = Depends(get_current_user)):
             try:
                 user_threads = list_threads(limit=10, user_id=user["user_id"])
                 for t_info in user_threads:
-                    thread = load_thread(t_info["id"], user_id=user["user_id"])
-                    if thread and role in thread.agent_metrics:
-                        m = thread.agent_metrics[role]
-                        if m.last_active and (last_active is None or m.last_active > last_active):
-                            last_active = m.last_active
+                    try:
+                        thread = load_thread(t_info["id"], user_id=user["user_id"])
+                        if thread and role in thread.agent_metrics:
+                            m = thread.agent_metrics[role]
+                            if m.last_active and (last_active is None or m.last_active > last_active):
+                                last_active = m.last_active
+                    except Exception:
+                        continue
             except Exception:
                 pass
 
@@ -1336,17 +1351,22 @@ async def get_agents_health(user: dict = Depends(get_current_user)):
                 elif delta < timedelta(minutes=30):
                     status = "idle"
 
+            uptime_pct = 99.0 if status in ("active", "idle") else 0.0
+
             agents.append({
                 "role": role,
+                "name": MODELS.get(role, {}).get("name", role),
                 "status": status,
-                "total_tasks": total,
-                "success_rate_pct": success_rate,
+                "success_rate": success_rate,
                 "avg_latency_ms": avg_latency,
                 "total_tokens": total_tokens,
+                "total_calls": total_calls,
+                "error_count": error_count,
                 "last_active": last_active.isoformat() if last_active else None,
+                "uptime_pct": uptime_pct,
             })
 
-        return {"agents": agents, "timestamp": now.isoformat()}
+        return agents
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch agent health: {e}")

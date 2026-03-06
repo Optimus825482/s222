@@ -247,7 +247,7 @@ function AgentAssignment() {
                   className="font-mono text-[10px] font-bold"
                   style={{ color: c.color }}
                 >
-                  {c.score.toFixed(1)}
+                  {(c.score ?? 0).toFixed(1)}
                 </span>
                 {isBest && (
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-medium">
@@ -348,7 +348,7 @@ function RotationHistory() {
             </span>
             <span className="text-slate-600 font-mono">
               {entry.latency_ms > 0
-                ? `${(entry.latency_ms / 1000).toFixed(1)}s`
+                ? `${((entry.latency_ms ?? 0) / 1000).toFixed(1)}s`
                 : "-"}
             </span>
           </div>
