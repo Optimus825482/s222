@@ -536,6 +536,125 @@ async def api_delete_skill(skill_id: str):
         raise HTTPException(503, f"Skills module error: {e}")
 
 
+# ── Workflow Engine Endpoints ────────────────────────────────────
+
+@app.get("/api/workflows/templates")
+async def api_workflow_templates():
+    """List available workflow templates."""
+    try:
+        from tools.workflow_engine import get_workflow_templates
+        return get_workflow_templates()
+    except Exception as e:
+        raise HTTPException(503, f"Workflow engine error: {e}")
+
+
+@app.get("/api/workflows/history")
+async def api_workflow_history(limit: int = 20, user: dict = Depends(get_current_user)):
+    """List recent workflow execution results."""
+    try:
+        from tools.workflow_engine import list_workflow_results
+        return list_workflow_results(limit=limit)
+    except Exception as e:
+        return []
+
+
+class WorkflowRunRequest(BaseModel):
+    template: str
+    variables: dict = {}
+    custom_steps: list[dict] | None = None
+
+
+@app.post("/api/workflows/run")
+async def api_run_workflow(req: WorkflowRunRequest, user: dict = Depends(get_current_user)):
+    """Execute a workflow template or custom workflow."""
+    try:
+        from tools.workflow_engine import (
+            WORKFLOW_TEMPLATES, create_workflow, execute_workflow, WorkflowStep, Workflow
+        )
+        from core.models import Thread as ThreadModel
+
+        if req.template != "custom" and req.template in WORKFLOW_TEMPLATES:
+            template = WORKFLOW_TEMPLATES[req.template]
+            steps = [WorkflowStep(**s) for s in template["steps"]]
+            workflow = Workflow(
+                workflow_id=f"{req.template}-{int(__import__('time').time())}",
+                name=template["name"],
+                description=template["description"],
+                steps=steps,
+                variables=req.variables,
+            )
+        elif req.template == "custom" and req.custom_steps:
+            steps = [WorkflowStep(**s) for s in req.custom_steps]
+            workflow = Workflow(
+                workflow_id=f"custom-{int(__import__('time').time())}",
+                name="Custom Workflow",
+                description="User-defined workflow",
+                steps=steps,
+                variables=req.variables,
+            )
+        else:
+            raise HTTPException(400, f"Unknown template: {req.template}")
+
+        thread = ThreadModel()
+        result = await execute_workflow(workflow, thread)
+        return {
+            "workflow_id": result.workflow_id,
+            "status": result.status,
+            "step_results": result.step_results,
+            "error": result.error,
+            "duration_ms": result.duration_ms,
+            "variables": result.variables,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"Workflow execution error: {e}")
+
+
+# ── Domain Expert Endpoints ──────────────────────────────────────
+
+@app.get("/api/domains")
+async def api_list_domains():
+    """List available domain expertise modules."""
+    try:
+        from tools.domain_skills import list_domains
+        return list_domains()
+    except Exception as e:
+        raise HTTPException(503, f"Domain skills error: {e}")
+
+
+@app.get("/api/domains/{domain_id}/tools")
+async def api_domain_tools(domain_id: str):
+    """List tools available in a specific domain."""
+    try:
+        from tools.domain_skills import get_domain_tools
+        tools = get_domain_tools(domain_id)
+        if tools is None:
+            raise HTTPException(404, f"Domain not found: {domain_id}")
+        return tools
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"Domain skills error: {e}")
+
+
+class DomainExpertRequest(BaseModel):
+    domain: str
+    tool_name: str
+    arguments: dict = {}
+
+
+@app.post("/api/domains/execute")
+async def api_execute_domain_tool(req: DomainExpertRequest, user: dict = Depends(get_current_user)):
+    """Execute a domain-specific tool."""
+    try:
+        from tools.domain_skills import execute_domain_tool
+        result = await execute_domain_tool(req.domain, req.tool_name, req.arguments)
+        return result
+    except Exception as e:
+        raise HTTPException(503, f"Domain execution error: {e}")
+
+
 @app.get("/api/mcp/servers")
 async def api_mcp_servers():
     try:

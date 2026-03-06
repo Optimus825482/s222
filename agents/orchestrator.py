@@ -458,6 +458,15 @@ class OrchestratorAgent(BaseAgent):
                 "reasoning": f"Auto-routed: model called {fn_name} directly",
             }, thread)
 
+        elif fn_name == "run_workflow":
+            return await self._handle_run_workflow(fn_args, thread)
+        elif fn_name == "list_workflows":
+            return await self._handle_list_workflows(fn_args)
+        elif fn_name == "domain_expert":
+            return await self._handle_domain_expert(fn_args, thread)
+        elif fn_name == "list_domain_tools":
+            return self._handle_list_domain_tools(fn_args)
+
         # Delegate shared tools to base
         return await super().handle_tool_call(fn_name, fn_args, thread)
 
@@ -794,6 +803,111 @@ class OrchestratorAgent(BaseAgent):
             f"Knowledge: {len(knowledge)} chars of structured instructions\n"
             f"Inject into sub-tasks by adding '{result['id']}' to the skills list."
         )
+
+    async def _handle_run_workflow(self, fn_args: dict, thread: Thread) -> str:
+        """Execute a workflow template or custom workflow."""
+        from tools.workflow_engine import (
+            WORKFLOW_TEMPLATES, create_workflow, execute_workflow,
+            WorkflowStep, Workflow,
+        )
+
+        template_name = fn_args.get("template", "")
+        variables = fn_args.get("variables", {})
+        custom_steps = fn_args.get("custom_steps")
+
+        if template_name != "custom" and template_name in WORKFLOW_TEMPLATES:
+            template = WORKFLOW_TEMPLATES[template_name]
+            steps = [WorkflowStep(**s) for s in template["steps"]]
+            workflow = Workflow(
+                workflow_id=f"{template_name}-{int(time.time())}",
+                name=template["name"],
+                description=template["description"],
+                steps=steps,
+                variables=variables,
+            )
+        elif template_name == "custom" and custom_steps:
+            steps = [WorkflowStep(**s) for s in custom_steps]
+            workflow = Workflow(
+                workflow_id=f"custom-{int(time.time())}",
+                name="Custom Workflow",
+                description="User-defined workflow",
+                steps=steps,
+                variables=variables,
+            )
+        else:
+            return f"[Error] Unknown workflow template: {template_name}. Available: {', '.join(WORKFLOW_TEMPLATES.keys())}"
+
+        self._emit("pipeline", f"🔄 Workflow başlatılıyor: {workflow.name}")
+        result = await execute_workflow(workflow, thread)
+        self._emit("pipeline", f"{'✅' if result.status == 'completed' else '❌'} Workflow tamamlandı: {result.status} ({result.duration_ms:.0f}ms)")
+
+        parts = [f"Workflow: {workflow.name}", f"Status: {result.status}", f"Duration: {result.duration_ms:.0f}ms"]
+        if result.error:
+            parts.append(f"Error: {result.error}")
+        for step_id, step_result in result.step_results.items():
+            preview = str(step_result)[:300]
+            parts.append(f"\n--- Step: {step_id} ---\n{preview}")
+        return "\n".join(parts)
+
+    async def _handle_list_workflows(self, fn_args: dict) -> str:
+        """List workflow templates and optionally execution history."""
+        from tools.workflow_engine import get_workflow_templates, list_workflow_results
+
+        templates = get_workflow_templates()
+        parts = ["Available Workflow Templates:"]
+        for t in templates:
+            parts.append(f"  - {t['id']}: {t['name']} — {t['description']}")
+
+        if fn_args.get("include_history"):
+            history = list_workflow_results(limit=10)
+            if history:
+                parts.append("\nRecent Executions:")
+                for h in history:
+                    parts.append(f"  - {h.get('workflow_id')}: {h.get('status')} ({h.get('duration_ms', 0):.0f}ms)")
+
+        return "\n".join(parts)
+
+    async def _handle_domain_expert(self, fn_args: dict, thread: Thread) -> str:
+        """Execute a domain-specific expert tool."""
+        from tools.domain_skills import execute_domain_tool
+
+        domain = fn_args.get("domain", "")
+        tool_name = fn_args.get("tool_name", "")
+        arguments = fn_args.get("arguments", {})
+
+        if not domain or not tool_name:
+            return "[Error] domain and tool_name are required."
+
+        self._emit("tool_call", f"🧠 Domain Expert: {domain}/{tool_name}")
+        result = await execute_domain_tool(domain, tool_name, arguments)
+
+        if result.get("success"):
+            return json.dumps(result["result"], ensure_ascii=False, indent=2, default=str)
+        else:
+            return f"[Error] Domain tool failed: {result.get('error', 'unknown')}"
+
+    def _handle_list_domain_tools(self, fn_args: dict) -> str:
+        """List available domain expertise tools."""
+        from tools.domain_skills import list_domains, get_domain_tools
+
+        domain_filter = fn_args.get("domain")
+
+        if domain_filter:
+            tools = get_domain_tools(domain_filter)
+            if tools is None:
+                return f"[Error] Domain not found: {domain_filter}"
+            parts = [f"Domain: {domain_filter}"]
+            for t in tools:
+                parts.append(f"  - {t['name']}: {t['description']}")
+            return "\n".join(parts)
+
+        domains = list_domains()
+        parts = ["Available Domains:"]
+        for d in domains:
+            parts.append(f"\n📌 {d['name']} ({d['name_tr']})")
+            parts.append(f"   {d['description']}")
+            parts.append(f"   Capabilities: {', '.join(d['capabilities'][:4])}")
+        return "\n".join(parts)
 
     async def _handle_decompose(self, fn_args: dict, thread: Thread) -> str:
         """Create Task with SubTasks from decomposition. Auto-discovers and injects relevant skills.

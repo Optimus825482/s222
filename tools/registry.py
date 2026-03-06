@@ -701,6 +701,109 @@ GENERATE_IMAGE_TOOL = {
     },
 }
 
+# ── Workflow Engine Tools ─────────────────────────────────────────
+
+RUN_WORKFLOW_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "run_workflow",
+        "description": (
+            "Execute a multi-step workflow with conditional branching, parallel execution, "
+            "error handling, and rollback. Use for complex multi-tool chains that need "
+            "orchestrated execution. Available templates: research-and-report, code-review-pipeline, deep-analysis. "
+            "Can also run custom workflows by providing steps directly."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "template": {
+                    "type": "string",
+                    "description": "Workflow template name (research-and-report, code-review-pipeline, deep-analysis) or 'custom'",
+                },
+                "variables": {
+                    "type": "object",
+                    "description": "Variables to inject into the workflow (e.g. {'topic': 'AI trends', 'language': 'tr'})",
+                },
+                "custom_steps": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Custom workflow steps (only when template='custom')",
+                },
+            },
+            "required": ["template", "variables"],
+        },
+    },
+}
+
+LIST_WORKFLOWS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_workflows",
+        "description": "List available workflow templates and recent workflow execution results.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "include_history": {
+                    "type": "boolean",
+                    "description": "Include recent execution history (default false)",
+                },
+            },
+        },
+    },
+}
+
+# ── Domain Expert Tools ──────────────────────────────────────────
+
+DOMAIN_EXPERT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "domain_expert",
+        "description": (
+            "Access specialized domain expertise for calculations and analysis. "
+            "Domains: finance (DCF, NPV, IRR, WACC, ratios), legal (contract analysis, KVKK/GDPR), "
+            "engineering (system design, load estimation, architecture), academic (literature review, methodology). "
+            "Use when a task requires domain-specific calculations or structured analysis."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "enum": ["finance", "legal", "engineering", "academic"],
+                    "description": "Domain area",
+                },
+                "tool_name": {
+                    "type": "string",
+                    "description": "Specific tool within the domain (e.g. 'calculate_dcf', 'check_kvkk_compliance')",
+                },
+                "arguments": {
+                    "type": "object",
+                    "description": "Tool-specific arguments",
+                },
+            },
+            "required": ["domain", "tool_name", "arguments"],
+        },
+    },
+}
+
+LIST_DOMAIN_TOOLS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_domain_tools",
+        "description": "List available domain expertise tools and their capabilities. Use to discover what domain-specific calculations and analyses are available.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "enum": ["finance", "legal", "engineering", "academic"],
+                    "description": "Optional: filter by specific domain",
+                },
+            },
+        },
+    },
+}
+
 # ── Orchestrator Tools ───────────────────────────────────────────
 
 ORCHESTRATOR_TOOLS = [
@@ -833,6 +936,10 @@ ORCHESTRATOR_TOOLS = [
     CREATE_SKILL_TOOL,
     RESEARCH_CREATE_SKILL_TOOL,
     GENERATE_IMAGE_TOOL,
+    RUN_WORKFLOW_TOOL,
+    LIST_WORKFLOWS_TOOL,
+    DOMAIN_EXPERT_TOOL,
+    LIST_DOMAIN_TOOLS_TOOL,
     {
         "type": "function",
         "function": {
@@ -881,6 +988,8 @@ RESEARCHER_TOOLS = [
     RAG_LIST_DOCUMENTS_TOOL,
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
+    DOMAIN_EXPERT_TOOL,
+    LIST_DOMAIN_TOOLS_TOOL,
 ]
 
 # ── Thinker Tools ────────────────────────────────────────────────
@@ -900,6 +1009,8 @@ THINKER_TOOLS = [
     LIST_TEACHINGS_TOOL,
     GET_AGENT_BASELINE_TOOL,
     GENERATE_IMAGE_TOOL,
+    DOMAIN_EXPERT_TOOL,
+    LIST_DOMAIN_TOOLS_TOOL,
 ]
 
 # ── Speed Tools ──────────────────────────────────────────────────
@@ -919,6 +1030,8 @@ SPEED_TOOLS = [
     RAG_LIST_DOCUMENTS_TOOL,
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
+    DOMAIN_EXPERT_TOOL,
+    LIST_DOMAIN_TOOLS_TOOL,
 ]
 
 # ── Reasoner Tools ───────────────────────────────────────────────
@@ -937,6 +1050,8 @@ REASONER_TOOLS = [
     RAG_LIST_DOCUMENTS_TOOL,
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
+    DOMAIN_EXPERT_TOOL,
+    LIST_DOMAIN_TOOLS_TOOL,
 ]
 
 # ── Observer Tools ────────────────────────────────────────────────
