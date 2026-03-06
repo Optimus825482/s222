@@ -31,6 +31,9 @@ from core.models import (
     AgentRole, EventType, PipelineType, SubTask, Task, TaskStatus, Thread,
 )
 from tools.skill_finder import get_skill_knowledge
+from tools.circuit_breaker import get_circuit_breaker
+from tools.cache import get_cached_response, cache_response
+from tools.confidence import score_confidence
 
 
 class PipelineEngine:
@@ -56,6 +59,20 @@ class PipelineEngine:
 
     async def execute(self, task: Task, thread: Thread) -> str:
         """Route to appropriate pipeline strategy."""
+        # Check cache for identical queries
+        try:
+            cached = await get_cached_response(task.user_input, task.pipeline_type.value)
+            if cached:
+                task.status = TaskStatus.COMPLETED
+                task.final_result = cached["response"]
+                thread.add_event(
+                    EventType.PIPELINE_COMPLETE,
+                    f"Cache hit (confidence: {cached.get('confidence', 0):.0%})",
+                )
+                return cached["response"]
+        except Exception:
+            pass  # Cache miss or error — proceed normally
+
         task.status = TaskStatus.RUNNING
         thread.add_event(
             EventType.PIPELINE_START,
@@ -94,6 +111,16 @@ class PipelineEngine:
             result = f"[Pipeline Error] {e}"
             thread.add_event(EventType.ERROR, result)
 
+        # Cache successful results
+        if task.status == TaskStatus.COMPLETED:
+            try:
+                await cache_response(
+                    task.user_input, result, task.pipeline_type.value,
+                    confidence=0.0,  # Will be set by synthesizer
+                )
+            except Exception:
+                pass
+
         thread.add_event(
             EventType.PIPELINE_COMPLETE,
             f"Pipeline {task.pipeline_type.value} completed: {task.status.value}",
@@ -110,6 +137,24 @@ class PipelineEngine:
 
         subtask.status = TaskStatus.RUNNING
         agent = self.get_agent(subtask.assigned_agent)
+
+        # Circuit breaker check
+        cb = get_circuit_breaker()
+        agent_role_str = subtask.assigned_agent.value
+        if not cb.is_available(agent_role_str):
+            fallback_role = cb.get_fallback_agent(agent_role_str)
+            if fallback_role:
+                thread.add_event(
+                    EventType.PIPELINE_STEP,
+                    f"⚡ Circuit breaker: {agent_role_str} unavailable, falling back to {fallback_role}",
+                    agent_role=subtask.assigned_agent,
+                )
+                subtask.assigned_agent = AgentRole(fallback_role)
+                agent = self.get_agent(subtask.assigned_agent)
+            else:
+                subtask.status = TaskStatus.FAILED
+                subtask.result = f"[CircuitBreaker] Agent {agent_role_str} is unavailable and no fallback found."
+                return subtask.result
 
         # Inject skill knowledge into context if skills were assigned
         skill_context = ""
@@ -142,11 +187,20 @@ class PipelineEngine:
                 agent.execute(enriched_context, thread),
                 timeout=SUBTASK_TIMEOUT,
             )
+            cb.record_success(agent_role_str)
         except asyncio.TimeoutError:
             result = "[Timeout] Agent did not respond in time. Try a simpler query or try again."
             subtask.status = TaskStatus.FAILED
             subtask.latency_ms = (time.monotonic() - t0) * 1000
             subtask.result = result
+            cb.record_failure(agent_role_str, "timeout")
+            return result
+        except Exception as e:
+            result = f"[Error] Agent {agent_role_str} failed: {type(e).__name__}: {e}"
+            subtask.status = TaskStatus.FAILED
+            subtask.latency_ms = (time.monotonic() - t0) * 1000
+            subtask.result = result
+            cb.record_failure(agent_role_str, str(e))
             return result
         subtask.latency_ms = (time.monotonic() - t0) * 1000
         subtask.status = TaskStatus.COMPLETED
@@ -213,6 +267,17 @@ class PipelineEngine:
                 subtask.status = TaskStatus.FAILED
             else:
                 parts.append(f"[{subtask.assigned_agent.value}] {result}")
+
+        # Score confidence for each successful result
+        for subtask, result in zip(task.sub_tasks, results):
+            if not isinstance(result, Exception) and not str(result).startswith("["):
+                try:
+                    from tools.agent_eval import detect_task_type
+                    task_type = detect_task_type(task.user_input)
+                    conf = score_confidence(str(result), subtask.assigned_agent.value, task_type)
+                    subtask.metadata["confidence"] = conf
+                except Exception:
+                    pass
 
         return "\n\n---\n\n".join(parts)
 

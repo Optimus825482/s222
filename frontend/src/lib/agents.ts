@@ -12,7 +12,12 @@ export const AGENT_CONFIG: Record<
 };
 
 /** Orchestration pattern (Kiro: parallel specialists / pipeline / swarm) */
-export type OrchestrationPattern = "parallel_specialists" | "pipeline" | "swarm" | "hybrid" | "auto";
+export type OrchestrationPattern =
+  | "parallel_specialists"
+  | "pipeline"
+  | "swarm"
+  | "hybrid"
+  | "auto";
 
 export const PIPELINE_OPTIONS = [
   {
@@ -77,16 +82,20 @@ export const EVENT_ICONS: Record<
   string,
   { icon: string; label: string; color: string }
 > = {
-  routing_decision: { icon: "🧭", label: "Routing", color: "#ec4899" },
-  agent_start: { icon: "🚀", label: "Start", color: "#3b82f6" },
-  agent_thinking: { icon: "💭", label: "Thinking", color: "#a78bfa" },
-  tool_call: { icon: "🔧", label: "Tool", color: "#f59e0b" },
-  tool_result: { icon: "📋", label: "Result", color: "#10b981" },
+  routing_decision: { icon: "🧭", label: "Yönlendirme", color: "#ec4899" },
+  routing: { icon: "🧭", label: "Yönlendirme", color: "#ec4899" },
+  agent_start: { icon: "🚀", label: "Başlatıldı", color: "#3b82f6" },
+  agent_thinking: { icon: "💭", label: "Düşünüyor", color: "#a78bfa" },
+  thinking: { icon: "💭", label: "Düşünüyor", color: "#a78bfa" },
+  tool_call: { icon: "🔧", label: "Araç", color: "#f59e0b" },
+  tool_result: { icon: "📋", label: "Sonuç", color: "#10b981" },
   pipeline_start: { icon: "▶️", label: "Pipeline", color: "#3b82f6" },
-  pipeline_step: { icon: "⏩", label: "Step", color: "#06b6d4" },
-  pipeline_complete: { icon: "✅", label: "Done", color: "#10b981" },
-  synthesis: { icon: "🔗", label: "Synthesis", color: "#8b5cf6" },
-  error: { icon: "⚠️", label: "Error", color: "#ef4444" },
+  pipeline_step: { icon: "⏩", label: "Adım", color: "#06b6d4" },
+  pipeline_complete: { icon: "✅", label: "Tamamlandı", color: "#10b981" },
+  pipeline: { icon: "⏩", label: "Pipeline", color: "#06b6d4" },
+  synthesis: { icon: "🔗", label: "Sentez", color: "#8b5cf6" },
+  error: { icon: "⚠️", label: "Hata", color: "#ef4444" },
+  response: { icon: "💬", label: "Yanıt", color: "#22d3ee" },
 };
 
 export function getAgentInfo(role: string) {

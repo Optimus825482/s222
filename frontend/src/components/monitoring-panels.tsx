@@ -61,6 +61,7 @@ function InlineError({ message }: { message: string }) {
 }
 
 function formatUptime(seconds: number): string {
+  if (!seconds || !Number.isFinite(seconds)) return "0sa 0dk";
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return `${h}sa ${m}dk`;
@@ -432,9 +433,17 @@ const HEALTH_CONFIG: Record<string, { label: string; className: string }> = {
     label: "Düşük Performans",
     className: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   },
+  warning: {
+    label: "Uyarı",
+    className: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  },
   critical: {
     label: "Kritik",
     className: "bg-red-500/20 text-red-400 border-red-500/30",
+  },
+  unknown: {
+    label: "Bilinmiyor",
+    className: "bg-slate-500/20 text-slate-400 border-slate-500/30",
   },
 };
 
@@ -478,7 +487,7 @@ export function AnomalyPanel() {
   }
 
   const health = report
-    ? HEALTH_CONFIG[report.overall_health]
+    ? (HEALTH_CONFIG[report.overall_health] ?? HEALTH_CONFIG.healthy)
     : HEALTH_CONFIG.healthy;
 
   return (

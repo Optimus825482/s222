@@ -17,6 +17,8 @@ from core.models import (
 )
 from core.events import build_orchestrator_context
 from tools.registry import ORCHESTRATOR_TOOLS
+from tools.cache import get_cached_response, cache_response, cache_stats
+from tools.circuit_breaker import get_circuit_breaker
 
 # Keywords that trigger brainstorm mode (Turkish + English)
 _BRAINSTORM_PATTERNS = re.compile(
@@ -873,6 +875,28 @@ class OrchestratorAgent(BaseAgent):
             summary_parts.append(f"  {i}. [{st.assigned_agent.value}] {st.description[:80]}{skill_info}")
         return "\n".join(summary_parts)
 
+    # ── Complexity Classification ────────────────────────────────
+
+    def _classify_complexity(self, user_input: str) -> str:
+        """Classify query complexity: 'simple', 'moderate', or 'complex'.
+        Determines how many agents to use and which pipeline."""
+        text = user_input.strip()
+        
+        # Simple: greetings, yes/no, very short
+        if _SIMPLE_PATTERNS.match(text) or len(text) < 20:
+            return "simple"
+        
+        # Complex: deep research patterns, long queries, multiple sentences
+        if _DEEP_RESEARCH_PATTERNS.search(text):
+            return "complex"
+        if len(text) > 200:
+            return "complex"
+        sentences = [s.strip() for s in re.split(r'[.!?]', text) if s.strip()]
+        if len(sentences) >= 3:
+            return "complex"
+        
+        return "moderate"
+
     # ── Main Entry Point ─────────────────────────────────────────
 
     async def route_and_execute(self, user_input: str, thread: Thread, live_monitor=None, forced_pipeline: PipelineType | None = None, user_id: str | None = None) -> str:
@@ -884,6 +908,40 @@ class OrchestratorAgent(BaseAgent):
             self.set_live_monitor(live_monitor)
 
         thread.add_event(EventType.USER_MESSAGE, user_input)
+
+        # ── Cache Check ──
+        try:
+            cached = await get_cached_response(user_input)
+            if cached:
+                self._emit("routing", f"⚡ Cache hit (güven: {cached.get('confidence', 0):.0%})")
+                thread.add_event(
+                    EventType.PIPELINE_COMPLETE,
+                    f"Cache hit — returning cached response",
+                    agent_role=self.role,
+                )
+                return cached["response"]
+        except Exception:
+            pass
+
+        # ── Complexity Classification (Smart Routing) ──
+        complexity = self._classify_complexity(user_input)
+        
+        # Simple queries: direct single-agent response, skip heavy pipelines
+        if complexity == "simple" and forced_pipeline in (None, PipelineType.AUTO):
+            self._emit("routing", "⚡ Basit sorgu — hızlı yanıt modu")
+            thread.add_event(
+                EventType.ROUTING_DECISION,
+                f"Simple query detected — fast single-agent response",
+                agent_role=self.role,
+                complexity=complexity,
+            )
+            result = await self.execute(user_input, thread)
+            try:
+                await cache_response(user_input, result, confidence=0.7)
+            except Exception:
+                pass
+            self._auto_save_memory(user_input, result, user_id=user_id)
+            return result
 
         # ── Phase -1: Prompt Enhancement ──
         try:
@@ -1163,18 +1221,44 @@ class OrchestratorAgent(BaseAgent):
             if live_monitor:
                 live_monitor.emit("routing", "orchestrator", "Beyin fırtınası sonuçları sentezleniyor...")
 
-            synth_input = (
-                f"You are synthesizing a multi-round brainstorm debate between 4 specialist agents.\n\n"
-                f"DEBATE RESULTS:\n{result}\n\n"
-                f"ORIGINAL TOPIC: {user_input}\n\n"
-                f"Create a comprehensive final response that:\n"
-                f"1. Highlights the strongest arguments from each perspective\n"
-                f"2. Notes key agreements and disagreements\n"
-                f"3. Provides a balanced, actionable conclusion\n"
-                f"Respond in the same language as the user's request."
-            )
-            final = await self.execute(synth_input, thread)
+            # Use SynthesizerAgent for structured synthesis
+            try:
+                from agents.synthesizer import SynthesizerAgent
+                synthesizer = SynthesizerAgent()
+                if live_monitor:
+                    synthesizer.set_live_monitor(live_monitor)
+                    live_monitor.emit("routing", "orchestrator", "📊 Sentez Agent çalışıyor — güven skorları hesaplanıyor...")
+                
+                # Parse agent results from brainstorm output
+                agent_results = {}
+                for st in task.sub_tasks:
+                    if st.result:
+                        agent_results[st.assigned_agent.value] = st.result
+                
+                final = await synthesizer.synthesize(agent_results, user_input, thread)
+            except Exception:
+                # Fallback to old synthesis
+                synth_input = (
+                    f"You are synthesizing a multi-round brainstorm debate between 4 specialist agents.\n\n"
+                    f"DEBATE RESULTS:\n{result}\n\n"
+                    f"ORIGINAL TOPIC: {user_input}\n\n"
+                    f"Create a comprehensive final response that:\n"
+                    f"1. Highlights the strongest arguments from each perspective\n"
+                    f"2. Notes key agreements and disagreements\n"
+                    f"3. Provides a balanced, actionable conclusion\n"
+                    f"Respond in the same language as the user's request."
+                )
+                final = await self.execute(synth_input, thread)
             task.final_result = final
+            try:
+                from tools.confidence import score_confidence
+                avg_conf = sum(
+                    score_confidence(r, role, "general").get("confidence_score", 0.5)
+                    for role, r in agent_results.items()
+                ) / max(len(agent_results), 1)
+                await cache_response(user_input, final, confidence=avg_conf)
+            except Exception:
+                pass
             self._auto_save_memory(user_input, final, user_id=user_id)
             return final
 
@@ -1226,19 +1310,44 @@ class OrchestratorAgent(BaseAgent):
             if live_monitor:
                 live_monitor.emit("routing", "orchestrator", "Sonuçlar sentezleniyor...")
 
-            synth_input = (
-                f"You are synthesizing results from 4 specialist agents who worked in parallel.\n\n"
-                f"AGENT RESULTS:\n{result}\n\n"
-                f"ORIGINAL USER REQUEST: {user_input}\n\n"
-                f"Create a comprehensive, well-structured final response that:\n"
-                f"1. Integrates insights from ALL agents\n"
-                f"2. Resolves any contradictions between agents\n"
-                f"3. Cites sources where available\n"
-                f"4. Provides clear actionable conclusions\n"
-                f"Respond in the same language as the user's request."
-            )
-            final = await self.execute(synth_input, thread)
+            # Use SynthesizerAgent for structured synthesis with confidence
+            try:
+                from agents.synthesizer import SynthesizerAgent
+                synthesizer = SynthesizerAgent()
+                if live_monitor:
+                    synthesizer.set_live_monitor(live_monitor)
+                    live_monitor.emit("routing", "orchestrator", "📊 Sentez Agent çalışıyor — güven skorları hesaplanıyor...")
+                
+                agent_results = {}
+                for st in task.sub_tasks:
+                    if st.result:
+                        agent_results[st.assigned_agent.value] = st.result
+                
+                final = await synthesizer.synthesize(agent_results, user_input, thread)
+            except Exception:
+                # Fallback to old synthesis
+                synth_input = (
+                    f"You are synthesizing results from {len(task.sub_tasks)} specialist agents who worked in parallel.\n\n"
+                    f"AGENT RESULTS:\n{result}\n\n"
+                    f"ORIGINAL USER REQUEST: {user_input}\n\n"
+                    f"Create a comprehensive, well-structured final response that:\n"
+                    f"1. Integrates insights from ALL agents\n"
+                    f"2. Resolves any contradictions between agents\n"
+                    f"3. Cites sources where available\n"
+                    f"4. Provides clear actionable conclusions\n"
+                    f"Respond in the same language as the user's request."
+                )
+                final = await self.execute(synth_input, thread)
             task.final_result = final
+            try:
+                from tools.confidence import score_confidence
+                avg_conf = sum(
+                    score_confidence(r, role, "general").get("confidence_score", 0.5)
+                    for role, r in agent_results.items()
+                ) / max(len(agent_results), 1)
+                await cache_response(user_input, final, confidence=avg_conf)
+            except Exception:
+                pass
             self._auto_save_memory(user_input, final, user_id=user_id)
             return final
 
@@ -1263,6 +1372,7 @@ class OrchestratorAgent(BaseAgent):
                 # or user forced parallel from UI — upgrade to parallel multi-agent
                 if (
                     len(current_task.sub_tasks) == 1
+                    and complexity != "simple"
                     and (
                         is_forced_parallel
                         or (len(user_input.strip()) > 30 and current_task.pipeline_type != PipelineType.PARALLEL)
@@ -1279,12 +1389,21 @@ class OrchestratorAgent(BaseAgent):
                     ]
                     # Add complementary agents
                     existing_agent = current_task.sub_tasks[0].assigned_agent.value
-                    complement = {
-                        "researcher": ["thinker", "reasoner"],
-                        "thinker": ["researcher", "reasoner"],
-                        "reasoner": ["thinker", "researcher"],
-                        "speed": ["thinker", "researcher"],
-                    }
+                    # Moderate: 2 agents total, Complex: 3 agents total
+                    if complexity == "moderate":
+                        complement = {
+                            "researcher": ["thinker"],
+                            "thinker": ["researcher"],
+                            "reasoner": ["thinker"],
+                            "speed": ["researcher"],
+                        }
+                    else:
+                        complement = {
+                            "researcher": ["thinker", "reasoner"],
+                            "thinker": ["researcher", "reasoner"],
+                            "reasoner": ["thinker", "researcher"],
+                            "speed": ["thinker", "researcher"],
+                        }
                     for agent_name in complement.get(existing_agent, ["thinker", "researcher"]):
                         current_task.sub_tasks.append(SubTask(
                             description=f"Support analysis for: {user_input}",
@@ -1320,17 +1439,48 @@ class OrchestratorAgent(BaseAgent):
                 if live_monitor:
                     live_monitor.emit("routing", "orchestrator", "Sonuçlar sentezleniyor...")
 
-                synth_input = (
-                    f"The specialists have completed their work. Here are the results:\n\n"
-                    f"{result}\n\n"
-                    f"Original user request: {user_input}\n\n"
-                    f"Synthesize a clear, comprehensive final response in the user's language."
-                )
-                final = await self.execute(synth_input, thread)
+                # Use SynthesizerAgent for structured synthesis
+                try:
+                    from agents.synthesizer import SynthesizerAgent
+                    synthesizer = SynthesizerAgent()
+                    if live_monitor:
+                        synthesizer.set_live_monitor(live_monitor)
+                        live_monitor.emit("routing", "orchestrator", "📊 Sentez Agent çalışıyor — güven skorları hesaplanıyor...")
+                    
+                    agent_results = {}
+                    for st in current_task.sub_tasks:
+                        if st.result:
+                            agent_results[st.assigned_agent.value] = st.result
+                    
+                    final = await synthesizer.synthesize(agent_results, user_input, thread)
+                except Exception:
+                    # Fallback to old synthesis
+                    synth_input = (
+                        f"The specialists have completed their work. Here are the results:\n\n"
+                        f"{result}\n\n"
+                        f"Original user request: {user_input}\n\n"
+                        f"Synthesize a clear, comprehensive final response in the user's language."
+                    )
+                    final = await self.execute(synth_input, thread)
                 current_task.final_result = final
+                try:
+                    from tools.confidence import score_confidence
+                    avg_conf = sum(
+                        score_confidence(r, role, "general").get("confidence_score", 0.5)
+                        for role, r in agent_results.items()
+                    ) / max(len(agent_results), 1)
+                    await cache_response(user_input, final, confidence=avg_conf)
+                except Exception:
+                    pass
                 self._auto_save_memory(user_input, final, user_id=user_id)
                 return final
 
+        # Cache direct orchestrator responses
+        try:
+            await cache_response(user_input, decision, confidence=0.5)
+        except Exception:
+            pass
+        self._auto_save_memory(user_input, decision, user_id=user_id)
         return decision
 
     async def _enhance_prompt(self, user_input: str, thread: Thread) -> str:

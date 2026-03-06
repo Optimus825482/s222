@@ -103,15 +103,19 @@ const STAGES: Stage[] = [
 
 const LOGGABLE_EVENTS = new Set([
   "routing_decision",
+  "routing",
   "agent_start",
   "agent_thinking",
+  "thinking",
   "tool_call",
   "tool_result",
   "pipeline_start",
   "pipeline_step",
   "pipeline_complete",
+  "pipeline",
   "synthesis",
   "error",
+  "response",
 ]);
 
 const ALL_AGENT_ROLES: AgentRole[] = [
@@ -173,15 +177,19 @@ function toTimeString(timestamp: number): string {
 function eventBorderClass(eventType: string): string {
   const map: Record<string, string> = {
     routing_decision: "border-l-fuchsia-400",
+    routing: "border-l-fuchsia-400",
     agent_start: "border-l-blue-400",
     agent_thinking: "border-l-teal-400",
+    thinking: "border-l-teal-400",
     tool_call: "border-l-amber-400",
     tool_result: "border-l-emerald-400",
     pipeline_start: "border-l-cyan-400",
     pipeline_step: "border-l-cyan-500",
     pipeline_complete: "border-l-emerald-500",
+    pipeline: "border-l-cyan-500",
     synthesis: "border-l-orange-400",
     error: "border-l-rose-500",
+    response: "border-l-cyan-300",
   };
   return map[eventType] ?? "border-l-slate-500";
 }
@@ -189,15 +197,19 @@ function eventBorderClass(eventType: string): string {
 function eventLabelColor(eventType: string): string {
   const map: Record<string, string> = {
     routing_decision: "text-fuchsia-300",
+    routing: "text-fuchsia-300",
     agent_start: "text-blue-300",
     agent_thinking: "text-teal-300",
+    thinking: "text-teal-300",
     tool_call: "text-amber-300",
     tool_result: "text-emerald-300",
     pipeline_start: "text-cyan-300",
     pipeline_step: "text-cyan-300",
     pipeline_complete: "text-emerald-300",
+    pipeline: "text-cyan-300",
     synthesis: "text-orange-300",
     error: "text-rose-300",
+    response: "text-cyan-200",
   };
   return map[eventType] ?? "text-slate-300";
 }
@@ -1187,15 +1199,19 @@ function PerformancePanel({
 
 const EVENT_FILTER_KEYS = [
   "routing_decision",
+  "routing",
   "agent_start",
   "agent_thinking",
+  "thinking",
   "tool_call",
   "tool_result",
   "pipeline_start",
   "pipeline_step",
   "pipeline_complete",
+  "pipeline",
   "synthesis",
   "error",
+  "response",
 ] as const;
 
 function LogStream({ logs }: { logs: LogItem[] }) {

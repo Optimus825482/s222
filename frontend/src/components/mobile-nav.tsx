@@ -1,49 +1,19 @@
 "use client";
 
-/* Mobile bottom navigation — SVG icons, 44px touch targets */
+import type { NavTab } from "@/components/cockpit-header";
+
 interface Props {
-  activeTab: "chat" | "monitor";
-  onTabChange: (tab: "chat" | "monitor") => void;
+  activeTab: NavTab;
+  onTabChange: (tab: NavTab) => void;
   isProcessing: boolean;
   liveEventCount: number;
 }
 
-const ChatIcon = () => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-
-const MonitorIcon = () => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <circle cx="12" cy="8" r="4" />
-    <path d="M6 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
-  </svg>
-);
-
-const TABS = [
-  { id: "chat" as const, label: "Sohbet", Icon: ChatIcon },
-  { id: "monitor" as const, label: "Akış", Icon: MonitorIcon },
+const MOBILE_TABS: { id: NavTab; label: string; emoji: string }[] = [
+  { id: "chat", label: "Sohbet", emoji: "💬" },
+  { id: "monitor", label: "Görev", emoji: "📊" },
+  { id: "insights", label: "Sistem", emoji: "⚙️" },
+  { id: "memory", label: "Bellek", emoji: "🧠" },
 ];
 
 export function MobileNav({
@@ -55,9 +25,9 @@ export function MobileNav({
   return (
     <nav
       className="lg:hidden flex border-t border-border bg-surface-raised safe-bottom"
-      aria-label="Ana navigasyon"
+      aria-label="Mobil navigasyon"
     >
-      {TABS.map(({ id, label, Icon }) => {
+      {MOBILE_TABS.map(({ id, label, emoji }) => {
         const isActive = activeTab === id;
         return (
           <button
@@ -71,8 +41,8 @@ export function MobileNav({
               ${isActive ? "text-blue-400" : "text-slate-500 hover:text-slate-300"}
             `}
           >
-            <span className="relative">
-              <Icon />
+            <span className="relative text-base">
+              {emoji}
               {id === "monitor" && isProcessing && liveEventCount > 0 && (
                 <span
                   className="absolute -top-1 -right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse"

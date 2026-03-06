@@ -269,7 +269,8 @@ const STATUS_COLORS: Record<string, string> = {
   completed: "text-emerald-400",
   running: "text-blue-400",
   failed: "text-red-400",
-  pending: "text-slate-500",
+  pending: "text-amber-400",
+  queued: "text-slate-400",
 };
 
 function RotationHistory() {
@@ -344,7 +345,15 @@ function RotationHistory() {
               {entry.description}
             </span>
             <span className={STATUS_COLORS[entry.status] ?? "text-slate-500"}>
-              {entry.status}
+              {entry.status === "completed"
+                ? "tamamlandı"
+                : entry.status === "running"
+                  ? "çalışıyor"
+                  : entry.status === "failed"
+                    ? "başarısız"
+                    : entry.status === "pending"
+                      ? "bekliyor"
+                      : entry.status}
             </span>
             <span className="text-slate-600 font-mono">
               {entry.latency_ms > 0

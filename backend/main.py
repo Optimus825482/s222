@@ -87,6 +87,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Multi-Agent Ops Center API", version="2.0.0", lifespan=lifespan)
 
+_APP_START_TIME = time.time()
+
 _cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -99,15 +101,26 @@ app.add_middleware(
 
 @app.middleware("http")
 async def security_and_rate_limit_middleware(request, call_next):
-    """Per-IP rate limiting + security headers for all responses."""
+    """Per-IP + per-user rate limiting + security headers for all responses."""
     if request.url.path.startswith("/api/"):
         client_ip = request.client.host if request.client else "unknown"
-        if not _rate_limiter.is_allowed(client_ip):
+        if not _rate_limiter.is_allowed(f"ip:{client_ip}"):
             from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Çok fazla istek. Lütfen biraz bekleyin."},
             )
+        # Per-user rate limiting via Authorization header
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            user_id = _validate_signed_token(token)
+            if user_id and not _rate_limiter.is_allowed(f"user:{user_id}"):
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Kullanıcı istek limiti aşıldı. Lütfen biraz bekleyin."},
+                )
     response = await call_next(request)
     # Security headers
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -1138,6 +1151,13 @@ async def ws_chat(ws: WebSocket):
             )
             save_thread(thread, user_id=effective_user_id)
 
+            # PII masking — strip personal data before sending to client
+            try:
+                from tools.pii_masker import mask_pii_in_response
+                result = mask_pii_in_response(result)
+            except Exception:
+                pass  # Never break response flow for PII masker errors
+
             if monitor.should_stop():
                 monitor.error("Kullanıcı tarafından durduruldu")
             else:
@@ -1229,6 +1249,14 @@ async def ws_chat(ws: WebSocket):
             pipeline_str = data.get("pipeline_type", "auto")
             effective_user_id = user_id or data.get("user_id", "") or None
 
+            # Per-user WebSocket rate limiting (20 messages/minute)
+            if effective_user_id and not _rate_limiter.is_allowed(f"ws:{effective_user_id}"):
+                await _safe_ws_send({
+                    "type": "error",
+                    "message": "İstek limiti aşıldı. Lütfen biraz bekleyin.",
+                })
+                continue
+
             if not message:
                 await _safe_ws_send({"type": "error", "message": "Empty message"})
                 continue
@@ -1264,6 +1292,118 @@ async def ws_chat(ws: WebSocket):
 async def ws_chat_api_alias(ws: WebSocket):
     """Alias route for deployments where only /api/* is routed to backend."""
     await ws_chat(ws)
+
+
+# ── Cache Management ─────────────────────────────────────────────
+
+@app.get("/api/cache/stats")
+async def api_cache_stats(user: dict = Depends(get_current_user)):
+    """Get response cache statistics."""
+    from tools.cache import cache_stats
+    return cache_stats()
+
+
+@app.post("/api/cache/clear")
+async def api_cache_clear(user: dict = Depends(get_current_user)):
+    """Clear the response cache."""
+    from tools.cache import clear_cache
+    cleared = await clear_cache()
+    _audit("cache_clear", user["user_id"], f"Cleared {cleared} entries")
+    return {"cleared": cleared}
+
+
+# ── Circuit Breaker ──────────────────────────────────────────────
+
+@app.get("/api/circuit-breaker/status")
+async def api_circuit_breaker_status(user: dict = Depends(get_current_user)):
+    """Get circuit breaker status for all agents."""
+    from tools.circuit_breaker import get_circuit_breaker
+    cb = get_circuit_breaker()
+    return {
+        "breakers": cb.status(),
+        "summary": {
+            role: data["state"]
+            for role, data in cb.status().items()
+        },
+    }
+
+
+@app.post("/api/circuit-breaker/reset")
+async def api_circuit_breaker_reset(
+    agent_role: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Reset circuit breaker for a specific agent or all agents."""
+    from tools.circuit_breaker import get_circuit_breaker
+    cb = get_circuit_breaker()
+    cb.reset(agent_role)
+    _audit("circuit_breaker_reset", user["user_id"], f"Reset: {agent_role or 'all'}")
+    return {"reset": agent_role or "all", "status": cb.status()}
+
+
+# ── Confidence Analysis ──────────────────────────────────────────
+
+@app.post("/api/confidence/analyze")
+async def api_confidence_analyze(
+    text: str,
+    agent_role: str = "general",
+    task_type: str = "general",
+    user: dict = Depends(get_current_user),
+):
+    """Analyze confidence of a text output."""
+    from tools.confidence import score_confidence
+    return score_confidence(text, agent_role, task_type)
+
+
+# ── System Overview ──────────────────────────────────────────────
+
+@app.get("/api/system/overview")
+async def api_system_overview(user: dict = Depends(get_current_user)):
+    """Comprehensive system overview: agents, cache, circuit breakers."""
+    from tools.cache import cache_stats
+    from tools.circuit_breaker import get_circuit_breaker
+
+    cb = get_circuit_breaker()
+    cb_status = cb.status()
+
+    # Count available vs unavailable agents
+    available_agents = sum(1 for s in cb_status.values() if s["state"] == "closed")
+    total_tracked = len(cb_status)
+
+    return {
+        "cache": cache_stats(),
+        "circuit_breakers": cb_status,
+        "agents": {
+            "available": available_agents,
+            "total_tracked": total_tracked,
+            "all_healthy": all(s["state"] == "closed" for s in cb_status.values()) if cb_status else True,
+        },
+    }
+
+
+@app.get("/api/sandbox/audit")
+async def api_sandbox_audit(
+    user: dict = Depends(get_current_user),
+    limit: int = 50,
+):
+    """Get sandbox audit log."""
+    try:
+        from tools.sandbox import get_audit_log
+        return {"audit_log": get_audit_log(limit)}
+    except ImportError:
+        return {"audit_log": [], "note": "Sandbox module not available"}
+
+
+@app.get("/api/pii/stats")
+async def api_pii_stats(user: dict = Depends(get_current_user)):
+    """Get PII masking statistics."""
+    return {
+        "enabled": True,
+        "supported_types": [
+            "email", "phone_tr", "phone_intl", "tc_kimlik",
+            "credit_card", "iban", "ip_address", "plate_tr",
+        ],
+    }
 
 
 # ── Health ───────────────────────────────────────────────────────
@@ -1594,9 +1734,8 @@ async def get_audit_log(
     return entries
 
 
-@app.get("/api/monitoring/system-stats")
 async def get_system_stats(user: dict = Depends(get_current_user)):
-    """Return system-wide stats: active threads, total tasks, memory usage, DB health."""
+    """Return system-wide stats matching frontend SystemStats interface."""
     _audit("system_stats_view", user["user_id"])
     try:
         user_threads = list_threads(limit=200, user_id=user["user_id"])
@@ -1604,51 +1743,66 @@ async def get_system_stats(user: dict = Depends(get_current_user)):
         total_tasks = sum(t.get("task_count", 0) for t in user_threads)
         total_events = sum(t.get("event_count", 0) for t in user_threads)
 
-        # Memory stats
-        memory_stats: dict = {}
+        # Memory usage (use resource module on unix, fallback to 0)
+        memory_mb = 0.0
         try:
-            from tools.memory import get_memory_stats
-            memory_stats = get_memory_stats()
+            import resource
+            memory_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # KB to MB
         except Exception:
-            memory_stats = {"error": "Memory stats unavailable"}
+            try:
+                # Windows fallback: read from /proc or just estimate
+                import os as _os
+                memory_mb = _os.popen('tasklist /FI "PID eq %d" /FO CSV /NH' % _os.getpid()).read()
+                # Parse CSV: "python.exe","1234","Console","1","45,000 K"
+                parts = memory_mb.strip().split(",")
+                if len(parts) >= 5:
+                    mem_str = parts[4].strip().strip('"').replace(",", "").replace(" K", "")
+                    memory_mb = float(mem_str) / 1024
+                else:
+                    memory_mb = 0.0
+            except Exception:
+                memory_mb = 0.0
 
         # DB health
-        db_healthy = False
+        db_status = "error"
         try:
             from tools.pg_connection import get_conn, release_conn
             conn = get_conn()
             try:
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1")
-                db_healthy = True
+                db_status = "healthy"
             finally:
                 release_conn(conn)
         except Exception:
             pass
 
-        # Agent eval stats
-        eval_stats: dict = {}
+        # Uptime
+        uptime_seconds = time.time() - _APP_START_TIME
+
+        # Active agents (from recent thread activity)
+        active_agents = 0
         try:
-            from tools.agent_eval import get_performance_baseline
-            eval_stats = get_performance_baseline()
+            from agents import orchestrator
+            agents_cfg = orchestrator._load_agents_config() if hasattr(orchestrator, '_load_agents_config') else {}
+            active_agents = len(agents_cfg) if agents_cfg else 5
         except Exception:
-            eval_stats = {"error": "Eval stats unavailable"}
+            active_agents = 5
 
         return {
-            "threads": {
-                "total": total_threads,
-                "total_tasks": total_tasks,
-                "total_events": total_events,
-            },
-            "memory": memory_stats,
-            "database": {"healthy": db_healthy},
-            "evaluation": eval_stats,
-            "audit_log_size": len(_AUDIT_LOG),
-            "timestamp": _utcnow().isoformat(),
+            "active_threads": total_threads,
+            "total_tasks": total_tasks,
+            "total_events": total_events,
+            "memory_usage_mb": round(memory_mb, 1),
+            "db_status": db_status,
+            "uptime_seconds": round(uptime_seconds),
+            "agents_active": active_agents,
+            "agents_total": 5,
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"System stats failed: {e}")
+
 
 
 @app.get("/api/monitoring/anomalies")

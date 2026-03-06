@@ -72,6 +72,15 @@ body {
   }
 }
 
+/* Hide scrollbar utility (nav tabs) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Agent glow effects */
 .glow-orchestrator {
   box-shadow: 0 0 12px #ec489940;

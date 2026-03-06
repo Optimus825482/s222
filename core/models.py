@@ -101,6 +101,7 @@ class SubTask(BaseModel):
     result: str | None = None
     token_usage: int = 0
     latency_ms: float = 0.0
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class Task(BaseModel):

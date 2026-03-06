@@ -116,7 +116,7 @@ ROLE_TO_MODEL = {cfg["role"]: key for key, cfg in MODELS.items()}
 DATA_DIR = Path(__file__).parent / "data"
 THREADS_DIR = DATA_DIR / "threads"
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://agent:agent_secret_2024@localhost:5432/multiagent")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:518518Erkan@localhost:5432/multiagent")
 
 
 # ── Iterative Eval Runtime Config ───────────────────────────────

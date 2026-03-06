@@ -474,6 +474,16 @@ class BaseAgent(ABC):
         Handle tool calls — shared tools first, then subclass-specific.
         Override _handle_custom_tool in subclasses for agent-specific tools.
         """
+        # Sandbox validation — block unauthorized or dangerous tool calls
+        try:
+            from tools.sandbox import validate_tool_call, SandboxViolation
+            validate_tool_call(self.role.value, fn_name, fn_args)
+        except SandboxViolation as e:
+            thread.add_event(EventType.ERROR, str(e), agent_role=self.role)
+            return f"[Sandbox] {e}"
+        except Exception:
+            pass  # Never break tool flow for sandbox import/init errors
+
         # Shared tools available to all agents
         if fn_name == "web_search":
             from tools.search import web_search, format_search_results

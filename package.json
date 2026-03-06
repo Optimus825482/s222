@@ -1,0 +1,12 @@
+{
+  "name": "multi-agent-dashboard",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload",
+    "dev:frontend": "cd frontend && node node_modules/next/dist/bin/next dev --port 3015",
+    "build": "cd frontend && npm run build",
+    "stop": "npx kill-port 8001 3015"
+  }
+}
