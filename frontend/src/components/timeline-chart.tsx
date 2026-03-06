@@ -1,6 +1,15 @@
 import React from "react";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
+
+/** Format a Date as HH:mm:ss */
+function fmtTime(d: Date): string {
+  return d.toLocaleTimeString("tr-TR", { hour12: false });
+}
+
+/** Format a Date as HH:mm:ss.SSS */
+function fmtTimeMs(d: Date): string {
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${fmtTime(d)}.${ms}`;
+}
 
 interface TimelineEvent {
   id: string;
@@ -43,8 +52,7 @@ export function TimelineChart({ events }: TimelineChartProps) {
           Zaman Çizelgesi
         </h3>
         <div className="text-xs text-slate-400">
-          {format(startTime, "HH:mm:ss", { locale: tr })} -{" "}
-          {format(endTime, "HH:mm:ss", { locale: tr })}
+          {fmtTime(startTime)} - {fmtTime(endTime)}
         </div>
       </div>
 
@@ -141,7 +149,7 @@ export function TimelineChart({ events }: TimelineChartProps) {
                     {event.content.length > 60 ? "..." : ""}
                   </span>
                   <span className="text-slate-500">
-                    {format(event.timestamp, "HH:mm:ss.SSS", { locale: tr })}
+                    {fmtTimeMs(event.timestamp)}
                   </span>
                 </div>
               </div>
