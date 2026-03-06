@@ -3,9 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import { AGENT_CONFIG } from "@/lib/agents";
-import type { AgentRole, AgentDirectMessage } from "@/lib/types";
+import type {
+  AgentRole,
+  AgentDirectMessage,
+  AutonomousConversation,
+  AutoChatConfig,
+  PostTaskMeeting,
+} from "@/lib/types";
 
-type CommsTab = "tools" | "behavior" | "messages";
+type CommsTab = "tools" | "behavior" | "messages" | "meetings";
+type MsgSubTab = "autonomous" | "manual";
 interface ToolEntry {
   tool_name: string;
   count: number;
@@ -341,6 +348,306 @@ function BehaviorTab() {
 
 /* ── Messages ───────────────────────────────────────────────── */
 function MessagesTab() {
+  const [sub, setSub] = useState<MsgSubTab>("autonomous");
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-1 bg-slate-800/40 rounded-lg p-0.5">
+        <button
+          onClick={() => setSub("autonomous")}
+          className={`flex-1 text-[10px] font-medium py-1.5 rounded-md transition-colors ${sub === "autonomous" ? "bg-cyan-600/20 text-cyan-400 border border-cyan-500/30" : "text-slate-500 hover:text-slate-300"}`}
+        >
+          🤖 Otonom Sohbet
+        </button>
+        <button
+          onClick={() => setSub("manual")}
+          className={`flex-1 text-[10px] font-medium py-1.5 rounded-md transition-colors ${sub === "manual" ? "bg-cyan-600/20 text-cyan-400 border border-cyan-500/30" : "text-slate-500 hover:text-slate-300"}`}
+        >
+          ✉️ Manuel Mesaj
+        </button>
+      </div>
+      {sub === "autonomous" ? <AutonomousChatTab /> : <ManualMessagesTab />}
+    </div>
+  );
+}
+
+/* ── Autonomous Chat (ClaudBot-style) ───────────────────────── */
+function AutonomousChatTab() {
+  const [convs, setConvs] = useState<AutonomousConversation[]>([]);
+  const [cfg, setCfg] = useState<AutoChatConfig | null>(null);
+  const [ld, setLd] = useState(true);
+  const [e, setE] = useState("");
+  const [triggering, setTriggering] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [filterAgent, setFilterAgent] = useState("");
+  const [showCfg, setShowCfg] = useState(false);
+
+  const loadConvs = useCallback(async () => {
+    try {
+      setE("");
+      const r = await api.getAutonomousConversations(
+        20,
+        filterAgent || undefined,
+      );
+      setConvs(r.conversations);
+    } catch (x) {
+      setE(x instanceof Error ? x.message : "Yüklenemedi");
+    } finally {
+      setLd(false);
+    }
+  }, [filterAgent]);
+
+  const loadCfg = useCallback(async () => {
+    try {
+      const r = await api.getAutoChatConfig();
+      setCfg(r.config);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    setLd(true);
+    loadConvs();
+    loadCfg();
+    const iv = setInterval(loadConvs, 12000);
+    return () => clearInterval(iv);
+  }, [loadConvs, loadCfg]);
+
+  const trigger = async () => {
+    if (triggering) return;
+    try {
+      setTriggering(true);
+      await api.triggerAutonomousChat();
+      await loadConvs();
+    } catch {
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  const toggleEnabled = async () => {
+    if (!cfg) return;
+    try {
+      const r = await api.updateAutoChatConfig({ enabled: !cfg.enabled });
+      setCfg(r.config);
+    } catch {}
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Controls */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={trigger}
+          disabled={triggering || (cfg !== null && !cfg.enabled)}
+          className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-[10px] font-medium rounded border border-emerald-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+        >
+          {triggering ? (
+            <span className="inline-block w-3 h-3 border border-emerald-400 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            "⚡"
+          )}
+          {triggering ? "Başlatılıyor..." : "Sohbet Başlat"}
+        </button>
+        <button
+          onClick={toggleEnabled}
+          className={`px-2.5 py-1.5 text-[10px] font-medium rounded border transition-colors ${cfg?.enabled ? "bg-green-600/15 text-green-400 border-green-500/20 hover:bg-green-600/25" : "bg-red-600/15 text-red-400 border-red-500/20 hover:bg-red-600/25"}`}
+        >
+          {cfg?.enabled ? "● Aktif" : "○ Pasif"}
+        </button>
+        <button
+          onClick={() => setShowCfg(!showCfg)}
+          className="px-2 py-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          ⚙️
+        </button>
+        <select
+          value={filterAgent}
+          onChange={(x) => setFilterAgent(x.target.value)}
+          className={`ml-auto ${sCls}`}
+          aria-label="Agent filtresi"
+        >
+          <option value="">Tüm Ajanlar</option>
+          <Opts />
+        </select>
+      </div>
+
+      {/* Config Panel */}
+      {showCfg && cfg && <CfgPanel cfg={cfg} onUpdate={setCfg} />}
+
+      {/* Conversations */}
+      {ld ? (
+        <Sk n={4} />
+      ) : e ? (
+        <Er m={e} r={loadConvs} />
+      ) : convs.length === 0 ? (
+        <div className="text-center py-10">
+          <div className="text-3xl mb-2">🤖</div>
+          <p className="text-xs text-slate-500">Henüz otonom sohbet yok</p>
+          <p className="text-[10px] text-slate-600 mt-1">
+            &quot;Sohbet Başlat&quot; ile ajanların kendi aralarında konuşmasını
+            başlatın
+          </p>
+        </div>
+      ) : (
+        <div
+          className="space-y-2 max-h-[420px] overflow-y-auto pr-1"
+          role="log"
+          aria-label="Otonom sohbetler"
+        >
+          {convs.map((c) => {
+            const ini = ai(c.initiator);
+            const res = ai(c.responder);
+            const isOpen = expanded === c.id;
+            return (
+              <div
+                key={c.id}
+                className="bg-slate-800/40 border border-slate-700/30 rounded-lg overflow-hidden hover:border-slate-600/40 transition-colors"
+              >
+                <button
+                  onClick={() => setExpanded(isOpen ? null : c.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                >
+                  <span className="text-sm" style={{ color: ini.color }}>
+                    {ini.icon}
+                  </span>
+                  <span className="text-[10px] text-slate-500">⇄</span>
+                  <span className="text-sm" style={{ color: res.color }}>
+                    {res.icon}
+                  </span>
+                  <span className="text-[10px] text-slate-400 flex-1 truncate">
+                    {c.topic}
+                  </span>
+                  <span className="text-[9px] text-slate-600 tabular-nums">
+                    {c.message_count} mesaj
+                  </span>
+                  <span className="text-[9px] text-slate-600">
+                    {ago(c.started_at)}
+                  </span>
+                  <span
+                    className={`text-[10px] transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  >
+                    ▾
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-slate-700/30 px-3 py-2 space-y-1.5">
+                    {c.messages.map((m) => {
+                      const s = ai(m.sender);
+                      const isLeft = m.sender === c.initiator;
+                      return (
+                        <div
+                          key={m.id}
+                          className={`flex gap-2 ${isLeft ? "" : "flex-row-reverse"}`}
+                        >
+                          <div
+                            className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px]"
+                            style={{ backgroundColor: `${s.color}20` }}
+                          >
+                            {s.icon}
+                          </div>
+                          <div
+                            className={`max-w-[80%] rounded-lg px-2.5 py-1.5 ${isLeft ? "bg-slate-700/40 rounded-tl-none" : "bg-cyan-900/20 rounded-tr-none"}`}
+                          >
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span
+                                className="text-[9px] font-semibold"
+                                style={{ color: s.color }}
+                              >
+                                {s.name}
+                              </span>
+                              <span className="text-[8px] text-slate-600">
+                                {ago(m.timestamp)}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-300 leading-relaxed break-words">
+                              {m.content}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Config Panel ───────────────────────────────────────────── */
+function CfgPanel({
+  cfg,
+  onUpdate,
+}: {
+  cfg: AutoChatConfig;
+  onUpdate: (c: AutoChatConfig) => void;
+}) {
+  const [maxEx, setMaxEx] = useState(cfg.max_exchanges);
+  const [agents, setAgents] = useState<string[]>(cfg.enabled_agents);
+
+  const save = async () => {
+    try {
+      const r = await api.updateAutoChatConfig({
+        max_exchanges: maxEx,
+        enabled_agents: agents,
+      });
+      onUpdate(r.config);
+    } catch {}
+  };
+
+  const toggleAgent = (role: string) => {
+    setAgents((prev) =>
+      prev.includes(role) ? prev.filter((a) => a !== role) : [...prev, role],
+    );
+  };
+
+  return (
+    <div className="bg-slate-800/60 border border-slate-700/40 rounded-lg p-3 space-y-2">
+      <div className="text-[10px] text-slate-400 font-medium">Ayarlar</div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-slate-500">Maks. mesaj:</span>
+        <input
+          type="range"
+          min={2}
+          max={6}
+          value={maxEx}
+          onChange={(x) => setMaxEx(Number(x.target.value))}
+          className="flex-1 h-1 accent-cyan-500"
+        />
+        <span className="text-[10px] text-cyan-400 tabular-nums w-4 text-center">
+          {maxEx}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {allRoles.map((r) => {
+          const a = ai(r);
+          const on = agents.includes(r);
+          return (
+            <button
+              key={r}
+              onClick={() => toggleAgent(r)}
+              className={`text-[9px] px-2 py-1 rounded border transition-colors ${on ? "border-cyan-500/30 bg-cyan-600/15 text-cyan-400" : "border-slate-700/40 text-slate-600 hover:text-slate-400"}`}
+            >
+              {a.icon} {a.name}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        onClick={save}
+        disabled={agents.length < 2}
+        className="w-full py-1.5 text-[10px] font-medium bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 rounded border border-cyan-500/20 transition-colors disabled:opacity-40"
+      >
+        Kaydet
+      </button>
+    </div>
+  );
+}
+
+/* ── Manual Messages (existing) ─────────────────────────────── */
+function ManualMessagesTab() {
   const [msgs, setMsgs] = useState<AgentDirectMessage[]>([]);
   const [ld, setLd] = useState(true);
   const [e, setE] = useState("");
@@ -503,11 +810,198 @@ function MessagesTab() {
   );
 }
 
+/* ── Post-Task Meetings ─────────────────────────────────────── */
+function MeetingsTab() {
+  const [meetings, setMeetings] = useState<PostTaskMeeting[]>([]);
+  const [ld, setLd] = useState(true);
+  const [e, setE] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [triggering, setTriggering] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setE("");
+      const r = await api.getMeetings(20);
+      setMeetings(r.meetings);
+    } catch (x) {
+      setE(x instanceof Error ? x.message : "Yüklenemedi");
+    } finally {
+      setLd(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setLd(true);
+    load();
+    const iv = setInterval(load, 15000);
+    return () => clearInterval(iv);
+  }, [load]);
+
+  const triggerManual = async () => {
+    if (triggering) return;
+    try {
+      setTriggering(true);
+      await api.triggerMeeting();
+      await load();
+    } catch {
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  const msgTypeStyle = (t: string) => {
+    if (t === "opening") return "border-l-2 border-l-pink-500/50";
+    if (t === "closing") return "border-l-2 border-l-emerald-500/50";
+    return "border-l-2 border-l-slate-600/50";
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={triggerManual}
+          disabled={triggering}
+          className="px-3 py-1.5 bg-pink-600/20 hover:bg-pink-600/30 text-pink-400 text-[10px] font-medium rounded border border-pink-500/20 transition-colors disabled:opacity-40 flex items-center gap-1"
+        >
+          {triggering ? (
+            <span className="inline-block w-3 h-3 border border-pink-400 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            "🏛️"
+          )}
+          {triggering ? "Toplanıyor..." : "Toplantı Başlat"}
+        </button>
+        <span className="text-[9px] text-slate-600 ml-auto">
+          Görev sonrası otomatik tetiklenir
+        </span>
+      </div>
+
+      {ld ? (
+        <Sk n={4} />
+      ) : e ? (
+        <Er m={e} r={load} />
+      ) : meetings.length === 0 ? (
+        <div className="text-center py-10">
+          <div className="text-3xl mb-2">🏛️</div>
+          <p className="text-xs text-slate-500">Henüz toplantı yok</p>
+          <p className="text-[10px] text-slate-600 mt-1">
+            Görev tamamlandığında Orchestrator otomatik toplantı düzenler
+          </p>
+        </div>
+      ) : (
+        <div
+          className="space-y-2 max-h-[420px] overflow-y-auto pr-1"
+          role="log"
+          aria-label="Toplantılar"
+        >
+          {meetings.map((m) => {
+            const isOpen = expanded === m.id;
+            const statusColor =
+              m.task_status === "completed"
+                ? "text-emerald-400"
+                : "text-red-400";
+            const statusIcon = m.task_status === "completed" ? "✅" : "❌";
+            return (
+              <div
+                key={m.id}
+                className="bg-slate-800/40 border border-slate-700/30 rounded-lg overflow-hidden hover:border-slate-600/40 transition-colors"
+              >
+                <button
+                  onClick={() => setExpanded(isOpen ? null : m.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
+                >
+                  <span className="text-sm">🏛️</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] text-slate-300 truncate">
+                      {m.task_summary}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[9px] ${statusColor}`}>
+                        {statusIcon}
+                      </span>
+                      <span className="text-[9px] text-slate-600">
+                        {m.participants.length} katılımcı
+                      </span>
+                      <span className="text-[9px] text-slate-600">
+                        {m.message_count} mesaj
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[9px] text-slate-600">
+                    {ago(m.started_at)}
+                  </span>
+                  <span
+                    className={`text-[10px] transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  >
+                    ▾
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-slate-700/30 px-3 py-2 space-y-2">
+                    {/* Meeting stats */}
+                    <div className="flex gap-3 text-[9px] text-slate-500 pb-1 border-b border-slate-700/20">
+                      <span>
+                        ⏱{" "}
+                        {m.duration_ms > 0
+                          ? `${(m.duration_ms / 1000).toFixed(1)}s`
+                          : "—"}
+                      </span>
+                      <span>🪙 {m.total_tokens.toLocaleString()} token</span>
+                      <span>
+                        👥 {m.participants.map((p) => ai(p).icon).join(" ")}
+                      </span>
+                    </div>
+                    {/* Messages */}
+                    {m.messages.map((msg) => {
+                      const speaker = ai(msg.speaker);
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`pl-3 py-1.5 ${msgTypeStyle(msg.msg_type)}`}
+                        >
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span
+                              className="text-[10px]"
+                              style={{ color: speaker.color }}
+                            >
+                              {speaker.icon} {speaker.name}
+                            </span>
+                            {msg.msg_type === "opening" && (
+                              <span className="text-[8px] bg-pink-500/15 text-pink-400 px-1 rounded">
+                                açılış
+                              </span>
+                            )}
+                            {msg.msg_type === "closing" && (
+                              <span className="text-[8px] bg-emerald-500/15 text-emerald-400 px-1 rounded">
+                                kapanış
+                              </span>
+                            )}
+                            <span className="text-[8px] text-slate-600 ml-auto">
+                              {ago(msg.timestamp)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 leading-relaxed break-words">
+                            {msg.content}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Main ───────────────────────────────────────────────────── */
 const TABS: { key: CommsTab; label: string; icon: string }[] = [
   { key: "tools", label: "Araç Kullanımı", icon: "🔧" },
   { key: "behavior", label: "Kullanıcı Davranışı", icon: "📊" },
   { key: "messages", label: "Agent Mesajları", icon: "💬" },
+  { key: "meetings", label: "Toplantılar", icon: "🏛️" },
 ];
 
 export function AgentCommsPanel() {
@@ -541,6 +1035,7 @@ export function AgentCommsPanel() {
         {tab === "tools" && <ToolUsageTab />}
         {tab === "behavior" && <BehaviorTab />}
         {tab === "messages" && <MessagesTab />}
+        {tab === "meetings" && <MeetingsTab />}
       </div>
     </div>
   );

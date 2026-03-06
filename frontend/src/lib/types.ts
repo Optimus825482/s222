@@ -430,3 +430,56 @@ export interface ApplyLearningResult {
   details: { action: string; result: "applied" | "skipped"; reason: string }[];
   timestamp: string;
 }
+
+// ── Autonomous Chat Types (ClaudBot-style) ──────────────────────
+
+export interface AutonomousChatMessage {
+  id: string;
+  conversation_id: string;
+  sender: string;
+  receiver: string;
+  content: string;
+  timestamp: string;
+  is_autonomous: boolean;
+  topic: string;
+}
+
+export interface AutonomousConversation {
+  id: string;
+  initiator: string;
+  responder: string;
+  topic: string;
+  messages: AutonomousChatMessage[];
+  started_at: string;
+  message_count: number;
+}
+
+export interface AutoChatConfig {
+  enabled: boolean;
+  max_exchanges: number;
+  enabled_agents: string[];
+  topics: string[];
+}
+
+// ── Post-Task Meeting Types ─────────────────────────────────────
+
+export interface MeetingMessage {
+  id: string;
+  meeting_id: string;
+  speaker: string;
+  content: string;
+  timestamp: string;
+  msg_type: "opening" | "feedback" | "closing";
+}
+
+export interface PostTaskMeeting {
+  id: string;
+  task_summary: string;
+  task_status: string;
+  participants: string[];
+  messages: MeetingMessage[];
+  started_at: string;
+  duration_ms: number;
+  total_tokens: number;
+  message_count: number;
+}

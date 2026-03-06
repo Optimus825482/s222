@@ -101,6 +101,9 @@ import type {
   ImprovementPlan,
   FailureLearning,
   ApplyLearningResult,
+  AutonomousConversation,
+  AutoChatConfig,
+  PostTaskMeeting,
 } from "./types";
 
 export const api = {
@@ -318,6 +321,40 @@ export const api = {
     fetcher<ApplyLearningResult>(
       `/api/agents/apply-learning?role=${encodeURIComponent(role)}`,
       { method: "POST" },
+    ),
+
+  // Autonomous Chat (ClaudBot-style)
+  triggerAutonomousChat: () =>
+    fetcher<{
+      conversation: AutonomousConversation;
+      total_conversations: number;
+    }>("/api/agents/autonomous-chat/trigger", { method: "POST" }),
+  getAutonomousConversations: (limit = 20, agent?: string) => {
+    let url = `/api/agents/autonomous-chat/conversations?limit=${limit}`;
+    if (agent) url += `&agent=${encodeURIComponent(agent)}`;
+    return fetcher<{
+      total: number;
+      conversations: AutonomousConversation[];
+      timestamp: string;
+    }>(url);
+  },
+  getAutoChatConfig: () =>
+    fetcher<{ config: AutoChatConfig }>("/api/agents/autonomous-chat/config"),
+  updateAutoChatConfig: (config: Partial<AutoChatConfig>) =>
+    fetcher<{ config: AutoChatConfig }>("/api/agents/autonomous-chat/config", {
+      method: "POST",
+      body: JSON.stringify(config),
+    }),
+
+  // Post-Task Meetings
+  triggerMeeting: (taskSummary = "Manuel toplantı") =>
+    fetcher<{ meeting: PostTaskMeeting; total_meetings: number }>(
+      `/api/agents/autonomous-chat/meeting?task_summary=${encodeURIComponent(taskSummary)}`,
+      { method: "POST" },
+    ),
+  getMeetings: (limit = 20) =>
+    fetcher<{ total: number; meetings: PostTaskMeeting[]; timestamp: string }>(
+      `/api/agents/autonomous-chat/meetings?limit=${limit}`,
     ),
 };
 

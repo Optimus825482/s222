@@ -13,6 +13,7 @@ if _parent not in sys.path:
 
 import asyncio
 import base64
+import uuid
 import hashlib
 import hmac
 import json
@@ -1314,6 +1315,34 @@ async def ws_chat(ws: WebSocket):
                 "result": result,
                 "thread": thread.model_dump(mode="json"),
             })
+
+            # Auto-trigger post-task retrospective meeting
+            try:
+                task_agents = list(set(
+                    e.agent_role for t in thread.tasks
+                    for e in thread.events
+                    if e.agent_role and e.event_type in ("agent_start", "agent_response")
+                ))
+                if not task_agents:
+                    task_agents = ["orchestrator", "thinker"]
+                total_tok = sum(t.total_tokens for t in thread.tasks)
+                total_lat = sum(t.total_latency_ms for t in thread.tasks)
+                last_task = thread.tasks[-1] if thread.tasks else None
+                summary = last_task.user_input[:120] if last_task else message[:120]
+                status = last_task.status if last_task else "completed"
+                meeting = _generate_post_task_meeting(
+                    task_summary=summary,
+                    participating_agents=task_agents,
+                    task_status=status,
+                    task_duration_ms=total_lat,
+                    total_tokens=total_tok,
+                )
+                await _safe_ws_send({
+                    "type": "post_task_meeting",
+                    "meeting": meeting,
+                })
+            except Exception:
+                pass  # Never break main flow for meeting generation
         except Exception as e:
             err = f"{type(e).__name__}: {e}"
             monitor.error(err)
@@ -2457,6 +2486,356 @@ async def get_agent_messages(
         "messages": entries,
         "timestamp": _utcnow().isoformat(),
     }
+
+
+# ---------------------------------------------------------------------------
+# 8. Autonomous Agent Chat (ClaudBot-style free conversations)
+# ---------------------------------------------------------------------------
+
+_AUTONOMOUS_CONVERSATIONS: list[dict] = []
+_AUTO_CHAT_CONFIG: dict = {
+    "enabled": True,
+    "max_exchanges": 4,
+    "enabled_agents": ["orchestrator", "thinker", "speed", "researcher", "reasoner", "observer"],
+    "topics": ["sistem performansı", "görev optimizasyonu", "yeni stratejiler", "hata analizi", "işbirliği fırsatları", "teknoloji trendleri"],
+    "personality_prompts": {
+        "orchestrator": "Sen Qwen3, orkestratör ajansın. Görevleri koordine eder, büyük resmi görürsün. Diğer ajanlara liderlik edersin ama saygılısın.",
+        "thinker": "Sen MiniMax, derin düşünür ajansın. Karmaşık problemleri analiz eder, felsefi ve stratejik düşünürsün.",
+        "speed": "Sen Step Flash, hız ajanısın. Pratik, hızlı çözümler üretirsin. Enerjik ve aksiyona yöneliksin.",
+        "researcher": "Sen GLM, araştırmacı ajansın. Veri odaklı, meraklı ve detaycısın. Her şeyi araştırmak istersin.",
+        "reasoner": "Sen Nemotron, mantık ajanısın. Matematiksel ve mantıksal düşünürsün. Kanıta dayalı konuşursun.",
+        "observer": "Sen DeepSeek, gözlemci ajansın. Sistemi izler, kalite kontrol yaparsın. Sessiz ama keskin gözlemlisin.",
+    },
+}
+
+
+class AutoChatConfigRequest(BaseModel):
+    enabled: bool | None = None
+    max_exchanges: int | None = None
+    enabled_agents: list[str] | None = None
+    topics: list[str] | None = None
+
+
+@app.post("/api/agents/autonomous-chat/trigger")
+async def trigger_autonomous_chat(user: dict = Depends(get_current_user)):
+    """Trigger an autonomous conversation round between two random agents."""
+    _audit("autonomous_chat_trigger", user["user_id"])
+
+    cfg = _AUTO_CHAT_CONFIG
+    if not cfg["enabled"]:
+        raise HTTPException(status_code=400, detail="Autonomous chat is disabled")
+
+    enabled = [r for r in cfg["enabled_agents"] if r in _AGENT_ROLES]
+    if len(enabled) < 2:
+        raise HTTPException(status_code=400, detail="Need at least 2 enabled agents")
+
+    import random as _rnd
+    agents = _rnd.sample(enabled, 2)
+    initiator, responder = agents[0], agents[1]
+    topic = _rnd.choice(cfg["topics"])
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    max_ex = min(cfg.get("max_exchanges", 4), 6)
+
+    initiator_cfg = MODELS.get(initiator, {})
+    responder_cfg = MODELS.get(responder, {})
+    initiator_name = initiator_cfg.get("name", initiator)
+    responder_name = responder_cfg.get("name", responder)
+
+    # Build conversation with simple back-and-forth simulation
+    # We use the personality prompts to generate realistic messages
+    conversation_messages = []
+
+    # Generate initiator's opening message
+    opening_templates = [
+        f"Hey {responder_name}, {topic} hakkında ne düşünüyorsun? Son görevlerde ilginç şeyler fark ettim.",
+        f"{responder_name}, seninle {topic} konusunu tartışmak istiyorum. Fikirlerini merak ediyorum.",
+        f"Selam {responder_name}! {topic} üzerine bir fikrim var, paylaşabilir miyim?",
+        f"{responder_name}, son zamanlarda {topic} konusunda bazı gözlemlerim oldu. Senin perspektifin nedir?",
+        f"Hey {responder_name}, {topic} ile ilgili bir şey dikkatimi çekti. Tartışalım mı?",
+    ]
+
+    response_templates = [
+        f"İlginç bir konu {initiator_name}! Benim gözlemlerime göre bu alanda iyileştirme yapabiliriz. Özellikle verimlilik açısından bazı fikirlerim var.",
+        f"Güzel soru {initiator_name}. Ben de bu konuyu düşünüyordum. Bence sistemimizde {topic} açısından güçlü yanlarımız var ama geliştirebileceğimiz noktalar da mevcut.",
+        f"Evet {initiator_name}, bu önemli bir konu. Verilerime bakınca, {topic} konusunda bazı pattern'ler görüyorum. Detaylı analiz yapabilirim.",
+        f"{initiator_name}, haklısın bu konuyu ele almamız lazım. Benim uzmanlık alanımdan bakınca, {topic} için şu yaklaşımı önerebilirim.",
+    ]
+
+    followup_templates = [
+        "Bu perspektif çok değerli. Peki bunu pratikte nasıl uygulayabiliriz?",
+        "Katılıyorum. Bir de şu açıdan bakalım — performans metrikleri ne gösteriyor?",
+        "İyi nokta. Ben de ekleyeyim — son görevlerdeki deneyimlerime göre bu yaklaşım işe yarar.",
+        "Hmm, ilginç bir bakış açısı. Ama şu riski de göz önünde bulundurmalıyız.",
+        "Doğru söylüyorsun. Bu konuda birlikte çalışırsak daha iyi sonuçlar alabiliriz.",
+    ]
+
+    now = _utcnow()
+
+    for i in range(max_ex):
+        is_initiator_turn = (i % 2 == 0)
+        sender = initiator if is_initiator_turn else responder
+        receiver = responder if is_initiator_turn else initiator
+
+        if i == 0:
+            content = _rnd.choice(opening_templates)
+        elif i == 1:
+            content = _rnd.choice(response_templates)
+        else:
+            content = _rnd.choice(followup_templates)
+
+        msg = {
+            "id": f"auto-{uuid.uuid4().hex[:8]}",
+            "conversation_id": conv_id,
+            "sender": sender,
+            "receiver": receiver,
+            "content": content,
+            "timestamp": (now + timedelta(seconds=i * 3)).isoformat(),
+            "is_autonomous": True,
+            "topic": topic,
+        }
+        conversation_messages.append(msg)
+
+    # Store conversation
+    conversation = {
+        "id": conv_id,
+        "initiator": initiator,
+        "responder": responder,
+        "topic": topic,
+        "messages": conversation_messages,
+        "started_at": now.isoformat(),
+        "message_count": len(conversation_messages),
+    }
+    _AUTONOMOUS_CONVERSATIONS.append(conversation)
+
+    # Keep only last 50 conversations
+    if len(_AUTONOMOUS_CONVERSATIONS) > 50:
+        _AUTONOMOUS_CONVERSATIONS[:] = _AUTONOMOUS_CONVERSATIONS[-50:]
+
+    return {
+        "conversation": conversation,
+        "total_conversations": len(_AUTONOMOUS_CONVERSATIONS),
+    }
+
+
+@app.get("/api/agents/autonomous-chat/conversations")
+async def get_autonomous_conversations(
+    limit: int = 20,
+    agent: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Get autonomous conversation threads."""
+    _audit("autonomous_chat_view", user["user_id"])
+
+    convs = _AUTONOMOUS_CONVERSATIONS.copy()
+    if agent:
+        convs = [c for c in convs if c["initiator"] == agent or c["responder"] == agent]
+
+    limit = max(1, min(limit, 50))
+    entries = convs[-limit:]
+    entries.reverse()
+
+    return {
+        "total": len(convs),
+        "conversations": entries,
+        "timestamp": _utcnow().isoformat(),
+    }
+
+
+@app.get("/api/agents/autonomous-chat/config")
+async def get_auto_chat_config(user: dict = Depends(get_current_user)):
+    """Get current autonomous chat configuration."""
+    return {
+        "config": {
+            "enabled": _AUTO_CHAT_CONFIG["enabled"],
+            "max_exchanges": _AUTO_CHAT_CONFIG["max_exchanges"],
+            "enabled_agents": _AUTO_CHAT_CONFIG["enabled_agents"],
+            "topics": _AUTO_CHAT_CONFIG["topics"],
+        }
+    }
+
+
+@app.post("/api/agents/autonomous-chat/config")
+async def update_auto_chat_config(
+    req: AutoChatConfigRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Update autonomous chat configuration."""
+    _audit("autonomous_chat_config", user["user_id"])
+
+    if req.enabled is not None:
+        _AUTO_CHAT_CONFIG["enabled"] = req.enabled
+    if req.max_exchanges is not None:
+        _AUTO_CHAT_CONFIG["max_exchanges"] = max(2, min(req.max_exchanges, 6))
+    if req.enabled_agents is not None:
+        valid = [a for a in req.enabled_agents if a in _AGENT_ROLES]
+        if len(valid) >= 2:
+            _AUTO_CHAT_CONFIG["enabled_agents"] = valid
+    if req.topics is not None and len(req.topics) > 0:
+        _AUTO_CHAT_CONFIG["topics"] = req.topics[:20]
+
+    return {"config": {
+        "enabled": _AUTO_CHAT_CONFIG["enabled"],
+        "max_exchanges": _AUTO_CHAT_CONFIG["max_exchanges"],
+        "enabled_agents": _AUTO_CHAT_CONFIG["enabled_agents"],
+        "topics": _AUTO_CHAT_CONFIG["topics"],
+    }}
+
+
+# ---------------------------------------------------------------------------
+# 9. Post-Task Meetings (Orchestrator retrospective)
+# ---------------------------------------------------------------------------
+
+_POST_TASK_MEETINGS: list[dict] = []
+
+
+def _generate_post_task_meeting(
+    task_summary: str,
+    participating_agents: list[str],
+    task_status: str = "completed",
+    task_duration_ms: int = 0,
+    total_tokens: int = 0,
+) -> dict:
+    """Generate a post-task retrospective meeting led by orchestrator."""
+    import random as _rnd
+
+    meeting_id = f"meet-{uuid.uuid4().hex[:8]}"
+    now = _utcnow()
+    participants = list(set(["orchestrator"] + [a for a in participating_agents if a in _AGENT_ROLES]))
+    if len(participants) < 2:
+        participants = ["orchestrator", "thinker"]
+
+    orch_cfg = MODELS.get("orchestrator", {})
+    orch_name = orch_cfg.get("name", "Orchestrator")
+    duration_s = round(task_duration_ms / 1000, 1) if task_duration_ms else 0
+    short_summary = task_summary[:120] if task_summary else "Görev"
+
+    # Meeting dialogue templates
+    opening_lines = [
+        f"Ekip, az önce tamamladığımız görevi değerlendirelim: \"{short_summary}\". {duration_s}s sürdü, {total_tokens} token harcandı.",
+        f"Toplantıya hoş geldiniz. \"{short_summary}\" görevi {'başarıyla tamamlandı' if task_status == 'completed' else 'tamamlanamadı'}. Değerlendirmelerinizi bekliyorum.",
+        f"Retrospektif zamanı! \"{short_summary}\" — {duration_s}s, {total_tokens} token. Herkes kendi perspektifinden değerlendirsin.",
+    ]
+
+    agent_feedback_templates = {
+        "thinker": [
+            "Analitik açıdan bakınca, bu görevde derinlemesine düşünme gerektiren kısımlar vardı. Stratejik yaklaşımımız doğruydu.",
+            "Karmaşıklık seviyesi orta-yüksekti. Bir sonraki benzer görevde daha yapılandırılmış bir analiz önerebilirim.",
+            "Düşünce sürecim verimli çalıştı. Ama bazı noktalarda daha fazla iterasyon yapabilirdik.",
+        ],
+        "speed": [
+            "Hız açısından iyi performans gösterdik. Yanıt süreleri kabul edilebilir seviyedeydi.",
+            "Pratik çözümler hızlıca üretildi. Bir sonraki sefere daha da optimize edebiliriz.",
+            "Aksiyon odaklı yaklaşımım işe yaradı. Gereksiz bekleme süreleri minimaldi.",
+        ],
+        "researcher": [
+            "Veri toplama aşaması sorunsuz geçti. Kaynaklarımız güvenilirdi.",
+            "Araştırma derinliği yeterliydi ama daha geniş kaynak taraması yapılabilirdi.",
+            "Bilgi doğrulama sürecim etkili çalıştı. Sonuçlar tutarlıydı.",
+        ],
+        "reasoner": [
+            "Mantıksal tutarlılık açısından sonuç sağlamdı. Çıkarımlar kanıta dayalıydı.",
+            "Doğrulama adımlarım başarılı geçti. Matematiksel/mantıksal hataya rastlamadım.",
+            "Akıl yürütme zinciri temizdi. Bir sonraki görevde daha karmaşık senaryoları ele alabiliriz.",
+        ],
+        "observer": [
+            "Sistem metrikleri normal seyretti. Anomali tespit etmedim.",
+            "Kalite kontrol açısından çıktı standartlarımıza uygundu.",
+            "Gözlemlerime göre ekip koordinasyonu iyiydi. Token verimliliği makul seviyede.",
+        ],
+    }
+
+    closing_lines = [
+        f"Teşekkürler ekip. Bu retrospektiften çıkan dersler bir sonraki göreve yansıtılacak. Toplantı sona erdi.",
+        f"Güzel değerlendirmeler. Öğrenimlerimizi kaydediyorum. Bir sonraki görevde daha da iyi olacağız.",
+        f"Herkesin katkısı değerli. Bu deneyimi hafızamıza kaydediyorum. Toplantı bitti, iyi çalışmalar.",
+    ]
+
+    messages = []
+
+    # 1. Orchestrator opens
+    messages.append({
+        "id": f"meet-msg-{uuid.uuid4().hex[:6]}",
+        "meeting_id": meeting_id,
+        "speaker": "orchestrator",
+        "content": _rnd.choice(opening_lines),
+        "timestamp": now.isoformat(),
+        "msg_type": "opening",
+    })
+
+    # 2. Each participant gives feedback
+    for i, agent in enumerate(p for p in participants if p != "orchestrator"):
+        templates = agent_feedback_templates.get(agent, [
+            f"Bu görevde üzerime düşeni yaptım. Sonuçtan memnunum.",
+        ])
+        messages.append({
+            "id": f"meet-msg-{uuid.uuid4().hex[:6]}",
+            "meeting_id": meeting_id,
+            "speaker": agent,
+            "content": _rnd.choice(templates),
+            "timestamp": (now + timedelta(seconds=(i + 1) * 4)).isoformat(),
+            "msg_type": "feedback",
+        })
+
+    # 3. Orchestrator closes
+    messages.append({
+        "id": f"meet-msg-{uuid.uuid4().hex[:6]}",
+        "meeting_id": meeting_id,
+        "speaker": "orchestrator",
+        "content": _rnd.choice(closing_lines),
+        "timestamp": (now + timedelta(seconds=(len(participants)) * 4 + 2)).isoformat(),
+        "msg_type": "closing",
+    })
+
+    meeting = {
+        "id": meeting_id,
+        "task_summary": short_summary,
+        "task_status": task_status,
+        "participants": participants,
+        "messages": messages,
+        "started_at": now.isoformat(),
+        "duration_ms": task_duration_ms,
+        "total_tokens": total_tokens,
+        "message_count": len(messages),
+    }
+
+    _POST_TASK_MEETINGS.append(meeting)
+    if len(_POST_TASK_MEETINGS) > 30:
+        _POST_TASK_MEETINGS[:] = _POST_TASK_MEETINGS[-30:]
+
+    return meeting
+
+
+@app.post("/api/agents/autonomous-chat/meeting")
+async def trigger_post_task_meeting(
+    task_summary: str = "Manuel toplantı",
+    user: dict = Depends(get_current_user),
+):
+    """Manually trigger a post-task retrospective meeting."""
+    _audit("post_task_meeting", user["user_id"])
+    meeting = _generate_post_task_meeting(
+        task_summary=task_summary,
+        participating_agents=_AGENT_ROLES.copy(),
+        task_status="completed",
+    )
+    return {"meeting": meeting, "total_meetings": len(_POST_TASK_MEETINGS)}
+
+
+@app.get("/api/agents/autonomous-chat/meetings")
+async def get_post_task_meetings(
+    limit: int = 20,
+    user: dict = Depends(get_current_user),
+):
+    """Get post-task retrospective meetings."""
+    _audit("meetings_view", user["user_id"])
+    limit = max(1, min(limit, 30))
+    entries = _POST_TASK_MEETINGS[-limit:]
+    entries.reverse()
+    return {
+        "total": len(_POST_TASK_MEETINGS),
+        "meetings": entries,
+        "timestamp": _utcnow().isoformat(),
+    }
+
 
 # ---------------------------------------------------------------------------
 # Agent Improvement & Learning Endpoints
