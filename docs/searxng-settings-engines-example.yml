@@ -1,0 +1,28 @@
+# SearXNG — engines bölümü örneği (dashboard ile uyumlu)
+# Mevcut settings.yml içindeki "engines:" kısmını aşağıdaki ile değiştir.
+# Sonra container'ı yeniden başlat (veya ayarı deploy et).
+
+engines:
+  - name: bing
+    disabled: false
+  - name: startpage
+    disabled: false
+  - name: wikipedia
+    disabled: false
+  - name: wikidata
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: wiby
+    disabled: false
+  # Aşağıdakiler log hataları nedeniyle kapalı
+  - name: duckduckgo
+    disabled: true   # CAPTCHA
+  - name: brave
+    disabled: true  # Too many request
+  - name: mojeek
+    disabled: true  # Sonuç dönmüyor (! 0)
+  - name: yep
+    disabled: true  # Hata oranı yüksek (! 85)
+  - name: reuters
+    disabled: true  # 401 Unauthorized (HABERLER motoru)

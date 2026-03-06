@@ -23,10 +23,12 @@ else:
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 
-SEARXNG_URL = os.getenv(
+# Base URL without trailing slash (app appends /search)
+_SEARXNG_RAW = os.getenv(
     "SEARXNG_URL",
     "http://searxng-pwcsc8ow08oks0ggokwoo8ww.77.42.68.4.sslip.io",
 )
+SEARXNG_URL = _SEARXNG_RAW.rstrip("/") if _SEARXNG_RAW else ""
 
 # ── Model Definitions ────────────────────────────────────────────
 
