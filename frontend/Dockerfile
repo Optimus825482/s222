@@ -2,8 +2,14 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Reduce ECONNRESET failures on flaky build networks (e.g. Coolify)
+ENV NPM_CONFIG_FETCH_RETRIES=5
+ENV NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
+
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Retry npm ci on transient network errors (common in CI/Coolify)
+RUN for i in 1 2 3; do npm ci && break; done
 
 COPY . .
 
