@@ -116,9 +116,6 @@ CREATE TABLE IF NOT EXISTS documents (
     user_id     TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_hash_user ON documents(doc_hash, COALESCE(user_id, ''));
-CREATE INDEX IF NOT EXISTS idx_docs_hash ON documents(doc_hash);
-CREATE INDEX IF NOT EXISTS idx_docs_user ON documents(user_id);
 
 CREATE TABLE IF NOT EXISTS chunks (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -150,19 +147,22 @@ CREATE INDEX IF NOT EXISTS idx_skills_cat    ON skills(category);
 CREATE INDEX IF NOT EXISTS idx_skills_active ON skills(active);
 """
 
+# Document indexes (run after migration so existing DBs without user_id get the column first)
+_SCHEMA_DOC_INDEXES = """
+CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_hash_user ON documents(doc_hash, COALESCE(user_id, ''));
+CREATE INDEX IF NOT EXISTS idx_docs_hash ON documents(doc_hash);
+CREATE INDEX IF NOT EXISTS idx_docs_user ON documents(user_id);
+"""
+
 
 def init_database() -> None:
     """Create all tables and extensions. Safe to call multiple times."""
     with db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(_SCHEMA_SQL)
-            # Migration: add user_id to documents if missing
-            cur.execute("""
-                ALTER TABLE documents ADD COLUMN IF NOT EXISTS user_id TEXT
-            """)
-            cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_docs_user ON documents(user_id)
-            """)
+            # Migration: add user_id to documents if missing (e.g. tables created before this column existed)
+            cur.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS user_id TEXT")
+            cur.execute(_SCHEMA_DOC_INDEXES)
         conn.commit()
     logger.info("Database schema initialized")
 

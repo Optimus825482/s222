@@ -27,7 +27,7 @@ async def web_fetch(url: str, max_chars: int = 8000) -> dict:
 
     try:
         async with httpx.AsyncClient(
-            timeout=20.0,
+            timeout=12.0,
             follow_redirects=True,
             max_redirects=5,
         ) as client:

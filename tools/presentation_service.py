@@ -34,8 +34,8 @@ MODE_CONFIG: dict[PresentationMode, dict[str, Any]] = {
     "mini": {
         "slide_range": (5, 7),
         "default_slides": 6,
-        "research_queries": 5,
-        "research_depth": 3,       # top N pages to fetch full content
+        "research_queries": 3,
+        "research_depth": 2,       # top N pages to fetch full content (reduced for faster response)
         "label": "MINI",
         "emoji": "⚡",
         "description_tr": "Özet sunum — ana noktalar ve temel veriler",
@@ -44,8 +44,8 @@ MODE_CONFIG: dict[PresentationMode, dict[str, Any]] = {
     "midi": {
         "slide_range": (10, 15),
         "default_slides": 12,
-        "research_queries": 8,
-        "research_depth": 5,
+        "research_queries": 5,
+        "research_depth": 3,
         "label": "MIDI",
         "emoji": "📊",
         "description_tr": "Standart sunum — detaylı analiz, örnekler ve veriler",
@@ -54,8 +54,8 @@ MODE_CONFIG: dict[PresentationMode, dict[str, Any]] = {
     "maxi": {
         "slide_range": (20, 30),
         "default_slides": 25,
-        "research_queries": 12,
-        "research_depth": 8,
+        "research_queries": 10,
+        "research_depth": 6,
         "label": "MAXI",
         "emoji": "🎯",
         "description_tr": "Kapsamlı sunum — derinlemesine araştırma, vaka çalışmaları, karşılaştırmalar",
@@ -137,8 +137,8 @@ async def deep_research_for_presentation(
     # Generate diverse search queries for comprehensive coverage
     queries = _generate_research_queries(topic, language, mode)[:effective_queries]
 
-    # Run all searches in parallel
-    results_per_query = 5 if mode == "mini" else 8 if mode == "midi" else 10
+    # Run all searches in parallel (fewer results per query for faster MINI/MIDI)
+    results_per_query = 4 if mode == "mini" else 5 if mode == "midi" else 10
     tasks = [web_search(q, max_results=results_per_query) for q in queries]
     all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -240,7 +240,7 @@ def _generate_research_queries(topic: str, language: str = "tr",
 async def _fetch_page_content(url: str, max_chars: int = 3000) -> str:
     """Fetch and extract text content from a URL."""
     try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
             resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
             if resp.status_code != 200:
                 return ""

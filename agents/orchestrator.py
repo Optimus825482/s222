@@ -260,7 +260,31 @@ class OrchestratorAgent(BaseAgent):
         return False
 
     def _build_deep_research_tasks(self, user_input: str) -> list[dict]:
-        """Build parallel sub-tasks for deep research mode."""
+        """Build parallel sub-tasks for deep research mode.
+        Short queries use 2 agents (researcher + speed) for faster response."""
+        query_len = len(user_input.strip())
+        quick_research = query_len < 180  # short query → fewer agents, faster
+
+        if quick_research:
+            return [
+                {
+                    "description": (
+                        f"Search the web for: {user_input}\n"
+                        "Find 2-4 good sources, current data or stats. Cite URLs. Be concise."
+                    ),
+                    "assigned_agent": "researcher",
+                    "priority": 1,
+                },
+                {
+                    "description": (
+                        f"Summarize and structure: {user_input}\n"
+                        "Clear sections, bullets, key takeaways. Keep it readable and short."
+                    ),
+                    "assigned_agent": "speed",
+                    "priority": 1,
+                },
+            ]
+        # Full deep research: 4 agents
         return [
             {
                 "description": (

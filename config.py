@@ -75,7 +75,7 @@ MODELS = {
         "name": "GLM 4.7",
         "role": "researcher",
         "description": "Research Agent — web search, data gathering, summarization",
-        "max_tokens": 16384,
+        "max_tokens": 4096,
         "temperature": 1.0,
         "top_p": 1.0,
         "has_thinking": False,

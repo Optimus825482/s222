@@ -13,10 +13,13 @@ from tools.registry import RESEARCHER_TOOLS
 class ResearcherAgent(BaseAgent):
     role = AgentRole.RESEARCHER
     model_key = "researcher"
+    max_steps = 5  # Fewer tool rounds for faster research responses
 
     def system_prompt(self) -> str:
         return (
             "You are a Research specialist with web search and fetch capabilities.\n\n"
+            "SPEED: Respond quickly. Use at most 1-2 web_search calls and 0-2 web_fetch calls, then summarize. "
+            "Avoid long tool chains; one good search plus optional 1-2 fetches is enough.\n\n"
             "TOOLS AVAILABLE:\n"
             "- web_search: Search the web for current information\n"
             "- web_fetch: Fetch full content from a specific URL\n"
@@ -24,10 +27,8 @@ class ResearcherAgent(BaseAgent):
             "- use_skill: Load a skill's instructions\n"
             "- rag_query: Search the document knowledge base\n\n"
             "APPROACH:\n"
-            "- Use web_search to find relevant sources first\n"
-            "- Use web_fetch to get detailed content from promising URLs\n"
-            "- Use find_skill for specialized research methodologies\n"
-            "- Cross-reference multiple sources when possible\n"
+            "- Use web_search once (or twice if needed) to find relevant sources\n"
+            "- Optionally web_fetch 1-2 top URLs for detail; then stop and summarize\n"
             "- Summarize findings clearly with source attribution\n"
             "- Distinguish facts from opinions\n"
             "- If search returns no useful results, state that clearly\n\n"

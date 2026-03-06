@@ -24,7 +24,7 @@ async def web_search(query: str, max_results: int = 5) -> list[dict]:
         "safesearch": 0,
     }
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{SEARXNG_URL}/search", params=params)
             resp.raise_for_status()
             data = resp.json()
