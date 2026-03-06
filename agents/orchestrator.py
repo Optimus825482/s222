@@ -100,18 +100,25 @@ class OrchestratorAgent(BaseAgent):
             "- speed: Format output, generate code/tables if needed\n\n"
             "YOUR TOOLS:\n"
             "- decompose_task: Break work into sub-tasks and assign to agents (ALWAYS prefer parallel)\n"
+            "- spawn_subagent: Create and run a ONE-OFF specialist on ANY topic (custom role + optional skills). Use when the fixed 4 agents are not the right fit or you need a domain expert (crypto, legal, etc.). You can create a skill first with research_create_skill then pass skill_ids to spawn_subagent.\n"
             "- direct_response: ONLY for trivial questions (greetings, yes/no)\n"
             "- synthesize_results: Combine specialist results into final answer\n"
             "- web_search / web_fetch: Search/fetch web directly\n"
             "- find_skill / use_skill: Discover and load specialized knowledge\n"
-            "- save_memory / recall_memory: Persistent knowledge\n"
+            "- save_memory / recall_memory: Long-term persistent memory — use recall_memory at START of complex tasks; save_memory after important outcomes so the team improves over time\n"
             "- code_execute: Run Python/JS/Bash code in sandbox\n"
             "- rag_ingest / rag_query: Ingest documents and search knowledge base\n"
             "- idea_to_project: Transform a raw idea into full project plan + scaffold\n"
             "- request_approval: Ask user approval for critical actions\n"
             "- self_evaluate: Rate your own response quality\n"
+            "- get_agent_baseline / get_best_agent: Read performance metrics; use when improving the team or choosing which agent to assign\n"
             "- mcp_call / mcp_list_tools: Call external services via MCP protocol\n"
-            "- create_skill: Save a new reusable skill/protocol to the dynamic registry\n\n"
+            "- create_skill / research_create_skill: Create new reusable skills when the team needs a capability it doesn't have yet\n\n"
+            "LONG-TERM MEMORY & SELF-IMPROVEMENT:\n"
+            "- At the START of non-trivial tasks: call recall_memory with a query related to the task (e.g. similar past solutions, user preferences). Use what you recall to avoid repeating mistakes and to match user style.\n"
+            "- After completing important work: call save_memory to store key learnings, solutions, or decisions (category: solution, pattern, or preference) so future runs benefit.\n"
+            "- When you need expertise that no existing skill covers: use research_create_skill to create it, then use_skill or inject that skill into spawn_subagent/decompose_task so the team gains the capability.\n"
+            "- When improving agent performance: use get_agent_baseline to see metrics, then create or refine skills and assign them via decompose_task or spawn_subagent.\n\n"
             "SKILL CREATION RULES (IMPORTANT):\n"
             "- Skills are SPECIAL CAPABILITIES (yetenekler) — NOT domain knowledge dumps.\n"
             "- A skill teaches HOW to do something: which libraries, APIs, algorithms, formulas, patterns to use.\n"
@@ -123,10 +130,11 @@ class OrchestratorAgent(BaseAgent):
             "- Example flow: User says 'astroloji uygulaması yap' → find_skill('astroloji') → not found → "
             "web_search('astrolojik hesaplama kütüphaneleri python') → create_skill with researched knowledge → "
             "decompose_task with skill IDs injected → agents use the skill.\n\n"
-            "PIPELINE TYPES:\n"
+            "PIPELINE TYPES (MULTIPARALLEL):\n"
+            "- When you use decompose_task with 2+ sub-tasks, they ALL run AT THE SAME TIME (multiparallel). No exceptions.\n"
             "- parallel: ALL agents work simultaneously (DEFAULT — use this most)\n"
             "- deep_research: Phase 1 parallel gather → Phase 2 synthesis (for complex research)\n"
-            "- sequential: A → B → C (only when output depends on previous)\n"
+            "- sequential: Only for a SINGLE sub-task; with 2+ sub-tasks the system forces parallel so all run together.\n"
             "- consensus: All agents answer same question, compare\n"
             "- iterative: Produce → review → refine\n"
             "- brainstorm: Multi-round debate — agents argue from different angles, cross-challenge, then synthesize\n\n"
@@ -716,16 +724,21 @@ class OrchestratorAgent(BaseAgent):
         )
 
     async def _handle_decompose(self, fn_args: dict, thread: Thread) -> str:
-        """Create Task with SubTasks from decomposition. Auto-discovers and injects relevant skills."""
+        """Create Task with SubTasks from decomposition. Auto-discovers and injects relevant skills.
+        When 2+ sub-tasks: always run multiparallel (all subagents at the same time)."""
         pipeline_str = fn_args.get("pipeline_type", "parallel")
         pipeline_type = PipelineType(pipeline_str)
+        sub_tasks_data = fn_args.get("sub_tasks", [])
+        # Multiparallel: 2+ sub-tasks always run simultaneously
+        if len(sub_tasks_data) >= 2 and pipeline_type == PipelineType.SEQUENTIAL:
+            pipeline_type = PipelineType.PARALLEL
 
         # Auto-discover relevant skills for each sub-task
         skill_cache: dict[str, list[dict]] = {}
         knowledge_cache: dict[str, str] = {}
         try:
             from tools.dynamic_skills import search_skills, get_full_skill_context
-            for st_data in fn_args.get("sub_tasks", []):
+            for st_data in sub_tasks_data:
                 desc = st_data.get("description", "")
                 if desc and len(desc) > 10:
                     found = search_skills(query=desc[:200], max_results=2)
@@ -741,7 +754,7 @@ class OrchestratorAgent(BaseAgent):
             pass
 
         sub_tasks = []
-        for st_data in fn_args.get("sub_tasks", []):
+        for st_data in sub_tasks_data:
             desc = st_data["description"]
             # Collect skill IDs for this sub-task
             injected_skills = skill_cache.get(desc[:50], [])
@@ -1188,12 +1201,17 @@ class OrchestratorAgent(BaseAgent):
                         ))
                     current_task.pipeline_type = PipelineType.PARALLEL
 
+                # Multiparallel: 2+ sub-tasks always run at the same time
+                if len(current_task.sub_tasks) >= 2 and current_task.pipeline_type == PipelineType.SEQUENTIAL:
+                    current_task.pipeline_type = PipelineType.PARALLEL
+                    self._emit("routing", "Multiparallel: tüm alt görevler aynı anda çalışacak")
+
                 if live_monitor:
                     live_monitor.emit(
                         "pipeline",
                         "orchestrator",
                         f"{current_task.pipeline_type.value} pipeline — "
-                        f"{len(current_task.sub_tasks)} alt görev",
+                        f"{len(current_task.sub_tasks)} alt görev (aynı anda)",
                     )
 
                 from pipelines.engine import PipelineEngine

@@ -7,6 +7,8 @@ import { Brain, CheckCircle, Clock, Coins } from "lucide-react";
 
 interface Props {
   thread: Thread | null;
+  isProcessing?: boolean;
+  status?: "idle" | "connecting" | "running" | "complete" | "error";
 }
 
 const CHAT_EVENTS = new Set(["user_message", "agent_response", "error"]);
@@ -272,7 +274,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
   return nodes;
 }
 
-export function ChatArea({ thread }: Props) {
+export function ChatArea({ thread, isProcessing, status }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -280,7 +282,12 @@ export function ChatArea({ thread }: Props) {
   }, [thread?.events?.length]);
 
   if (!thread || !thread.events.length) {
-    return <WelcomeScreen />;
+    return (
+      <WelcomeScreen
+        isProcessing={isProcessing}
+        status={status}
+      />
+    );
   }
 
   // Build clean chat: user messages + errors + ONLY the final report per round.
@@ -331,7 +338,13 @@ export function ChatArea({ thread }: Props) {
   );
 }
 
-function WelcomeScreen() {
+function WelcomeScreen({
+  isProcessing,
+  status,
+}: {
+  isProcessing?: boolean;
+  status?: "idle" | "connecting" | "running" | "complete" | "error";
+}) {
   const hints = [
     { label: "Derin Araştırma", desc: "Kapsamlı analiz" },
     { label: "Paralel", desc: "Hızlı çoklu agent" },
@@ -340,8 +353,25 @@ function WelcomeScreen() {
     { label: "Beyin Fırtınası", desc: "Çok yönlü tartışma" },
   ];
 
+  const statusLabel =
+    status === "connecting"
+      ? "Bağlanıyor..."
+      : status === "running"
+        ? "Gönderiliyor..."
+        : null;
+
   return (
-    <div className="flex-1 flex items-center justify-center px-4">
+    <div className="flex-1 flex flex-col items-center justify-center px-4">
+      {statusLabel && (
+        <div
+          className="mb-4 flex items-center gap-2 rounded-full bg-blue-500/10 border border-blue-500/20 px-4 py-2 text-sm text-blue-300"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" aria-hidden />
+          {statusLabel}
+        </div>
+      )}
       <div className="text-center max-w-sm">
         <Brain
           className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-pink-400"

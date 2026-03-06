@@ -304,6 +304,54 @@ SKILL_REGISTRY: list[dict[str, Any]] = [
             "8. Plan for testing, documentation, and deployment"
         ),
     },
+    # ── Development & agent improvement (Cursor/Kiro patterns) ─────
+    {
+        "id": "code-review",
+        "name": "Code Review",
+        "category": "coding",
+        "description": "Structured code and PR review: correctness, security, performance, maintainability",
+        "keywords": ["review", "pr", "code review", "inceleme", "kod inceleme", "pull request", "quality"],
+        "knowledge": (
+            "CODE REVIEW PROTOCOL:\n"
+            "1. Correctness: logic, edge cases, error handling\n"
+            "2. Security: OWASP-relevant issues, auth, input validation\n"
+            "3. Performance: N+1, algorithms, resource use\n"
+            "4. Maintainability: naming, structure, tests, docs\n"
+            "5. Provide concrete suggestions; use get_agent_baseline when improving agent-related code\n"
+            "6. Output: critical / suggestion / nice-to-have with clear priority"
+        ),
+    },
+    {
+        "id": "agent-improvement",
+        "name": "Agent Performance Improvement",
+        "category": "orchestration",
+        "description": "Improve existing agents via baseline metrics, failure analysis, prompt and rollout",
+        "keywords": ["agent", "improve", "performance", "prompt", "baseline", "eval", "agent iyileştirme", "performans"],
+        "knowledge": (
+            "AGENT IMPROVEMENT PROTOCOL:\n"
+            "1. Establish baseline: use get_agent_baseline for task_success_rate, satisfaction, latency, token_ratio\n"
+            "2. Identify failure modes: instruction misunderstanding, format errors, context loss, tool misuse\n"
+            "3. Apply improvements: chain-of-thought, few-shot examples, role refinement, constitutional checks\n"
+            "4. Validate: test suite + A/B; roll out in stages (alpha → beta → canary)\n"
+            "5. Success criteria: success +15%%, corrections -25%%, no safety regression, latency within 10%%\n"
+            "6. Use get_best_agent when assigning tasks by type"
+        ),
+    },
+    {
+        "id": "changelog-release",
+        "name": "Changelog & Release Notes",
+        "category": "writing",
+        "description": "Write changelogs, release notes, and version documentation",
+        "keywords": ["changelog", "release", "release notes", "version", "değişiklik", "sürüm", "notlar"],
+        "knowledge": (
+            "CHANGELOG/RELEASE PROTOCOL:\n"
+            "1. Use version format: MAJOR.MINOR.PATCH (breaking / feature / fix)\n"
+            "2. Group changes: Added, Changed, Deprecated, Removed, Fixed, Security\n"
+            "3. One line per change; link to issues/PRs when possible\n"
+            "4. Release notes: audience-friendly summary, migration notes for breaking changes\n"
+            "5. Keep entries concise and actionable"
+        ),
+    },
 ]
 
 

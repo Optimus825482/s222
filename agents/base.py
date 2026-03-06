@@ -502,6 +502,43 @@ class BaseAgent(ABC):
             request.approve("Auto-approved (non-interactive mode)")
             return format_approval_for_agent(request)
 
+        if fn_name == "spawn_subagent":
+            from tools.spawn_subagent import run_subagent
+            task = fn_args.get("task", "")
+            role = fn_args.get("role_description", "")
+            skill_ids = fn_args.get("skill_ids") or []
+            model_key = fn_args.get("model_key") or "thinker"
+            if not task or not role:
+                return "[spawn_subagent] task and role_description are required."
+            result = await run_subagent(
+                task=task,
+                role_description=role,
+                skill_ids=skill_ids,
+                model_key=model_key,
+            )
+            return f"[Subagent result]\n{result}"
+
+        if fn_name == "get_agent_baseline":
+            from tools.agent_eval import get_performance_baseline
+            baseline = get_performance_baseline(fn_args.get("agent_role"))
+            return (
+                f"Performance baseline ({baseline.get('agent_role') or 'system-wide'}): "
+                f"task_success_rate={baseline['task_success_rate_pct']}%, "
+                f"user_satisfaction={baseline['user_satisfaction_score']}/10, "
+                f"avg_latency_ms={baseline['avg_latency_ms']}, "
+                f"token_ratio={baseline['token_efficiency_ratio']}, "
+                f"total_tasks={baseline['total_tasks']}, success_count={baseline['success_count']}. "
+                "Use for improvement targets: +15% success, -25% corrections, no safety regression."
+            )
+
+        if fn_name == "get_best_agent":
+            from tools.agent_eval import get_best_agent_for_task, detect_task_type
+            task_type = fn_args.get("task_type") or "general"
+            best = get_best_agent_for_task(task_type)
+            if best:
+                return f"Best agent for task_type '{task_type}': {best}. Prefer assigning this agent."
+            return f"No sufficient evaluation data for task_type '{task_type}'. Use default assignment."
+
         if fn_name == "self_evaluate":
             from tools.reflexion import build_evaluation_prompt, parse_evaluation
             eval_prompt = build_evaluation_prompt(

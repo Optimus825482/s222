@@ -120,6 +120,19 @@ export interface ThreadSummary {
   event_count: number;
 }
 
+/** Performance baseline report (agent-orchestration-improve-agent skill) */
+export interface PerformanceBaseline {
+  task_success_rate_pct: number;
+  total_tasks: number;
+  success_count: number;
+  avg_score: number;
+  user_satisfaction_score: number;
+  avg_latency_ms: number;
+  total_tokens: number;
+  token_efficiency_ratio: string;
+  agent_role?: string | null;
+}
+
 // ── WebSocket Message Types ─────────────────────────────────────
 
 export interface WSLiveEvent {

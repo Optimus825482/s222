@@ -1155,7 +1155,7 @@ export function TeachabilityPanel() {
   );
 }
 
-// ── Eval Panel ──────────────────────────────────────────────────
+// ── Eval Panel (agent-orchestration-improve-agent: baseline + success criteria) ─
 
 interface EvalStat {
   agent_role: string;
@@ -1165,19 +1165,56 @@ interface EvalStat {
 
 export function EvalPanel() {
   const [stats, setStats] = useState<EvalStat[]>([]);
+  const [baseline, setBaseline] = useState<{
+    task_success_rate_pct: number;
+    user_satisfaction_score: number;
+    avg_latency_ms: number;
+    token_efficiency_ratio: string;
+    total_tasks: number;
+    success_count: number;
+  } | null>(null);
 
   useEffect(() => {
-    api
-      .evalStats()
-      .then((s) => setStats(s as EvalStat[]))
-      .catch(() => {});
+    api.evalStats().then((s) => setStats(s as EvalStat[])).catch(() => {});
+    api.evalBaseline().then(setBaseline).catch(() => setBaseline(null));
   }, []);
 
   return (
-    <div className="space-y-3 px-3 lg:px-4">
+    <div className="space-y-4 px-3 lg:px-4">
       <div className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
         <BarChart3 className="w-4 h-4" aria-hidden="true" /> Agent Eval
       </div>
+
+      {/* Performance baseline (skill: agent-orchestration-improve-agent) */}
+      {baseline && baseline.total_tasks > 0 && (
+        <div className="rounded-lg border border-border bg-surface-raised/50 p-2.5 space-y-1.5">
+          <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+            Performance baseline
+          </div>
+          <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
+            <dt className="text-slate-500">Task success</dt>
+            <dd className="font-medium text-right text-slate-200">
+              {baseline.task_success_rate_pct}%
+            </dd>
+            <dt className="text-slate-500">Satisfaction (1–10)</dt>
+            <dd className="font-medium text-right text-slate-200">
+              {baseline.user_satisfaction_score.toFixed(1)}
+            </dd>
+            <dt className="text-slate-500">Avg latency</dt>
+            <dd className="font-medium text-right text-slate-200">
+              {baseline.avg_latency_ms} ms
+            </dd>
+            <dt className="text-slate-500">Token ratio</dt>
+            <dd className="font-medium text-right text-slate-200">
+              {baseline.token_efficiency_ratio}
+            </dd>
+          </dl>
+          <p className="text-[10px] text-slate-500 pt-1 border-t border-border mt-1">
+            Hedef: başarı +%15, düzeltme −%25, güvenlik aynı (skill)
+          </p>
+        </div>
+      )}
+
       {stats.length > 0 ? (
         <div className="space-y-2">
           {stats.map((s) => {

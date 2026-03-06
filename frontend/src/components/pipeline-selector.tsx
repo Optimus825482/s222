@@ -65,6 +65,18 @@ export function PipelineSelector({ selected, onSelect }: Props) {
               {selectedOpt.label}:
             </span>{" "}
             {selectedOpt.desc}
+            {selectedOpt.pattern && selectedOpt.pattern !== "auto" && (
+              <span className="block mt-1 text-slate-500">
+                Orkestrasyon:{" "}
+                {selectedOpt.pattern === "parallel_specialists"
+                  ? "Paralel uzmanlar"
+                  : selectedOpt.pattern === "pipeline"
+                    ? "Pipeline"
+                    : selectedOpt.pattern === "swarm"
+                      ? "Swarm"
+                      : selectedOpt.pattern}
+              </span>
+            )}
           </p>
         </div>
       )}

@@ -44,7 +44,12 @@ async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ── Models & Config ─────────────────────────────────────────────
 
-import type { ModelConfig, ThreadSummary, Thread } from "./types";
+import type {
+  ModelConfig,
+  ThreadSummary,
+  Thread,
+  PerformanceBaseline,
+} from "./types";
 
 export const api = {
   getModels: () => fetcher<Record<string, ModelConfig>>("/api/models"),
@@ -136,8 +141,14 @@ export const api = {
       body: JSON.stringify({ content }),
     }),
 
-  // Eval
+  // Eval (agent-orchestration-improve-agent baseline)
   evalStats: () => fetcher("/api/eval/stats"),
+  evalBaseline: (agentRole?: string) =>
+    fetcher<PerformanceBaseline>(
+      agentRole
+        ? `/api/eval/baseline?agent_role=${encodeURIComponent(agentRole)}`
+        : "/api/eval/baseline",
+    ),
 
   // Projects (Idea-to-Project exports)
   listProjects: () =>
@@ -163,14 +174,26 @@ export const api = {
 
 // ── Memory API ───────────────────────────────────────────────────
 
+const authHeaders = (): HeadersInit => {
+  const token = getAuthToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 export async function getMemoryStats() {
-  const res = await fetch(`${BASE}/api/memory/stats`);
+  const res = await fetch(`${BASE}/api/memory/stats`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function getMemoryLayers() {
-  const res = await fetch(`${BASE}/api/memory/layers`);
+  const res = await fetch(`${BASE}/api/memory/layers`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) return { working: [], episodic: [], semantic: [] };
   return res.json();
 }
@@ -178,18 +201,23 @@ export async function getMemoryLayers() {
 export async function deleteMemory(memoryId: number) {
   const res = await fetch(`${BASE}/api/memory/${memoryId}`, {
     method: "DELETE",
+    headers: authHeaders(),
   });
   return res.ok;
 }
 
 export async function getAutoSkills() {
-  const res = await fetch(`${BASE}/api/skills/auto`);
+  const res = await fetch(`${BASE}/api/skills/auto`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function getDbHealth() {
-  const res = await fetch(`${BASE}/api/db/health`);
+  const res = await fetch(`${BASE}/api/db/health`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) return { status: "error" };
   return res.json();
 }

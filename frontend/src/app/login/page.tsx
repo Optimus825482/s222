@@ -101,7 +101,8 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-5 w-full bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="mt-5 w-full min-h-[44px] bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            aria-busy={loading}
           >
             {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
           </button>

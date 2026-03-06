@@ -11,54 +11,65 @@ export const AGENT_CONFIG: Record<
   reasoner: { icon: "🌊", color: "#10b981", name: "Nemotron 3 Nano" },
 };
 
+/** Orchestration pattern (Kiro: parallel specialists / pipeline / swarm) */
+export type OrchestrationPattern = "parallel_specialists" | "pipeline" | "swarm" | "hybrid" | "auto";
+
 export const PIPELINE_OPTIONS = [
   {
     id: "auto",
     label: "Otomatik",
     short: "Oto",
     desc: "Sisteme bırak, en uygun pipeline seçilsin",
+    pattern: "auto" as OrchestrationPattern,
   },
   {
     id: "deep_research",
     label: "Derin Araştırma",
     short: "Araştır",
     desc: "Kapsamlı web araştırması + çoklu analiz",
+    pattern: "pipeline" as OrchestrationPattern,
   },
   {
     id: "parallel",
     label: "Paralel",
     short: "Paralel",
-    desc: "Tüm agent'lar aynı anda çalışır, hızlı sonuç",
+    desc: "Paralel uzmanlar: tüm agent'lar aynı anda çalışır, sonuçlar birleştirilir",
+    pattern: "parallel_specialists" as OrchestrationPattern,
   },
   {
     id: "sequential",
     label: "Sıralı",
     short: "Sıralı",
-    desc: "Agent'lar sırayla çalışır, her biri öncekinin çıktısını kullanır",
+    desc: "Pipeline: agent'lar sırayla çalışır, her biri öncekinin çıktısını kullanır",
+    pattern: "pipeline" as OrchestrationPattern,
   },
   {
     id: "consensus",
     label: "Uzlaşı",
     short: "Uzlaşı",
     desc: "Agent'lar tartışıp ortak karara varır",
+    pattern: "swarm" as OrchestrationPattern,
   },
   {
     id: "iterative",
     label: "Tekrarlı",
     short: "Tekrar",
     desc: "Sonuç iyileşene kadar döngü yapar",
+    pattern: "pipeline" as OrchestrationPattern,
   },
   {
     id: "idea_to_project",
     label: "Proje Oluştur",
     short: "Proje",
     desc: "Fikirden tam proje planına dönüştürür",
+    pattern: "pipeline" as OrchestrationPattern,
   },
   {
     id: "brainstorm",
     label: "Beyin Fırtınası",
     short: "Tartış",
-    desc: "Agent'lar konu üzerinde tartışır, farklı bakış açıları sunar",
+    desc: "Swarm: agent'lar konu üzerinde tartışır, farklı bakış açıları sunar",
+    pattern: "swarm" as OrchestrationPattern,
   },
 ] as const;
 

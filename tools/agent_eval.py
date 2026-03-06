@@ -233,6 +233,60 @@ def get_agent_stats(agent_role: str | None = None) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_performance_baseline(agent_role: str | None = None) -> dict[str, Any]:
+    """
+    Build a Performance Baseline report (agent-orchestration-improve-agent skill).
+    Aggregates eval data into: task_success_rate, avg_corrections, tool_efficiency,
+    user_satisfaction_score, avg_latency_ms, token_efficiency_ratio.
+    """
+    conn = _get_conn()
+    # Success = score >= 3.5
+    if agent_role:
+        row = conn.execute("""
+            SELECT
+                COUNT(*) as total_tasks,
+                SUM(CASE WHEN score >= 3.5 THEN 1 ELSE 0 END) as success_count,
+                ROUND(AVG(score), 2) as avg_score,
+                ROUND(AVG(latency_ms), 0) as avg_latency,
+                COALESCE(SUM(tokens_used), 0) as total_tokens
+            FROM evaluations
+            WHERE agent_role = ?
+        """, (agent_role,)).fetchone()
+    else:
+        row = conn.execute("""
+            SELECT
+                COUNT(*) as total_tasks,
+                SUM(CASE WHEN score >= 3.5 THEN 1 ELSE 0 END) as success_count,
+                ROUND(AVG(score), 2) as avg_score,
+                ROUND(AVG(latency_ms), 0) as avg_latency,
+                COALESCE(SUM(tokens_used), 0) as total_tokens
+            FROM evaluations
+        """).fetchone()
+
+    total = row["total_tasks"] or 0
+    success = row["success_count"] or 0
+    avg_score = float(row["avg_score"] or 0)
+    avg_latency = float(row["avg_latency"] or 0)
+    total_tokens = int(row["total_tokens"] or 0)
+
+    task_success_rate = (success / total * 100) if total else 0
+    # Map avg_score 1-5 to satisfaction 1-10
+    user_satisfaction = round((avg_score / 5.0) * 10, 1) if avg_score else 0
+    token_per_task = (total_tokens / total) if total else 0
+
+    return {
+        "task_success_rate_pct": round(task_success_rate, 1),
+        "total_tasks": total,
+        "success_count": success,
+        "avg_score": avg_score,
+        "user_satisfaction_score": min(10, max(1, user_satisfaction)),
+        "avg_latency_ms": round(avg_latency, 0),
+        "total_tokens": total_tokens,
+        "token_efficiency_ratio": f"{total_tokens}:{total}" if total else "0:0",
+        "agent_role": agent_role,
+    }
+
+
 def get_best_agent_for_task(task_type: str) -> str | None:
     """Recommend the best agent for a given task type based on historical scores."""
     conn = _get_conn()

@@ -310,6 +310,90 @@ REQUEST_APPROVAL_TOOL = {
     },
 }
 
+# ── Dynamic Subagent (self-improving, long-term, skill-creating team) ─
+
+SPAWN_SUBAGENT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "spawn_subagent",
+        "description": (
+            "Create and run a one-off specialist subagent on ANY topic. Use when the fixed agents (thinker, speed, researcher, reasoner) "
+            "are not the right fit, or when you need a dedicated expert (e.g. crypto, legal, domain-specific). "
+            "The subagent runs with the given role and optional skills, then returns its answer. "
+            "Combine with find_skill/use_skill or research_create_skill when the needed expertise is missing."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "The concrete task or question for this subagent",
+                },
+                "role_description": {
+                    "type": "string",
+                    "description": "Expert role and expertise (e.g. 'Cryptocurrency and blockchain expert', 'Legal compliance specialist')",
+                },
+                "skill_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional skill IDs to inject (from find_skill). Use when the subagent should follow specific protocols.",
+                },
+                "model_key": {
+                    "type": "string",
+                    "enum": ["thinker", "researcher", "speed", "reasoner"],
+                    "description": "Which model to use (default: thinker for quality, speed for fast/simple)",
+                },
+            },
+            "required": ["task", "role_description"],
+        },
+    },
+}
+
+# ── Agent Performance Tools (agent-orchestration-improve-agent) ───
+
+GET_AGENT_BASELINE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_agent_baseline",
+        "description": (
+            "Get performance baseline metrics for agents (task success rate, satisfaction, latency, token ratio). "
+            "Use when improving agent performance, analyzing failures, or planning prompt/workflow changes. "
+            "Optionally filter by agent_role to see one agent's baseline."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "agent_role": {
+                    "type": "string",
+                    "description": "Optional: specific agent (thinker, speed, researcher, reasoner). Omit for system-wide baseline.",
+                },
+            },
+        },
+    },
+}
+
+GET_BEST_AGENT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_best_agent",
+        "description": (
+            "Get the best-performing agent for a given task type based on historical evaluation scores. "
+            "Use when decomposing a task to assign the right specialist (e.g. research, coding, math). "
+            "Returns agent_role or null if insufficient data."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task_type": {
+                    "type": "string",
+                    "description": "Task type: research, coding, math, creative, comparison, planning, summarization, translation, general",
+                },
+            },
+            "required": ["task_type"],
+        },
+    },
+}
+
 # ── Self-Evaluate Tool ───────────────────────────────────────────
 
 SELF_EVALUATE_TOOL = {
@@ -536,7 +620,7 @@ ORCHESTRATOR_TOOLS = [
         "type": "function",
         "function": {
             "name": "decompose_task",
-            "description": "Break a complex user request into sub-tasks and assign each to a specialist agent.",
+            "description": "Break a complex user request into sub-tasks and assign each to a specialist agent. With 2+ sub-tasks, ALL run at the same time (multiparallel).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -569,7 +653,7 @@ ORCHESTRATOR_TOOLS = [
                     "pipeline_type": {
                         "type": "string",
                         "enum": ["sequential", "parallel", "consensus", "iterative", "deep_research"],
-                        "description": "How to execute the sub-tasks. Use 'parallel' for most tasks, 'deep_research' for complex research.",
+                        "description": "With 2+ sub-tasks they always run in parallel (same time). Use 'parallel' or 'deep_research' for multi-agent work.",
                     },
                     "reasoning": {"type": "string", "description": "Why this decomposition and pipeline"},
                 },
@@ -617,7 +701,10 @@ ORCHESTRATOR_TOOLS = [
     RAG_INGEST_TOOL,
     RAG_QUERY_TOOL,
     IDEA_TO_PROJECT_TOOL,
+    SPAWN_SUBAGENT_TOOL,
     REQUEST_APPROVAL_TOOL,
+    GET_AGENT_BASELINE_TOOL,
+    GET_BEST_AGENT_TOOL,
     SELF_EVALUATE_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
@@ -681,6 +768,7 @@ THINKER_TOOLS = [
     USE_SKILL_TOOL,
     CREATE_SKILL_TOOL,
     RAG_QUERY_TOOL,
+    GET_AGENT_BASELINE_TOOL,
     GENERATE_IMAGE_TOOL,
 ]
 

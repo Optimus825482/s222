@@ -35,11 +35,27 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     }
   }, []);
 
+  const getToken = useCallback(() => {
+    try {
+      const stored = typeof window !== "undefined" ? localStorage.getItem("ops-center-auth") : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed?.state?.user?.token ?? "";
+      }
+    } catch {
+      /* ignore */
+    }
+    return "";
+  }, []);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const wsUrl =
-      process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8001/ws/chat";
+    let wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8001/ws/chat";
+    const token = getToken();
+    if (token) {
+      wsUrl += (wsUrl.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token);
+    }
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -61,13 +77,16 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
           case "monitor_start":
             setStatus("running");
             setLiveEvents([]);
+            optsRef.current.onStatusChange?.("running");
             break;
           case "monitor_complete":
             setStatus("complete");
+            optsRef.current.onStatusChange?.("complete");
             break;
           case "monitor_error":
             setStatus("error");
             optsRef.current.onError?.(msg.message);
+            optsRef.current.onStatusChange?.("error");
             break;
           case "result":
             optsRef.current.onResult?.(msg.thread_id, msg.result, msg.thread);
@@ -75,10 +94,9 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
           case "error":
             setStatus("error");
             optsRef.current.onError?.(msg.message);
+            optsRef.current.onStatusChange?.("error");
             break;
         }
-
-        optsRef.current.onStatusChange?.(status);
       } catch {
         /* ignore parse errors */
       }
@@ -103,7 +121,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
       setStatus("error");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearReconnectTimer]);
+  }, [clearReconnectTimer, getToken]);
 
   /** Manually reset backoff counter and reconnect */
   const reconnect = useCallback(() => {

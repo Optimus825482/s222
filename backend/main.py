@@ -12,8 +12,8 @@ if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
 import asyncio
-import hashlib
 import json
+import os
 import re
 import secrets
 import time
@@ -22,7 +22,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+import bcrypt
+from fastapi import Depends, FastAPI, Header, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -57,9 +58,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Multi-Agent Ops Center API", version="2.0.0", lifespan=lifespan)
 
+_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,14 +70,17 @@ app.add_middleware(
 
 # ── Auth ─────────────────────────────────────────────────────────
 
+# Precomputed bcrypt hash for "518518" (backward compatibility)
+_BCRYPT_518518 = "$2b$12$.aDl7KHhQH7/x67LuKwnE.RKH7zrd5ezNuSNX/yS.MwoKEI2oiviK"
+
 USERS = {
     "erkan": {
-        "password_hash": hashlib.sha256("518518".encode()).hexdigest(),
+        "password_hash": _BCRYPT_518518,
         "full_name": "Erkan Erdem",
         "user_id": "erkan",
     },
     "yigit": {
-        "password_hash": hashlib.sha256("518518".encode()).hexdigest(),
+        "password_hash": _BCRYPT_518518,
         "full_name": "Yiğit Avcı",
         "user_id": "yigit",
     },
@@ -95,6 +100,18 @@ def _get_user_from_token(token: str) -> dict | None:
     if not user_id:
         return None
     return USERS.get(user_id)
+
+
+def get_current_user(authorization: str | None = Header(None, alias="Authorization")) -> dict:
+    """Extract Bearer token, resolve user from _active_tokens + USERS; raise 401 if invalid."""
+    raw = (authorization or "").strip()
+    if not raw.lower().startswith("bearer "):
+        raise HTTPException(401, "Missing or invalid Authorization header")
+    token = raw[7:].strip()
+    user = _get_user_from_token(token)
+    if not user:
+        raise HTTPException(401, "Invalid or expired token")
+    return {"user_id": user["user_id"], "full_name": user["full_name"]}
 
 
 # ── Request/Response Models ──────────────────────────────────────
@@ -152,8 +169,13 @@ async def api_login(req: LoginRequest):
     user = USERS.get(req.username.lower())
     if not user:
         raise HTTPException(401, "Kullanıcı bulunamadı")
-    expected = hashlib.sha256(req.password.encode()).hexdigest()
-    if user["password_hash"] != expected:
+    stored = user["password_hash"]
+    if stored.startswith("$2b$") or stored.startswith("$2a$"):
+        ok = bcrypt.checkpw(req.password.encode(), stored.encode())
+    else:
+        import hashlib
+        ok = hashlib.sha256(req.password.encode()).hexdigest() == stored
+    if not ok:
         raise HTTPException(401, "Şifre hatalı")
     token = secrets.token_hex(32)
     _active_tokens[token] = user["user_id"]
@@ -165,15 +187,15 @@ async def api_login(req: LoginRequest):
 
 
 @app.post("/api/auth/logout")
-async def api_logout(authorization: str = ""):
-    token = authorization.replace("Bearer ", "").strip()
+async def api_logout(authorization: str | None = Header(None, alias="Authorization")):
+    token = (authorization or "").replace("Bearer ", "").strip()
     _active_tokens.pop(token, None)
     return {"ok": True}
 
 
 @app.get("/api/auth/me")
-async def api_me(authorization: str = ""):
-    token = authorization.replace("Bearer ", "").strip()
+async def api_me(authorization: str | None = Header(None, alias="Authorization")):
+    token = (authorization or "").replace("Bearer ", "").strip()
     user = _get_user_from_token(token)
     if not user:
         raise HTTPException(401, "Geçersiz token")
@@ -200,60 +222,60 @@ async def get_pipelines():
 # ── REST Endpoints: Threads ──────────────────────────────────────
 
 @app.get("/api/threads")
-async def api_list_threads(limit: int = 20, user_id: str = ""):
-    return list_threads(limit=limit, user_id=user_id or None)
+async def api_list_threads(user: dict = Depends(get_current_user), limit: int = 20):
+    return list_threads(limit=limit, user_id=user["user_id"])
 
 
 @app.post("/api/threads")
-async def api_create_thread(user_id: str = ""):
+async def api_create_thread(user: dict = Depends(get_current_user)):
     thread = Thread()
-    save_thread(thread, user_id=user_id or None)
+    save_thread(thread, user_id=user["user_id"])
     return {"id": thread.id}
 
 
 @app.get("/api/threads/{thread_id}")
-async def api_get_thread(thread_id: str, user_id: str = ""):
-    thread = load_thread(thread_id, user_id=user_id or None)
+async def api_get_thread(thread_id: str, user: dict = Depends(get_current_user)):
+    thread = load_thread(thread_id, user_id=user["user_id"])
     if not thread:
         raise HTTPException(404, "Thread not found")
     return thread.model_dump(mode="json")
 
 
 @app.delete("/api/threads/{thread_id}")
-async def api_delete_thread(thread_id: str, user_id: str = ""):
-    ok = delete_thread(thread_id, user_id=user_id or None)
+async def api_delete_thread(thread_id: str, user: dict = Depends(get_current_user)):
+    ok = delete_thread(thread_id, user_id=user["user_id"])
     if not ok:
         raise HTTPException(404, "Thread not found")
     return {"deleted": True}
 
 
 @app.delete("/api/threads")
-async def api_delete_all_threads(user_id: str = ""):
-    count = delete_all_threads(user_id=user_id or None)
+async def api_delete_all_threads(user: dict = Depends(get_current_user)):
+    count = delete_all_threads(user_id=user["user_id"])
     return {"deleted": count}
 
 
 # ── REST Endpoints: Tools (RAG, Skills, MCP, Teachability, Eval) ─
 
 @app.post("/api/rag/ingest")
-async def api_rag_ingest(req: RAGIngestRequest):
+async def api_rag_ingest(req: RAGIngestRequest, user: dict = Depends(get_current_user)):
     from tools.rag import ingest_document
-    result = ingest_document(req.content, req.title, req.source, user_id=req.user_id or None)
+    result = ingest_document(req.content, req.title, req.source, user_id=user["user_id"])
     return result
 
 
 @app.post("/api/rag/query")
-async def api_rag_query(req: RAGQueryRequest):
+async def api_rag_query(req: RAGQueryRequest, user: dict = Depends(get_current_user)):
     from tools.rag import query_documents
-    results = query_documents(req.query, req.max_results, user_id=req.user_id or None)
+    results = query_documents(req.query, req.max_results, user_id=user["user_id"])
     return results
 
 
 @app.get("/api/rag/documents")
-async def api_rag_documents(user_id: str = ""):
+async def api_rag_documents(user: dict = Depends(get_current_user)):
     try:
         from tools.rag import list_documents
-        return list_documents(user_id=user_id or None)
+        return list_documents(user_id=user["user_id"])
     except Exception:
         return []
 
@@ -386,6 +408,7 @@ async def api_add_teaching(req: TeachRequest):
 
 @app.get("/api/eval/stats")
 async def api_eval_stats():
+    """Per-agent evaluation stats (task count, avg score)."""
     try:
         from tools.agent_eval import get_agent_stats
         return get_agent_stats()
@@ -393,10 +416,24 @@ async def api_eval_stats():
         return {"total_evals": 0, "avg_score": 0, "evals": []}
 
 
+@app.get("/api/eval/baseline")
+async def api_eval_baseline(agent_role: str | None = None):
+    """
+    Performance baseline report (agent-orchestration-improve-agent skill).
+    Returns: task_success_rate_pct, user_satisfaction_score, avg_latency_ms,
+    token_efficiency_ratio, total_tasks, success_count.
+    """
+    try:
+        from tools.agent_eval import get_performance_baseline
+        return get_performance_baseline(agent_role)
+    except Exception as e:
+        raise HTTPException(503, "Baseline unavailable") from e
+
+
 # ── Memory Endpoints ─────────────────────────────────────────────
 
 @app.get("/api/memory/stats")
-async def api_memory_stats():
+async def api_memory_stats(user: dict = Depends(get_current_user)):
     """Get layered memory statistics."""
     try:
         from tools.memory import get_memory_stats
@@ -404,8 +441,9 @@ async def api_memory_stats():
     except Exception as e:
         return {"error": str(e), "total_memories": 0}
 
+
 @app.get("/api/memory/layers")
-async def api_memory_layers():
+async def api_memory_layers(user: dict = Depends(get_current_user)):
     """Get memories grouped by layer."""
     try:
         from tools.memory import list_memories
@@ -416,8 +454,9 @@ async def api_memory_layers():
     except Exception as e:
         return {"working": [], "episodic": [], "semantic": [], "error": str(e)}
 
+
 @app.delete("/api/memory/{memory_id}")
-async def api_delete_memory(memory_id: int):
+async def api_delete_memory(memory_id: int, user: dict = Depends(get_current_user)):
     try:
         from tools.memory import delete_memory
         ok = delete_memory(memory_id)
@@ -448,8 +487,18 @@ async def api_db_health():
 
 # ── REST Endpoints: Project Export ───────────────────────────────
 
+def _resolve_project_path(project_name: str):
+    """Resolve project path and ensure it is under PROJECTS_DIR (path traversal safe)."""
+    from tools.idea_to_project import PROJECTS_DIR
+    base = PROJECTS_DIR.resolve()
+    path = (PROJECTS_DIR / project_name).resolve()
+    if not path.is_relative_to(base) or path == base or not path.exists() or not path.is_dir():
+        raise HTTPException(404, "Project not found")
+    return path
+
+
 @app.get("/api/projects")
-async def api_list_projects():
+async def api_list_projects(user: dict = Depends(get_current_user)):
     """List all generated idea-to-project outputs."""
     from tools.idea_to_project import PROJECTS_DIR, PHASES
     if not PROJECTS_DIR.exists():
@@ -470,12 +519,10 @@ async def api_list_projects():
 
 
 @app.get("/api/projects/{project_name}/export")
-async def api_export_project(project_name: str):
+async def api_export_project(project_name: str, user: dict = Depends(get_current_user)):
     """Export full project as a single combined Markdown document."""
     from tools.idea_to_project import PROJECTS_DIR, PHASES
-    project_dir = PROJECTS_DIR / project_name
-    if not project_dir.exists():
-        raise HTTPException(404, "Project not found")
+    project_dir = _resolve_project_path(project_name)
 
     parts = [
         f"# 🚀 Proje Raporu\n",
@@ -508,15 +555,13 @@ async def api_export_project(project_name: str):
 
 
 @app.get("/api/projects/{project_name}/export/pdf")
-async def api_export_project_pdf(project_name: str):
+async def api_export_project_pdf(project_name: str, user: dict = Depends(get_current_user)):
     """Export full project as a professional PDF with Turkish character support."""
     from fastapi.responses import Response
     from tools.idea_to_project import PROJECTS_DIR, PHASES
     from tools.export_service import generate_pdf
 
-    project_dir = PROJECTS_DIR / project_name
-    if not project_dir.exists():
-        raise HTTPException(404, "Project not found")
+    project_dir = _resolve_project_path(project_name)
 
     # Build markdown content
     parts = [
@@ -656,8 +701,30 @@ async def api_generate_presentation(req: PresentationRequest):
 
 # ── Presentation File Endpoints ─────────────────────────────────
 
+def _resolve_presentation_path(filename: str) -> Path:
+    """Resolve presentation filename to path under pres_dir (base name only, no path traversal)."""
+    safe_name = Path(filename).name
+    pres_dir = Path(__file__).parent.parent / "data" / "presentations"
+    pres_dir = pres_dir.resolve()
+    filepath = (pres_dir / safe_name).resolve()
+    if not filepath.is_relative_to(pres_dir) or not filepath.exists() or filepath.suffix.lower() != ".pptx":
+        raise HTTPException(404, "Presentation not found")
+    return filepath
+
+
+def _resolve_image_path(filename: str) -> Path:
+    """Resolve image filename to path under images_dir (base name only, no path traversal)."""
+    safe_name = Path(filename).name
+    images_dir = Path(__file__).parent.parent / "data" / "images"
+    images_dir = images_dir.resolve()
+    filepath = (images_dir / safe_name).resolve()
+    if not filepath.is_relative_to(images_dir) or not filepath.exists():
+        raise HTTPException(404, "Image not found")
+    return filepath
+
+
 @app.get("/api/presentations")
-async def api_list_presentations():
+async def api_list_presentations(user: dict = Depends(get_current_user)):
     """List all generated presentations."""
     pres_dir = Path(__file__).parent.parent / "data" / "presentations"
     if not pres_dir.exists():
@@ -670,55 +737,43 @@ async def api_list_presentations():
 
 
 @app.get("/api/presentations/{filename}/download")
-async def api_download_presentation(filename: str):
+async def api_download_presentation(filename: str, user: dict = Depends(get_current_user)):
     """Download a generated PPTX file."""
     from fastapi.responses import FileResponse
-    pres_dir = Path(__file__).parent.parent / "data" / "presentations"
-    filepath = pres_dir / filename
-    if not filepath.exists() or not filepath.suffix == ".pptx":
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Presentation not found")
+    filepath = _resolve_presentation_path(filename)
     return FileResponse(
         path=str(filepath),
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        filename=filename,
+        filename=filepath.name,
     )
 
 
 @app.get("/api/images/{filename}/download")
-async def api_download_image(filename: str):
+async def api_download_image(filename: str, user: dict = Depends(get_current_user)):
     """Download a generated image file."""
     from fastapi.responses import FileResponse
-    images_dir = Path(__file__).parent.parent / "data" / "images"
-    filepath = images_dir / filename
-    if not filepath.exists():
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Image not found")
-    # Determine media type
+    filepath = _resolve_image_path(filename)
     suffix = filepath.suffix.lower()
     media_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
     media_type = media_types.get(suffix, "image/jpeg")
     return FileResponse(
         path=str(filepath),
         media_type=media_type,
-        filename=filename,
+        filename=filepath.name,
     )
 
 
 @app.get("/api/presentations/{filename}/pdf")
-async def api_presentation_pdf(filename: str):
+async def api_presentation_pdf(filename: str, user: dict = Depends(get_current_user)):
     """Export a PPTX presentation as a professional PDF with slide content."""
     from fastapi.responses import Response
     from tools.export_service import generate_presentation_pdf
 
-    pres_dir = Path(__file__).parent.parent / "data" / "presentations"
-    filepath = pres_dir / filename
-    if not filepath.exists() or not filepath.suffix == ".pptx":
-        raise HTTPException(status_code=404, detail="Presentation not found")
+    filepath = _resolve_presentation_path(filename)
 
-    title = filename.replace("_", " ").replace(".pptx", "").strip()
+    title = filepath.stem.replace("_", " ")
     pdf_bytes = generate_presentation_pdf(str(filepath), title=title)
-    pdf_name = filename.replace(".pptx", ".pdf")
+    pdf_name = filepath.name.replace(".pptx", ".pdf")
 
     return Response(
         content=pdf_bytes,
@@ -735,7 +790,7 @@ class ExportPdfRequest(BaseModel):
 
 
 @app.post("/api/export/pdf")
-async def api_export_pdf(req: ExportPdfRequest):
+async def api_export_pdf(req: ExportPdfRequest, user: dict = Depends(get_current_user)):
     """Convert any markdown content to professional PDF."""
     from fastapi.responses import Response
     from tools.export_service import generate_pdf
@@ -755,7 +810,7 @@ class ExportHtmlRequest(BaseModel):
 
 
 @app.post("/api/export/html")
-async def api_export_html(req: ExportHtmlRequest):
+async def api_export_html(req: ExportHtmlRequest, user: dict = Depends(get_current_user)):
     """Convert any markdown content to a standalone styled HTML report."""
     from fastapi.responses import Response
     from tools.export_service import generate_html
@@ -823,9 +878,18 @@ class WSLiveMonitor:
 async def ws_chat(ws: WebSocket):
     """
     WebSocket endpoint for real-time agent execution.
+    Auth: pass token via query ?token=... or in first message {"token": "..."}.
     Client sends: {"message": "...", "thread_id": "...", "pipeline_type": "auto"}
     Server streams: live events, then final result.
     """
+    # Optional token from query
+    token = (ws.query_params.get("token") or "").strip()
+    user_id: str | None = None
+    if token:
+        user = _get_user_from_token(token)
+        if user:
+            user_id = user["user_id"]
+
     await ws.accept()
     try:
         while True:
@@ -833,6 +897,21 @@ async def ws_chat(ws: WebSocket):
             data = json.loads(raw)
 
             msg_type = data.get("type", "chat")
+
+            # If we don't have user_id yet, allow first message to carry token
+            if user_id is None and "token" in data:
+                token = (data.get("token") or "").strip()
+                user = _get_user_from_token(token) if token else None
+                if user:
+                    user_id = user["user_id"]
+                else:
+                    await ws.close(code=4001)
+                    return
+
+            # Require auth for chat: if no valid user_id after first real message, reject
+            if msg_type == "chat" and user_id is None:
+                await ws.close(code=4001)
+                return
 
             if msg_type == "stop":
                 # Client requests stop
@@ -848,7 +927,8 @@ async def ws_chat(ws: WebSocket):
             message = data.get("message", "")
             thread_id = data.get("thread_id")
             pipeline_str = data.get("pipeline_type", "auto")
-            user_id = data.get("user_id", "")
+            # Use validated user_id from token; fallback to payload only if we already validated
+            effective_user_id = user_id or data.get("user_id", "") or None
 
             if not message:
                 await ws.send_json({"type": "error", "message": "Empty message"})
@@ -879,9 +959,9 @@ async def ws_chat(ws: WebSocket):
                     message, thread,
                     live_monitor=monitor,
                     forced_pipeline=forced_pipe,
-                    user_id=user_id or None,
+                    user_id=effective_user_id,
                 )
-                save_thread(thread, user_id=user_id or None)
+                save_thread(thread, user_id=effective_user_id)
 
                 if monitor.should_stop():
                     monitor.error("Kullanıcı tarafından durduruldu")

@@ -51,8 +51,13 @@ class PipelineEngine:
         )
 
         t0 = time.monotonic()
+        # Multiparallel: 2+ sub-tasks always run simultaneously (never sequential)
+        effective_type = task.pipeline_type
+        if len(task.sub_tasks) >= 2 and effective_type == PipelineType.SEQUENTIAL:
+            effective_type = PipelineType.PARALLEL
+
         try:
-            match task.pipeline_type:
+            match effective_type:
                 case PipelineType.SEQUENTIAL:
                     result = await self._sequential(task, thread)
                 case PipelineType.PARALLEL:
@@ -68,7 +73,7 @@ class PipelineEngine:
                 case PipelineType.BRAINSTORM:
                     result = await self._brainstorm(task, thread)
                 case _:
-                    result = await self._sequential(task, thread)
+                    result = await self._parallel(task, thread) if len(task.sub_tasks) >= 2 else await self._sequential(task, thread)
 
             task.status = TaskStatus.COMPLETED
             task.total_latency_ms = (time.monotonic() - t0) * 1000

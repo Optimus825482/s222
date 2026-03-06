@@ -1,23 +1,36 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAgentSocket } from "@/lib/use-agent-socket";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Thread, ThreadSummary, PipelineType } from "@/lib/types";
-import { Sidebar } from "@/components/sidebar";
 import { CockpitHeader } from "@/components/cockpit-header";
 import { PipelineSelector } from "@/components/pipeline-selector";
 import { ChatArea } from "@/components/chat-area";
-import { ActivityStream } from "@/components/activity-stream";
 import { ChatInput } from "@/components/chat-input";
 import { LiveEventLog } from "@/components/live-event-log";
 import { TaskHistory } from "@/components/task-history";
 import { ExportButtons } from "@/components/export-buttons";
-import { InterAgentChat } from "@/components/inter-agent-chat";
-import { MobileNav } from "../components/mobile-nav";
-import { MobileResultPanel } from "../components/mobile-result-panel";
+import { MobileNav } from "@/components/mobile-nav";
+import { MobileResultPanel } from "@/components/mobile-result-panel";
+
+const Sidebar = dynamic(() => import("@/components/sidebar").then((m) => ({ default: m.Sidebar })), {
+  ssr: false,
+  loading: () => <div className="w-72 h-full bg-surface/50 animate-pulse" aria-hidden />,
+});
+
+const ActivityStream = dynamic(
+  () => import("@/components/activity-stream").then((m) => ({ default: m.ActivityStream })),
+  { ssr: false, loading: () => <div className="flex-1 min-h-[120px] bg-surface/30 animate-pulse rounded-lg" aria-hidden /> },
+);
+
+const InterAgentChat = dynamic(
+  () => import("@/components/inter-agent-chat").then((m) => ({ default: m.InterAgentChat })),
+  { ssr: false, loading: () => <div className="flex-1 min-h-[120px] bg-surface/30 animate-pulse rounded-lg" aria-hidden /> },
+);
 
 export default function Home() {
   const router = useRouter();
@@ -47,7 +60,7 @@ export default function Home() {
       const list = await api.listThreads();
       setThreadList(list);
     } catch {
-      /* backend might not be running yet */
+      setLastError("Thread listesi yüklenemedi");
     }
   }, []);
 
@@ -81,7 +94,7 @@ export default function Home() {
       setLastError(null);
       setSidebarOpen(false);
     } catch {
-      /* ignore */
+      setLastError("Thread yüklenemedi");
     }
   };
 
@@ -91,7 +104,7 @@ export default function Home() {
       if (thread?.id === id) setThread(null);
       loadThreadList();
     } catch {
-      /* ignore */
+      setLastError("Thread silinemedi");
     }
   };
 
@@ -101,7 +114,7 @@ export default function Home() {
       setThread(null);
       loadThreadList();
     } catch {
-      /* ignore */
+      setLastError("Threadler silinemedi");
     }
   };
 
@@ -152,7 +165,7 @@ export default function Home() {
               ${mobileTab !== "chat" ? "hidden lg:flex" : "flex"}
             `}
           >
-            <ChatArea thread={thread} />
+            <ChatArea thread={thread} isProcessing={isProcessing} status={status} />
 
             {/* Desktop: export buttons + history (no pipeline agent cards) */}
             <div className="hidden lg:block">
@@ -181,13 +194,13 @@ export default function Home() {
             </div>
             {lastError && (
               <div
-                className="px-3 py-2 bg-red-950/50 border-t border-red-900/50 text-red-300 text-sm flex items-center justify-between"
+                className="shrink-0 px-3 py-2 bg-red-950/50 border-t border-red-900/50 text-red-300 text-sm flex items-center justify-between"
                 role="alert"
               >
                 <span>{lastError}</span>
                 <button
                   onClick={() => setLastError(null)}
-                  className="text-red-400 hover:text-red-200 text-xs p-1 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  className="text-red-400 hover:text-red-200 text-xs p-1 min-w-[44px] min-h-[44px] flex items-center justify-center rounded"
                   aria-label="Hatayı kapat"
                 >
                   ✕

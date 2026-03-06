@@ -84,6 +84,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-dvh bg-surface antialiased font-sans safe-bottom">
+        <a href="#main-content" className="skip-link">
+          İçeriğe atla
+        </a>
         {children}
         <PWAInstallPrompt />
       </body>
