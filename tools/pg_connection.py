@@ -267,7 +267,11 @@ def migrate_from_sqlite() -> dict[str, int]:
                         result = cur.fetchone()
                         if not result:
                             continue
-                        new_doc_id = result["id"]
+                        new_doc_id = (
+                            result.get("id") if isinstance(result, dict) else None
+                        )
+                        if new_doc_id is None:
+                            continue
                         counts["documents"] += 1
 
                         chunk_rows = src.execute(

@@ -16,7 +16,7 @@ import re
 import tempfile
 import urllib.parse
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 from pptx import Presentation
@@ -24,6 +24,9 @@ from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
+
+if TYPE_CHECKING:
+    from pptx.presentation import Presentation as PresentationType
 
 
 # ── Presentation Modes ───────────────────────────────────────────
@@ -149,7 +152,7 @@ async def deep_research_for_presentation(
     all_snippets: list[str] = []
 
     for result_set in all_results:
-        if isinstance(result_set, Exception):
+        if isinstance(result_set, Exception) or not isinstance(result_set, list):
             continue
         for item in result_set:
             url = item.get("url", "")
@@ -368,9 +371,18 @@ def _set_slide_bg(slide, color: RGBColor):
     fill.fore_color.rgb = color
 
 
-def _add_text_box(slide, left, top, width, height, text: str,
-                  font_size: int = 18, color: RGBColor = None,
-                  bold: bool = False, alignment=PP_ALIGN.LEFT):
+def _add_text_box(
+    slide,
+    left,
+    top,
+    width,
+    height,
+    text: str,
+    font_size: int = 18,
+    color: RGBColor | None = None,
+    bold: bool = False,
+    alignment=PP_ALIGN.LEFT,
+):
     """Add a text box to a slide."""
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
@@ -384,8 +396,9 @@ def _add_text_box(slide, left, top, width, height, text: str,
     return txBox
 
 
-def _build_title_slide(prs: Presentation, title: str, subtitle: str = "",
-                       colors: dict | None = None):
+def _build_title_slide(
+    prs: "PresentationType", title: str, subtitle: str = "", colors: dict | None = None
+):
     """Create a cinematic title slide with geometric accents."""
     c = colors or COLORS
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -462,10 +475,15 @@ def _build_title_slide(prs: Presentation, title: str, subtitle: str = "",
     )
 
 
-def _build_content_slide(prs: Presentation, title: str, bullets: list[str],
-                         slide_num: int, total_slides: int,
-                         image_bytes: bytes | None = None,
-                         colors: dict | None = None):
+def _build_content_slide(
+    prs: "PresentationType",
+    title: str,
+    bullets: list[str],
+    slide_num: int,
+    total_slides: int,
+    image_bytes: bytes | None = None,
+    colors: dict | None = None,
+):
     """Create a polished content slide with accent shapes and visual hierarchy."""
     c = colors or COLORS
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -573,8 +591,13 @@ def _build_content_slide(prs: Presentation, title: str, bullets: list[str],
     )
 
 
-def _build_section_slide(prs: Presentation, title: str, slide_num: int, total_slides: int,
-                         colors: dict | None = None):
+def _build_section_slide(
+    prs: "PresentationType",
+    title: str,
+    slide_num: int,
+    total_slides: int,
+    colors: dict | None = None,
+):
     """Create a bold section divider slide with geometric design."""
     c = colors or COLORS
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -631,8 +654,9 @@ def _build_section_slide(prs: Presentation, title: str, slide_num: int, total_sl
     )
 
 
-def _build_closing_slide(prs: Presentation, title: str = "Teşekkürler",
-                         colors: dict | None = None):
+def _build_closing_slide(
+    prs: "PresentationType", title: str = "Teşekkürler", colors: dict | None = None
+):
     """Create a cinematic closing slide mirroring the title slide style."""
     c = colors or COLORS
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -691,12 +715,17 @@ def _build_closing_slide(prs: Presentation, title: str = "Teşekkürler",
 
 # ── New Slide Types (MAXI mode) ─────────────────────────────────
 
-def _build_quote_slide(prs: Presentation, title: str,
-                       quote_text: str, quote_author: str,
-                       bullets: list[str] | None = None,
-                       slide_num: int = 0, total_slides: int = 0,
-                       image_bytes: bytes | None = None,
-                       colors: dict | None = None):
+def _build_quote_slide(
+    prs: "PresentationType",
+    title: str,
+    quote_text: str,
+    quote_author: str,
+    bullets: list[str] | None = None,
+    slide_num: int = 0,
+    total_slides: int = 0,
+    image_bytes: bytes | None = None,
+    colors: dict | None = None,
+):
     """Create a dramatic quote slide with oversized quotation mark and accent styling."""
     c = colors or COLORS
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -769,12 +798,16 @@ def _build_quote_slide(prs: Presentation, title: str,
     )
 
 
-def _build_data_slide(prs: Presentation, title: str,
-                      data_highlights: list[dict[str, str]],
-                      bullets: list[str] | None = None,
-                      slide_num: int = 0, total_slides: int = 0,
-                      image_bytes: bytes | None = None,
-                      colors: dict | None = None):
+def _build_data_slide(
+    prs: "PresentationType",
+    title: str,
+    data_highlights: list[dict[str, str]],
+    bullets: list[str] | None = None,
+    slide_num: int = 0,
+    total_slides: int = 0,
+    image_bytes: bytes | None = None,
+    colors: dict | None = None,
+):
     """Create a data-focused slide with bold metric cards and accent styling."""
     c = colors or COLORS
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -1397,7 +1430,7 @@ async def analyze_topic_for_presentation(
     fact_count = 0
     subtopics: set[str] = set()
     for result_set in results:
-        if isinstance(result_set, Exception):
+        if isinstance(result_set, Exception) or not isinstance(result_set, list):
             continue
         for item in result_set:
             snippet = item.get("snippet", "")

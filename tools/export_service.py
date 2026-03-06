@@ -619,7 +619,10 @@ def generate_presentation_pdf(pptx_path: str, title: str = "Sunum") -> bytes:
         for shape in slide.shapes:
             if not shape.has_text_frame:
                 continue
-            for para in shape.text_frame.paragraphs:
+            text_frame = getattr(shape, "text_frame", None)
+            if text_frame is None:
+                continue
+            for para in text_frame.paragraphs:
                 text = para.text.strip()
                 if text:
                     texts.append(text)

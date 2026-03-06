@@ -133,6 +133,54 @@ RECALL_MEMORY_TOOL = {
     },
 }
 
+LIST_MEMORIES_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_memories",
+        "description": (
+            "List stored memories with optional filters. "
+            "Use when you need an overview before recall or when auditing saved knowledge."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "enum": [
+                        "general",
+                        "solution",
+                        "preference",
+                        "pattern",
+                        "research",
+                    ],
+                    "description": "Optional category filter",
+                },
+                "layer": {
+                    "type": "string",
+                    "enum": ["session", "global"],
+                    "description": "Optional memory layer filter",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum memories to list (default 20)",
+                },
+            },
+        },
+    },
+}
+
+MEMORY_STATS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "memory_stats",
+        "description": "Get memory statistics (counts by category/layer and recency overview).",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+}
+
 USE_SKILL_TOOL = {
     "type": "function",
     "function": {
@@ -238,6 +286,50 @@ RAG_QUERY_TOOL = {
                 },
             },
             "required": ["query"],
+        },
+    },
+}
+
+RAG_LIST_DOCUMENTS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "rag_list_documents",
+        "description": (
+            "List ingested RAG documents with metadata (title, chunk count, source). "
+            "Use before rag_query to understand available knowledge."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Max number of documents (default 20)",
+                },
+                "user_id": {
+                    "type": "string",
+                    "description": "Optional user filter",
+                },
+            },
+        },
+    },
+}
+
+LIST_TEACHINGS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_teachings",
+        "description": (
+            "List teachability entries (user preferences/instructions learned over time). "
+            "Use to personalize responses consistently."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "active_only": {
+                    "type": "boolean",
+                    "description": "Return only active teachings (default true)",
+                },
+            },
         },
     },
 }
@@ -616,6 +708,8 @@ ORCHESTRATOR_TOOLS = [
     WEB_FETCH_TOOL,
     SAVE_MEMORY_TOOL,
     RECALL_MEMORY_TOOL,
+    LIST_MEMORIES_TOOL,
+    MEMORY_STATS_TOOL,
     {
         "type": "function",
         "function": {
@@ -629,13 +723,24 @@ ORCHESTRATOR_TOOLS = [
                         "items": {
                             "type": "object",
                             "properties": {
-                                "description": {"type": "string", "description": "What this sub-task should accomplish"},
+                                "description": {
+                                    "type": "string",
+                                    "description": "What this sub-task should accomplish",
+                                },
                                 "assigned_agent": {
                                     "type": "string",
-                                    "enum": ["thinker", "speed", "researcher", "reasoner"],
+                                    "enum": [
+                                        "thinker",
+                                        "speed",
+                                        "researcher",
+                                        "reasoner",
+                                    ],
                                     "description": "Which specialist agent to assign",
                                 },
-                                "priority": {"type": "integer", "description": "1=highest priority"},
+                                "priority": {
+                                    "type": "integer",
+                                    "description": "1=highest priority",
+                                },
                                 "depends_on": {
                                     "type": "array",
                                     "items": {"type": "string"},
@@ -652,10 +757,19 @@ ORCHESTRATOR_TOOLS = [
                     },
                     "pipeline_type": {
                         "type": "string",
-                        "enum": ["sequential", "parallel", "consensus", "iterative", "deep_research"],
+                        "enum": [
+                            "sequential",
+                            "parallel",
+                            "consensus",
+                            "iterative",
+                            "deep_research",
+                        ],
                         "description": "With 2+ sub-tasks they always run in parallel (same time). Use 'parallel' or 'deep_research' for multi-agent work.",
                     },
-                    "reasoning": {"type": "string", "description": "Why this decomposition and pipeline"},
+                    "reasoning": {
+                        "type": "string",
+                        "description": "Why this decomposition and pipeline",
+                    },
                 },
                 "required": ["sub_tasks", "pipeline_type"],
             },
@@ -669,7 +783,10 @@ ORCHESTRATOR_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "response": {"type": "string", "description": "Direct answer to the user"},
+                    "response": {
+                        "type": "string",
+                        "description": "Direct answer to the user",
+                    },
                 },
                 "required": ["response"],
             },
@@ -683,7 +800,10 @@ ORCHESTRATOR_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "final_response": {"type": "string", "description": "Synthesized final answer"},
+                    "final_response": {
+                        "type": "string",
+                        "description": "Synthesized final answer",
+                    },
                     "confidence": {"type": "number", "description": "Confidence 0-1"},
                     "sources": {
                         "type": "array",
@@ -700,6 +820,8 @@ ORCHESTRATOR_TOOLS = [
     CODE_EXECUTE_TOOL,
     RAG_INGEST_TOOL,
     RAG_QUERY_TOOL,
+    RAG_LIST_DOCUMENTS_TOOL,
+    LIST_TEACHINGS_TOOL,
     IDEA_TO_PROJECT_TOOL,
     SPAWN_SUBAGENT_TOOL,
     REQUEST_APPROVAL_TOOL,
@@ -750,10 +872,14 @@ RESEARCHER_TOOLS = [
     WEB_FETCH_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
+    LIST_MEMORIES_TOOL,
+    MEMORY_STATS_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
     CREATE_SKILL_TOOL,
     RAG_QUERY_TOOL,
+    RAG_LIST_DOCUMENTS_TOOL,
+    LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
 ]
 
@@ -764,10 +890,14 @@ THINKER_TOOLS = [
     WEB_FETCH_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
+    LIST_MEMORIES_TOOL,
+    MEMORY_STATS_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
     CREATE_SKILL_TOOL,
     RAG_QUERY_TOOL,
+    RAG_LIST_DOCUMENTS_TOOL,
+    LIST_TEACHINGS_TOOL,
     GET_AGENT_BASELINE_TOOL,
     GENERATE_IMAGE_TOOL,
 ]
@@ -779,11 +909,15 @@ SPEED_TOOLS = [
     WEB_FETCH_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
+    LIST_MEMORIES_TOOL,
+    MEMORY_STATS_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
     CREATE_SKILL_TOOL,
     CODE_EXECUTE_TOOL,
     RAG_QUERY_TOOL,
+    RAG_LIST_DOCUMENTS_TOOL,
+    LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
 ]
 
@@ -793,11 +927,15 @@ REASONER_TOOLS = [
     WEB_SEARCH_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
+    LIST_MEMORIES_TOOL,
+    MEMORY_STATS_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
     CREATE_SKILL_TOOL,
     CODE_EXECUTE_TOOL,
     RAG_QUERY_TOOL,
+    RAG_LIST_DOCUMENTS_TOOL,
+    LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
 ]
 

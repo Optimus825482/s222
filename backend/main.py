@@ -894,8 +894,8 @@ async def ws_chat(ws: WebSocket):
             user_id = user["user_id"]
 
     await ws.accept()
-    ws._run_task = None
-    ws._live_events = []
+    ws.state.run_task = None
+    ws.state.live_events = []
 
     async def _execute_run(
         message: str,
@@ -945,7 +945,7 @@ async def ws_chat(ws: WebSocket):
                 "thread_id": thread.id,
             })
         finally:
-            ws._run_task = None
+            ws.state.run_task = None
 
     try:
         while True:
@@ -970,8 +970,9 @@ async def ws_chat(ws: WebSocket):
                 return
 
             if msg_type == "stop":
-                if hasattr(ws, "_monitor") and ws._monitor:
-                    ws._monitor.request_stop()
+                monitor_obj = getattr(ws.state, "monitor", None)
+                if monitor_obj:
+                    monitor_obj.request_stop()
                 continue
 
             if msg_type == "ping":
@@ -981,8 +982,8 @@ async def ws_chat(ws: WebSocket):
             # Orchestrator chat: status while run is active (or "no active task")
             if msg_type == "orchestrator_chat":
                 user_msg = (data.get("message") or "").strip()
-                run_task = getattr(ws, "_run_task", None)
-                events = getattr(ws, "_live_events", [])
+                run_task = getattr(ws.state, "run_task", None)
+                events = getattr(ws.state, "live_events", [])
                 if run_task and not run_task.done():
                     # Build status from last events
                     step_count = len(events)
@@ -1018,7 +1019,8 @@ async def ws_chat(ws: WebSocket):
                 await ws.send_json({"type": "error", "message": "Empty message"})
                 continue
 
-            if getattr(ws, "_run_task", None) and not ws._run_task.done():
+            active_task = getattr(ws.state, "run_task", None)
+            if active_task is not None and not active_task.done():
                 await ws.send_json({
                     "type": "error",
                     "message": "Bir görev zaten çalışıyor. Durdurmak için Durdur'a basın veya Orkestratör sohbetinden durum sorun.",
@@ -1029,12 +1031,12 @@ async def ws_chat(ws: WebSocket):
             if not thread:
                 thread = Thread()
 
-            ws._live_events = []
-            monitor = WSLiveMonitor(ws, ws._live_events)
-            ws._monitor = monitor
+            ws.state.live_events = []
+            monitor = WSLiveMonitor(ws, ws.state.live_events)
+            ws.state.monitor = monitor
             monitor.start(message)
 
-            ws._run_task = asyncio.create_task(
+            ws.state.run_task = asyncio.create_task(
                 _execute_run(message, thread, monitor, pipeline_str, effective_user_id),
             )
 

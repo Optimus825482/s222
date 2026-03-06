@@ -73,6 +73,26 @@ _SIMPLE_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+_MEMORY_STATS_PATTERNS = re.compile(
+    r"(memory\s*stats|hafıza\s*istatistik|bellek\s*istatistik)",
+    re.IGNORECASE,
+)
+
+_LIST_MEMORIES_PATTERNS = re.compile(
+    r"(list\s+memories|memories\s+list|hafızaları\s+listele|bellekleri\s+listele)",
+    re.IGNORECASE,
+)
+
+_LIST_RAG_DOCS_PATTERNS = re.compile(
+    r"(list\s+documents|rag\s+documents|dokümanları\s+listele|dökümanları\s+listele)",
+    re.IGNORECASE,
+)
+
+_LIST_TEACHINGS_PATTERNS = re.compile(
+    r"(list\s+teachings|teachings\s+list|öğretileri\s+listele|tercihleri\s+listele)",
+    re.IGNORECASE,
+)
+
 
 class OrchestratorAgent(BaseAgent):
     role = AgentRole.ORCHESTRATOR
@@ -93,6 +113,12 @@ class OrchestratorAgent(BaseAgent):
             "2. NEVER send a complex task to just ONE agent. Fan out to ALL relevant agents.\n"
             "3. Only use direct_response for greetings, simple yes/no, or trivial questions.\n"
             "4. Do NOT call agent names directly as tools. Use decompose_task.\n\n"
+            "TOOL DECISION POLICY (DETERMINISTIC):\n"
+            "- If user asks memory overview/stats: use list_memories or memory_stats.\n"
+            "- If user asks what docs are available in knowledge base: use rag_list_documents first, then rag_query if needed.\n"
+            "- If user asks learned preferences/teachings: use list_teachings.\n"
+            "- For deep/complex analysis: use decompose_task with parallel specialists.\n"
+            "- For trivial greeting/acknowledgement: use direct_response.\n\n"
             "STANDARD DECOMPOSITION for research/analysis tasks:\n"
             "- researcher: Search web, gather current data and sources\n"
             "- thinker: Deep analysis, pros/cons, strategic evaluation\n"
@@ -106,8 +132,10 @@ class OrchestratorAgent(BaseAgent):
             "- web_search / web_fetch: Search/fetch web directly\n"
             "- find_skill / use_skill: Discover and load specialized knowledge\n"
             "- save_memory / recall_memory: Long-term persistent memory — use recall_memory at START of complex tasks; save_memory after important outcomes so the team improves over time\n"
+            "- list_memories / memory_stats: Memory inventory and diagnostics\n"
             "- code_execute: Run Python/JS/Bash code in sandbox\n"
-            "- rag_ingest / rag_query: Ingest documents and search knowledge base\n"
+            "- rag_ingest / rag_query / rag_list_documents: Ingest, query, and list knowledge documents\n"
+            "- list_teachings: Show learned user preferences/instructions\n"
             "- idea_to_project: Transform a raw idea into full project plan + scaffold\n"
             "- request_approval: Ask user approval for critical actions\n"
             "- self_evaluate: Rate your own response quality\n"
@@ -354,6 +382,24 @@ class OrchestratorAgent(BaseAgent):
         if len(user_input.strip()) < 10:
             return False
         return bool(_PRESENTATION_PATTERNS.search(user_input))
+
+    def _detect_direct_tool_intent(
+        self, user_input: str
+    ) -> tuple[str, dict[str, Any]] | None:
+        """Deterministically route explicit operational requests to the right shared tool."""
+        text = user_input.strip()
+        if not text:
+            return None
+
+        if _MEMORY_STATS_PATTERNS.search(text):
+            return ("memory_stats", {})
+        if _LIST_MEMORIES_PATTERNS.search(text):
+            return ("list_memories", {"limit": 20})
+        if _LIST_RAG_DOCS_PATTERNS.search(text):
+            return ("rag_list_documents", {"limit": 20})
+        if _LIST_TEACHINGS_PATTERNS.search(text):
+            return ("list_teachings", {"active_only": True})
+        return None
 
     # ── Tool Call Handling ────────────────────────────────────────
 
@@ -863,6 +909,28 @@ class OrchestratorAgent(BaseAgent):
                 )
         except Exception:
             pass  # Never break main flow for teachability
+
+        # ── Phase 0.5: Deterministic direct tool routing for explicit operational intents ──
+        direct_intent = self._detect_direct_tool_intent(user_input)
+        if direct_intent and forced_pipeline in (None, PipelineType.AUTO):
+            tool_name, tool_args = direct_intent
+            self._emit("routing", f"🎯 Deterministic tool route: {tool_name}")
+            thread.add_event(
+                EventType.ROUTING_DECISION,
+                f"Deterministic route to tool: {tool_name}",
+                agent_role=self.role,
+            )
+            result = await super().handle_tool_call(tool_name, tool_args, thread)
+
+            direct_task = Task(
+                user_input=user_input,
+                pipeline_type=PipelineType.SEQUENTIAL,
+                sub_tasks=[],
+                final_result=str(result),
+            )
+            direct_task.status = TaskStatus.COMPLETED
+            thread.tasks.append(direct_task)
+            return str(result)
 
         # ── Phase 0: Determine pipeline mode ──
         # Check for idea-to-project first

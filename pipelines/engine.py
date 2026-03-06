@@ -456,7 +456,7 @@ class PipelineEngine:
             if isinstance(result, Exception):
                 text = f"[Error: {result}]"
             else:
-                text = result
+                text = str(result)
             round1_texts[role] = text
             round1_section.append(f"### [{role.value.upper()}]\n{text}")
 

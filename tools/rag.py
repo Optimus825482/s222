@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,20 @@ logger = logging.getLogger(__name__)
 CHUNK_SIZE = 512
 CHUNK_OVERLAP = 64
 MAX_CHUNKS_PER_DOC = 200
+
+
+def _as_row_dict(row: Any) -> dict[str, Any]:
+    """Normalize DB row values from psycopg into a plain dict."""
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    if isinstance(row, Mapping):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
 
 
 # ── Embedding ────────────────────────────────────────────────────
@@ -49,7 +64,7 @@ def extract_text_from_file(filepath: str) -> tuple[str, str]:
         try:
             import fitz
             doc = fitz.open(str(path))
-            text = "\n".join(page.get_text() for page in doc)
+            text = "\n".join(str(page.get_text()) for page in doc)
             doc.close()
             return text, "pdf"
         except ImportError:
@@ -115,11 +130,11 @@ def ingest_document(
                 "SELECT id, title FROM documents WHERE doc_hash = %s AND (user_id = %s OR user_id IS NULL)",
                 (doc_hash, user_id),
             )
-            existing = cur.fetchone()
+            existing = _as_row_dict(cur.fetchone())
             if existing:
                 return {
                     "success": False,
-                    "error": f"Document already exists: '{existing['title']}' (id={existing['id']})",
+                    "error": f"Document already exists: '{existing.get('title')}' (id={existing.get('id')})",
                 }
 
             chunks = chunk_text(content)
@@ -130,7 +145,10 @@ def ingest_document(
                    RETURNING id""",
                 (title, source, source_type, content[:10000], doc_hash, len(chunks), user_id),
             )
-            doc_id = cur.fetchone()["id"]
+            inserted = _as_row_dict(cur.fetchone())
+            doc_id = inserted.get("id")
+            if doc_id is None:
+                return {"success": False, "error": "Failed to create document record"}
 
             embedded_count = 0
             for i, chunk in enumerate(chunks):
@@ -218,15 +236,16 @@ def query_documents(
 
         return [
             {
-                "chunk_id": r["id"],
-                "doc_id": r["doc_id"],
-                "doc_title": r["title"],
-                "source": r["source"],
-                "chunk_index": r["chunk_index"],
-                "content": r["content"],
-                "similarity": round(float(r["similarity"]), 3),
+                "chunk_id": rd.get("id"),
+                "doc_id": rd.get("doc_id"),
+                "doc_title": rd.get("title"),
+                "source": rd.get("source"),
+                "chunk_index": rd.get("chunk_index"),
+                "content": rd.get("content", ""),
+                "similarity": round(float(rd.get("similarity", 0.0)), 3),
             }
             for r in rows
+            for rd in [_as_row_dict(r)]
         ]
     finally:
         release_conn(conn)
@@ -262,15 +281,16 @@ def _keyword_search(query: str, max_results: int = 5, user_id: str | None = None
 
         return [
             {
-                "chunk_id": r["id"],
-                "doc_id": r["doc_id"],
-                "doc_title": r["title"],
-                "source": r["source"],
-                "chunk_index": r["chunk_index"],
-                "content": r["content"],
+                "chunk_id": rd.get("id"),
+                "doc_id": rd.get("doc_id"),
+                "doc_title": rd.get("title"),
+                "source": rd.get("source"),
+                "chunk_index": rd.get("chunk_index"),
+                "content": rd.get("content", ""),
                 "similarity": None,
             }
             for r in rows
+            for rd in [_as_row_dict(r)]
         ]
     finally:
         release_conn(conn)
@@ -295,7 +315,7 @@ def list_documents(limit: int = 20, user_id: str | None = None) -> list[dict[str
                        FROM documents ORDER BY created_at DESC LIMIT %s""",
                     (limit,),
                 )
-            return [dict(r) for r in cur.fetchall()]
+            return [_as_row_dict(r) for r in cur.fetchall()]
     finally:
         release_conn(conn)
 

@@ -8,24 +8,23 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import time
 import uuid
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
-import sys
-from pathlib import Path
+from openai import AsyncOpenAI
+
+from config import NVIDIA_API_KEY, NVIDIA_BASE_URL, MODELS
+from core.models import AgentRole, EventType, Thread
+from core.events import serialize_thread_for_llm
 
 # Ensure project root is in path for Streamlit compatibility
 _root = str(Path(__file__).parent.parent)
 if _root not in sys.path:
     sys.path.insert(0, _root)
-
-from openai import AsyncOpenAI
-
-from config import NVIDIA_API_KEY, NVIDIA_BASE_URL, MODELS
-from core.models import AgentMetrics, AgentRole, Event, EventType, Thread
-from core.events import serialize_thread_for_llm
 
 # Regex to strip <think>...</think> blocks from model responses
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
@@ -112,7 +111,7 @@ class BaseAgent(ABC):
         """Override to provide function-calling tools."""
         return None
 
-    def build_context(self, thread: Thread, task_input: str) -> list[dict[str, str]]:
+    def build_context(self, thread: Thread, task_input: str) -> list[dict[str, Any]]:
         """
         12-Factor #3: Build context window.
         Default: system prompt + serialized thread + current task.
@@ -272,6 +271,43 @@ class BaseAgent(ABC):
             except Exception:
                 pass  # Never let UI updates break execution
 
+    def _tool_error(self, code: str, message: str, recovery: str | None = None) -> str:
+        """Return structured, recovery-friendly tool error messages for the LLM."""
+        msg = f"[tool_error:{code}] {message}"
+        if recovery:
+            msg += f" | recovery: {recovery}"
+        return msg
+
+    def _normalize_tool_args(
+        self, fn_name: str, fn_args: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Clamp and sanitize common tool parameters to safe ranges."""
+        args = dict(fn_args)
+
+        if "max_results" in args:
+            try:
+                args["max_results"] = max(1, min(20, int(args["max_results"])))
+            except Exception:
+                args["max_results"] = 5
+
+        if "max_chars" in args:
+            try:
+                args["max_chars"] = max(200, min(30000, int(args["max_chars"])))
+            except Exception:
+                args["max_chars"] = 8000
+
+        if fn_name == "generate_image":
+            try:
+                args["width"] = max(256, min(2048, int(args.get("width", 800))))
+            except Exception:
+                args["width"] = 800
+            try:
+                args["height"] = max(256, min(2048, int(args.get("height", 450))))
+            except Exception:
+                args["height"] = 450
+
+        return args
+
     async def execute(self, task_input: str, thread: Thread) -> str:
         """
         12-Factor #8: Own your control flow.
@@ -316,20 +352,68 @@ class BaseAgent(ABC):
             if result["tool_calls"]:
                 for tc in result["tool_calls"]:
                     fn_name = tc.function.name
-                    fn_args = json.loads(tc.function.arguments)
+                    raw_args = getattr(tc.function, "arguments", "{}")
+                    args_for_message = (
+                        raw_args
+                        if isinstance(raw_args, str)
+                        else json.dumps(raw_args, ensure_ascii=False)
+                    )
+
+                    parse_error = None
+                    if isinstance(raw_args, dict):
+                        fn_args = raw_args
+                    elif isinstance(raw_args, str):
+                        try:
+                            fn_args = json.loads(raw_args) if raw_args.strip() else {}
+                            if not isinstance(fn_args, dict):
+                                parse_error = "Tool arguments must be a JSON object"
+                                fn_args = {}
+                        except json.JSONDecodeError as e:
+                            parse_error = f"Invalid JSON arguments: {e}"
+                            fn_args = {}
+                    else:
+                        parse_error = (
+                            f"Unsupported argument type: {type(raw_args).__name__}"
+                        )
+                        fn_args = {}
+
+                    fn_args = self._normalize_tool_args(fn_name, fn_args)
+                    args_preview = json.dumps(fn_args, ensure_ascii=False)
 
                     thread.add_event(
                         EventType.TOOL_CALL,
-                        f"{fn_name}({json.dumps(fn_args, ensure_ascii=False)[:200]})",
+                        f"{fn_name}({args_preview[:200]})",
                         agent_role=self.role,
                     )
                     self._emit(
                         "tool_call",
-                        json.dumps(fn_args, ensure_ascii=False)[:120],
+                        args_preview[:120],
                         tool_name=fn_name,
                     )
 
-                    tool_result = await self.handle_tool_call(fn_name, fn_args, thread)
+                    if parse_error:
+                        tool_result = self._tool_error(
+                            "invalid_tool_arguments",
+                            parse_error,
+                            "Call the same tool again with valid JSON object arguments.",
+                        )
+                    else:
+                        try:
+                            tool_result = await self.handle_tool_call(
+                                fn_name, fn_args, thread
+                            )
+                        except KeyError as e:
+                            tool_result = self._tool_error(
+                                "missing_required_argument",
+                                f"Missing required argument: {e}",
+                                "Check tool schema and provide all required fields.",
+                            )
+                        except Exception as e:
+                            tool_result = self._tool_error(
+                                "tool_execution_failed",
+                                f"{type(e).__name__}: {e}",
+                                "Try smaller input, adjust parameters, or use an alternative tool.",
+                            )
 
                     thread.add_event(
                         EventType.TOOL_RESULT,
@@ -339,11 +423,22 @@ class BaseAgent(ABC):
                     self._emit("tool_result", str(tool_result)[:150])
 
                     # Append to messages for next LLM turn
-                    messages.append({
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [{"id": tc.id, "type": "function", "function": {"name": fn_name, "arguments": tc.function.arguments}}],
-                    })
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": fn_name,
+                                        "arguments": args_for_message,
+                                    },
+                                }
+                            ],
+                        }
+                    )
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc.id,
@@ -414,6 +509,30 @@ class BaseAgent(ABC):
                 max_results=fn_args.get("max_results", 5),
             )
             return format_recall_results(results)
+
+        if fn_name == "list_memories":
+            from tools.memory import list_memories
+
+            memories = list_memories(
+                category=fn_args.get("category"),
+                layer=fn_args.get("layer"),
+                limit=fn_args.get("limit", 20),
+            )
+            if not memories:
+                return "No memories found for the given filters."
+            lines = [f"Found {len(memories)} memories:"]
+            for i, mem in enumerate(memories, 1):
+                lines.append(
+                    f"{i}. [{mem.get('category')}|{mem.get('memory_layer')}] "
+                    f"{str(mem.get('content', ''))[:220]}"
+                )
+            return "\n".join(lines)
+
+        if fn_name == "memory_stats":
+            from tools.memory import get_memory_stats
+
+            stats = get_memory_stats()
+            return json.dumps(stats, ensure_ascii=False, indent=2)
 
         if fn_name == "find_skill":
             # Try dynamic registry first, fallback to static
@@ -494,6 +613,35 @@ class BaseAgent(ABC):
             )
             return format_rag_results(results)
 
+        if fn_name == "rag_list_documents":
+            from tools.rag import list_documents
+
+            docs = list_documents(
+                limit=fn_args.get("limit", 20), user_id=fn_args.get("user_id")
+            )
+            if not docs:
+                return "No documents ingested yet."
+            lines = [f"Found {len(docs)} documents:"]
+            for i, d in enumerate(docs, 1):
+                lines.append(
+                    f"{i}. [{d.get('id')}] {d.get('title', 'Untitled')} | "
+                    f"chunks={d.get('chunk_count', 0)} | source={d.get('source', '-')}"
+                )
+            return "\n".join(lines)
+
+        if fn_name == "list_teachings":
+            from tools.teachability import get_all_teachings
+
+            teachings = get_all_teachings(active_only=fn_args.get("active_only", True))
+            if not teachings:
+                return "No teachings found."
+            lines = [f"Found {len(teachings)} teachings:"]
+            for i, t in enumerate(teachings, 1):
+                lines.append(
+                    f"{i}. [{t.get('category')}] {str(t.get('instruction', ''))[:220]}"
+                )
+            return "\n".join(lines)
+
         if fn_name == "request_approval":
             from tools.human_loop import create_approval_request, format_approval_for_agent
             request = create_approval_request(
@@ -537,7 +685,7 @@ class BaseAgent(ABC):
             )
 
         if fn_name == "get_best_agent":
-            from tools.agent_eval import get_best_agent_for_task, detect_task_type
+            from tools.agent_eval import get_best_agent_for_task
             task_type = fn_args.get("task_type") or "general"
             best = get_best_agent_for_task(task_type)
             if best:
@@ -545,7 +693,7 @@ class BaseAgent(ABC):
             return f"No sufficient evaluation data for task_type '{task_type}'. Use default assignment."
 
         if fn_name == "self_evaluate":
-            from tools.reflexion import build_evaluation_prompt, parse_evaluation
+            from tools.reflexion import build_evaluation_prompt
             eval_prompt = build_evaluation_prompt(
                 question=fn_args["question"],
                 response=fn_args["response"],
@@ -564,7 +712,7 @@ class BaseAgent(ABC):
             return f"[MCP Error] {result.get('error', 'unknown')}"
 
         if fn_name == "mcp_list_tools":
-            from tools.mcp_client import list_discovered_tools, format_mcp_tools_for_agent
+            from tools.mcp_client import format_mcp_tools_for_agent
             server_id = fn_args.get("server_id")
             formatted = format_mcp_tools_for_agent(server_id)
             if formatted:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
 
@@ -64,7 +65,21 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 
 # ── Helpers ──────────────────────────────────────────────────────
 
-def _row_to_dict(row: dict) -> dict[str, Any]:
+def _as_row_dict(row: Any) -> dict[str, Any]:
+    """Normalize DB row values from psycopg into a plain dict."""
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    if isinstance(row, Mapping):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
+def _row_to_dict(row: Mapping[str, Any]) -> dict[str, Any]:
     tags = row.get("tags", "[]")
     if isinstance(tags, str):
         try:
@@ -72,9 +87,9 @@ def _row_to_dict(row: dict) -> dict[str, Any]:
         except (json.JSONDecodeError, TypeError):
             tags = []
     return {
-        "id": row["id"],
-        "content": row["content"],
-        "category": row["category"],
+        "id": row.get("id"),
+        "content": row.get("content", ""),
+        "category": row.get("category", "general"),
         "memory_layer": row.get("memory_layer", "episodic"),
         "tags": tags,
         "source_agent": row.get("source_agent"),
@@ -107,18 +122,18 @@ def _insert_memory(
                    RETURNING id, created_at""",
                 (content, category, memory_layer, tags_json, source_agent, emb_str, ttl_hours),
             )
-            row = cur.fetchone()
+            row = _as_row_dict(cur.fetchone())
         conn.commit()
         backend = "pgvector" if embedding else "keyword-only"
         logger.info(f"Memory saved [{memory_layer}/{backend}]: {content[:50]}")
         return {
-            "id": row["id"],
+            "id": row.get("id"),
             "content": content,
             "category": category,
             "memory_layer": memory_layer,
             "tags": tags,
             "source_agent": source_agent,
-            "created_at": str(row["created_at"]),
+            "created_at": str(row.get("created_at", "")),
         }
     finally:
         release_conn(conn)
@@ -178,7 +193,7 @@ def list_memories(
                    ORDER BY created_at DESC LIMIT %s""",
                 params + [limit],
             )
-            return [_row_to_dict(dict(r)) for r in cur.fetchall()]
+            return [_row_to_dict(_as_row_dict(r)) for r in cur.fetchall()]
     finally:
         release_conn(conn)
 
@@ -213,17 +228,17 @@ def get_memory_stats() -> dict[str, Any]:
                     COUNT(*) FILTER (WHERE memory_layer = 'semantic') AS semantic_count
                 FROM memories
             """)
-            row = dict(cur.fetchone())
+            row = _as_row_dict(cur.fetchone())
         return {
-            "total_memories": row["total"],
-            "categories": row["categories"],
-            "with_embeddings": row["with_embeddings"],
-            "total_accesses": row["total_accesses"] or 0,
-            "last_saved": str(row["last_saved"]) if row["last_saved"] else None,
+            "total_memories": row.get("total", 0),
+            "categories": row.get("categories", 0),
+            "with_embeddings": row.get("with_embeddings", 0),
+            "total_accesses": row.get("total_accesses") or 0,
+            "last_saved": str(row.get("last_saved")) if row.get("last_saved") else None,
             "layers": {
-                "working": row["working_count"],
-                "episodic": row["episodic_count"],
-                "semantic": row["semantic_count"],
+                "working": row.get("working_count", 0),
+                "episodic": row.get("episodic_count", 0),
+                "semantic": row.get("semantic_count", 0),
             },
             "backend": "PostgreSQL + pgvector",
         }
@@ -312,7 +327,7 @@ def recall_layered(
                     )
                     rows = cur.fetchall()
                     if rows:
-                        result[layer] = [_row_to_dict(dict(r)) for r in rows]
+                        result[layer] = [_row_to_dict(_as_row_dict(r)) for r in rows]
                         continue
 
                 # keyword fallback per layer
@@ -324,7 +339,7 @@ def recall_layered(
                        ORDER BY created_at DESC LIMIT %s""",
                     (layer, f"%{query.lower()[:50]}%", max_results),
                 )
-                result[layer] = [_row_to_dict(dict(r)) for r in cur.fetchall()]
+                result[layer] = [_row_to_dict(_as_row_dict(r)) for r in cur.fetchall()]
 
         # Update access counts for all returned memories
         all_ids = [m["id"] for layer_mems in result.values() for m in layer_mems]
@@ -400,7 +415,7 @@ def _pgvector_recall(
         if not rows:
             return []
 
-        results = [_row_to_dict(dict(r)) for r in rows]
+        results = [_row_to_dict(_as_row_dict(r)) for r in rows]
         ids = [r["id"] for r in results]
         with conn.cursor() as cur:
             cur.execute(
@@ -453,7 +468,7 @@ def _keyword_recall(
         query_lower = query.lower()
         scored = []
         for row in rows:
-            d = dict(row)
+            d = _as_row_dict(row)
             score = sum(2.0 for w in words if w in d["content"].lower())
             if query_lower in d["content"].lower():
                 score += 5.0

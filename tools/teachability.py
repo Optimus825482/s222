@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 
 from tools.pg_connection import get_conn, release_conn
 
@@ -51,12 +51,13 @@ def save_teaching(
             )
             row = cur.fetchone()
         conn.commit()
+        row_dict = _as_row_dict(row)
         logger.info(f"Teaching saved: [{category}] {instruction[:60]}")
         return {
-            "id": row["id"],
+            "id": row_dict.get("id"),
             "instruction": instruction,
             "category": category,
-            "created_at": str(row["created_at"]),
+            "created_at": str(row_dict.get("created_at")),
         }
     finally:
         release_conn(conn)
@@ -78,7 +79,7 @@ def get_relevant_teachings(
                     (max_results,),
                 )
                 rows = cur.fetchall()
-                return [_row_to_dict(dict(r)) for r in rows]
+                return [_row_to_dict(_as_row_dict(r)) for r in rows]
 
             cur.execute(
                 "SELECT * FROM teachings WHERE active = TRUE ORDER BY created_at DESC LIMIT 100"
@@ -87,10 +88,12 @@ def get_relevant_teachings(
 
         scored = []
         for row in rows:
-            d = dict(row)
-            text = (d["instruction"] + " " + d["trigger_text"]).lower()
+            d = _as_row_dict(row)
+            text = (
+                str(d.get("instruction", "")) + " " + str(d.get("trigger_text", ""))
+            ).lower()
             score = sum(1.0 for w in query_words if w in text)
-            score += d["use_count"] * 0.1
+            score += float(d.get("use_count", 0)) * 0.1
             if score > 0:
                 scored.append((score, d))
 
@@ -123,7 +126,7 @@ def get_all_teachings(active_only: bool = True) -> list[dict[str, Any]]:
                 )
             else:
                 cur.execute("SELECT * FROM teachings ORDER BY created_at DESC")
-            return [_row_to_dict(dict(r)) for r in cur.fetchall()]
+            return [_row_to_dict(_as_row_dict(r)) for r in cur.fetchall()]
     finally:
         release_conn(conn)
 
@@ -157,13 +160,21 @@ def format_teachings_for_context(teachings: list[dict]) -> str:
 
 # ── Helper ───────────────────────────────────────────────────────
 
-def _row_to_dict(row: dict) -> dict[str, Any]:
+def _as_row_dict(row: Any) -> dict[str, Any]:
+    if isinstance(row, dict):
+        return row
+    if isinstance(row, Mapping):
+        return dict(row)
+    return {}
+
+
+def _row_to_dict(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "id": row["id"],
-        "category": row["category"],
-        "trigger_text": row["trigger_text"],
-        "instruction": row["instruction"],
-        "use_count": row["use_count"],
-        "active": bool(row["active"]),
-        "created_at": str(row["created_at"]),
+        "id": row.get("id"),
+        "category": row.get("category", "preference"),
+        "trigger_text": row.get("trigger_text", ""),
+        "instruction": row.get("instruction", ""),
+        "use_count": row.get("use_count", 0),
+        "active": bool(row.get("active", True)),
+        "created_at": str(row.get("created_at", "")),
     }
