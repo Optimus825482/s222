@@ -140,9 +140,9 @@ export function AgentHealthPanel() {
                 aria-label={`Durum: ${STATUS_LABEL[agent.status]}`}
               >
                 <span
-                  className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[agent.status]}`}
+                  className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[agent.status] ?? "bg-gray-500"}`}
                 />
-                {STATUS_LABEL[agent.status]}
+                {STATUS_LABEL[agent.status] ?? "Bilinmiyor"}
               </span>
             </div>
 

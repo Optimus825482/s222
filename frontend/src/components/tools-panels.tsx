@@ -1177,7 +1177,7 @@ export function EvalPanel() {
   useEffect(() => {
     api
       .evalStats()
-      .then((s) => setStats(s as EvalStat[]))
+      .then((s) => setStats(Array.isArray(s) ? (s as EvalStat[]) : []))
       .catch(() => {});
     api
       .evalBaseline()

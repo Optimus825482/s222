@@ -19,8 +19,8 @@ from tools.pg_connection import get_conn, release_conn
 
 logger = logging.getLogger(__name__)
 
-_EMBED_MODEL = "nvidia/nv-embedqa-e5-v5"
-_EMBED_DIMENSIONS = 1024
+_EMBED_MODEL = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+_EMBED_DIMENSIONS = 1024  # Matryoshka: request 1024-dim from 2048-native model
 
 
 # ── Embedding ────────────────────────────────────────────────────
@@ -32,6 +32,10 @@ def _get_embedding(text: str) -> list[float] | None:
         if not NVIDIA_API_KEY:
             return None
 
+        clean = (text or "").strip()
+        if not clean:
+            return None
+
         resp = httpx.post(
             f"{NVIDIA_BASE_URL}/embeddings",
             headers={
@@ -40,9 +44,11 @@ def _get_embedding(text: str) -> list[float] | None:
             },
             json={
                 "model": _EMBED_MODEL,
-                "input": [text[:2048]],
+                "input": [clean[:8000]],
                 "encoding_format": "float",
                 "input_type": "query",
+                "truncate": "END",
+                "dimensions": _EMBED_DIMENSIONS,
             },
             timeout=15.0,
         )

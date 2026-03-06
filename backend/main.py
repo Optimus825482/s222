@@ -22,7 +22,7 @@ import secrets
 import time
 import traceback
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
@@ -564,7 +564,7 @@ async def api_eval_stats():
         from tools.agent_eval import get_agent_stats
         return get_agent_stats()
     except Exception:
-        return {"total_evals": 0, "avg_score": 0, "evals": []}
+        return []
 
 
 @app.get("/api/eval/baseline")
@@ -1104,6 +1104,13 @@ async def ws_chat(ws: WebSocket):
     ws.state.run_task = None
     ws.state.live_events = []
 
+    async def _safe_ws_send(data: dict):
+        """Send JSON to WS, silently ignore if connection already closed."""
+        try:
+            await ws.send_json(data)
+        except Exception:
+            pass
+
     async def _execute_run(
         message: str,
         thread: Thread,
@@ -1136,7 +1143,7 @@ async def ws_chat(ws: WebSocket):
             else:
                 monitor.complete(result[:80] if result else "")
 
-            await ws.send_json({
+            await _safe_ws_send({
                 "type": "result",
                 "thread_id": thread.id,
                 "result": result,
@@ -1145,7 +1152,7 @@ async def ws_chat(ws: WebSocket):
         except Exception as e:
             err = f"{type(e).__name__}: {e}"
             monitor.error(err)
-            await ws.send_json({
+            await _safe_ws_send({
                 "type": "error",
                 "message": err,
                 "traceback": traceback.format_exc(),
@@ -1183,7 +1190,7 @@ async def ws_chat(ws: WebSocket):
                 continue
 
             if msg_type == "ping":
-                await ws.send_json({"type": "pong"})
+                await _safe_ws_send({"type": "pong"})
                 continue
 
             # Orchestrator chat: status while run is active (or "no active task")
@@ -1203,13 +1210,13 @@ async def ws_chat(ws: WebSocket):
                         reply = "\n".join(status_lines)
                     else:
                         reply = "\n".join(status_lines) + "\n\nEk talimatınız kaydedildi; mevcut görev bittikten sonra yeni bir mesaj olarak gönderebilirsiniz."
-                    await ws.send_json({
+                    await _safe_ws_send({
                         "type": "orchestrator_chat_reply",
                         "content": reply,
                         "is_status": True,
                     })
                 else:
-                    await ws.send_json({
+                    await _safe_ws_send({
                         "type": "orchestrator_chat_reply",
                         "content": "Şu an aktif görev yok. Yeni görev için ana alandan mesaj gönderin.",
                         "is_status": False,
@@ -1223,12 +1230,12 @@ async def ws_chat(ws: WebSocket):
             effective_user_id = user_id or data.get("user_id", "") or None
 
             if not message:
-                await ws.send_json({"type": "error", "message": "Empty message"})
+                await _safe_ws_send({"type": "error", "message": "Empty message"})
                 continue
 
             active_task = getattr(ws.state, "run_task", None)
             if active_task is not None and not active_task.done():
-                await ws.send_json({
+                await _safe_ws_send({
                     "type": "error",
                     "message": "Bir görev zaten çalışıyor. Durdurmak için Durdur'a basın veya Orkestratör sohbetinden durum sorun.",
                 })
@@ -1279,7 +1286,7 @@ _AGENT_ROLES = ["orchestrator", "thinker", "speed", "researcher", "reasoner"]
 def _audit(event_type: str, user_id: str, detail: str = "", **extra: Any) -> None:
     """Append an audit entry to the in-memory FIFO log."""
     _AUDIT_LOG.append({
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "event_type": event_type,
         "user_id": user_id,
         "detail": detail,
@@ -1288,7 +1295,7 @@ def _audit(event_type: str, user_id: str, detail: str = "", **extra: Any) -> Non
 
 
 def _utcnow() -> datetime:
-    return datetime.now()
+    return datetime.now(timezone.utc)
 
 
 # ── 1. Agent Performance Analytics ───────────────────────────────
@@ -1298,54 +1305,71 @@ def _utcnow() -> datetime:
 async def get_agents_health(user: dict = Depends(get_current_user)):
     """Return health status for all agents matching frontend AgentHealth interface."""
     _audit("agents_health_check", user["user_id"])
+    now = _utcnow()
+    agents = []
+
+    # Pre-fetch eval stats — tolerate missing DB gracefully
+    stats_by_role: dict = {}
     try:
         from tools.agent_eval import get_agent_stats, get_performance_baseline
+        stats_by_role = {s["agent_role"]: s for s in get_agent_stats()}
+    except Exception:
+        get_performance_baseline = None  # type: ignore[assignment]
 
+    # Pre-fetch threads once (not per-agent)
+    user_threads: list[dict] = []
+    thread_cache: dict = {}
+    try:
+        user_threads = list_threads(limit=10, user_id=user["user_id"])
+        for t_info in user_threads:
+            try:
+                t = load_thread(t_info["id"], user_id=user["user_id"])
+                if t:
+                    thread_cache[t_info["id"]] = t
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    for role in _AGENT_ROLES:
         try:
-            stats_list = get_agent_stats()
-        except Exception:
-            stats_list = []
-        stats_by_role = {s["agent_role"]: s for s in stats_list}
-
-        now = _utcnow()
-        agents = []
-
-        for role in _AGENT_ROLES:
             stat = stats_by_role.get(role, {})
             avg_score = float(stat.get("avg_score", 0) or 0)
             avg_latency = float(stat.get("avg_latency", 0) or 0)
             total_tokens = int(stat.get("total_tokens", 0) or 0)
             success_rate = round((avg_score / 5.0) * 100, 1) if avg_score else 0.0
 
-            # Get baseline for total_calls and error_count
-            try:
-                baseline = get_performance_baseline(role)
-                total_calls = int(baseline.get("total_tasks", 0))
-                success_count = int(baseline.get("success_count", 0))
-                error_count = max(0, total_calls - success_count)
-            except Exception:
-                total_calls = int(stat.get("total_tasks", 0))
-                error_count = 0
+            total_calls = int(stat.get("total_tasks", 0) or 0)
+            error_count = 0
+            if get_performance_baseline is not None:
+                try:
+                    baseline = get_performance_baseline(role)
+                    total_calls = int(baseline.get("total_tasks", 0))
+                    success_count = int(baseline.get("success_count", 0))
+                    error_count = max(0, total_calls - success_count)
+                except Exception:
+                    pass
 
-            # Determine status from thread metrics (last_active)
+            # Determine status from cached threads
             last_active = None
             status = "offline"
-            try:
-                user_threads = list_threads(limit=10, user_id=user["user_id"])
-                for t_info in user_threads:
-                    try:
-                        thread = load_thread(t_info["id"], user_id=user["user_id"])
-                        if thread and role in thread.agent_metrics:
-                            m = thread.agent_metrics[role]
-                            if m.last_active and (last_active is None or m.last_active > last_active):
-                                last_active = m.last_active
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+            for t in thread_cache.values():
+                try:
+                    if role in t.agent_metrics:
+                        m = t.agent_metrics[role]
+                        if m.last_active and (last_active is None or m.last_active > last_active):
+                            last_active = m.last_active
+                except Exception:
+                    continue
 
             if last_active:
-                delta = now - last_active
+                try:
+                    delta = now - last_active
+                except TypeError:
+                    # Mixed timezone-aware/naive — normalize both to naive UTC
+                    _now_naive = now.replace(tzinfo=None)
+                    _la_naive = last_active.replace(tzinfo=None)
+                    delta = _now_naive - _la_naive
                 if delta < timedelta(minutes=5):
                     status = "active"
                 elif delta < timedelta(minutes=30):
@@ -1365,11 +1389,22 @@ async def get_agents_health(user: dict = Depends(get_current_user)):
                 "last_active": last_active.isoformat() if last_active else None,
                 "uptime_pct": uptime_pct,
             })
+        except Exception:
+            # Fallback: return minimal healthy entry so frontend never gets empty
+            agents.append({
+                "role": role,
+                "name": MODELS.get(role, {}).get("name", role),
+                "status": "offline",
+                "success_rate": 0.0,
+                "avg_latency_ms": 0,
+                "total_tokens": 0,
+                "total_calls": 0,
+                "error_count": 0,
+                "last_active": None,
+                "uptime_pct": 0.0,
+            })
 
-        return agents
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch agent health: {e}")
+    return agents
 
 
 @app.get("/api/agents/{role}/performance")
@@ -1836,17 +1871,26 @@ async def get_competency_matrix(user: dict = Depends(get_current_user)):
     """Return agent competency matrix: role x skill_category -> score."""
     _audit("competency_matrix_view", user["user_id"])
     try:
-        from tools.agent_eval import get_performance_baseline
-
         categories = ["reasoning", "speed", "research", "creativity", "accuracy"]
         matrix: list[dict] = []
 
+        # Tolerate missing eval DB
+        _get_baseline = None
+        try:
+            from tools.agent_eval import get_performance_baseline
+            _get_baseline = get_performance_baseline
+        except Exception:
+            pass
+
         for role in _AGENT_ROLES:
-            b = get_performance_baseline(role)
+            try:
+                b = _get_baseline(role) if _get_baseline else {}
+            except Exception:
+                b = {}
             model_cfg = MODELS.get(role, {})
-            success_rate = b.get("task_success_rate_pct", 0)
-            avg_latency = b.get("avg_latency_ms", 0)
-            avg_score = b.get("avg_score", 0)
+            success_rate = b.get("task_success_rate_pct", 0) or 0
+            avg_latency = b.get("avg_latency_ms", 0) or 0
+            avg_score = b.get("avg_score", 0) or 0
 
             # Derive category scores from baseline metrics
             speed_score = max(0, min(100, 100 - (avg_latency / 300)))
@@ -1886,7 +1930,13 @@ async def get_competency_matrix(user: dict = Depends(get_current_user)):
             "timestamp": _utcnow().isoformat(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Competency matrix failed: {e}")
+        # Return empty but valid structure instead of 500
+        return {
+            "categories": ["reasoning", "speed", "research", "creativity", "accuracy"],
+            "matrix": [],
+            "timestamp": _utcnow().isoformat(),
+            "error": str(e),
+        }
 
 
 @app.get("/api/coordination/rotation-history")
@@ -1898,24 +1948,30 @@ async def get_rotation_history(
     _audit("rotation_history_view", user["user_id"])
     try:
         history: list[dict] = []
-        user_threads = list_threads(limit=30, user_id=user["user_id"])
+        try:
+            user_threads = list_threads(limit=30, user_id=user["user_id"])
+        except Exception:
+            user_threads = []
 
         for t_info in user_threads:
-            thread = load_thread(t_info["id"], user_id=user["user_id"])
-            if not thread:
+            try:
+                thread = load_thread(t_info["id"], user_id=user["user_id"])
+                if not thread:
+                    continue
+                for task in thread.tasks:
+                    for sub in task.sub_tasks:
+                        history.append({
+                            "task_id": task.id,
+                            "sub_task_id": sub.id,
+                            "description": sub.description[:120],
+                            "assigned_agent": sub.assigned_agent.value,
+                            "status": sub.status.value,
+                            "latency_ms": sub.latency_ms,
+                            "tokens": sub.token_usage,
+                            "timestamp": task.created_at.isoformat(),
+                        })
+            except Exception:
                 continue
-            for task in thread.tasks:
-                for sub in task.sub_tasks:
-                    history.append({
-                        "task_id": task.id,
-                        "sub_task_id": sub.id,
-                        "description": sub.description[:120],
-                        "assigned_agent": sub.assigned_agent.value,
-                        "status": sub.status.value,
-                        "latency_ms": sub.latency_ms,
-                        "tokens": sub.token_usage,
-                        "timestamp": task.created_at.isoformat(),
-                    })
 
         history.sort(key=lambda x: x["timestamp"], reverse=True)
         return {
@@ -1924,7 +1980,12 @@ async def get_rotation_history(
             "timestamp": _utcnow().isoformat(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Rotation history failed: {e}")
+        return {
+            "total": 0,
+            "entries": [],
+            "timestamp": _utcnow().isoformat(),
+            "error": str(e),
+        }
 
 
 # ── 6. Agent Ecosystem Map ──────────────────────────────────────
@@ -1935,12 +1996,21 @@ async def get_agent_ecosystem(user: dict = Depends(get_current_user)):
     """Return agent relationship graph data: nodes + edges with interaction counts."""
     _audit("ecosystem_view", user["user_id"])
     try:
-        from tools.agent_eval import get_performance_baseline
+        # Tolerate missing eval DB
+        _get_baseline = None
+        try:
+            from tools.agent_eval import get_performance_baseline
+            _get_baseline = get_performance_baseline
+        except Exception:
+            pass
 
         # Build nodes
         nodes: list[dict] = []
         for role in _AGENT_ROLES:
-            b = get_performance_baseline(role)
+            try:
+                b = _get_baseline(role) if _get_baseline else {}
+            except Exception:
+                b = {}
             model_cfg = MODELS.get(role, {})
             nodes.append({
                 "id": role,
@@ -1948,29 +2018,34 @@ async def get_agent_ecosystem(user: dict = Depends(get_current_user)):
                 "role": role,
                 "color": model_cfg.get("color", "#6b7280"),
                 "icon": model_cfg.get("icon", "⚙️"),
-                "total_tasks": b.get("total_tasks", 0),
-                "success_rate": b.get("task_success_rate_pct", 0),
-                "status": "active" if b.get("total_tasks", 0) > 0 else "idle",
+                "total_tasks": b.get("total_tasks", 0) or 0,
+                "success_rate": b.get("task_success_rate_pct", 0) or 0,
+                "status": "active" if (b.get("total_tasks", 0) or 0) > 0 else "idle",
             })
 
         # Build edges from co-occurrence in tasks
         edge_counts: dict[str, int] = {}
-        user_threads = list_threads(limit=50, user_id=user["user_id"])
+        try:
+            user_threads = list_threads(limit=50, user_id=user["user_id"])
+        except Exception:
+            user_threads = []
 
         for t_info in user_threads:
-            thread = load_thread(t_info["id"], user_id=user["user_id"])
-            if not thread:
+            try:
+                thread = load_thread(t_info["id"], user_id=user["user_id"])
+                if not thread:
+                    continue
+                for task in thread.tasks:
+                    agents_in_task = list(set(
+                        sub.assigned_agent.value for sub in task.sub_tasks
+                    ))
+                    for i in range(len(agents_in_task)):
+                        for j in range(i + 1, len(agents_in_task)):
+                            a, b_role = sorted([agents_in_task[i], agents_in_task[j]])
+                            key = f"{a}:{b_role}"
+                            edge_counts[key] = edge_counts.get(key, 0) + 1
+            except Exception:
                 continue
-            for task in thread.tasks:
-                agents_in_task = list(set(
-                    sub.assigned_agent.value for sub in task.sub_tasks
-                ))
-                # Create edges between all pairs
-                for i in range(len(agents_in_task)):
-                    for j in range(i + 1, len(agents_in_task)):
-                        a, b_role = sorted([agents_in_task[i], agents_in_task[j]])
-                        key = f"{a}:{b_role}"
-                        edge_counts[key] = edge_counts.get(key, 0) + 1
 
         edges: list[dict] = []
         for key, count in edge_counts.items():
@@ -1989,7 +2064,18 @@ async def get_agent_ecosystem(user: dict = Depends(get_current_user)):
             "timestamp": _utcnow().isoformat(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ecosystem data failed: {e}")
+        return {
+            "nodes": [{
+                "id": r, "name": MODELS.get(r, {}).get("name", r), "role": r,
+                "color": MODELS.get(r, {}).get("color", "#6b7280"),
+                "icon": MODELS.get(r, {}).get("icon", "⚙️"),
+                "total_tasks": 0, "success_rate": 0, "status": "idle",
+            } for r in _AGENT_ROLES],
+            "edges": [],
+            "total_interactions": 0,
+            "timestamp": _utcnow().isoformat(),
+            "error": str(e),
+        }
 
 
 # ── 7. Agent Direct Messaging ───────────────────────────────────

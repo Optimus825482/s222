@@ -283,8 +283,8 @@ function RotationHistory() {
       setLoading(true);
       setError(null);
       const res = await api.getRotationHistory(30);
-      setEntries(res.entries);
-      setTotal(res.total);
+      setEntries(Array.isArray(res?.entries) ? res.entries : []);
+      setTotal(res?.total ?? 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Yüklenemedi");
     } finally {
