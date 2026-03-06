@@ -172,25 +172,33 @@ export default function Home() {
         />
       )}
 
-      {/* Sidebar — hidden on mobile, drawer on tablet, fixed on desktop */}
+      {/* Left column: Sidebar + Activity Stream (sol alt) — hidden on mobile, drawer on tablet */}
       <div
         className={`
-          fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 ease-out
+          fixed inset-y-0 left-0 z-50 w-72 flex flex-col transform transition-transform duration-200 ease-out
           lg:relative lg:translate-x-0 lg:z-auto
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <Sidebar
-          thread={thread}
-          threadList={threadList}
-          onNewThread={handleNewThread}
-          onLoadThread={handleLoadThread}
-          onDeleteThread={handleDeleteThread}
-          onDeleteAllThreads={handleDeleteAllThreads}
-          liveEvents={liveEvents}
-          isProcessing={isProcessing}
-          onClose={() => setSidebarOpen(false)}
-        />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <Sidebar
+            thread={thread}
+            threadList={threadList}
+            onNewThread={handleNewThread}
+            onLoadThread={handleLoadThread}
+            onDeleteThread={handleDeleteThread}
+            onDeleteAllThreads={handleDeleteAllThreads}
+            liveEvents={liveEvents}
+            isProcessing={isProcessing}
+            onClose={() => setSidebarOpen(false)}
+          />
+        </div>
+        {/* Activity Stream: sol alt (sadece desktop) — kaybolan blok buraya alındı */}
+        <div className="hidden lg:block shrink-0 border-t border-border min-h-0 overflow-hidden" style={{ maxHeight: "38vh" }}>
+          <div className="h-full overflow-y-auto p-2">
+            <ActivityStream thread={thread} liveEvents={liveEvents} />
+          </div>
+        </div>
       </div>
 
       {/* Main content */}
@@ -267,14 +275,15 @@ export default function Home() {
             />
           </div>
 
-          {/* Right panel: Activity stream + Inter-agent chat — hidden on mobile */}
+          {/* Right panel: Sadece Agent Konuşmaları (Activity Stream sol alta taşındı) — hidden on mobile */}
           <div
             className={`
               w-full lg:w-72 lg:shrink-0 flex flex-col min-h-0
               ${mobileTab === "activity" ? "flex" : "hidden lg:flex"}
             `}
           >
-            <div className="flex-1 overflow-y-auto border-b border-border">
+            {/* Activity Stream: sadece mobil "activity" sekmesinde */}
+            <div className="flex-1 overflow-y-auto border-b border-border lg:hidden">
               <ActivityStream thread={thread} liveEvents={liveEvents} />
             </div>
             <div className="flex-1 overflow-y-auto">
