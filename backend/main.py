@@ -487,6 +487,32 @@ async def get_skill_recommendations(
         raise HTTPException(status_code=500, detail=f"Skill recommendation failed: {e}")
 
 
+@app.post("/api/skills/hygiene")
+async def api_skill_hygiene(dry_run: bool = False):
+    """Run autonomous skill hygiene check — validates and cleans junk skills."""
+    try:
+        from tools.skill_hygiene import run_hygiene_check
+        return run_hygiene_check(dry_run=dry_run)
+    except Exception as e:
+        raise HTTPException(503, f"Skill hygiene error: {e}")
+
+
+@app.get("/api/skills/hygiene/validate/{skill_id}")
+async def api_validate_skill(skill_id: str):
+    """Validate a single skill and return quality report."""
+    try:
+        from tools.dynamic_skills import get_skill
+        from tools.skill_hygiene import validate_skill
+        skill = get_skill(skill_id)
+        if not skill:
+            raise HTTPException(404, "Skill not found")
+        return validate_skill(skill)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"Validation error: {e}")
+
+
 @app.get("/api/skills/{skill_id}")
 async def api_get_skill(skill_id: str):
     try:

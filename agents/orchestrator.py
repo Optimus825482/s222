@@ -1566,14 +1566,13 @@ class OrchestratorAgent(BaseAgent):
             or result.strip().lower().startswith("[warning]")
             or "error:" in result.lower()[:200]
         )
-        if not _skip_auto_skill:
-            try:
-                from tools.dynamic_skills import auto_create_skill_from_pattern
-                auto_create_skill_from_pattern(
-                    pattern_description=user_input[:200],
-                    knowledge=result[:500],
-                    category="learned",
-                    keywords=tags,
-                )
-            except Exception:
-                pass
+        # Auto skill creation disabled — agents should write learnings
+        # to memory (memories table), not create skills from every task.
+        # Periodic skill hygiene check (every ~10 tasks)
+        try:
+            import random
+            if random.random() < 0.1:  # ~10% chance per task = ~every 10 tasks
+                from tools.skill_hygiene import run_hygiene_check
+                run_hygiene_check(dry_run=False)
+        except Exception:
+            pass

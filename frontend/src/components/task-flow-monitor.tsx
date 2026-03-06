@@ -1214,12 +1214,91 @@ const EVENT_FILTER_KEYS = [
   "response",
 ] as const;
 
+function LogDetailDialog({
+  log,
+  onClose,
+}: {
+  log: LogItem;
+  onClose: () => void;
+}) {
+  const eventCfg = EVENT_ICONS[log.eventType] ?? {
+    icon: "•",
+    label: log.eventType,
+    color: "#64748b",
+  };
+  const agent = getAgentInfo(log.agent);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Log detayı"
+    >
+      <div
+        className="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-[90vw] max-w-xl max-h-[70vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className={`text-xs font-semibold ${eventLabelColor(log.eventType)}`}
+            >
+              {eventCfg.icon} {eventCfg.label}
+            </span>
+            <span className={`text-xs ${agentTextColor(log.agent)}`}>
+              {agent.name}
+            </span>
+            {log.isLive && (
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-slate-500 font-mono">
+              {toTimeString(log.timestamp)}
+            </span>
+            <button
+              onClick={onClose}
+              className="text-slate-500 hover:text-slate-200 transition-colors text-lg leading-none"
+              aria-label="Kapat"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        {/* Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+          <pre className="text-[12px] leading-relaxed text-slate-300 whitespace-pre-wrap break-words font-mono">
+            {log.content}
+          </pre>
+        </div>
+        {/* Footer */}
+        <div className="px-4 py-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
+          <span>ID: {log.id}</span>
+          <span>Tür: {log.eventType}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LogStream({ logs }: { logs: LogItem[] }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [selectedLog, setSelectedLog] = useState<LogItem | null>(null);
 
   const toggleFilter = useCallback((key: string) => {
     setActiveFilters((prev) => {
@@ -1379,12 +1458,19 @@ function LogStream({ logs }: { logs: LogItem[] }) {
           return (
             <article
               key={log.id}
+              onClick={() => setSelectedLog(log)}
               className={`
-                rounded border-l-2 px-2.5 py-1.5 transition-all duration-200
+                rounded border-l-2 px-2.5 py-1.5 transition-all duration-200 cursor-pointer hover:bg-slate-800/40
                 ${eventBorderClass(log.eventType)}
                 ${isError ? "bg-rose-950/20" : "bg-slate-900/40"}
                 ${log.isLive ? "ring-1 ring-cyan-500/15" : ""}
               `}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setSelectedLog(log);
+              }}
+              aria-label={`${eventCfg.label} - ${agent.name}: detay için tıkla`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1438,6 +1524,14 @@ function LogStream({ logs }: { logs: LogItem[] }) {
           );
         })}
       </div>
+
+      {/* Log Detail Dialog */}
+      {selectedLog && (
+        <LogDetailDialog
+          log={selectedLog}
+          onClose={() => setSelectedLog(null)}
+        />
+      )}
     </div>
   );
 }

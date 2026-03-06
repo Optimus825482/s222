@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Menu } from "lucide-react";
+import { HelpCircle, LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
@@ -61,9 +61,15 @@ interface Props {
   onMenuToggle: () => void;
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
+  onHelpOpen?: () => void;
 }
 
-export function CockpitHeader({ onMenuToggle, activeTab, onTabChange }: Props) {
+export function CockpitHeader({
+  onMenuToggle,
+  activeTab,
+  onTabChange,
+  onHelpOpen,
+}: Props) {
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -93,6 +99,16 @@ export function CockpitHeader({ onMenuToggle, activeTab, onTabChange }: Props) {
           Qwen3 80B • 4 Agents
         </span>
         <div className="flex-1" />
+        {onHelpOpen && (
+          <button
+            onClick={onHelpOpen}
+            className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-surface-overlay text-slate-500 hover:text-slate-300 transition-colors"
+            aria-label="Sistem rehberi"
+            title="Sistem Rehberi"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        )}
         {user && (
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline text-xs text-slate-400 truncate max-w-[120px]">

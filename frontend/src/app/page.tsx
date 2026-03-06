@@ -10,6 +10,7 @@ import type { Thread, ThreadSummary, PipelineType } from "@/lib/types";
 import { useToast } from "@/components/toast";
 import { CockpitHeader } from "@/components/cockpit-header";
 import type { NavTab } from "@/components/cockpit-header";
+import { SystemGuideDialog } from "@/components/system-guide-dialog";
 import { PipelineSelector } from "@/components/pipeline-selector";
 import { ChatArea } from "@/components/chat-area";
 import { ChatInput } from "@/components/chat-input";
@@ -199,6 +200,7 @@ export default function Home() {
   >([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
+  const [showSystemGuide, setShowSystemGuide] = useState(false);
   const toast = useToast();
 
   const { status, liveEvents, sendMessage, sendOrchestratorChat, stop } =
@@ -493,6 +495,7 @@ export default function Home() {
           onMenuToggle={() => setSidebarOpen(true)}
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          onHelpOpen={() => setShowSystemGuide(true)}
         />
 
         <div className="flex-1 flex overflow-hidden">{renderTabContent()}</div>
@@ -512,6 +515,11 @@ export default function Home() {
           onSend={handleOrchestratorChatSend}
           threadId={thread?.id}
           isProcessing={isProcessing}
+        />
+
+        <SystemGuideDialog
+          open={showSystemGuide}
+          onClose={() => setShowSystemGuide(false)}
         />
 
         {/* Desktop footer */}
