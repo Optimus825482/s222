@@ -121,6 +121,15 @@ class BaseAgent(ABC):
         """Each agent owns its prompt — 12-Factor #2."""
         ...
 
+    def _identity_prompt(self) -> str:
+        """Load SOUL.md identity context for this agent (Faz 11.6)."""
+        try:
+            from tools.agent_identity import IdentityManager
+            mgr = IdentityManager()
+            return mgr.get_system_prompt(self.role.value if hasattr(self.role, 'value') else str(self.role))
+        except Exception:
+            return ""
+
     def get_tools(self) -> list[dict] | None:
         """Override to provide function-calling tools."""
         return None
@@ -169,8 +178,13 @@ class BaseAgent(ABC):
             "- Example prompt: 'Professional diagram showing microservices architecture with API gateway'\n"
         )
 
+        # Faz 11.6 — SOUL.md identity injection
+        identity_ctx = self._identity_prompt()
+
         history = serialize_thread_for_llm(thread, max_events=30)
         system_content = self.system_prompt() + date_injection + integrity_rules + image_capability
+        if identity_ctx:
+            system_content = identity_ctx + "\n\n---\nAgent Task Instructions:\n" + system_content
         if skill_injection:
             system_content += skill_injection
 

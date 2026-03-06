@@ -3360,3 +3360,81 @@ async def get_user_behavior_analytics(
         "recent": recent,
         "timestamp": _utcnow().isoformat(),
     }
+
+# ---------------------------------------------------------------------------
+# 10. Agent Identity — SOUL.md Pattern (Faz 11.6)
+# ---------------------------------------------------------------------------
+
+from tools.agent_identity import IdentityManager as _IdentityManager
+
+_identity_mgr = _IdentityManager()
+
+
+class IdentityFileUpdate(BaseModel):
+    content: str
+
+
+class MemoryEntryRequest(BaseModel):
+    entry: str
+
+
+@app.get("/api/agents/{role}/identity")
+async def get_agent_identity(role: str, user: dict = Depends(get_current_user)):
+    """Get all identity files for an agent."""
+    _audit("get_agent_identity", user["user_id"], detail=f"role={role}")
+    if role not in _AGENT_ROLES:
+        raise HTTPException(status_code=404, detail=f"Unknown agent role: {role}")
+    identity = _identity_mgr.load(role)
+    return {
+        "role": identity.role,
+        "soul": identity.soul,
+        "user": identity.user,
+        "memory": identity.memory,
+        "bootstrap": identity.bootstrap,
+    }
+
+
+@app.put("/api/agents/{role}/identity/{file_type}")
+async def update_identity_file(
+    role: str, file_type: str, body: IdentityFileUpdate,
+    user: dict = Depends(get_current_user),
+):
+    """Update a specific identity file (soul, user, memory, bootstrap)."""
+    _audit("update_identity_file", user["user_id"], detail=f"role={role}, file={file_type}")
+    if role not in _AGENT_ROLES:
+        raise HTTPException(status_code=404, detail=f"Unknown agent role: {role}")
+    try:
+        _identity_mgr.save_file(role, file_type, body.content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"status": "ok", "role": role, "file_type": file_type}
+
+
+@app.post("/api/agents/{role}/memory")
+async def add_agent_memory_entry(
+    role: str, body: MemoryEntryRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Add a new memory entry for an agent."""
+    _audit("add_agent_memory", user["user_id"], detail=f"role={role}")
+    if role not in _AGENT_ROLES:
+        raise HTTPException(status_code=404, detail=f"Unknown agent role: {role}")
+    _identity_mgr.update_memory(role, body.entry)
+    return {"status": "ok", "role": role}
+
+
+@app.post("/api/agents/identity/initialize")
+async def initialize_all_identities(user: dict = Depends(get_current_user)):
+    """Initialize identity files for all agents."""
+    _audit("initialize_identities", user["user_id"])
+    from config import MODELS as _MODELS_CFG
+    count = _identity_mgr.initialize_all(_MODELS_CFG)
+    agents = _identity_mgr.list_agents()
+    return {"initialized": count, "agents": agents}
+
+
+@app.get("/api/agents/identity/list")
+async def list_identity_agents(user: dict = Depends(get_current_user)):
+    """List agents that have identity files."""
+    agents = _identity_mgr.list_agents()
+    return {"agents": agents}

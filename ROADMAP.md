@@ -208,10 +208,12 @@ Implementasyon rehberi: `autonomous-agent-ecosystem` Kiro Power (Faz 13.1 ✅)
 
 ### 11.6 — Markdown-Based Kimlik ve Hafıza Sistemi
 
-- 🔴 SOUL.md — her agent için kişilik, değerler ve davranış kuralları
-- 🔴 user.md — kullanıcı tercihleri ve iletişim stili
-- 🔴 memory.md — kalıcı cross-session hafıza (persistent memory)
-- 🔴 bootstrap.md — agent başlangıç protokolü ve self-initialization
+- 🟢 SOUL.md — her agent için kişilik, değerler ve davranış kuralları
+- 🟢 user.md — kullanıcı tercihleri ve iletişim stili
+- 🟢 memory.md — kalıcı cross-session hafıza (persistent memory)
+- 🟢 bootstrap.md — agent başlangıç protokolü ve self-initialization
+- 🟢 Kimlik editörü UI — agent-comms-panel "Kimlik" sekmesi
+- 🟢 build_context entegrasyonu — SOUL.md identity prompt injection
 - 📘 Rehber: `autonomous-agent-ecosystem` → `steering/agent-identity.md`
 
 ## Faz 12 — Otonom Evrim ve Kolektif Bilinç 🧬 `[🔴 VİZYON]`
@@ -285,7 +287,7 @@ Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power e
 | Faz 8 — Multimedya           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
 | Faz 9 — Kişiselleştirme      | 🟡 Kısmi        | ██████░░░░░░ 55%  |
 | Faz 10 — İşbirliği           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
-| Faz 11 — Otonom Ekosistem 🦞 | 🟡 Kısmi        | ██░░░░░░░░░░ 18%  |
+| Faz 11 — Otonom Ekosistem 🦞 | 🟡 Kısmi        | █████░░░░░░░ 50%  |
 | Faz 12 — Kolektif Bilinç 🧬  | 🔴 Vizyon       | ░░░░░░░░░░░░ 0%   |
 | Faz 13 — Kiro Entegrasyon 🔮 | 🟡 Devam ediyor | ███░░░░░░░░░ 30%  |
 

@@ -231,7 +231,7 @@ const PHASES: Phase[] = [
     status: "wip",
     color: "text-orange-400",
     border: "border-orange-400/30",
-    progress: 18,
+    progress: 50,
     items: [
       { done: false, label: "11.1 Agentic Loop — otonom görev zincirleme" },
       { done: false, label: "11.1 Context Window Guard + Cost Governor" },
@@ -255,8 +255,12 @@ const PHASES: Phase[] = [
         label: "11.5 Multi-channel gateway (WhatsApp/Telegram/Discord)",
       },
       {
-        done: false,
+        done: true,
         label: "11.6 SOUL.md / user.md / memory.md / bootstrap.md",
+      },
+      {
+        done: true,
+        label: "11.6 Kimlik editörü UI + build_context entegrasyonu",
       },
     ],
   },

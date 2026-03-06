@@ -356,6 +356,29 @@ export const api = {
     fetcher<{ total: number; meetings: PostTaskMeeting[]; timestamp: string }>(
       `/api/agents/autonomous-chat/meetings?limit=${limit}`,
     ),
+
+  // Agent Identity (SOUL.md Pattern)
+  getAgentIdentity: (role: string) =>
+    fetcher<import("./types").AgentIdentity>(
+      `/api/agents/${encodeURIComponent(role)}/identity`,
+    ),
+  updateIdentityFile: (role: string, fileType: string, content: string) =>
+    fetcher<{ status: string }>(
+      `/api/agents/${encodeURIComponent(role)}/identity/${encodeURIComponent(fileType)}`,
+      { method: "PUT", body: JSON.stringify({ content }) },
+    ),
+  addAgentMemoryEntry: (role: string, entry: string) =>
+    fetcher<{ status: string }>(
+      `/api/agents/${encodeURIComponent(role)}/memory`,
+      { method: "POST", body: JSON.stringify({ entry }) },
+    ),
+  initializeAllIdentities: () =>
+    fetcher<{ initialized: number; agents: string[] }>(
+      "/api/agents/identity/initialize",
+      { method: "POST" },
+    ),
+  listIdentityAgents: () =>
+    fetcher<{ agents: string[] }>("/api/agents/identity/list"),
 };
 
 // ── Memory API (uses fetcher for consistent auth + 401 handling) ─

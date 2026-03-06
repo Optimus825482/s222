@@ -483,3 +483,15 @@ export interface PostTaskMeeting {
   total_tokens: number;
   message_count: number;
 }
+
+// ── Agent Identity Types (SOUL.md Pattern) ──────────────────────
+
+export interface AgentIdentity {
+  role: AgentRole;
+  soul: string;
+  user: string;
+  memory: string;
+  bootstrap: string;
+}
+
+export type IdentityFileType = "soul" | "user" | "memory" | "bootstrap";

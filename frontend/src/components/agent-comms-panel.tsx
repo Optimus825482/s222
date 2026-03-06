@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import { AGENT_CONFIG } from "@/lib/agents";
+import { AgentIdentityEditor } from "./agent-identity-editor";
 import type {
   AgentRole,
   AgentDirectMessage,
@@ -11,7 +12,7 @@ import type {
   PostTaskMeeting,
 } from "@/lib/types";
 
-type CommsTab = "tools" | "behavior" | "messages" | "meetings";
+type CommsTab = "tools" | "behavior" | "messages" | "meetings" | "identity";
 type MsgSubTab = "autonomous" | "manual";
 interface ToolEntry {
   tool_name: string;
@@ -1002,6 +1003,7 @@ const TABS: { key: CommsTab; label: string; icon: string }[] = [
   { key: "behavior", label: "Kullanıcı Davranışı", icon: "📊" },
   { key: "messages", label: "Agent Mesajları", icon: "💬" },
   { key: "meetings", label: "Toplantılar", icon: "🏛️" },
+  { key: "identity", label: "Kimlik", icon: "🧬" },
 ];
 
 export function AgentCommsPanel() {
@@ -1036,6 +1038,7 @@ export function AgentCommsPanel() {
         {tab === "behavior" && <BehaviorTab />}
         {tab === "messages" && <MessagesTab />}
         {tab === "meetings" && <MeetingsTab />}
+        {tab === "identity" && <AgentIdentityEditor />}
       </div>
     </div>
   );
