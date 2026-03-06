@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WSMessage, WSLiveEvent, Thread, PipelineType } from "./types";
+import { useAuth } from "@/lib/auth";
 
 const INITIAL_RECONNECT_MS = 1_000;
 const MAX_RECONNECT_MS = 30_000;
@@ -32,6 +33,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
 
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentWsUrlRef = useRef<string | null>(null);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimer.current !== null) {
@@ -42,7 +44,10 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
 
   const getToken = useCallback(() => {
     try {
-      const stored = typeof window !== "undefined" ? localStorage.getItem("ops-center-auth") : null;
+      const stored =
+        typeof window !== "undefined"
+          ? localStorage.getItem("ops-center-auth")
+          : null;
       if (stored) {
         const parsed = JSON.parse(stored);
         return parsed?.state?.user?.token ?? "";
@@ -57,11 +62,21 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     if (!enabled) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    let wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8001/ws/chat";
+    let wsUrl =
+      currentWsUrlRef.current ||
+      process.env.NEXT_PUBLIC_WS_URL ||
+      "ws://localhost:8001/ws/chat";
+    if (wsUrl.includes("/ws/chat") && !wsUrl.includes("/api/ws/chat")) {
+      wsUrl = wsUrl.replace("/ws/chat", "/api/ws/chat");
+    }
     const token = getToken();
     if (token) {
-      wsUrl += (wsUrl.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token);
+      wsUrl +=
+        (wsUrl.includes("?") ? "&" : "?") +
+        "token=" +
+        encodeURIComponent(token);
     }
+    currentWsUrlRef.current = wsUrl;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -116,8 +131,36 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       setStatus("idle");
+
+      // 4001 = backend auth rejected. Do not reconnect-loop with stale token.
+      if (ev.code === 4001) {
+        try {
+          localStorage.removeItem("ops-center-auth");
+          sessionStorage.removeItem("auth:validated-token");
+        } catch {
+          /* ignore */
+        }
+        try {
+          useAuth.setState({ user: null });
+        } catch {
+          /* ignore */
+        }
+        clearReconnectTimer();
+        return;
+      }
+
+      // Fallback for reverse proxies that expose websocket under /api/ws/chat.
+      if (
+        reconnectAttempts.current === 0 &&
+        currentWsUrlRef.current?.includes("/ws/chat")
+      ) {
+        currentWsUrlRef.current = currentWsUrlRef.current.replace(
+          "/ws/chat",
+          "/api/ws/chat",
+        );
+      }
 
       if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) return;
 
@@ -208,17 +251,27 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     wsRef.current?.send(JSON.stringify({ type: "stop" }));
   }, []);
 
-  const sendOrchestratorChat = useCallback((message: string, threadId?: string) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(
-      JSON.stringify({
-        type: "orchestrator_chat",
-        message: message.trim(),
-        thread_id: threadId,
-      }),
-    );
-  }, []);
+  const sendOrchestratorChat = useCallback(
+    (message: string, threadId?: string) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(
+        JSON.stringify({
+          type: "orchestrator_chat",
+          message: message.trim(),
+          thread_id: threadId,
+        }),
+      );
+    },
+    [],
+  );
 
-  return { status, liveEvents, sendMessage, sendOrchestratorChat, stop, reconnect };
+  return {
+    status,
+    liveEvents,
+    sendMessage,
+    sendOrchestratorChat,
+    stop,
+    reconnect,
+  };
 }

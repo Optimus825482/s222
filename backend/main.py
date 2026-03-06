@@ -1120,6 +1120,12 @@ async def ws_chat(ws: WebSocket):
         pass
 
 
+@app.websocket("/api/ws/chat")
+async def ws_chat_api_alias(ws: WebSocket):
+    """Alias route for deployments where only /api/* is routed to backend."""
+    await ws_chat(ws)
+
+
 # ── Health ───────────────────────────────────────────────────────
 
 @app.get("/api/health")

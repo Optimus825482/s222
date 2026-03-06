@@ -14,6 +14,24 @@ import {
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
+function getAuthHeaders(contentType = false): HeadersInit {
+  let token = "";
+  try {
+    const stored = localStorage.getItem("ops-center-auth");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      token = parsed?.state?.user?.token || "";
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    ...(contentType ? { "Content-Type": "application/json" } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 interface Props {
   result: string;
   task?: Task | null;
@@ -88,6 +106,7 @@ export function ExportButtons({ result, task }: Props) {
     try {
       const res = await fetch(
         `${BASE}/api/projects/${encodeURIComponent(projectName)}/export/pdf`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) throw new Error(`PDF export failed: ${res.status}`);
       const blob = await res.blob();
@@ -115,7 +134,7 @@ export function ExportButtons({ result, task }: Props) {
       ) {
         const p = presentations[0];
         const url = `${BASE}/api/presentations/${encodeURIComponent(p.filename)}/pdf`;
-        const res = await fetch(url);
+        const res = await fetch(url, { headers: getAuthHeaders() });
         if (res.ok) {
           const blob = await res.blob();
           const blobUrl = URL.createObjectURL(blob);
@@ -132,7 +151,7 @@ export function ExportButtons({ result, task }: Props) {
       const title = task?.user_input?.slice(0, 60) || "Rapor";
       const res = await fetch(`${BASE}/api/export/pdf`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({ markdown: result, title }),
       });
       if (!res.ok) throw new Error(`PDF export failed: ${res.status}`);
@@ -175,7 +194,7 @@ export function ExportButtons({ result, task }: Props) {
       const title = task?.user_input?.slice(0, 60) || "Rapor";
       const res = await fetch(`${BASE}/api/export/html`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({ markdown: result, title }),
       });
       if (!res.ok) throw new Error(`HTML export failed: ${res.status}`);

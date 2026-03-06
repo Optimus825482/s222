@@ -7,6 +7,7 @@ Supports skill injection into agent context.
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from typing import Any
 
@@ -14,12 +15,18 @@ from typing import Any
 SUBTASK_TIMEOUT = 120
 # Max seconds for entire parallel/consensus gather
 PIPELINE_GATHER_TIMEOUT = 300
+ITERATIVE_SCORE_THRESHOLD = 0.8
+ITERATIVE_MIN_IMPROVEMENT_DELTA = 0.05
+ITERATIVE_DEFAULT_MAX_ROUNDS = 3
+ITERATIVE_FAST_MAX_ROUNDS = 1
+ITERATIVE_FAST_SCORE_THRESHOLD = 0.65
 
 from agents.base import BaseAgent
 from agents.thinker import ThinkerAgent
 from agents.speed import SpeedAgent
 from agents.researcher import ResearcherAgent
 from agents.reasoner import ReasonerAgent
+from config import get_iterative_eval_runtime_config
 from core.models import (
     AgentRole, EventType, PipelineType, SubTask, Task, TaskStatus, Thread,
 )
@@ -240,8 +247,98 @@ class PipelineEngine:
 
     # ── Iterative Pipeline ───────────────────────────────────────
 
-    async def _iterative(self, task: Task, thread: Thread, max_rounds: int = 3) -> str:
-        """Producer creates → Reviewer critiques → refine until good."""
+    @staticmethod
+    def _extract_json_object(text: str) -> dict[str, Any] | None:
+        """Best-effort JSON extraction from model text output."""
+        if not text:
+            return None
+
+        raw = text.strip()
+        try:
+            obj = json.loads(raw)
+            return obj if isinstance(obj, dict) else None
+        except Exception:
+            pass
+
+        # Fallback: take first JSON object block.
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        try:
+            obj = json.loads(raw[start : end + 1])
+            return obj if isinstance(obj, dict) else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _should_use_fast_iterative_mode(user_input: str, task: Task) -> bool:
+        """Use a low-latency iterative strategy for simple requests."""
+        text = (user_input or "").lower()
+        complexity_markers = (
+            "detailed",
+            "comprehensive",
+            "deep",
+            "architecture",
+            "step-by-step",
+            "report",
+            "analysis",
+        )
+        has_complexity_signal = any(marker in text for marker in complexity_markers)
+        # Keep simple requests fast by default.
+        return (
+            len(text) <= 280 and len(task.sub_tasks) <= 2 and not has_complexity_signal
+        )
+
+    async def _evaluate_draft_with_reviewer(
+        self,
+        reviewer: BaseAgent,
+        user_input: str,
+        draft: str,
+        round_num: int,
+        fast_mode: bool,
+        thread: Thread,
+    ) -> tuple[dict[str, Any] | None, str]:
+        """Run structured reviewer evaluation and return (parsed_json, raw_text)."""
+        if fast_mode:
+            review_prompt = (
+                f"Original request: {user_input}\n"
+                f"Draft (round {round_num}): {draft}\n\n"
+                "Return ONLY JSON: "
+                '{"approved":boolean,"overall_score":number,"weaknesses":[string],"improvements":[string]}\n'
+                "Rules: overall_score 0..1, keep weaknesses/improvements very short (max 2 each)."
+            )
+        else:
+            review_prompt = (
+                f"Original request: {user_input}\n\n"
+                f"Draft (round {round_num}):\n{draft}\n\n"
+                "Evaluate this draft and respond ONLY as JSON with this schema:\n"
+                "{\n"
+                '  "approved": boolean,\n'
+                '  "overall_score": number,\n'
+                '  "dimensions": {\n'
+                '    "accuracy": number,\n'
+                '    "clarity": number,\n'
+                '    "completeness": number,\n'
+                '    "actionability": number\n'
+                "  },\n"
+                '  "weaknesses": [string],\n'
+                '  "improvements": [string]\n'
+                "}\n"
+                "Scoring rules:\n"
+                "- overall_score must be 0.0 to 1.0\n"
+                "- approved=true only if overall_score >= 0.8 and no critical weaknesses\n"
+                "- weaknesses/improvements must be concise and actionable\n"
+            )
+
+        raw_review = await reviewer.execute(review_prompt, thread)
+        parsed = self._extract_json_object(raw_review)
+        return parsed, raw_review
+
+    async def _iterative(
+        self, task: Task, thread: Thread, max_rounds: int | None = None
+    ) -> str:
+        """Evaluator-optimizer loop with structured scoring and convergence checks."""
         if len(task.sub_tasks) < 2:
             return await self._sequential(task, thread)
 
@@ -250,6 +347,46 @@ class PipelineEngine:
 
         producer = self.get_agent(producer_task.assigned_agent)
         reviewer = self.get_agent(reviewer_task.assigned_agent)
+        iterative_cfg = get_iterative_eval_runtime_config()
+        configured_mode = str(iterative_cfg.get("mode", "auto"))
+        if configured_mode == "fast":
+            fast_mode = True
+        elif configured_mode == "full":
+            fast_mode = False
+        else:
+            fast_mode = self._should_use_fast_iterative_mode(task.user_input, task)
+
+        effective_max_rounds = (
+            max_rounds
+            if max_rounds is not None
+            else (
+                int(iterative_cfg.get("fast_max_rounds", ITERATIVE_FAST_MAX_ROUNDS))
+                if fast_mode
+                else int(
+                    iterative_cfg.get(
+                        "default_max_rounds", ITERATIVE_DEFAULT_MAX_ROUNDS
+                    )
+                )
+            )
+        )
+        effective_max_rounds = max(1, effective_max_rounds)
+
+        score_threshold = (
+            float(
+                iterative_cfg.get(
+                    "fast_score_threshold", ITERATIVE_FAST_SCORE_THRESHOLD
+                )
+            )
+            if fast_mode
+            else float(
+                iterative_cfg.get("full_score_threshold", ITERATIVE_SCORE_THRESHOLD)
+            )
+        )
+        score_threshold = max(0.0, min(1.0, score_threshold))
+        min_improvement_delta = float(
+            iterative_cfg.get("min_improvement_delta", ITERATIVE_MIN_IMPROVEMENT_DELTA)
+        )
+        min_improvement_delta = max(0.0, min_improvement_delta)
 
         # Initial draft
         draft = await producer.execute(
@@ -257,31 +394,94 @@ class PipelineEngine:
             thread,
         )
 
-        for round_num in range(max_rounds):
-            # Review
-            review_prompt = (
-                f"Original request: {task.user_input}\n\n"
-                f"Draft (round {round_num + 1}):\n{draft}\n\n"
-                f"Review this draft. If it's good, say 'APPROVED'. "
-                f"Otherwise, provide specific feedback for improvement."
-            )
-            review = await reviewer.execute(review_prompt, thread)
+        best_draft = draft
+        best_score = 0.0
+        stagnation_rounds = 0
+        review_summary: dict[str, Any] | None = None
 
-            if "APPROVED" in review.upper():
+        for round_num in range(1, effective_max_rounds + 1):
+            review_json, review_raw = await self._evaluate_draft_with_reviewer(
+                reviewer=reviewer,
+                user_input=task.user_input,
+                draft=draft,
+                round_num=round_num,
+                fast_mode=fast_mode,
+                thread=thread,
+            )
+
+            # Graceful parse fallback: keep previous behavior semantics.
+            if not review_json:
+                approved = "APPROVED" in review_raw.upper()
+                review_json = {
+                    "approved": approved,
+                    "overall_score": 1.0 if approved else 0.5,
+                    "weaknesses": []
+                    if approved
+                    else ["Unstructured reviewer feedback"],
+                    "improvements": [] if approved else [review_raw[:400]],
+                }
+
+            review_summary = review_json
+            score = float(review_json.get("overall_score", 0.0) or 0.0)
+            approved = bool(review_json.get("approved", False))
+
+            thread.add_event(
+                EventType.EVALUATION,
+                (
+                    f"Iterative round {round_num} ({'fast' if fast_mode else 'full'}"
+                    f", cfg={configured_mode}): score={score:.2f}, approved={approved}"
+                ),
+                agent_role=reviewer_task.assigned_agent,
+            )
+
+            if score > best_score:
+                if score - best_score < min_improvement_delta:
+                    stagnation_rounds += 1
+                else:
+                    stagnation_rounds = 0
+                best_score = score
+                best_draft = draft
+            else:
+                stagnation_rounds += 1
+
+            if approved or score >= score_threshold:
+                best_draft = draft
                 break
 
-            # Refine
+            if stagnation_rounds >= 2:
+                thread.add_event(
+                    EventType.EVALUATION,
+                    "Iterative loop stopped due to convergence/stagnation",
+                    agent_role=reviewer_task.assigned_agent,
+                )
+                break
+
+            weaknesses = review_json.get("weaknesses") or []
+            improvements = review_json.get("improvements") or []
+            weaknesses_text = (
+                "\n".join(f"- {w}" for w in weaknesses)
+                if weaknesses
+                else "- No explicit weaknesses provided"
+            )
+            improvements_text = (
+                "\n".join(f"- {i}" for i in improvements)
+                if improvements
+                else "- Improve clarity, completeness, and actionable details"
+            )
+
             refine_prompt = (
                 f"Original request: {task.user_input}\n\n"
-                f"Your previous draft:\n{draft}\n\n"
-                f"Reviewer feedback:\n{review}\n\n"
-                f"Improve your draft based on this feedback."
+                f"Current draft:\n{draft}\n\n"
+                f"Reviewer weaknesses:\n{weaknesses_text}\n\n"
+                f"Reviewer improvements:\n{improvements_text}\n\n"
+                "Revise the draft to address all weaknesses. "
+                "Keep correct parts unchanged, improve only weak parts, and preserve factual accuracy."
             )
             draft = await producer.execute(refine_prompt, thread)
 
-        producer_task.result = draft
-        reviewer_task.result = review
-        return draft
+        producer_task.result = best_draft
+        reviewer_task.result = json.dumps(review_summary or {}, ensure_ascii=False)
+        return best_draft
 
     # ── Deep Research Pipeline ───────────────────────────────────
 

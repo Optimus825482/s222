@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { Thread, Task, TaskStatus, WSLiveEvent } from "@/lib/types";
 import { EVENT_ICONS, getAgentInfo } from "@/lib/agents";
-import { Activity, GitBranch, Radio, Circle, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Activity, GitBranch, Radio, Circle, CheckCircle2, AlertTriangle, BarChart3, Calendar } from "lucide-react";
+import { TimelineChart } from "./timeline-chart";
+import { PerformanceMetrics } from "./performance-metrics";
 
 interface Props {
     thread: Thread | null;
@@ -274,6 +276,52 @@ export function TaskFlowMonitor({ thread, liveEvents }: Props) {
                         </article>
                     ))}
                 </div>
+            </div>
+
+            {/* Timeline ve Performans Metrikleri Bölümleri */}
+            <div className="px-3 lg:px-4 py-3 border-b border-border/80 space-y-3">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-300">
+                    <Calendar className="w-3.5 h-3.5 text-amber-300" aria-hidden="true" />
+                    Zaman Çizelgesi
+                </div>
+                <TimelineChart
+                    events={liveEvents.map(event => ({
+                        id: typeof event.extra?.event_id === 'string' ? event.extra.event_id : event.timestamp.toString(),
+                        timestamp: new Date(event.timestamp * 1000), // saniye cinsinden olduğu için 1000 ile çarp
+                        eventType: event.event_type,
+                        content: event.content,
+                        agent: event.agent
+                    }))}
+                />
+            </div>
+
+            <div className="px-3 lg:px-4 py-3 border-b border-border/80 space-y-3">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-300">
+                    <BarChart3 className="w-3.5 h-3.5 text-emerald-300" aria-hidden="true" />
+                    Performans Metrikleri
+                </div>
+                <PerformanceMetrics
+                    metrics={[
+                        { name: 'Toplam Olay', value: liveEvents.length, unit: 'adet' },
+                        {
+                            name: 'Aktif Thread',
+                            value: thread?.id ? thread.id.substring(0, 8) : 'Yok',
+                            unit: thread?.id ? 'ID' : undefined
+                        },
+                        {
+                            name: 'Son Olay',
+                            value: liveEvents.length > 0
+                                ? new Date(liveEvents[liveEvents.length - 1].timestamp).toLocaleTimeString('tr-TR')
+                                : 'Yok',
+                            unit: liveEvents.length > 0 ? 'saat' : undefined
+                        },
+                        {
+                            name: 'Olay Türü',
+                            value: [...new Set(liveEvents.map(e => e.event_type))].length,
+                            unit: 'tür'
+                        }
+                    ]}
+                />
             </div>
 
             <div className="flex-1 min-h-0 flex flex-col">
