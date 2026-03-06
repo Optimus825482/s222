@@ -38,7 +38,14 @@ const PHASES: Phase[] = [
       { done: true, label: "RAG, Dynamic Skills, Teachability, MCP Client" },
       { done: true, label: "Sunum üretimi (MINI/MIDI/MAXI)" },
       { done: true, label: "Idea-to-Project pipeline" },
-      { done: true, label: "Frontend: Next.js cockpit (8 tab)" },
+      { done: true, label: "Frontend: Next.js cockpit (9 tab)" },
+      {
+        done: true,
+        label:
+          "Agent İletişim Paneli (Tool Usage, Behavior, Otonom Sohbet, Toplantılar)",
+      },
+      { done: true, label: "Roadmap dialog + Task History sağ panel" },
+      { done: true, label: "Reasoning model timeout desteği (180s)" },
     ],
   },
   {
@@ -102,7 +109,7 @@ const PHASES: Phase[] = [
   {
     id: "f4",
     title: "Faz 4 — Gelişmiş RAG",
-    icon: "📚",
+    icon: "�",
     status: "planned",
     color: "text-indigo-400",
     border: "border-indigo-400/30",
@@ -118,7 +125,7 @@ const PHASES: Phase[] = [
   {
     id: "f5",
     title: "Faz 5 — Güvenlik",
-    icon: "🔐",
+    icon: "�",
     status: "wip",
     color: "text-red-400",
     border: "border-red-400/30",
@@ -134,23 +141,25 @@ const PHASES: Phase[] = [
   {
     id: "f6",
     title: "Faz 6 — Performans",
-    icon: "📈",
+    icon: "�",
     status: "wip",
     color: "text-amber-400",
     border: "border-amber-400/30",
-    progress: 30,
+    progress: 55,
     items: [
       { done: true, label: "Agent başarı oranı tracking + Confidence scoring" },
       { done: true, label: "Circuit breaker" },
-      { done: false, label: "Tool usage analytics dashboard" },
+      { done: true, label: "Tool usage analytics dashboard" },
+      { done: true, label: "User behavior tracking" },
       { done: false, label: "Hata pattern analizi" },
+      { done: false, label: "Otomatik optimizasyon önerileri" },
       { done: false, label: "Cost tracking (token → maliyet)" },
     ],
   },
   {
     id: "f7",
     title: "Faz 7 — API Entegrasyon",
-    icon: "🔌",
+    icon: "�",
     status: "wip",
     color: "text-cyan-400",
     border: "border-cyan-400/30",
@@ -181,40 +190,118 @@ const PHASES: Phase[] = [
   {
     id: "f9",
     title: "Faz 9 — Kişiselleştirme",
-    icon: "🎯",
+    icon: "�",
     status: "wip",
     color: "text-violet-400",
     border: "border-violet-400/30",
-    progress: 40,
+    progress: 55,
     items: [
       {
         done: true,
         label: "Teachability + Dynamic Skills + Skill Hygiene + Reflexion",
       },
-      { done: false, label: "User behavior tracking" },
+      { done: true, label: "User behavior tracking" },
       { done: false, label: "Proaktif skill önerisi" },
       { done: false, label: "Adaptive tool selection" },
+      { done: false, label: "Workflow auto-optimization" },
     ],
   },
   {
     id: "f10",
     title: "Faz 10 — Gerçek Zamanlı İşbirliği",
     icon: "🤝",
-    status: "planned",
+    status: "wip",
     color: "text-rose-400",
     border: "border-rose-400/30",
-    progress: 0,
+    progress: 20,
     items: [
-      { done: false, label: "Otonom ajan-ajan iletişimi" },
+      { done: true, label: "Otonom ajan-ajan iletişimi (OpenClaw tarzı)" },
+      { done: true, label: "Post-task retrospective toplantılar" },
       { done: false, label: "Paylaşımlı çalışma alanı — ortak bağlam panosu" },
       { done: false, label: "Dinamik rol atama" },
+      { done: false, label: "Canlı agent ilerleme görüntüleme" },
+      { done: false, label: "Shared workspace (çoklu kullanıcı)" },
+      { done: false, label: "Collaborative document editing" },
+    ],
+  },
+  {
+    id: "f11",
+    title: "Faz 11 — Otonom Agent Ekosistemi",
+    icon: "�",
+    status: "wip",
+    color: "text-orange-400",
+    border: "border-orange-400/30",
+    progress: 18,
+    items: [
+      { done: false, label: "11.1 Agentic Loop — otonom görev zincirleme" },
+      { done: false, label: "11.1 Context Window Guard + Cost Governor" },
+      { done: false, label: "11.2 Heartbeat — proaktif bildirim sistemi" },
+      { done: false, label: "11.2 Sabah brifingleri + anomali uyarıları" },
+      {
+        done: true,
+        label: "11.3 Self-Skill — runtime skill oluşturma (Dynamic Skills)",
+      },
+      { done: true, label: "11.3 Skill Markdown dosya depolama" },
       {
         done: false,
-        label: "Diğer ajanların ilerleme durumunu canlı görüntüleme",
+        label: "11.3 Gelişmiş pattern detection + cross-agent paylaşım",
       },
-      { done: false, label: "Shared workspace (çoklu kullanıcı)" },
-      { done: false, label: "Real-time collaboration" },
-      { done: false, label: "Collaborative document editing" },
+      { done: true, label: "11.4 Agent-to-agent otonom sohbet" },
+      { done: true, label: "11.4 Agent kişilik bazlı iletişim" },
+      { done: true, label: "11.4 Post-task retrospective toplantılar" },
+      { done: false, label: "11.4 Konu bazlı topluluklar + swarm voting" },
+      {
+        done: false,
+        label: "11.5 Multi-channel gateway (WhatsApp/Telegram/Discord)",
+      },
+      {
+        done: false,
+        label: "11.6 SOUL.md / user.md / memory.md / bootstrap.md",
+      },
+    ],
+  },
+  {
+    id: "f12",
+    title: "Faz 12 — Kolektif Bilinç",
+    icon: "🧬",
+    status: "planned",
+    color: "text-fuchsia-400",
+    border: "border-fuchsia-400/30",
+    progress: 0,
+    items: [
+      { done: false, label: "Agent öz-evrim — kendi parametrelerini ayarlama" },
+      { done: false, label: "Kolektif karar alma — oylama ve konsensüs" },
+      { done: false, label: "Emergent davranış izleme ve loglama" },
+      { done: false, label: "Agent kültür oluşumu" },
+      { done: false, label: "Cross-instance iletişim" },
+      { done: false, label: "Safety sandbox + kill-switch" },
+      { done: false, label: "İnsan gözetimi dashboard'u" },
+    ],
+  },
+  {
+    id: "f13",
+    title: "Faz 13 — Kiro IDE Entegrasyonu",
+    icon: "🔮",
+    status: "wip",
+    color: "text-teal-400",
+    border: "border-teal-400/30",
+    progress: 30,
+    items: [
+      { done: true, label: "13.1 Custom Power: autonomous-agent-ecosystem" },
+      { done: true, label: "13.1 Agentic Loop rehberi (steering)" },
+      {
+        done: true,
+        label: "13.1 Heartbeat + Self-Skill + Identity rehberleri",
+      },
+      { done: true, label: "13.1 Social Network + Safety Sandbox rehberleri" },
+      {
+        done: false,
+        label: "13.2 Kiro Skill entegrasyonları (ai-agents-architect vb.)",
+      },
+      {
+        done: false,
+        label: "13.3 Power kullanımları (api-design, performance vb.)",
+      },
     ],
   },
 ];
@@ -393,7 +480,7 @@ export function RoadmapDialog({ open, onClose }: Props) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-slate-800 text-center text-[10px] text-slate-600">
-          Son güncelleme: 2026-03-06 · Her sprint sonunda güncellenir
+          Son güncelleme: 2026-03-07 · Her sprint sonunda güncellenir
         </div>
       </div>
     </div>

@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Roadmap Sync Reminder",
+  "description": "When ROADMAP.md is edited, reminds the agent to also update the hardcoded PHASES data in roadmap-dialog.tsx to keep the UI in sync.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "ROADMAP.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "ROADMAP.md güncellendi. frontend/src/components/roadmap-dialog.tsx dosyasındaki PHASES array'ini de güncellemeyi UNUTMA. İlgili fazın progress yüzdesini, status'ünü ve items listesindeki done değerlerini ROADMAP.md ile senkronize et."
+  }
+}

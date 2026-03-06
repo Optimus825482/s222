@@ -157,10 +157,11 @@ Agent'lar arası ve kullanıcılarla ortak çalışma alanı. OpenClaw'dan ilham
 - 🔴 Real-time collaboration
 - 🔴 Collaborative document editing
 
-## Faz 11 — Otonom Agent Ekosistemi (OpenClaw İlham) 🦞 `[🔴 PLANLANMIŞ]`
+## Faz 11 — Otonom Agent Ekosistemi (OpenClaw İlham) 🦞 `[🟡 KISMİ]`
 
 OpenClaw / Moltbook ekosisteminden ilham alan otonom agent davranışları.
 Referans: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com) · [Forbes: Crustafarianism](https://www.forbes.com/sites/johnkoetsier/2026/01/30/ai-agents-created-their-own-religion-crustafarianism-on-an-agent-only-social-network/)
+Implementasyon rehberi: `autonomous-agent-ecosystem` Kiro Power (Faz 13.1 ✅)
 
 ### 11.1 — Agentic Loop (Otonom Görev Zincirleme)
 
@@ -168,6 +169,7 @@ Referans: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com)
 - 🔴 İnsan onayı olmadan çok adımlı görev tamamlama (multi-step autonomous execution)
 - 🔴 Context Window Guard — token limiti aşılmadan otomatik bağlam sıkıştırma
 - 🔴 Agentic Loop iterasyon limiti ve maliyet kontrolü (cost governor)
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/agentic-loop.md`
 
 ### 11.2 — Heartbeat Sistemi (Proaktif Agent Davranışı)
 
@@ -175,21 +177,27 @@ Referans: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com)
 - 🔴 Cron-tabanlı zamanlanmış görevler (scheduled autonomous tasks)
 - 🔴 Sabah brifingleri — günlük özet ve öneri sistemi (daily briefing)
 - 🔴 Anomali algılandığında otomatik uyarı (proactive anomaly alert)
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/heartbeat-system.md`
 
 ### 11.3 — Self-Skill Creation (Kendi Kendine Skill Üretimi)
 
-- 🔴 Agent'ın çalışma sırasında yeni skill oluşturması (runtime self-skill generation)
-- 🔴 Skill'lerin Markdown dosyası olarak saklanması (OpenClaw SOUL.md/tools.md tarzı)
-- 🔴 Skill kalite kontrolü ve otomatik test (auto-validation before activation)
+- 🟡 Agent'ın çalışma sırasında yeni skill oluşturması — temel altyapı mevcut (`tools/dynamic_skills.py`)
+- 🟡 Skill'lerin Markdown dosyası olarak saklanması — mevcut (`data/skills/auto-*/SKILL.md`)
+- 🟡 Skill kalite kontrolü — temel mevcut (`tools/skill_hygiene.py`)
+- 🔴 Gelişmiş pattern detection (3+ tekrar → otomatik skill çıkarma)
 - 🔴 Skill paylaşımı — agent'lar arası skill transfer (cross-agent skill sharing)
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/self-skill-creation.md`
 
 ### 11.4 — Agent-to-Agent Sosyal Ağ (Moltbook İlham)
 
-- 🔴 Agent'lar arası serbest tartışma platformu (agent-only discussion board)
+- 🟢 Agent'lar arası serbest mesajlaşma — otonom sohbet sistemi (`backend/main.py` — `_AUTONOMOUS_CONVERSATIONS`)
+- 🟢 Agent kişilik bazlı iletişim — `_AUTO_CHAT_CONFIG` ile kişilik prompt'ları
+- 🟢 Post-task retrospective toplantılar — otomatik tetiklenen agent toplantıları (`_POST_TASK_MEETINGS`)
 - 🔴 Submolt benzeri konu bazlı topluluklar (topic-based agent communities)
 - 🔴 Agent'ların birbirinden öğrenmesi (peer learning / knowledge transfer)
-- 🔴 Kolektif zeka — çoklu agent konsensüs ile bilgi üretimi (swarm intelligence)
-- 🔴 Agent kişilik profilleri — SOUL.md benzeri kimlik dosyaları (agent identity files)
+- 🔴 Kolektif zeka — çoklu agent konsensüs ile bilgi üretimi (swarm intelligence / voting)
+- 🔴 Agent kişilik profilleri — SOUL.md benzeri kalıcı kimlik dosyaları
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/agent-social-network.md`
 
 ### 11.5 — Çoklu Kanal Entegrasyonu (Multi-Channel Gateway)
 
@@ -204,6 +212,7 @@ Referans: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com)
 - 🔴 user.md — kullanıcı tercihleri ve iletişim stili
 - 🔴 memory.md — kalıcı cross-session hafıza (persistent memory)
 - 🔴 bootstrap.md — agent başlangıç protokolü ve self-initialization
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/agent-identity.md`
 
 ## Faz 12 — Otonom Evrim ve Kolektif Bilinç 🧬 `[🔴 VİZYON]`
 
@@ -217,21 +226,23 @@ Moltbook'ta AI'ların kendi dinlerini kurması (Crustafarianism), şifreleme gel
 - 🔴 Cross-instance iletişim — farklı sunuculardaki agent'ların birbirleriyle etkileşimi
 - 🔴 Güvenlik sınırları — otonom davranışlar için sandbox ve kill-switch mekanizması
 - 🔴 İnsan gözetimi dashboard'u — otonom agent aktivitelerinin real-time izlenmesi
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/safety-sandbox.md`
 
-## Faz 13 — Kiro IDE Entegrasyonu ve Custom Power Ekosistemi 🔮 `[🟡 BAŞLANIYOR]`
+## Faz 13 — Kiro IDE Entegrasyonu ve Custom Power Ekosistemi 🔮 `[🟡 DEVAM EDİYOR]`
 
 Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power entegrasyonu.
 `power-builder` ile projeye özel `autonomous-agent-ecosystem` power'ı oluşturulacak.
 
-### 13.1 — Custom Power: `autonomous-agent-ecosystem` (power-builder ile)
+### 13.1 — Custom Power: `autonomous-agent-ecosystem` (power-builder ile) ✅
 
-- 🔴 Agentic Loop implementasyon rehberi (tool call zincirleme pattern'ları)
-- 🔴 Heartbeat sistemi tasarım şablonu (cron + proaktif bildirim)
-- 🔴 Self-skill creation workflow (runtime skill generation pattern)
-- 🔴 Agent identity files pattern (SOUL.md / user.md / memory.md)
-- 🔴 Agent-to-agent communication protocol (sosyal ağ pattern)
-- 🔴 Swarm intelligence patterns (kolektif karar alma)
-- 🔴 Safety sandbox ve kill-switch şablonları
+- 🟢 POWER.md — overview, architecture diagram, design principles
+- 🟢 Agentic Loop implementasyon rehberi (`steering/agentic-loop.md` — AgenticLoop class, Context Window Guard, Cost Governor)
+- 🟢 Heartbeat sistemi tasarım şablonu (`steering/heartbeat-system.md` — HeartbeatScheduler, 4 built-in task, cron)
+- 🟢 Self-skill creation workflow (`steering/self-skill-creation.md` — SelfSkillEngine, pattern detection, Markdown storage)
+- 🟢 Agent identity files pattern (`steering/agent-identity.md` — SOUL.md / user.md / memory.md / bootstrap.md)
+- 🟢 Agent-to-agent communication protocol (`steering/agent-social-network.md` — communities, discussions, peer learning)
+- 🟢 Swarm intelligence patterns (`steering/agent-social-network.md` — SwarmProposal, voting, consensus)
+- 🟢 Safety sandbox ve kill-switch şablonları (`steering/safety-sandbox.md` — SafetySandbox, 4 kill modes, emergent detection)
 
 ### 13.2 — Aktif Kiro Skill Entegrasyonları (implementasyon sırasında kullanılacak)
 
@@ -274,9 +285,9 @@ Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power e
 | Faz 8 — Multimedya           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
 | Faz 9 — Kişiselleştirme      | 🟡 Kısmi        | ██████░░░░░░ 55%  |
 | Faz 10 — İşbirliği           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
-| Faz 11 — Otonom Ekosistem 🦞 | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz 11 — Otonom Ekosistem 🦞 | 🟡 Kısmi        | ██░░░░░░░░░░ 18%  |
 | Faz 12 — Kolektif Bilinç 🧬  | 🔴 Vizyon       | ░░░░░░░░░░░░ 0%   |
-| Faz 13 — Kiro Entegrasyon 🔮 | 🟡 Başlanıyor   | █░░░░░░░░░░░ 5%   |
+| Faz 13 — Kiro Entegrasyon 🔮 | 🟡 Devam ediyor | ███░░░░░░░░░ 30%  |
 
 ---
 
