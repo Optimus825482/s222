@@ -340,63 +340,82 @@ export default function Home() {
   /* ── Tab content renderer ── */
   const renderTabContent = () => {
     switch (activeTab) {
-      case "chat":
+      case "chat": {
+        const lastTask = thread?.tasks?.length
+          ? thread.tasks[thread.tasks.length - 1]
+          : null;
+        const hasHistory = !!thread?.tasks?.length;
         return (
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex items-center gap-2 shrink-0 px-2">
-              <div className="flex-1 min-w-0">
-                <PipelineSelector selected={pipeline} onSelect={setPipeline} />
-              </div>
-            </div>
-            <ChatArea
-              thread={thread}
-              isProcessing={isProcessing}
-              status={status}
-            />
-            <div className="hidden lg:block">
-              {(() => {
-                const lastTask = thread?.tasks?.length
-                  ? thread.tasks[thread.tasks.length - 1]
-                  : null;
-                return lastTask?.final_result ? (
-                  <ExportButtons
-                    result={lastTask.final_result}
-                    task={lastTask}
+          <div className="flex-1 flex min-w-0">
+            {/* Left: Chat column */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="flex items-center gap-2 shrink-0 px-2">
+                <div className="flex-1 min-w-0">
+                  <PipelineSelector
+                    selected={pipeline}
+                    onSelect={setPipeline}
                   />
-                ) : null;
-              })()}
-              <TaskHistory thread={thread} />
-              <LiveEventLog events={liveEvents} status={status} />
-            </div>
-            <div className="lg:hidden">
-              <MobileResultPanel
+                </div>
+              </div>
+              <ChatArea
                 thread={thread}
-                liveEvents={liveEvents}
+                isProcessing={isProcessing}
                 status={status}
               />
-            </div>
-            {lastError && (
-              <div
-                className="shrink-0 px-3 py-2 bg-red-950/50 border-t border-red-900/50 text-red-300 text-sm flex items-center justify-between"
-                role="alert"
-              >
-                <span>{lastError}</span>
-                <button
-                  onClick={() => setLastError(null)}
-                  className="text-red-400 hover:text-red-200 text-xs p-1 min-w-[44px] min-h-[44px] flex items-center justify-center rounded"
-                  aria-label="Hatayı kapat"
-                >
-                  ✕
-                </button>
+              <div className="lg:hidden">
+                <MobileResultPanel
+                  thread={thread}
+                  liveEvents={liveEvents}
+                  status={status}
+                />
               </div>
+              {lastError && (
+                <div
+                  className="shrink-0 px-3 py-2 bg-red-950/50 border-t border-red-900/50 text-red-300 text-sm flex items-center justify-between"
+                  role="alert"
+                >
+                  <span>{lastError}</span>
+                  <button
+                    onClick={() => setLastError(null)}
+                    className="text-red-400 hover:text-red-200 text-xs p-1 min-w-[44px] min-h-[44px] flex items-center justify-center rounded"
+                    aria-label="Hatayı kapat"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              <ChatInput
+                onSend={handleSend}
+                onStop={stop}
+                isProcessing={isProcessing}
+              />
+            </div>
+
+            {/* Right: Task History + Export panel (desktop only) */}
+            {hasHistory && (
+              <aside className="hidden lg:flex flex-col w-80 xl:w-96 shrink-0 border-l border-border bg-surface/30">
+                {/* Export buttons at top */}
+                {lastTask?.final_result && (
+                  <div className="shrink-0 border-b border-border/50">
+                    <ExportButtons
+                      result={lastTask.final_result}
+                      task={lastTask}
+                    />
+                  </div>
+                )}
+                {/* Task History */}
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <TaskHistory thread={thread} />
+                </div>
+                {/* Live Event Log at bottom */}
+                <div className="shrink-0 max-h-40 overflow-y-auto border-t border-border/50">
+                  <LiveEventLog events={liveEvents} status={status} />
+                </div>
+              </aside>
             )}
-            <ChatInput
-              onSend={handleSend}
-              onStop={stop}
-              isProcessing={isProcessing}
-            />
           </div>
         );
+      }
       case "monitor":
         return (
           <div className="flex-1 overflow-y-auto">

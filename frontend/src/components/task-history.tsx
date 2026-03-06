@@ -42,8 +42,8 @@ export function TaskHistory({ thread }: Props) {
   if (!thread?.tasks?.length) return null;
 
   return (
-    <section className="border-t border-border" aria-label="Görev geçmişi">
-      <div className="px-3 lg:px-4 py-2 flex items-center gap-2">
+    <section className="flex flex-col h-full" aria-label="Görev geçmişi">
+      <div className="px-3 lg:px-4 py-2 flex items-center gap-2 shrink-0">
         <ClipboardList
           className="w-3.5 h-3.5 text-slate-400"
           aria-hidden="true"
@@ -55,7 +55,7 @@ export function TaskHistory({ thread }: Props) {
           {thread.tasks.length} görev
         </span>
       </div>
-      <div className="max-h-52 overflow-y-auto px-3 lg:px-4 pb-2 space-y-1">
+      <div className="flex-1 overflow-y-auto px-3 lg:px-4 pb-2 space-y-1">
         {[...thread.tasks].reverse().map((task) => (
           <TaskRow key={task.id} task={task} />
         ))}
