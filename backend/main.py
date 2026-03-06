@@ -1446,7 +1446,7 @@ async def health():
 from collections import deque as _deque
 
 _AUDIT_LOG: _deque[dict[str, Any]] = _deque(maxlen=1000)
-_AGENT_ROLES = ["orchestrator", "thinker", "speed", "researcher", "reasoner"]
+_AGENT_ROLES = ["orchestrator", "thinker", "speed", "researcher", "reasoner", "observer"]
 
 
 def _audit(event_type: str, user_id: str, detail: str = "", **extra: Any) -> None:
@@ -1760,6 +1760,7 @@ async def get_audit_log(
     return entries
 
 
+@app.get("/api/monitoring/system-stats")
 async def get_system_stats(user: dict = Depends(get_current_user)):
     """Return system-wide stats matching frontend SystemStats interface."""
     _audit("system_stats_view", user["user_id"])
@@ -1823,7 +1824,7 @@ async def get_system_stats(user: dict = Depends(get_current_user)):
             "db_status": db_status,
             "uptime_seconds": round(uptime_seconds),
             "agents_active": active_agents,
-            "agents_total": 5,
+            "agents_total": 6,
         }
 
     except Exception as e:
@@ -1856,48 +1857,63 @@ async def get_anomalies(user: dict = Depends(get_current_user)):
             if success_rate < 60:
                 anomalies.append({
                     "type": "high_error_rate",
-                    "severity": "critical" if success_rate < 30 else "warning",
-                    "agent": role,
-                    "detail": f"Success rate {success_rate}% ({total} tasks)",
-                    "metric": success_rate,
+                    "severity": "high" if success_rate < 30 else "medium",
+                    "agent_role": role,
+                    "description": f"Success rate {success_rate}% ({total} tasks)",
+                    "metric_value": success_rate,
+                    "threshold": 60.0,
+                    "detected_at": _utcnow().isoformat(),
                 })
 
             # Slow responses: avg > 15s
             if avg_latency > 15000:
                 anomalies.append({
                     "type": "slow_response",
-                    "severity": "critical" if avg_latency > 30000 else "warning",
-                    "agent": role,
-                    "detail": f"Avg latency {avg_latency:.0f}ms",
-                    "metric": avg_latency,
+                    "severity": "high" if avg_latency > 30000 else "medium",
+                    "agent_role": role,
+                    "description": f"Avg latency {avg_latency:.0f}ms",
+                    "metric_value": avg_latency,
+                    "threshold": 15000,
+                    "detected_at": _utcnow().isoformat(),
                 })
 
             # Token spike: > 5000 tokens per task average
             if tokens_per_task > 5000:
                 anomalies.append({
                     "type": "token_spike",
-                    "severity": "warning",
-                    "agent": role,
-                    "detail": f"Avg {tokens_per_task:.0f} tokens/task",
-                    "metric": tokens_per_task,
+                    "severity": "medium",
+                    "agent_role": role,
+                    "description": f"Avg {tokens_per_task:.0f} tokens/task",
+                    "metric_value": tokens_per_task,
+                    "threshold": 5000,
+                    "detected_at": _utcnow().isoformat(),
                 })
 
             # Low quality: avg score < 2.0
             if avg_score > 0 and avg_score < 2.0:
                 anomalies.append({
                     "type": "low_quality",
-                    "severity": "critical",
-                    "agent": role,
-                    "detail": f"Avg score {avg_score}/5.0",
-                    "metric": avg_score,
+                    "severity": "high",
+                    "agent_role": role,
+                    "description": f"Avg score {avg_score}/5.0",
+                    "metric_value": avg_score,
+                    "threshold": 2.0,
+                    "detected_at": _utcnow().isoformat(),
                 })
 
-        severity_order = {"critical": 0, "warning": 1, "info": 2}
+        severity_order = {"high": 0, "medium": 1, "low": 2}
         anomalies.sort(key=lambda x: severity_order.get(x["severity"], 9))
+
+        overall_health = "healthy"
+        if any(a["severity"] == "high" for a in anomalies):
+            overall_health = "critical"
+        elif any(a["severity"] == "medium" for a in anomalies):
+            overall_health = "degraded"
 
         return {
             "anomaly_count": len(anomalies),
             "anomalies": anomalies,
+            "overall_health": overall_health,
             "timestamp": _utcnow().isoformat(),
         }
 

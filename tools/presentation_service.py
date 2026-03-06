@@ -115,7 +115,7 @@ COLORS = THEMES["corporate"]
 
 POLLINATIONS_BASE = "https://gen.pollinations.ai/image"
 POLLINATIONS_MODEL = "zimage"
-POLLINATIONS_API_KEY = "sk_IPFPaqTQv7Jpw4SDTTOKtF8qwN4SFZgZ"
+_POLLINATIONS_API_KEY_DEFAULT = ""  # loaded from .env via POLLINATIONS_API_KEY
 
 
 # ── Deep Research for Presentations ──────────────────────────────
@@ -287,7 +287,7 @@ def _get_pollinations_token() -> str:
     return (
         os.environ.get("POLLINATIONS_API_KEY")
         or os.environ.get("Pollinations_api_key")
-        or POLLINATIONS_API_KEY
+        or _POLLINATIONS_API_KEY_DEFAULT
     )
 
 

@@ -37,7 +37,7 @@ function getCategoryColor(cat: string): string {
 }
 
 type GroupBy = "hour" | "day" | "category";
-type TimeRange = 24 | 48 | 168;
+type TimeRange = 24 | 48 | 168 | 8760;
 
 const GROUP_LABELS: Record<GroupBy, string> = {
   hour: "Saatlik",
@@ -49,6 +49,7 @@ const RANGE_LABELS: Record<TimeRange, string> = {
   24: "24s",
   48: "48s",
   168: "7g",
+  8760: "Tümü",
 };
 
 // ── Component 1: MemoryTimelinePanel ────────────────────────────
@@ -59,8 +60,8 @@ export function MemoryTimelinePanel() {
   const [data, setData] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [groupBy, setGroupBy] = useState<GroupBy>("hour");
-  const [hours, setHours] = useState<TimeRange>(24);
+  const [groupBy, setGroupBy] = useState<GroupBy>("day");
+  const [hours, setHours] = useState<TimeRange>(168);
 
   const fetchTimeline = useCallback(async () => {
     try {
@@ -229,6 +230,13 @@ export function MemoryCorrelationPanel() {
     setSubmittedQuery(query);
     search(query);
   };
+
+  // Auto-load recent memories on mount
+  useEffect(() => {
+    search("*");
+    setSubmittedQuery("*");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleCluster = (idx: number) => {
     setExpandedIdx((prev) => {

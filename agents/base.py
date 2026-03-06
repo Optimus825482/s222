@@ -17,7 +17,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from config import NVIDIA_API_KEY, NVIDIA_BASE_URL, MODELS
+from config import NVIDIA_API_KEY, NVIDIA_BASE_URL, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, MODELS
 from core.models import AgentRole, EventType, Thread
 from core.events import serialize_thread_for_llm
 
@@ -94,9 +94,15 @@ class BaseAgent(ABC):
 
     def __init__(self) -> None:
         self.cfg = MODELS[self.model_key]
+        if self.cfg.get("base_url") == "deepseek":
+            _base_url = DEEPSEEK_BASE_URL
+            _api_key = DEEPSEEK_API_KEY
+        else:
+            _base_url = NVIDIA_BASE_URL
+            _api_key = NVIDIA_API_KEY
         self.client = AsyncOpenAI(
-            base_url=NVIDIA_BASE_URL,
-            api_key=NVIDIA_API_KEY,
+            base_url=_base_url,
+            api_key=_api_key,
             timeout=float(self.LLM_TIMEOUT),
         )
         self.max_steps = 10  # 12-Factor #10: small focused

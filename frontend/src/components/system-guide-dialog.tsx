@@ -107,6 +107,15 @@ const AGENTS = [
     tagColor: "bg-emerald-400/10 text-emerald-400 border-emerald-400/30",
     desc: "Mantıksal çıkarım, doğrulama, tutarlılık kontrolü. Sonuçları denetler.",
   },
+  {
+    icon: "👁️",
+    title: "Observer",
+    color: "text-cyan-400",
+    border: "border-cyan-400/30",
+    tag: "Gözlemci",
+    tagColor: "bg-cyan-400/10 text-cyan-400 border-cyan-400/30",
+    desc: "Sistem izleme, anomali tespiti, kalite güvencesi. DeepSeek Chat modeli.",
+  },
 ];
 
 interface Props {

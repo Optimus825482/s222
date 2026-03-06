@@ -939,6 +939,15 @@ REASONER_TOOLS = [
     GENERATE_IMAGE_TOOL,
 ]
 
+# ── Observer Tools ────────────────────────────────────────────────
+
+OBSERVER_TOOLS = [
+    WEB_SEARCH_TOOL,
+    FIND_SKILL_TOOL,
+    USE_SKILL_TOOL,
+    RAG_QUERY_TOOL,
+]
+
 # ── Agent → Tools Mapping ────────────────────────────────────────
 
 AGENT_TOOLS: dict[str, list[dict[str, Any]]] = {
@@ -947,4 +956,5 @@ AGENT_TOOLS: dict[str, list[dict[str, Any]]] = {
     "speed": SPEED_TOOLS,
     "researcher": RESEARCHER_TOOLS,
     "reasoner": REASONER_TOOLS,
+    "observer": OBSERVER_TOOLS,
 }

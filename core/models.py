@@ -29,6 +29,7 @@ class AgentRole(str, Enum):
     SPEED = "speed"                 # Step 3.5 Flash
     RESEARCHER = "researcher"       # GLM 4.7
     REASONER = "reasoner"           # Nemotron 3 Nano
+    OBSERVER = "observer"           # DeepSeek Chat
 
 
 class TaskStatus(str, Enum):

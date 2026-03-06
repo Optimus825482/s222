@@ -19,6 +19,7 @@ const ROLE_ICON: Record<AgentRole, string> = {
   speed: "⚡",
   researcher: "🔍",
   reasoner: "🌊",
+  observer: "👁️",
 };
 
 const ROLE_COLOR: Record<AgentRole, string> = {
@@ -27,6 +28,7 @@ const ROLE_COLOR: Record<AgentRole, string> = {
   speed: "#a78bfa",
   researcher: "#f59e0b",
   reasoner: "#10b981",
+  observer: "#06b6d4",
 };
 
 const STATUS_DOT: Record<AgentStatus, string> = {

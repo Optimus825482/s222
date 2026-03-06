@@ -22,6 +22,8 @@ else:
 
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 
 # Base URL without trailing slash (app appends /search)
 _SEARXNG_RAW = os.getenv(
@@ -102,6 +104,20 @@ MODELS = {
         },
         "color": "#10b981",
         "icon": "🌊",
+    },
+    "observer": {
+        "id": "deepseek-chat",
+        "name": "DeepSeek Chat",
+        "role": "observer",
+        "description": "Observer — system monitoring, anomaly detection, quality assurance",
+        "max_tokens": 4096,
+        "temperature": 0.3,
+        "top_p": 0.9,
+        "has_thinking": False,
+        "extra_body": None,
+        "color": "#06b6d4",
+        "icon": "👁️",
+        "base_url": "deepseek",
     },
 }
 
