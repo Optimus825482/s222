@@ -72,10 +72,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     const qIdx = baseUrl.indexOf("?");
     if (qIdx !== -1) baseUrl = baseUrl.slice(0, qIdx);
 
-    // Ensure /api/ws/chat path (only if not already present)
-    if (baseUrl.includes("/ws/chat") && !baseUrl.includes("/api/ws/chat")) {
-      baseUrl = baseUrl.replace("/ws/chat", "/api/ws/chat");
-    }
+    // URL is used as-is from env var — no path rewriting
 
     // Store clean base URL (no token, no query params)
     currentWsUrlRef.current = baseUrl;
@@ -160,18 +157,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
         return;
       }
 
-      // Fallback for reverse proxies that expose websocket under /api/ws/chat.
-      if (
-        reconnectAttempts.current === 0 &&
-        currentWsUrlRef.current &&
-        currentWsUrlRef.current.includes("/ws/chat") &&
-        !currentWsUrlRef.current.includes("/api/ws/chat")
-      ) {
-        currentWsUrlRef.current = currentWsUrlRef.current.replace(
-          "/ws/chat",
-          "/api/ws/chat",
-        );
-      }
+      // No URL rewriting on reconnect
 
       if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) return;
 

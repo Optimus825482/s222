@@ -463,12 +463,12 @@ async def get_skill_recommendations(
             task_type = detect_task_type(query)
             best_agent = get_best_agent_for_task(task_type)
 
-        return {
-            "query": query,
-            "task_type": task_type,
-            "recommended_agent": best_agent,
-            "skills": skills,
-        }
+        # Inject recommended_agent into each skill
+        for skill in skills:
+            if "recommended_agent" not in skill or not skill["recommended_agent"]:
+                skill["recommended_agent"] = best_agent
+
+        return skills
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Skill recommendation failed: {e}")
@@ -1439,24 +1439,27 @@ async def get_agent_leaderboard(user: dict = Depends(get_current_user)):
             b = get_performance_baseline(role)
             rankings.append({
                 "role": role,
-                "total_tasks": b.get("total_tasks", 0),
-                "success_rate_pct": b.get("task_success_rate_pct", 0),
-                "avg_score": b.get("avg_score", 0),
-                "avg_latency_ms": b.get("avg_latency_ms", 0),
-                "total_tokens": b.get("total_tokens", 0),
-                "efficiency_score": round(
+                "name": MODELS.get(role, {}).get("name", role),
+                "score": round(
                     (b.get("task_success_rate_pct", 0) * 0.5)
                     + (max(0, 100 - (b.get("avg_latency_ms", 0) / 100)) * 0.3)
                     + (b.get("avg_score", 0) * 4),
                     1,
                 ),
+                "success_rate": round(b.get("task_success_rate_pct", 0), 1),
+                "avg_latency_ms": round(b.get("avg_latency_ms", 0), 1),
+                "efficiency": round(
+                    (b.get("task_success_rate_pct", 0) / max(b.get("avg_latency_ms", 1), 1)) * 100,
+                    2,
+                ),
+                "rank": 0,
             })
 
-        rankings.sort(key=lambda x: x["efficiency_score"], reverse=True)
+        rankings.sort(key=lambda x: x["score"], reverse=True)
         for i, r in enumerate(rankings):
             r["rank"] = i + 1
 
-        return {"leaderboard": rankings, "timestamp": _utcnow().isoformat()}
+        return rankings
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to build leaderboard: {e}")
@@ -1553,11 +1556,7 @@ async def get_audit_log(
     entries = list(_AUDIT_LOG)[-limit:]
     entries.reverse()  # newest first
 
-    return {
-        "total_entries": len(_AUDIT_LOG),
-        "returned": len(entries),
-        "entries": entries,
-    }
+    return entries
 
 
 @app.get("/api/monitoring/system-stats")
