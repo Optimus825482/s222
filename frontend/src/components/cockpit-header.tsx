@@ -1,6 +1,6 @@
 "use client";
 
-import { HelpCircle, LogOut, Menu } from "lucide-react";
+import { HelpCircle, LogOut, Map, Menu } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
@@ -62,6 +62,7 @@ interface Props {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   onHelpOpen?: () => void;
+  onRoadmapOpen?: () => void;
 }
 
 export function CockpitHeader({
@@ -69,6 +70,7 @@ export function CockpitHeader({
   activeTab,
   onTabChange,
   onHelpOpen,
+  onRoadmapOpen,
 }: Props) {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -99,6 +101,16 @@ export function CockpitHeader({
           Qwen3 80B • 4 Agents
         </span>
         <div className="flex-1" />
+        {onRoadmapOpen && (
+          <button
+            onClick={onRoadmapOpen}
+            className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-surface-overlay text-slate-500 hover:text-slate-300 transition-colors"
+            aria-label="Yol haritası"
+            title="Yol Haritası"
+          >
+            <Map className="w-4 h-4" />
+          </button>
+        )}
         {onHelpOpen && (
           <button
             onClick={onHelpOpen}

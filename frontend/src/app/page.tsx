@@ -11,6 +11,7 @@ import { useToast } from "@/components/toast";
 import { CockpitHeader } from "@/components/cockpit-header";
 import type { NavTab } from "@/components/cockpit-header";
 import { SystemGuideDialog } from "@/components/system-guide-dialog";
+import { RoadmapDialog } from "@/components/roadmap-dialog";
 import { PipelineSelector } from "@/components/pipeline-selector";
 import { ChatArea } from "@/components/chat-area";
 import { ChatInput } from "@/components/chat-input";
@@ -201,6 +202,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [showSystemGuide, setShowSystemGuide] = useState(false);
+  const [showRoadmap, setShowRoadmap] = useState(false);
   const toast = useToast();
 
   const { status, liveEvents, sendMessage, sendOrchestratorChat, stop } =
@@ -496,6 +498,7 @@ export default function Home() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
           onHelpOpen={() => setShowSystemGuide(true)}
+          onRoadmapOpen={() => setShowRoadmap(true)}
         />
 
         <div className="flex-1 flex overflow-hidden">{renderTabContent()}</div>
@@ -520,6 +523,11 @@ export default function Home() {
         <SystemGuideDialog
           open={showSystemGuide}
           onClose={() => setShowSystemGuide(false)}
+        />
+
+        <RoadmapDialog
+          open={showRoadmap}
+          onClose={() => setShowRoadmap(false)}
         />
 
         {/* Desktop footer */}

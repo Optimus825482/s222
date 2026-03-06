@@ -141,9 +141,12 @@ Kullanıcı davranışını öğrenen, bağlama dayalı araç seçimi yapan sist
 
 Agent'lar arası ve kullanıcılarla ortak çalışma alanı.
 
+- 🔴 Otonom ajan-ajan iletişimi (agent-to-agent autonomous messaging)
+- 🔴 Paylaşımlı çalışma alanı — ortak bağlam panosu (shared context board)
+- 🔴 Dinamik rol atama (runtime role reassignment based on task context)
+- 🔴 Diğer ajanların ilerleme durumunu canlı görüntüleme (live agent progress tracking)
 - 🔴 Shared workspace (çoklu kullanıcı)
 - 🔴 Real-time collaboration
-- 🔴 Agent-to-agent direct messaging
 - 🔴 Collaborative document editing
 
 ---
