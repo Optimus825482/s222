@@ -89,11 +89,16 @@ class BaseAgent(ABC):
     role: AgentRole
     model_key: str
 
+    # Max seconds per LLM request and per agent run (avoid endless hangs)
+    LLM_TIMEOUT = 90
+    AGENT_EXECUTE_TIMEOUT = 120
+
     def __init__(self) -> None:
         self.cfg = MODELS[self.model_key]
         self.client = AsyncOpenAI(
             base_url=NVIDIA_BASE_URL,
             api_key=NVIDIA_API_KEY,
+            timeout=float(self.LLM_TIMEOUT),
         )
         self.max_steps = 10  # 12-Factor #10: small focused
         self._live_monitor = None  # LiveMonitor callback for realtime UI

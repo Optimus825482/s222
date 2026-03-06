@@ -10,6 +10,11 @@ import asyncio
 import time
 from typing import Any
 
+# Max seconds for one sub-agent run; prevents one stuck agent from blocking the pipeline
+SUBTASK_TIMEOUT = 120
+# Max seconds for entire parallel/consensus gather
+PIPELINE_GATHER_TIMEOUT = 300
+
 from agents.base import BaseAgent
 from agents.thinker import ThinkerAgent
 from agents.speed import SpeedAgent
@@ -125,7 +130,17 @@ class PipelineEngine:
         enriched_context = skill_context + context
 
         t0 = time.monotonic()
-        result = await agent.execute(enriched_context, thread)
+        try:
+            result = await asyncio.wait_for(
+                agent.execute(enriched_context, thread),
+                timeout=SUBTASK_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            result = "[Timeout] Agent did not respond in time. Try a simpler query or try again."
+            subtask.status = TaskStatus.FAILED
+            subtask.latency_ms = (time.monotonic() - t0) * 1000
+            subtask.result = result
+            return result
         subtask.latency_ms = (time.monotonic() - t0) * 1000
         subtask.status = TaskStatus.COMPLETED
         subtask.result = result
@@ -171,7 +186,18 @@ class PipelineEngine:
             enriched = f"Original request: {task.user_input}\n\nYour task: {subtask.description}"
             coros.append(self._run_subtask(subtask, enriched, thread))
 
-        results = await asyncio.gather(*coros, return_exceptions=True)
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*coros, return_exceptions=True),
+                timeout=PIPELINE_GATHER_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            timeout_msg = "[Timeout] Pipeline did not complete in time. Some agents may still be running."
+            results = [timeout_msg] * len(task.sub_tasks)
+            for st in task.sub_tasks:
+                st.status = TaskStatus.FAILED
+                if not st.result:
+                    st.result = timeout_msg
 
         parts = []
         for subtask, result in zip(task.sub_tasks, results):
@@ -195,7 +221,13 @@ class PipelineEngine:
             agent = self.get_agent(role)
             coros.append(agent.execute(question, thread))
 
-        results = await asyncio.gather(*coros, return_exceptions=True)
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*coros, return_exceptions=True),
+                timeout=PIPELINE_GATHER_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            results = ["[Timeout] Consensus round did not complete in time."] * len(agents_to_use)
 
         parts = ["CONSENSUS RESULTS — Multiple agents answered the same question:\n"]
         for role, result in zip(agents_to_use, results):
@@ -275,7 +307,17 @@ class PipelineEngine:
             )
             coros.append(self._run_subtask(subtask, enriched, thread))
 
-        results = await asyncio.gather(*coros, return_exceptions=True)
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*coros, return_exceptions=True),
+                timeout=PIPELINE_GATHER_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            results = [
+                "[Timeout] Deep Research did not complete in time."
+            ] * len(task.sub_tasks)
+            for st in task.sub_tasks:
+                st.status = TaskStatus.FAILED
 
         # Phase 2: Merge results with agent labels
         parts = []
@@ -402,7 +444,10 @@ class PipelineEngine:
             )
             round1_coros.append(agent.execute(prompt, thread))
 
-        round1_results = await asyncio.gather(*round1_coros, return_exceptions=True)
+        round1_results = await asyncio.wait_for(
+            asyncio.gather(*round1_coros, return_exceptions=True),
+            timeout=PIPELINE_GATHER_TIMEOUT,
+        )
 
         round1_texts: dict[AgentRole, str] = {}
         round1_section = ["## 🧠 ROUND 1 — Initial Perspectives\n"]
@@ -457,7 +502,10 @@ class PipelineEngine:
             agent = self.get_agent(role)
             round2_coros.append(agent.execute(prompt, thread))
 
-        round2_results = await asyncio.gather(*round2_coros, return_exceptions=True)
+        round2_results = await asyncio.wait_for(
+            asyncio.gather(*round2_coros, return_exceptions=True),
+            timeout=PIPELINE_GATHER_TIMEOUT,
+        )
 
         round2_section = ["## ⚔️ ROUND 2 — Cross-Challenge & Debate\n"]
 
