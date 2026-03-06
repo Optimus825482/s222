@@ -38,6 +38,8 @@ export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
 
+  /** Only true after token validated with backend (avoids 401 + WS close on stale token). */
+  const [authValidated, setAuthValidated] = useState(false);
   const [thread, setThread] = useState<Thread | null>(null);
   const [threadList, setThreadList] = useState<ThreadSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineType>("auto");
@@ -51,7 +53,7 @@ export default function Home() {
   );
 
   const { status, liveEvents, sendMessage, sendOrchestratorChat, stop } = useAgentSocket({
-    enabled: !!user,
+    enabled: !!user && authValidated,
     onResult: (_tid, _result, updatedThread) => {
       setThread(updatedThread);
       setLastError(null);
@@ -77,14 +79,38 @@ export default function Home() {
   useEffect(() => {
     if (!user) {
       router.replace("/login");
+      return;
     }
-  }, [user, router]);
+    // Validate token before opening WS / loading threads (avoids 401 + "WS closed before connect")
+    let cancelled = false;
+    api
+      .me()
+      .then(() => {
+        if (!cancelled) setAuthValidated(true);
+      })
+      .catch(() => {
+        if (!cancelled) setAuthValidated(false);
+        // clearAuthOn401 already ran; user will become null and redirect
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
-    loadThreadList();
-  }, [loadThreadList]);
+    if (authValidated && user) loadThreadList();
+  }, [authValidated, loadThreadList, user]);
 
   if (!user) return null;
+
+  // Wait for token validation so we don't open WS or hit /api/threads with stale token
+  if (!authValidated) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-background" aria-busy="true">
+        <p className="text-sm text-slate-500">Oturum doğrulanıyor…</p>
+      </div>
+    );
+  }
 
   const handleSend = (message: string) => {
     sendMessage(message, thread?.id, pipeline);

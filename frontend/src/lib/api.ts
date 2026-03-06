@@ -72,6 +72,10 @@ export const api = {
     fetcher<{ id: string; label: string }[]>("/api/pipelines"),
   health: () => fetcher<{ status: string }>("/api/health"),
 
+  /** Validate current token; 401 clears auth and throws. Use before opening WS / loading data. */
+  me: () =>
+    fetcher<{ user_id: string; full_name: string }>("/api/auth/me"),
+
   // Threads
   listThreads: (limit = 20) => {
     const uid = getCurrentUserId();
