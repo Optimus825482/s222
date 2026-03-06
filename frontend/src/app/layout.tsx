@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import PWAInstallPrompt from "@/components/pwa-install-prompt";
+import { ToastProvider } from "@/components/toast";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -87,7 +88,7 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           İçeriğe atla
         </a>
-        {children}
+        <ToastProvider>{children}</ToastProvider>
         <PWAInstallPrompt />
       </body>
     </html>

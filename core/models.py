@@ -187,3 +187,100 @@ class Thread(BaseModel):
         else:
             m.error_count += 1
         m.last_active = _now()
+
+
+# ── Agent Health & Monitoring ────────────────────────────────────
+
+
+class AgentStatus(str, Enum):
+    ACTIVE = "active"
+    IDLE = "idle"
+    OFFLINE = "offline"
+    ERROR = "error"
+
+
+class AgentHealth(BaseModel):
+    """Real-time health status for an agent."""
+    role: AgentRole
+    name: str
+    status: AgentStatus = AgentStatus.OFFLINE
+    success_rate: float = 0.0
+    avg_latency_ms: float = 0.0
+    total_tokens: int = 0
+    total_calls: int = 0
+    error_count: int = 0
+    last_active: datetime | None = None
+    uptime_pct: float = 0.0
+
+
+class AuditLogEntry(BaseModel):
+    """Security audit log entry."""
+    id: str = Field(default_factory=_uid)
+    timestamp: datetime = Field(default_factory=_now)
+    event_type: str  # login, logout, api_call, auth_failure, anomaly
+    user_id: str = ""
+    details: str = ""
+    ip: str | None = None
+    severity: str = "info"  # info, warning, critical
+
+
+class SystemStats(BaseModel):
+    """System-wide statistics snapshot."""
+    active_threads: int = 0
+    total_tasks: int = 0
+    total_events: int = 0
+    memory_usage_mb: float = 0.0
+    db_status: str = "unknown"
+    uptime_seconds: float = 0.0
+    agents_active: int = 0
+    agents_total: int = 5
+
+
+class Anomaly(BaseModel):
+    """Detected anomalous behavior."""
+    type: str  # high_error_rate, slow_response, token_spike, unusual_pattern
+    agent_role: AgentRole
+    severity: str = "low"  # low, medium, high
+    description: str = ""
+    detected_at: datetime = Field(default_factory=_now)
+    metric_value: float = 0.0
+    threshold: float = 0.0
+
+
+class AnomalyReport(BaseModel):
+    """Collection of detected anomalies with overall health assessment."""
+    anomalies: list[Anomaly] = Field(default_factory=list)
+    overall_health: str = "healthy"  # healthy, degraded, critical
+
+
+class AgentLeaderboardEntry(BaseModel):
+    """Agent ranking entry."""
+    role: AgentRole
+    name: str
+    score: float = 0.0
+    success_rate: float = 0.0
+    avg_latency_ms: float = 0.0
+    efficiency: float = 0.0  # tokens per successful task
+    rank: int = 0
+
+
+class SkillRecommendation(BaseModel):
+    """Skill recommendation for a given context."""
+    skill_id: str
+    name: str
+    description: str = ""
+    relevance_score: float = 0.0
+    category: str = "custom"
+    recommended_agent: AgentRole | None = None
+
+
+class ThreadAnalytics(BaseModel):
+    """Detailed analytics for a thread."""
+    thread_id: str
+    duration_ms: float = 0.0
+    agent_participation: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    pipeline_types_used: list[PipelineType] = Field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    event_timeline: list[dict[str, Any]] = Field(default_factory=list)
+    total_tokens: int = 0
+    total_cost_estimate: float = 0.0

@@ -375,6 +375,220 @@ def cleanup_expired_working_memory() -> int:
         release_conn(conn)
 
 
+# ── Advanced Indexing & Correlation ──────────────────────────────
+
+def correlate_memories(
+    query: str,
+    max_results: int = 10,
+    time_window_hours: int | None = None,
+) -> dict[str, Any]:
+    """
+    Find correlated memories across layers and categories.
+    Groups by time proximity and semantic similarity.
+    Returns clusters of related memories with correlation scores.
+    """
+    embedding = _get_embedding(query)
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            time_filter = ""
+            params: list[Any] = []
+
+            if time_window_hours:
+                time_filter = "AND created_at > now() - interval '%s hours'"
+                params.append(time_window_hours)
+
+            if embedding:
+                cur.execute(
+                    f"""SELECT id, content, category, memory_layer, tags, source_agent,
+                               access_count, created_at,
+                               1 - (embedding <=> %s::vector) AS similarity
+                        FROM memories
+                        WHERE embedding IS NOT NULL
+                          AND 1 - (embedding <=> %s::vector) > 0.25
+                          {time_filter}
+                        ORDER BY embedding <=> %s::vector
+                        LIMIT %s""",
+                    [str(embedding), str(embedding)] + params + [str(embedding), max_results * 2],
+                )
+            else:
+                words = [w for w in query.lower().split() if len(w) > 2][:5]
+                like_parts = " OR ".join(f"LOWER(content) LIKE %s" for _ in words) if words else "TRUE"
+                word_params = [f"%{w}%" for w in words]
+                cur.execute(
+                    f"""SELECT id, content, category, memory_layer, tags, source_agent,
+                               access_count, created_at
+                        FROM memories
+                        WHERE ({like_parts}) {time_filter}
+                        ORDER BY created_at DESC
+                        LIMIT %s""",
+                    word_params + params + [max_results * 2],
+                )
+
+            rows = [_row_to_dict(_as_row_dict(r)) for r in cur.fetchall()]
+
+        if not rows:
+            return {"clusters": [], "total_found": 0}
+
+        # Group by time proximity (within 1 hour = same cluster)
+        clusters: list[dict[str, Any]] = []
+        used = set()
+
+        for i, mem in enumerate(rows):
+            if i in used:
+                continue
+            cluster_members = [mem]
+            used.add(i)
+            mem_ts = mem.get("created_at", "")
+
+            for j, other in enumerate(rows):
+                if j in used:
+                    continue
+                other_ts = other.get("created_at", "")
+                # Same category or same agent = likely correlated
+                same_category = mem.get("category") == other.get("category")
+                same_agent = mem.get("source_agent") == other.get("source_agent")
+                high_sim = (mem.get("similarity") or 0) > 0.5 and (other.get("similarity") or 0) > 0.5
+
+                if same_category or same_agent or high_sim:
+                    cluster_members.append(other)
+                    used.add(j)
+
+            if cluster_members:
+                avg_sim = sum(m.get("similarity") or 0 for m in cluster_members) / len(cluster_members)
+                clusters.append({
+                    "members": cluster_members[:max_results],
+                    "size": len(cluster_members),
+                    "primary_category": mem.get("category"),
+                    "primary_agent": mem.get("source_agent"),
+                    "avg_similarity": round(avg_sim, 3),
+                })
+
+        clusters.sort(key=lambda c: c["avg_similarity"], reverse=True)
+        return {
+            "clusters": clusters[:5],
+            "total_found": len(rows),
+        }
+    finally:
+        release_conn(conn)
+
+
+def get_memory_timeline(
+    hours: int = 24,
+    group_by: str = "hour",
+) -> list[dict[str, Any]]:
+    """
+    Get memory creation timeline grouped by time intervals.
+    Useful for understanding memory activity patterns.
+    group_by: 'hour', 'day', or 'category'
+    """
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            if group_by == "category":
+                cur.execute(
+                    """SELECT category,
+                              COUNT(*) AS count,
+                              MAX(created_at) AS latest,
+                              array_agg(DISTINCT memory_layer) AS layers
+                       FROM memories
+                       WHERE created_at > now() - interval '%s hours'
+                       GROUP BY category
+                       ORDER BY count DESC""",
+                    (hours,),
+                )
+                return [
+                    {
+                        "group": _as_row_dict(r).get("category", "unknown"),
+                        "count": _as_row_dict(r).get("count", 0),
+                        "latest": str(_as_row_dict(r).get("latest", "")),
+                        "layers": _as_row_dict(r).get("layers", []),
+                    }
+                    for r in cur.fetchall()
+                ]
+            else:
+                trunc = "hour" if group_by == "hour" else "day"
+                cur.execute(
+                    f"""SELECT date_trunc(%s, created_at) AS period,
+                               COUNT(*) AS count,
+                               COUNT(DISTINCT source_agent) AS agents,
+                               COUNT(DISTINCT category) AS categories
+                        FROM memories
+                        WHERE created_at > now() - interval '%s hours'
+                        GROUP BY period
+                        ORDER BY period DESC""",
+                    (trunc, hours),
+                )
+                return [
+                    {
+                        "period": str(_as_row_dict(r).get("period", "")),
+                        "count": _as_row_dict(r).get("count", 0),
+                        "agents": _as_row_dict(r).get("agents", 0),
+                        "categories": _as_row_dict(r).get("categories", 0),
+                    }
+                    for r in cur.fetchall()
+                ]
+    finally:
+        release_conn(conn)
+
+
+def find_related_memories(
+    memory_id: int,
+    max_results: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    Find memories related to a specific memory by its ID.
+    Uses the source memory's embedding for similarity search,
+    falls back to category + tag matching.
+    """
+    conn = get_conn()
+    try:
+        # Fetch the source memory
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT id, content, category, memory_layer, tags, source_agent,
+                          embedding
+                   FROM memories WHERE id = %s""",
+                (memory_id,),
+            )
+            source_row = cur.fetchone()
+
+        if not source_row:
+            return []
+
+        source = _as_row_dict(source_row)
+        source_embedding = source.get("embedding")
+
+        with conn.cursor() as cur:
+            if source_embedding is not None:
+                # pgvector similarity search using source embedding
+                cur.execute(
+                    """SELECT id, content, category, memory_layer, tags, source_agent,
+                              access_count, created_at,
+                              1 - (embedding <=> (SELECT embedding FROM memories WHERE id = %s)) AS similarity
+                       FROM memories
+                       WHERE id != %s AND embedding IS NOT NULL
+                       ORDER BY embedding <=> (SELECT embedding FROM memories WHERE id = %s)
+                       LIMIT %s""",
+                    (memory_id, memory_id, memory_id, max_results),
+                )
+            else:
+                # Fallback: same category + recent
+                cur.execute(
+                    """SELECT id, content, category, memory_layer, tags, source_agent,
+                              access_count, created_at
+                       FROM memories
+                       WHERE id != %s AND category = %s
+                       ORDER BY created_at DESC
+                       LIMIT %s""",
+                    (memory_id, source.get("category", "general"), max_results),
+                )
+
+            return [_row_to_dict(_as_row_dict(r)) for r in cur.fetchall()]
+    finally:
+        release_conn(conn)
+
+
 # ── Internal Search ──────────────────────────────────────────────
 
 def _pgvector_recall(

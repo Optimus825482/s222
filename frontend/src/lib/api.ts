@@ -67,7 +67,9 @@ async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     if (res.status === 401) {
       clearAuthOn401();
-      throw new Error("Oturum süresi doldu veya geçersiz. Lütfen tekrar giriş yapın.");
+      throw new Error(
+        "Oturum süresi doldu veya geçersiz. Lütfen tekrar giriş yapın.",
+      );
     }
     const err = await res.text().catch(() => res.statusText);
     throw new Error(`API ${res.status}: ${err}`);
@@ -82,6 +84,23 @@ import type {
   ThreadSummary,
   Thread,
   PerformanceBaseline,
+  AgentHealth,
+  AgentPerformance,
+  AgentLeaderboardEntry,
+  AutoDiscoveryResult,
+  SkillRecommendation,
+  AuditLogEntry,
+  SystemStats,
+  AnomalyReport,
+  ThreadAnalytics,
+  CoordinationAssignment,
+  CompetencyMatrix,
+  RotationEntry,
+  EcosystemData,
+  AgentDirectMessage,
+  ImprovementPlan,
+  FailureLearning,
+  ApplyLearningResult,
 } from "./types";
 
 export const api = {
@@ -91,8 +110,7 @@ export const api = {
   health: () => fetcher<{ status: string }>("/api/health"),
 
   /** Validate current token; 401 clears auth and throws. Use before opening WS / loading data. */
-  me: () =>
-    fetcher<{ user_id: string; full_name: string }>("/api/auth/me"),
+  me: () => fetcher<{ user_id: string; full_name: string }>("/api/auth/me"),
 
   // Threads
   listThreads: (limit = 20) => {
@@ -207,54 +225,145 @@ export const api = {
     fetcher<{ name: string; filename: string; size_kb: number }[]>(
       "/api/presentations",
     ),
+
+  // Agent Health & Performance
+  getAgentsHealth: () => fetcher<AgentHealth[]>("/api/agents/health"),
+  getAgentPerformance: (role: string) =>
+    fetcher<AgentPerformance>(
+      `/api/agents/${encodeURIComponent(role)}/performance`,
+    ),
+  getAgentLeaderboard: () =>
+    fetcher<AgentLeaderboardEntry[]>("/api/agents/leaderboard"),
+
+  // Skill Discovery
+  autoDiscoverSkills: () =>
+    fetcher<AutoDiscoveryResult>("/api/skills/auto-discover", {
+      method: "POST",
+    }),
+  getSkillRecommendations: (query = "") =>
+    fetcher<SkillRecommendation[]>(
+      `/api/skills/recommendations${query ? `?query=${encodeURIComponent(query)}` : ""}`,
+    ),
+
+  // Security & Monitoring
+  getAuditLog: (limit = 50) =>
+    fetcher<AuditLogEntry[]>(`/api/security/audit-log?limit=${limit}`),
+  getSystemStats: () => fetcher<SystemStats>("/api/monitoring/system-stats"),
+  getAnomalies: () => fetcher<AnomalyReport>("/api/monitoring/anomalies"),
+
+  // Thread Analytics
+  getThreadAnalytics: (threadId: string) =>
+    fetcher<ThreadAnalytics>(`/api/threads/${threadId}/analytics`),
+
+  // Memory Advanced
+  correlateMemories: (
+    query: string,
+    maxResults = 10,
+    timeWindowHours?: number,
+  ) =>
+    fetcher<{ clusters: unknown[]; total_found: number }>(
+      `/api/memory/correlate?query=${encodeURIComponent(query)}&max_results=${maxResults}${timeWindowHours ? `&time_window_hours=${timeWindowHours}` : ""}`,
+    ),
+  getMemoryTimeline: (
+    hours = 24,
+    groupBy: "hour" | "day" | "category" = "hour",
+  ) =>
+    fetcher<{ period?: string; group?: string; count: number }[]>(
+      `/api/memory/timeline?hours=${hours}&group_by=${groupBy}`,
+    ),
+  getRelatedMemories: (memoryId: number, maxResults = 5) =>
+    fetcher<unknown[]>(
+      `/api/memory/${memoryId}/related?max_results=${maxResults}`,
+    ),
+
+  // Coordination
+  assignBestAgent: (taskType = "general", complexity = "medium") =>
+    fetcher<CoordinationAssignment>(
+      `/api/coordination/assign?task_type=${encodeURIComponent(taskType)}&complexity=${encodeURIComponent(complexity)}`,
+      { method: "POST" },
+    ),
+  getCompetencyMatrix: () =>
+    fetcher<CompetencyMatrix>("/api/coordination/matrix"),
+  getRotationHistory: (limit = 50) =>
+    fetcher<{ total: number; entries: RotationEntry[] }>(
+      `/api/coordination/rotation-history?limit=${limit}`,
+    ),
+
+  // Ecosystem
+  getAgentEcosystem: () => fetcher<EcosystemData>("/api/agents/ecosystem"),
+
+  // Agent Messaging
+  sendAgentMessage: (sender: string, receiver: string, content: string) =>
+    fetcher<{ message: AgentDirectMessage; total_messages: number }>(
+      `/api/agents/message?sender=${encodeURIComponent(sender)}&receiver=${encodeURIComponent(receiver)}&content=${encodeURIComponent(content)}`,
+      { method: "POST" },
+    ),
+  getAgentMessages: (limit = 50, sender?: string, receiver?: string) => {
+    let url = `/api/agents/messages?limit=${limit}`;
+    if (sender) url += `&sender=${encodeURIComponent(sender)}`;
+    if (receiver) url += `&receiver=${encodeURIComponent(receiver)}`;
+    return fetcher<{ total: number; messages: AgentDirectMessage[] }>(url);
+  },
+
+  // Autonomous Evolution
+  getImprovementPlan: (role: string) =>
+    fetcher<ImprovementPlan>(
+      `/api/agents/${encodeURIComponent(role)}/improvement-plan`,
+    ),
+  getFailureLearnings: (role: string) =>
+    fetcher<FailureLearning>(
+      `/api/agents/${encodeURIComponent(role)}/failure-learnings`,
+    ),
+  applyLearning: (role: string) =>
+    fetcher<ApplyLearningResult>(
+      `/api/agents/apply-learning?role=${encodeURIComponent(role)}`,
+      { method: "POST" },
+    ),
 };
 
-// ── Memory API ───────────────────────────────────────────────────
-
-const authHeaders = (): HeadersInit => {
-  const token = getAuthToken();
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
+// ── Memory API (uses fetcher for consistent auth + 401 handling) ─
 
 export async function getMemoryStats() {
-  const res = await fetch(`${BASE}/api/memory/stats`, {
-    headers: authHeaders(),
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    return await fetcher<Record<string, unknown>>("/api/memory/stats");
+  } catch {
+    return null;
+  }
 }
 
 export async function getMemoryLayers() {
-  const res = await fetch(`${BASE}/api/memory/layers`, {
-    headers: authHeaders(),
-  });
-  if (!res.ok) return { working: [], episodic: [], semantic: [] };
-  return res.json();
+  try {
+    return await fetcher<{
+      working: unknown[];
+      episodic: unknown[];
+      semantic: unknown[];
+    }>("/api/memory/layers");
+  } catch {
+    return { working: [], episodic: [], semantic: [] };
+  }
 }
 
 export async function deleteMemory(memoryId: number) {
-  const res = await fetch(`${BASE}/api/memory/${memoryId}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  return res.ok;
+  try {
+    await fetcher(`/api/memory/${memoryId}`, { method: "DELETE" });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getAutoSkills() {
-  const res = await fetch(`${BASE}/api/skills/auto`, {
-    headers: authHeaders(),
-  });
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    return await fetcher<unknown[]>("/api/skills/auto");
+  } catch {
+    return [];
+  }
 }
 
 export async function getDbHealth() {
-  const res = await fetch(`${BASE}/api/db/health`, {
-    headers: authHeaders(),
-  });
-  if (!res.ok) return { status: "error" };
-  return res.json();
+  try {
+    return await fetcher<{ status: string }>("/api/db/health");
+  } catch {
+    return { status: "error" };
+  }
 }

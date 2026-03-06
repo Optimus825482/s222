@@ -7,6 +7,7 @@ import { useAgentSocket } from "@/lib/use-agent-socket";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Thread, ThreadSummary, PipelineType } from "@/lib/types";
+import { useToast } from "@/components/toast";
 import { CockpitHeader } from "@/components/cockpit-header";
 import { PipelineSelector } from "@/components/pipeline-selector";
 import { ChatArea } from "@/components/chat-area";
@@ -20,10 +21,175 @@ import { OrchestratorChatDrawer } from "@/components/orchestrator-chat-drawer";
 import { TaskFlowMonitor } from "@/components/task-flow-monitor";
 import type { OrchestratorChatMessage } from "@/components/orchestrator-chat-drawer";
 
-const Sidebar = dynamic(() => import("@/components/sidebar").then((m) => ({ default: m.Sidebar })), {
-  ssr: false,
-  loading: () => <div className="w-72 h-full bg-surface/50 animate-pulse" aria-hidden />,
-});
+const Sidebar = dynamic(
+  () => import("@/components/sidebar").then((m) => ({ default: m.Sidebar })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-72 h-full bg-surface/50 animate-pulse" aria-hidden />
+    ),
+  },
+);
+
+const AgentHealthPanel = dynamic(
+  () =>
+    import("@/components/monitoring-panels").then((m) => ({
+      default: m.AgentHealthPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const LeaderboardPanel = dynamic(
+  () =>
+    import("@/components/monitoring-panels").then((m) => ({
+      default: m.LeaderboardPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-32 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const SystemStatsPanel = dynamic(
+  () =>
+    import("@/components/monitoring-panels").then((m) => ({
+      default: m.SystemStatsPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-24 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const AnomalyPanel = dynamic(
+  () =>
+    import("@/components/monitoring-panels").then((m) => ({
+      default: m.AnomalyPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-32 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const MemoryTimelinePanel = dynamic(
+  () =>
+    import("@/components/memory-panels").then((m) => ({
+      default: m.MemoryTimelinePanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const MemoryCorrelationPanel = dynamic(
+  () =>
+    import("@/components/memory-panels").then((m) => ({
+      default: m.MemoryCorrelationPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const AgentEvolutionPanel = dynamic(
+  () =>
+    import("@/components/agent-evolution-panel").then((m) => ({
+      default: m.AgentEvolutionPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const CoordinationPanel = dynamic(
+  () =>
+    import("@/components/coordination-panel").then((m) => ({
+      default: m.CoordinationPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const AgentEcosystemMap = dynamic(
+  () =>
+    import("@/components/agent-ecosystem-map").then((m) => ({
+      default: m.AgentEcosystemMap,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const AutonomousEvolutionPanel = dynamic(
+  () =>
+    import("@/components/autonomous-evolution-panel").then((m) => ({
+      default: m.AutonomousEvolutionPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
 
 export default function Home() {
   const router = useRouter();
@@ -37,25 +203,39 @@ export default function Home() {
   const [pipeline, setPipeline] = useState<PipelineType>("auto");
   const [lastError, setLastError] = useState<string | null>(null);
   const [orchestratorChatOpen, setOrchestratorChatOpen] = useState(false);
-  const [orchestratorChatMessages, setOrchestratorChatMessages] = useState<OrchestratorChatMessage[]>([]);
+  const [orchestratorChatMessages, setOrchestratorChatMessages] = useState<
+    OrchestratorChatMessage[]
+  >([]);
   // Mobile state
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"chat" | "monitor">(
-    "chat",
-  );
+  const [mobileTab, setMobileTab] = useState<"chat" | "monitor">("chat");
+  const [rightTab, setRightTab] = useState<
+    | "monitor"
+    | "insights"
+    | "memory"
+    | "evolution"
+    | "coordination"
+    | "ecosystem"
+    | "autonomous"
+  >("monitor");
+  const toast = useToast();
 
-  const { status, liveEvents, sendMessage, sendOrchestratorChat, stop } = useAgentSocket({
-    enabled: !!user && authValidated,
-    onResult: (_tid, _result, updatedThread) => {
-      setThread(updatedThread);
-      setLastError(null);
-      loadThreadList();
-    },
-    onError: (msg) => setLastError(msg),
-    onOrchestratorChatReply: (content) => {
-      setOrchestratorChatMessages((prev) => [...prev, { role: "assistant", content }]);
-    },
-  });
+  const { status, liveEvents, sendMessage, sendOrchestratorChat, stop } =
+    useAgentSocket({
+      enabled: !!user && authValidated,
+      onResult: (_tid, _result, updatedThread) => {
+        setThread(updatedThread);
+        setLastError(null);
+        loadThreadList();
+      },
+      onError: (msg) => setLastError(msg),
+      onOrchestratorChatReply: (content) => {
+        setOrchestratorChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content },
+        ]);
+      },
+    });
 
   const loadThreadList = useCallback(async () => {
     try {
@@ -88,7 +268,10 @@ export default function Home() {
     }
 
     const sessionKey = "auth:validated-token";
-    if (typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === token) {
+    if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(sessionKey) === token
+    ) {
       lastValidatedTokenRef.current = token;
       setAuthValidated(true);
       return;
@@ -133,7 +316,10 @@ export default function Home() {
   // Wait for token validation so we don't open WS or hit /api/threads with stale token
   if (!authValidated) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-background" aria-busy="true">
+      <div
+        className="flex h-dvh items-center justify-center bg-background"
+        aria-busy="true"
+      >
         <p className="text-sm text-slate-500">Oturum doğrulanıyor…</p>
       </div>
     );
@@ -157,7 +343,7 @@ export default function Home() {
       setLastError(null);
       setSidebarOpen(false);
     } catch {
-      setLastError("Thread yüklenemedi");
+      toast({ type: "error", message: "Thread yüklenemedi" });
     }
   };
 
@@ -166,8 +352,9 @@ export default function Home() {
       await api.deleteThread(id);
       if (thread?.id === id) setThread(null);
       loadThreadList();
+      toast({ type: "success", message: "Thread silindi" });
     } catch {
-      setLastError("Thread silinemedi");
+      toast({ type: "error", message: "Thread silinemedi" });
     }
   };
 
@@ -176,15 +363,19 @@ export default function Home() {
       await api.deleteAllThreads();
       setThread(null);
       loadThreadList();
+      toast({ type: "success", message: "Tüm thread'ler silindi" });
     } catch {
-      setLastError("Threadler silinemedi");
+      toast({ type: "error", message: "Threadler silinemedi" });
     }
   };
 
   const isProcessing = status === "running" || status === "connecting";
 
   const handleOrchestratorChatSend = (message: string) => {
-    setOrchestratorChatMessages((prev) => [...prev, { role: "user", content: message }]);
+    setOrchestratorChatMessages((prev) => [
+      ...prev,
+      { role: "user", content: message },
+    ]);
     sendOrchestratorChat(message, thread?.id ?? undefined);
   };
 
@@ -247,7 +438,11 @@ export default function Home() {
               ${mobileTab !== "chat" ? "hidden lg:flex" : "flex"}
             `}
           >
-            <ChatArea thread={thread} isProcessing={isProcessing} status={status} />
+            <ChatArea
+              thread={thread}
+              isProcessing={isProcessing}
+              status={status}
+            />
 
             {/* Desktop: export buttons + history (no pipeline agent cards) */}
             <div className="hidden lg:block">
@@ -303,7 +498,98 @@ export default function Home() {
               ${mobileTab === "monitor" ? "flex" : "hidden lg:flex"}
             `}
           >
-            <TaskFlowMonitor thread={thread} liveEvents={liveEvents} />
+            {/* Tab switcher */}
+            <div className="flex border-b border-border shrink-0">
+              {[
+                {
+                  key: "monitor" as const,
+                  label: "Görev",
+                  active:
+                    "text-blue-400 border-b-2 border-blue-400 bg-blue-400/5",
+                },
+                {
+                  key: "insights" as const,
+                  label: "Sistem",
+                  active:
+                    "text-emerald-400 border-b-2 border-emerald-400 bg-emerald-400/5",
+                },
+                {
+                  key: "memory" as const,
+                  label: "Bellek",
+                  active:
+                    "text-purple-400 border-b-2 border-purple-400 bg-purple-400/5",
+                },
+                {
+                  key: "evolution" as const,
+                  label: "Gelişim",
+                  active:
+                    "text-amber-400 border-b-2 border-amber-400 bg-amber-400/5",
+                },
+                {
+                  key: "coordination" as const,
+                  label: "Koordinasyon",
+                  active:
+                    "text-pink-400 border-b-2 border-pink-400 bg-pink-400/5",
+                },
+                {
+                  key: "ecosystem" as const,
+                  label: "Ekosistem",
+                  active:
+                    "text-cyan-400 border-b-2 border-cyan-400 bg-cyan-400/5",
+                },
+                {
+                  key: "autonomous" as const,
+                  label: "Özerk",
+                  active:
+                    "text-rose-400 border-b-2 border-rose-400 bg-rose-400/5",
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setRightTab(tab.key)}
+                  className={`flex-1 px-2 py-2 text-[11px] font-medium transition-colors ${
+                    rightTab === tab.key
+                      ? tab.active
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {rightTab === "monitor" ? (
+              <TaskFlowMonitor thread={thread} liveEvents={liveEvents} />
+            ) : rightTab === "insights" ? (
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                <SystemStatsPanel />
+                <AgentHealthPanel />
+                <AnomalyPanel />
+                <LeaderboardPanel />
+              </div>
+            ) : rightTab === "memory" ? (
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                <MemoryTimelinePanel />
+                <MemoryCorrelationPanel />
+              </div>
+            ) : rightTab === "coordination" ? (
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                <CoordinationPanel />
+              </div>
+            ) : rightTab === "ecosystem" ? (
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                <AgentEcosystemMap />
+              </div>
+            ) : rightTab === "autonomous" ? (
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                <AutonomousEvolutionPanel />
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                <AgentEvolutionPanel />
+              </div>
+            )}
           </div>
         </div>
 
