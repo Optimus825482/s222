@@ -124,6 +124,7 @@ const ALL_AGENT_ROLES: AgentRole[] = [
   "speed",
   "researcher",
   "reasoner",
+  "observer",
 ];
 
 /* ═══════════════════════════════════════════════════════════════
