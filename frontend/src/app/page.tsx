@@ -51,6 +51,7 @@ export default function Home() {
   );
 
   const { status, liveEvents, sendMessage, sendOrchestratorChat, stop } = useAgentSocket({
+    enabled: !!user,
     onResult: (_tid, _result, updatedThread) => {
       setThread(updatedThread);
       setLastError(null);
@@ -66,8 +67,10 @@ export default function Home() {
     try {
       const list = await api.listThreads();
       setThreadList(list);
-    } catch {
-      setLastError("Thread listesi yüklenemedi");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Thread listesi yüklenemedi";
+      setLastError(msg);
+      // 401: clearAuthOn401 already ran; page will redirect when user becomes null
     }
   }, []);
 

@@ -8,6 +8,8 @@ const MAX_RECONNECT_MS = 30_000;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
 interface UseAgentSocketOptions {
+  /** When false, does not connect (avoids "closed before connection" on redirect). */
+  enabled?: boolean;
   onLiveEvent?: (event: WSLiveEvent) => void;
   onResult?: (threadId: string, result: string, thread: Thread) => void;
   onError?: (message: string) => void;
@@ -18,13 +20,15 @@ interface UseAgentSocketOptions {
 }
 
 export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
+  const { enabled = true, ...rest } = opts;
+  const optsRef = useRef(opts);
+  optsRef.current = opts;
+
   const wsRef = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState<
     "idle" | "connecting" | "running" | "complete" | "error"
   >("idle");
   const [liveEvents, setLiveEvents] = useState<WSLiveEvent[]>([]);
-  const optsRef = useRef(opts);
-  optsRef.current = opts;
 
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -50,6 +54,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
   }, []);
 
   const connect = useCallback(() => {
+    if (!enabled) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     let wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8001/ws/chat";
@@ -130,7 +135,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
       setStatus("error");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearReconnectTimer, getToken]);
+  }, [clearReconnectTimer, getToken, enabled]);
 
   /** Manually reset backoff counter and reconnect */
   const reconnect = useCallback(() => {
@@ -142,12 +147,21 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
   }, [clearReconnectTimer, connect]);
 
   useEffect(() => {
-    connect();
+    if (enabled) {
+      connect();
+    } else {
+      clearReconnectTimer();
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    }
     return () => {
       clearReconnectTimer();
       wsRef.current?.close();
+      wsRef.current = null;
     };
-  }, [connect, clearReconnectTimer]);
+  }, [connect, clearReconnectTimer, enabled]);
 
   const sendMessage = useCallback(
     (

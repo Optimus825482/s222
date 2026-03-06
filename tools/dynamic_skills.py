@@ -250,25 +250,76 @@ def get_skill_knowledge(skill_id: str) -> str | None:
     return skill["knowledge"] if skill else None
 
 
+# Stopwords to avoid as skill name / keyword (Turkish + English)
+_AUTO_SKILL_STOP = frozenset({
+    "ve", "veya", "için", "bir", "bu", "şu", "ile", "olarak", "gibi", "kadar",
+    "the", "and", "or", "for", "with", "from", "that", "this", "are", "you",
+    "bir", "bu", "şu", "ile", "için", "olarak", "gibi", "kadar", "ne", "nasıl",
+    "mi", "mı", "mu", "mü", "da", "de", "ta", "te", "ya", "ye",
+})
+
+
+def _skill_name_from_description(desc: str, max_len: int = 55) -> str:
+    """Build a readable skill name: first sentence or word-boundary truncation."""
+    text = desc.strip()
+    if not text:
+        return "Öğrenilen görev"
+    # First sentence (., !, ?, newline)
+    for sep in (".", "!", "?", "\n"):
+        idx = text.find(sep)
+        if idx != -1 and idx <= max_len + 10:
+            candidate = text[:idx].strip()
+            if len(candidate) >= 10:
+                return (candidate[:max_len] + "…") if len(candidate) > max_len else candidate
+    # Word-boundary truncation
+    if len(text) <= max_len:
+        return text
+    cut = text[: max_len + 1].rsplit(maxsplit=1)
+    if not cut:
+        return text[:max_len].strip()
+    return (cut[0].strip() + "…") if cut[0] else text[:max_len].strip()
+
+
+def _topic_keywords_from_description(desc: str, max_words: int = 4) -> list[str]:
+    """Extract a few topic-like keywords from the task description (avoid stopwords)."""
+    words = re.findall(r"[a-zA-ZçğıöşüÇĞİÖŞÜ0-9]+", desc)
+    seen: set[str] = set()
+    out: list[str] = []
+    for w in words:
+        w_lower = w.lower()
+        if len(w_lower) < 3 or w_lower in _AUTO_SKILL_STOP or w_lower in seen:
+            continue
+        seen.add(w_lower)
+        out.append(w)
+        if len(out) >= max_words:
+            break
+    return out
+
+
 def auto_create_skill_from_pattern(
     pattern_description: str,
     knowledge: str,
     category: str = "learned",
     keywords: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Auto-create a skill from a learned agent pattern."""
+    """Auto-create a skill from a learned agent pattern. Uses readable name and topic keywords."""
     import hashlib
-    clean_desc = pattern_description.strip()[:120]
+    clean_desc = pattern_description.strip()[:200]
+    if not clean_desc:
+        clean_desc = "Tamamlanan görev"
     skill_id = "auto-" + hashlib.md5(clean_desc.encode()).hexdigest()[:8]
-    # Generate a short readable name from description
-    short_name = re.sub(r"[^a-zA-ZçğıöşüÇĞİÖŞÜ0-9\s]", "", clean_desc)[:50].strip()
+    name = _skill_name_from_description(clean_desc)
+    topic_kw = _topic_keywords_from_description(clean_desc)
+    all_keywords = list(dict.fromkeys((keywords or []) + topic_kw))[:12]
+    if not all_keywords:
+        all_keywords = ["task-completion"]
     return create_skill(
         skill_id=skill_id,
-        name=short_name or clean_desc[:50],
+        name=name,
         description=clean_desc,
         knowledge=knowledge,
         category=category,
-        keywords=keywords or [],
+        keywords=all_keywords,
         source="auto-learned",
     )
 

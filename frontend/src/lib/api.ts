@@ -1,5 +1,16 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
+function clearAuthOn401(): void {
+  try {
+    // Dynamic import to avoid circular dependency; sync setState for immediate UI update
+    import("@/lib/auth").then(({ useAuth }) => {
+      useAuth.setState({ user: null });
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
 function getAuthToken(): string {
   try {
     const stored = localStorage.getItem("ops-center-auth");
@@ -36,6 +47,10 @@ async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      clearAuthOn401();
+      throw new Error("Oturum süresi doldu veya geçersiz. Lütfen tekrar giriş yapın.");
+    }
     const err = await res.text().catch(() => res.statusText);
     throw new Error(`API ${res.status}: ${err}`);
   }

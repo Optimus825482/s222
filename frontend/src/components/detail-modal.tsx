@@ -128,10 +128,10 @@ export function DetailModal({
             <X className="w-4 h-4" />
           </button>
         </div>
-        {/* Content: min-h-0 lets flex child shrink so overflow-y-auto scrolls */}
+        {/* Content: bounded height so scrollbars appear; break-all so long lines wrap */}
         <div
           ref={contentRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-5 py-4 text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap break-words font-mono"
+          className="flex-1 min-h-0 max-h-[70vh] overflow-y-auto overflow-x-auto px-5 py-4 text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap break-all font-mono"
         >
           {content || "İçerik yok"}
         </div>

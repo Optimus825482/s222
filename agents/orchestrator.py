@@ -1313,7 +1313,7 @@ class OrchestratorAgent(BaseAgent):
         return user_input
 
     def _auto_save_memory(self, user_input: str, result: str, user_id: str | None = None) -> None:
-        """Silently save task completion to persistent memory + auto-create skill if pattern detected."""
+        """Save task completion to learned memory and auto-create skill when result is successful."""
         tags: list[str] = []
         keywords = ["search", "code", "analyze", "math", "translate", "summarize",
                     "research", "compare", "explain", "calculate", "predict"]
@@ -1339,14 +1339,23 @@ class OrchestratorAgent(BaseAgent):
         except Exception:
             pass
 
-        # Auto-create skill from recurring patterns
-        try:
-            from tools.dynamic_skills import auto_create_skill_from_pattern
-            auto_create_skill_from_pattern(
-                pattern_description=user_input[:200],
-                knowledge=result[:500],
-                category="learned",
-                keywords=tags,
-            )
-        except Exception:
-            pass
+        # Auto-create skill when result is successful (not partial/failed)
+        _skip_auto_skill = (
+            not result
+            or len(result.strip()) < 150
+            or "max steps reached" in result.lower()
+            or "partial result" in result.lower()
+            or result.strip().lower().startswith("[warning]")
+            or "error:" in result.lower()[:200]
+        )
+        if not _skip_auto_skill:
+            try:
+                from tools.dynamic_skills import auto_create_skill_from_pattern
+                auto_create_skill_from_pattern(
+                    pattern_description=user_input[:200],
+                    knowledge=result[:500],
+                    category="learned",
+                    keywords=tags,
+                )
+            except Exception:
+                pass
