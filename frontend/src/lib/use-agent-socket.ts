@@ -20,7 +20,7 @@ interface UseAgentSocketOptions {
 }
 
 export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
-  const { enabled = true, ...rest } = opts;
+  const enabled = opts.enabled ?? true;
   const optsRef = useRef(opts);
   optsRef.current = opts;
 
