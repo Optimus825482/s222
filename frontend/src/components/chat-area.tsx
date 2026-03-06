@@ -52,6 +52,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
         const imgAlt = img[2];
         parts.push(
           <span key={i++} className="inline-block relative group">
+            {/* eslint-disable-next-line @next/next/no-img-element -- dynamic markdown URLs (agent/user content) */}
             <img
               src={imgSrc}
               alt={imgAlt}
@@ -226,6 +227,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       if (imgMatch) {
         nodes.push(
           <figure key={key++} className="my-3 text-center relative group">
+            {/* eslint-disable-next-line @next/next/no-img-element -- dynamic markdown URLs (agent/user content) */}
             <img
               src={imgMatch[2]}
               alt={imgMatch[1]}
@@ -356,7 +358,7 @@ function WelcomeScreen({
   const statusLabel =
     status === "connecting"
       ? "Bağlanıyor..."
-      : status === "running"
+      : status === "running" || isProcessing
         ? "Gönderiliyor..."
         : null;
 
