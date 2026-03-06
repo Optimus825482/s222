@@ -91,6 +91,8 @@ class BaseAgent(ABC):
     # Max seconds per LLM request and per agent run (avoid endless hangs)
     LLM_TIMEOUT = 90
     AGENT_EXECUTE_TIMEOUT = 120
+    # Extended timeout for reasoning models (chain-of-thought takes longer)
+    LLM_TIMEOUT_REASONING = 180
 
     def __init__(self) -> None:
         self.cfg = MODELS[self.model_key]
@@ -100,10 +102,16 @@ class BaseAgent(ABC):
         else:
             _base_url = NVIDIA_BASE_URL
             _api_key = NVIDIA_API_KEY
+        # Use extended timeout for reasoning/thinking models
+        _timeout = (
+            float(self.LLM_TIMEOUT_REASONING)
+            if self.cfg.get("has_thinking")
+            else float(self.LLM_TIMEOUT)
+        )
         self.client = AsyncOpenAI(
             base_url=_base_url,
             api_key=_api_key,
-            timeout=float(self.LLM_TIMEOUT),
+            timeout=_timeout,
         )
         self.max_steps = 10  # 12-Factor #10: small focused
         self._live_monitor = None  # LiveMonitor callback for realtime UI

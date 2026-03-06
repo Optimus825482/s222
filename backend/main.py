@@ -2817,3 +2817,167 @@ async def apply_agent_learning(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Apply learning failed: {e}")
+
+# ── 8. Tool Usage Analytics ─────────────────────────────────────
+
+_TOOL_USAGE: list[dict] = []
+
+
+@app.post("/api/analytics/tool-usage")
+async def record_tool_usage(
+    tool_name: str,
+    agent_role: str,
+    latency_ms: float = 0,
+    success: bool = True,
+    tokens_used: int = 0,
+    user: dict = Depends(get_current_user),
+):
+    """Record a tool usage event for analytics."""
+    entry = {
+        "id": f"tu-{len(_TOOL_USAGE)}",
+        "tool_name": tool_name,
+        "agent_role": agent_role,
+        "latency_ms": latency_ms,
+        "success": success,
+        "tokens_used": tokens_used,
+        "timestamp": _utcnow().isoformat(),
+        "user_id": user["user_id"],
+    }
+    _TOOL_USAGE.append(entry)
+    if len(_TOOL_USAGE) > 500:
+        _TOOL_USAGE[:] = _TOOL_USAGE[-500:]
+    return {"recorded": True, "total": len(_TOOL_USAGE)}
+
+
+@app.get("/api/analytics/tool-usage")
+async def get_tool_usage_analytics(
+    limit: int = 100,
+    agent_role: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Get tool usage analytics with aggregation."""
+    _audit("tool_analytics_view", user["user_id"])
+
+    filtered = _TOOL_USAGE.copy()
+    if agent_role:
+        filtered = [t for t in filtered if t["agent_role"] == agent_role]
+
+    # Aggregate by tool
+    tool_stats: dict[str, dict] = {}
+    for entry in filtered:
+        name = entry["tool_name"]
+        if name not in tool_stats:
+            tool_stats[name] = {"tool_name": name, "count": 0, "success_count": 0, "total_latency_ms": 0, "total_tokens": 0, "agents": set()}
+        tool_stats[name]["count"] += 1
+        if entry["success"]:
+            tool_stats[name]["success_count"] += 1
+        tool_stats[name]["total_latency_ms"] += entry["latency_ms"]
+        tool_stats[name]["total_tokens"] += entry["tokens_used"]
+        tool_stats[name]["agents"].add(entry["agent_role"])
+
+    # Convert sets to lists for JSON
+    summary = []
+    for ts in tool_stats.values():
+        count = ts["count"]
+        summary.append({
+            "tool_name": ts["tool_name"],
+            "count": count,
+            "success_rate": round(ts["success_count"] / max(count, 1) * 100, 1),
+            "avg_latency_ms": round(ts["total_latency_ms"] / max(count, 1), 1),
+            "total_tokens": ts["total_tokens"],
+            "agents": list(ts["agents"]),
+        })
+    summary.sort(key=lambda x: x["count"], reverse=True)
+
+    # Aggregate by agent
+    agent_stats: dict[str, dict] = {}
+    for entry in filtered:
+        role = entry["agent_role"]
+        if role not in agent_stats:
+            agent_stats[role] = {"agent_role": role, "tool_calls": 0, "success_count": 0, "total_latency_ms": 0, "total_tokens": 0, "tools_used": set()}
+        agent_stats[role]["tool_calls"] += 1
+        if entry["success"]:
+            agent_stats[role]["success_count"] += 1
+        agent_stats[role]["total_latency_ms"] += entry["latency_ms"]
+        agent_stats[role]["total_tokens"] += entry["tokens_used"]
+        agent_stats[role]["tools_used"].add(entry["tool_name"])
+
+    agent_summary = []
+    for ag in agent_stats.values():
+        count = ag["tool_calls"]
+        agent_summary.append({
+            "agent_role": ag["agent_role"],
+            "tool_calls": count,
+            "success_rate": round(ag["success_count"] / max(count, 1) * 100, 1),
+            "avg_latency_ms": round(ag["total_latency_ms"] / max(count, 1), 1),
+            "total_tokens": ag["total_tokens"],
+            "tools_used": list(ag["tools_used"]),
+        })
+    agent_summary.sort(key=lambda x: x["tool_calls"], reverse=True)
+
+    recent = filtered[-min(limit, len(filtered)):]
+    recent.reverse()
+
+    return {
+        "total_events": len(filtered),
+        "by_tool": summary,
+        "by_agent": agent_summary,
+        "recent": recent,
+        "timestamp": _utcnow().isoformat(),
+    }
+
+
+# ── 9. User Behavior Tracking ──────────────────────────────────
+
+_USER_BEHAVIORS: list[dict] = []
+
+
+@app.post("/api/analytics/user-behavior")
+async def record_user_behavior(
+    action: str,
+    context: str = "",
+    metadata: dict | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Record user behavior event."""
+    entry = {
+        "id": f"ub-{len(_USER_BEHAVIORS)}",
+        "action": action,
+        "context": context,
+        "metadata": metadata or {},
+        "timestamp": _utcnow().isoformat(),
+        "user_id": user["user_id"],
+    }
+    _USER_BEHAVIORS.append(entry)
+    if len(_USER_BEHAVIORS) > 500:
+        _USER_BEHAVIORS[:] = _USER_BEHAVIORS[-500:]
+    return {"recorded": True, "total": len(_USER_BEHAVIORS)}
+
+
+@app.get("/api/analytics/user-behavior")
+async def get_user_behavior_analytics(
+    limit: int = 100,
+    user: dict = Depends(get_current_user),
+):
+    """Get user behavior analytics."""
+    _audit("user_behavior_view", user["user_id"])
+
+    uid = user["user_id"]
+    filtered = [b for b in _USER_BEHAVIORS if b["user_id"] == uid]
+
+    # Aggregate by action
+    action_counts: dict[str, int] = {}
+    for entry in filtered:
+        action_counts[entry["action"]] = action_counts.get(entry["action"], 0) + 1
+
+    action_summary = [{"action": k, "count": v} for k, v in sorted(action_counts.items(), key=lambda x: x[1], reverse=True)]
+
+    recent = filtered[-min(limit, len(filtered)):]
+    recent.reverse()
+
+    return {
+        "total_events": len(filtered),
+        "by_action": action_summary,
+        "recent": recent,
+        "timestamp": _utcnow().isoformat(),
+    }

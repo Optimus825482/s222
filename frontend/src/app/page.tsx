@@ -20,9 +20,7 @@ import { TaskHistory } from "@/components/task-history";
 import { ExportButtons } from "@/components/export-buttons";
 import { MobileNav } from "@/components/mobile-nav";
 import { MobileResultPanel } from "@/components/mobile-result-panel";
-import { OrchestratorChatDrawer } from "@/components/orchestrator-chat-drawer";
 import { TaskFlowMonitor } from "@/components/task-flow-monitor";
-import type { OrchestratorChatMessage } from "@/components/orchestrator-chat-drawer";
 
 const Sidebar = dynamic(
   () => import("@/components/sidebar").then((m) => ({ default: m.Sidebar })),
@@ -184,6 +182,21 @@ const AutonomousEvolutionPanel = dynamic(
     ),
   },
 );
+const AgentCommsPanel = dynamic(
+  () =>
+    import("@/components/agent-comms-panel").then((m) => ({
+      default: m.AgentCommsPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
 
 export default function Home() {
   const router = useRouter();
@@ -195,32 +208,21 @@ export default function Home() {
   const [threadList, setThreadList] = useState<ThreadSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineType>("auto");
   const [lastError, setLastError] = useState<string | null>(null);
-  const [orchestratorChatOpen, setOrchestratorChatOpen] = useState(false);
-  const [orchestratorChatMessages, setOrchestratorChatMessages] = useState<
-    OrchestratorChatMessage[]
-  >([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<NavTab>("chat");
   const [showSystemGuide, setShowSystemGuide] = useState(false);
   const [showRoadmap, setShowRoadmap] = useState(false);
   const toast = useToast();
 
-  const { status, liveEvents, sendMessage, sendOrchestratorChat, stop } =
-    useAgentSocket({
-      enabled: !!user && authValidated,
-      onResult: (_tid, _result, updatedThread) => {
-        setThread(updatedThread);
-        setLastError(null);
-        loadThreadList();
-      },
-      onError: (msg) => setLastError(msg),
-      onOrchestratorChatReply: (content) => {
-        setOrchestratorChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content },
-        ]);
-      },
-    });
+  const { status, liveEvents, sendMessage, stop } = useAgentSocket({
+    enabled: !!user && authValidated,
+    onResult: (_tid, _result, updatedThread) => {
+      setThread(updatedThread);
+      setLastError(null);
+      loadThreadList();
+    },
+    onError: (msg) => setLastError(msg),
+  });
 
   const loadThreadList = useCallback(async () => {
     try {
@@ -334,13 +336,6 @@ export default function Home() {
     }
   };
   const isProcessing = status === "running" || status === "connecting";
-  const handleOrchestratorChatSend = (message: string) => {
-    setOrchestratorChatMessages((prev) => [
-      ...prev,
-      { role: "user", content: message },
-    ]);
-    sendOrchestratorChat(message, thread?.id ?? undefined);
-  };
 
   /* ── Tab content renderer ── */
   const renderTabContent = () => {
@@ -352,14 +347,6 @@ export default function Home() {
               <div className="flex-1 min-w-0">
                 <PipelineSelector selected={pipeline} onSelect={setPipeline} />
               </div>
-              <button
-                type="button"
-                onClick={() => setOrchestratorChatOpen(true)}
-                className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-border/50 hover:border-border transition-colors"
-                aria-label="Orkestratörle sohbet aç"
-              >
-                Orkestratör sohbet
-              </button>
             </div>
             <ChatArea
               thread={thread}
@@ -456,6 +443,12 @@ export default function Home() {
             <AutonomousEvolutionPanel />
           </div>
         );
+      case "comms":
+        return (
+          <div className="flex-1 overflow-hidden">
+            <AgentCommsPanel />
+          </div>
+        );
       default:
         return null;
     }
@@ -509,15 +502,6 @@ export default function Home() {
           onTabChange={setActiveTab}
           isProcessing={isProcessing}
           liveEventCount={liveEvents.length}
-        />
-
-        <OrchestratorChatDrawer
-          isOpen={orchestratorChatOpen}
-          onClose={() => setOrchestratorChatOpen(false)}
-          messages={orchestratorChatMessages}
-          onSend={handleOrchestratorChatSend}
-          threadId={thread?.id}
-          isProcessing={isProcessing}
         />
 
         <SystemGuideDialog

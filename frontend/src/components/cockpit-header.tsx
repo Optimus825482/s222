@@ -12,7 +12,8 @@ export type NavTab =
   | "evolution"
   | "coordination"
   | "ecosystem"
-  | "autonomous";
+  | "autonomous"
+  | "comms";
 
 const NAV_TABS: { key: NavTab; label: string; color: string }[] = [
   {
@@ -54,6 +55,11 @@ const NAV_TABS: { key: NavTab; label: string; color: string }[] = [
     key: "autonomous",
     label: "🤖 Özerk",
     color: "text-rose-400 border-rose-400 bg-rose-400/5",
+  },
+  {
+    key: "comms",
+    label: "📡 İletişim",
+    color: "text-cyan-400 border-cyan-400 bg-cyan-400/5",
   },
 ];
 
