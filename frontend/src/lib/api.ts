@@ -1,13 +1,31 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
+import { useAuth } from "@/lib/auth";
+
+let _isClearingAuth = false;
+
 function clearAuthOn401(): void {
+  if (_isClearingAuth) return;
+  _isClearingAuth = true;
+
   try {
-    // Dynamic import to avoid circular dependency; sync setState for immediate UI update
-    import("@/lib/auth").then(({ useAuth }) => {
-      useAuth.setState({ user: null });
-    }).catch(() => {});
+    // Clear persisted auth/session markers first so future requests do not reuse stale tokens.
+    localStorage.removeItem("ops-center-auth");
+    sessionStorage.removeItem("auth:validated-token");
   } catch {
     /* ignore */
+  }
+
+  try {
+    // Force immediate in-memory auth reset.
+    useAuth.setState({ user: null });
+  } catch {
+    /* ignore */
+  } finally {
+    // Allow a subsequent login to proceed normally.
+    setTimeout(() => {
+      _isClearingAuth = false;
+    }, 500);
   }
 }
 
