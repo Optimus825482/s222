@@ -829,9 +829,10 @@ async def api_export_html(req: ExportHtmlRequest, user: dict = Depends(get_curre
 class WSLiveMonitor:
     """WebSocket-based live monitor replacing Streamlit's LiveMonitor."""
 
-    def __init__(self, ws: WebSocket):
+    def __init__(self, ws: WebSocket, events_list: list | None = None):
         self.ws = ws
         self._stop = False
+        self._events_list = events_list or []
 
     def should_stop(self) -> bool:
         return self._stop
@@ -852,14 +853,16 @@ class WSLiveMonitor:
         }))
 
     def emit(self, event_type: str, agent: str, content: str, **extra):
-        asyncio.ensure_future(self._send({
+        payload = {
             "type": "live_event",
             "event_type": event_type,
             "agent": agent,
             "content": content,
             "extra": extra,
             "timestamp": time.time(),
-        }))
+        }
+        self._events_list.append(payload)
+        asyncio.ensure_future(self._send(payload))
 
     def complete(self, summary: str = ""):
         asyncio.ensure_future(self._send({
@@ -891,6 +894,59 @@ async def ws_chat(ws: WebSocket):
             user_id = user["user_id"]
 
     await ws.accept()
+    ws._run_task = None
+    ws._live_events = []
+
+    async def _execute_run(
+        message: str,
+        thread: Thread,
+        monitor: WSLiveMonitor,
+        pipeline_str: str,
+        effective_user_id: str | None,
+    ):
+        try:
+            from agents.orchestrator import OrchestratorAgent
+
+            orchestrator = OrchestratorAgent()
+            forced_pipe = None
+            if pipeline_str != "auto":
+                try:
+                    forced_pipe = PipelineType(pipeline_str)
+                except ValueError:
+                    pass
+
+            result = await orchestrator.route_and_execute(
+                message,
+                thread,
+                live_monitor=monitor,
+                forced_pipeline=forced_pipe,
+                user_id=effective_user_id,
+            )
+            save_thread(thread, user_id=effective_user_id)
+
+            if monitor.should_stop():
+                monitor.error("Kullanıcı tarafından durduruldu")
+            else:
+                monitor.complete(result[:80] if result else "")
+
+            await ws.send_json({
+                "type": "result",
+                "thread_id": thread.id,
+                "result": result,
+                "thread": thread.model_dump(mode="json"),
+            })
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            monitor.error(err)
+            await ws.send_json({
+                "type": "error",
+                "message": err,
+                "traceback": traceback.format_exc(),
+                "thread_id": thread.id,
+            })
+        finally:
+            ws._run_task = None
+
     try:
         while True:
             raw = await ws.receive_text()
@@ -914,7 +970,6 @@ async def ws_chat(ws: WebSocket):
                 return
 
             if msg_type == "stop":
-                # Client requests stop
                 if hasattr(ws, "_monitor") and ws._monitor:
                     ws._monitor.request_stop()
                 continue
@@ -923,68 +978,65 @@ async def ws_chat(ws: WebSocket):
                 await ws.send_json({"type": "pong"})
                 continue
 
-            # Chat message
+            # Orchestrator chat: status while run is active (or "no active task")
+            if msg_type == "orchestrator_chat":
+                user_msg = (data.get("message") or "").strip()
+                run_task = getattr(ws, "_run_task", None)
+                events = getattr(ws, "_live_events", [])
+                if run_task and not run_task.done():
+                    # Build status from last events
+                    step_count = len(events)
+                    last_agents = list(dict.fromkeys(e.get("agent", "") for e in events[-20:] if e.get("agent")))
+                    status_lines = [
+                        f"Görev devam ediyor. Toplam {step_count} adım.",
+                        f"Son etkileşimler: {', '.join(last_agents[-5:]) or '—'}.",
+                    ]
+                    if user_msg.lower() in ("durum", "status", "nerede", "ne oldu", "?"):
+                        reply = "\n".join(status_lines)
+                    else:
+                        reply = "\n".join(status_lines) + "\n\nEk talimatınız kaydedildi; mevcut görev bittikten sonra yeni bir mesaj olarak gönderebilirsiniz."
+                    await ws.send_json({
+                        "type": "orchestrator_chat_reply",
+                        "content": reply,
+                        "is_status": True,
+                    })
+                else:
+                    await ws.send_json({
+                        "type": "orchestrator_chat_reply",
+                        "content": "Şu an aktif görev yok. Yeni görev için ana alandan mesaj gönderin.",
+                        "is_status": False,
+                    })
+                continue
+
+            # Chat message (main task)
             message = data.get("message", "")
             thread_id = data.get("thread_id")
             pipeline_str = data.get("pipeline_type", "auto")
-            # Use validated user_id from token; fallback to payload only if we already validated
             effective_user_id = user_id or data.get("user_id", "") or None
 
             if not message:
                 await ws.send_json({"type": "error", "message": "Empty message"})
                 continue
 
-            # Load or create thread
+            if getattr(ws, "_run_task", None) and not ws._run_task.done():
+                await ws.send_json({
+                    "type": "error",
+                    "message": "Bir görev zaten çalışıyor. Durdurmak için Durdur'a basın veya Orkestratör sohbetinden durum sorun.",
+                })
+                continue
+
             thread = load_thread(thread_id, user_id=user_id or None) if thread_id else None
             if not thread:
                 thread = Thread()
 
-            # Create WS monitor
-            monitor = WSLiveMonitor(ws)
+            ws._live_events = []
+            monitor = WSLiveMonitor(ws, ws._live_events)
             ws._monitor = monitor
             monitor.start(message)
 
-            try:
-                from agents.orchestrator import OrchestratorAgent
-
-                orchestrator = OrchestratorAgent()
-                forced_pipe = None
-                if pipeline_str != "auto":
-                    try:
-                        forced_pipe = PipelineType(pipeline_str)
-                    except ValueError:
-                        pass
-
-                result = await orchestrator.route_and_execute(
-                    message, thread,
-                    live_monitor=monitor,
-                    forced_pipeline=forced_pipe,
-                    user_id=effective_user_id,
-                )
-                save_thread(thread, user_id=effective_user_id)
-
-                if monitor.should_stop():
-                    monitor.error("Kullanıcı tarafından durduruldu")
-                else:
-                    monitor.complete(result[:80] if result else "")
-
-                # Send final result + full thread state
-                await ws.send_json({
-                    "type": "result",
-                    "thread_id": thread.id,
-                    "result": result,
-                    "thread": thread.model_dump(mode="json"),
-                })
-
-            except Exception as e:
-                err = f"{type(e).__name__}: {e}"
-                monitor.error(err)
-                await ws.send_json({
-                    "type": "error",
-                    "message": err,
-                    "traceback": traceback.format_exc(),
-                    "thread_id": thread.id,
-                })
+            ws._run_task = asyncio.create_task(
+                _execute_run(message, thread, monitor, pipeline_str, effective_user_id),
+            )
 
     except WebSocketDisconnect:
         pass

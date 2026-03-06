@@ -16,6 +16,8 @@ import { TaskHistory } from "@/components/task-history";
 import { ExportButtons } from "@/components/export-buttons";
 import { MobileNav } from "@/components/mobile-nav";
 import { MobileResultPanel } from "@/components/mobile-result-panel";
+import { OrchestratorChatDrawer } from "@/components/orchestrator-chat-drawer";
+import type { OrchestratorChatMessage } from "@/components/orchestrator-chat-drawer";
 
 const Sidebar = dynamic(() => import("@/components/sidebar").then((m) => ({ default: m.Sidebar })), {
   ssr: false,
@@ -40,19 +42,24 @@ export default function Home() {
   const [threadList, setThreadList] = useState<ThreadSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineType>("auto");
   const [lastError, setLastError] = useState<string | null>(null);
+  const [orchestratorChatOpen, setOrchestratorChatOpen] = useState(false);
+  const [orchestratorChatMessages, setOrchestratorChatMessages] = useState<OrchestratorChatMessage[]>([]);
   // Mobile state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "activity" | "agents">(
     "chat",
   );
 
-  const { status, liveEvents, sendMessage, stop } = useAgentSocket({
+  const { status, liveEvents, sendMessage, sendOrchestratorChat, stop } = useAgentSocket({
     onResult: (_tid, _result, updatedThread) => {
       setThread(updatedThread);
       setLastError(null);
       loadThreadList();
     },
     onError: (msg) => setLastError(msg),
+    onOrchestratorChatReply: (content) => {
+      setOrchestratorChatMessages((prev) => [...prev, { role: "assistant", content }]);
+    },
   });
 
   const loadThreadList = useCallback(async () => {
@@ -120,6 +127,11 @@ export default function Home() {
 
   const isProcessing = status === "running" || status === "connecting";
 
+  const handleOrchestratorChatSend = (message: string) => {
+    setOrchestratorChatMessages((prev) => [...prev, { role: "user", content: message }]);
+    sendOrchestratorChat(message, thread?.id ?? undefined);
+  };
+
   return (
     <div className="flex h-dvh overflow-hidden">
       {/* Mobile sidebar overlay */}
@@ -155,7 +167,19 @@ export default function Home() {
       {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0" id="main-content">
         <CockpitHeader onMenuToggle={() => setSidebarOpen(true)} />
-        <PipelineSelector selected={pipeline} onSelect={setPipeline} />
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex-1 min-w-0">
+            <PipelineSelector selected={pipeline} onSelect={setPipeline} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setOrchestratorChatOpen(true)}
+            className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-border/50 hover:border-border transition-colors"
+            aria-label="Orkestratörle sohbet aç"
+          >
+            Orkestratör sohbet
+          </button>
+        </div>
 
         <div className="flex-1 flex overflow-hidden">
           {/* Center: Chat + Pipeline flow */}
@@ -248,6 +272,15 @@ export default function Home() {
           onTabChange={setMobileTab}
           isProcessing={isProcessing}
           liveEventCount={liveEvents.length}
+        />
+
+        <OrchestratorChatDrawer
+          isOpen={orchestratorChatOpen}
+          onClose={() => setOrchestratorChatOpen(false)}
+          messages={orchestratorChatMessages}
+          onSend={handleOrchestratorChatSend}
+          threadId={thread?.id}
+          isProcessing={isProcessing}
         />
 
         {/* Desktop footer */}

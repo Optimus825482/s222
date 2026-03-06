@@ -14,6 +14,7 @@ interface UseAgentSocketOptions {
   onStatusChange?: (
     status: "idle" | "connecting" | "running" | "complete" | "error",
   ) => void;
+  onOrchestratorChatReply?: (content: string, isStatus: boolean) => void;
 }
 
 export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
@@ -95,6 +96,14 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
             setStatus("error");
             optsRef.current.onError?.(msg.message);
             optsRef.current.onStatusChange?.("error");
+            break;
+          case "orchestrator_chat_reply":
+            if ("content" in msg && typeof msg.content === "string") {
+              optsRef.current.onOrchestratorChatReply?.(
+                msg.content,
+                !!("is_status" in msg && msg.is_status),
+              );
+            }
             break;
         }
       } catch {
@@ -185,5 +194,17 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     wsRef.current?.send(JSON.stringify({ type: "stop" }));
   }, []);
 
-  return { status, liveEvents, sendMessage, stop, reconnect };
+  const sendOrchestratorChat = useCallback((message: string, threadId?: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(
+      JSON.stringify({
+        type: "orchestrator_chat",
+        message: message.trim(),
+        thread_id: threadId,
+      }),
+    );
+  }, []);
+
+  return { status, liveEvents, sendMessage, sendOrchestratorChat, stop, reconnect };
 }

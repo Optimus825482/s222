@@ -199,8 +199,8 @@ function SkillDetailModal({
         aria-hidden="true"
       />
 
-      {/* Modal */}
-      <div className="relative z-10 w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
+      {/* Modal: min-h-0 so body can shrink and scroll */}
+      <div className="relative z-10 w-full max-w-lg max-h-[85vh] flex flex-col min-h-0 rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -222,7 +222,7 @@ function SkillDetailModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-5 py-4 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
@@ -543,7 +543,7 @@ export function SkillsPanel() {
               onClick={() => setShowSkillsModal(false)}
               aria-hidden="true"
             />
-            <div className="relative z-10 w-full max-w-3xl max-h-[85vh] flex flex-col rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
+            <div className="relative z-10 w-full max-w-3xl max-h-[85vh] flex flex-col min-h-0 rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
                 <div className="flex items-center gap-2">
@@ -567,7 +567,7 @@ export function SkillsPanel() {
                 </button>
               </div>
               {/* Table */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
                 <table className="w-full text-[11px]">
                   <thead className="sticky top-0 bg-[#1a1f2e] border-b border-border">
                     <tr>

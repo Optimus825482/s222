@@ -158,10 +158,17 @@ export interface WSError {
   thread_id?: string;
 }
 
+export interface WSOrchestratorChatReply {
+  type: "orchestrator_chat_reply";
+  content: string;
+  is_status?: boolean;
+}
+
 export type WSMessage =
   | WSLiveEvent
   | WSResult
   | WSError
+  | WSOrchestratorChatReply
   | { type: "monitor_start"; description: string }
   | { type: "monitor_complete"; summary: string }
   | { type: "monitor_error"; message: string }

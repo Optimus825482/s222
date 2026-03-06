@@ -99,7 +99,7 @@ export function DetailModal({
         onClick={handleClose}
         aria-hidden="true"
       />
-      <div className="relative z-10 w-full max-w-2xl max-h-[80vh] flex flex-col rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
+      <div className="relative z-10 w-full max-w-2xl max-h-[85vh] flex flex-col min-h-0 rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -128,10 +128,10 @@ export function DetailModal({
             <X className="w-4 h-4" />
           </button>
         </div>
-        {/* Content */}
+        {/* Content: min-h-0 lets flex child shrink so overflow-y-auto scrolls */}
         <div
           ref={contentRef}
-          className="flex-1 overflow-y-auto px-5 py-4 text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap break-words font-mono"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-5 py-4 text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap break-words font-mono"
         >
           {content || "İçerik yok"}
         </div>
