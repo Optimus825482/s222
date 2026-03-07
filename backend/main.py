@@ -75,6 +75,48 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] PostgreSQL init failed (SQLite fallback): {e}")
 
+    # Create analytics tables
+    try:
+        from tools.pg_connection import get_pg_connection
+        conn = get_pg_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS tool_usage (
+                    id SERIAL PRIMARY KEY,
+                    tool_name TEXT NOT NULL,
+                    agent_role TEXT NOT NULL,
+                    latency_ms REAL DEFAULT 0,
+                    success INTEGER DEFAULT 1,
+                    tokens_used INTEGER DEFAULT 0,
+                    user_id TEXT NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_behavior (
+                    id SERIAL PRIMARY KEY,
+                    action TEXT NOT NULL,
+                    context TEXT DEFAULT '',
+                    metadata JSONB DEFAULT '{}',
+                    user_id TEXT NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # Create indexes for common queries
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tool_usage_user_id
+                ON tool_usage(user_id, timestamp DESC)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_user_behavior_user_id
+                ON user_behavior(user_id, timestamp DESC)
+            """)
+        conn.commit()
+        conn.close()
+        print("[Backend] Analytics tables initialized")
+    except Exception as e:
+        print(f"[Backend] Analytics tables init failed: {e}")
+
     # Seed default MCP servers for orchestration
     try:
         from tools.mcp_client import seed_default_servers
@@ -761,6 +803,172 @@ async def api_delete_skill(skill_id: str):
         return delete_skill(skill_id)
     except Exception as e:
         raise HTTPException(503, f"Skills module error: {e}")
+
+
+# ── Skill Creator Endpoints ──────────────────────────────────────
+
+class SkillGradeRequest(BaseModel):
+    output_text: str
+    expectations: list[str]
+    strict: bool = False
+
+class SkillValidateRequest(BaseModel):
+    skill_path: str
+
+class BenchmarkRequest(BaseModel):
+    workspace_dir: str
+    skill_name: str = "unnamed-skill"
+
+class EvalViewerRequest(BaseModel):
+    workspace_dir: str
+    skill_name: str = "unnamed-skill"
+    benchmark_path: str = ""
+    output_path: str = ""
+
+
+@app.post("/api/skill-creator/grade")
+async def api_skill_creator_grade(req: SkillGradeRequest):
+    """Grade a skill output against expectations."""
+    import re as _re
+    results = []
+    passed_count = 0
+    output_lower = req.output_text.lower()
+
+    for exp in req.expectations:
+        exp_lower = exp.lower()
+        key_terms = [w for w in _re.findall(r'\b\w{3,}\b', exp_lower)]
+
+        if req.strict:
+            found = exp_lower in output_lower
+            evidence = f"Exact match {'found' if found else 'not found'}"
+        else:
+            matched_terms = [t for t in key_terms if t in output_lower]
+            ratio = len(matched_terms) / max(len(key_terms), 1)
+            found = ratio >= 0.6
+            if found:
+                evidence = f"Matched {len(matched_terms)}/{len(key_terms)} key terms: {', '.join(matched_terms[:5])}"
+            else:
+                missing = [t for t in key_terms if t not in output_lower]
+                evidence = f"Only {len(matched_terms)}/{len(key_terms)} terms found. Missing: {', '.join(missing[:5])}"
+
+        if found:
+            passed_count += 1
+        results.append({"text": exp, "passed": found, "evidence": evidence})
+
+    total = len(req.expectations)
+    return {
+        "expectations": results,
+        "summary": {
+            "passed": passed_count,
+            "failed": total - passed_count,
+            "total": total,
+            "pass_rate": round(passed_count / max(total, 1), 4),
+        },
+    }
+
+
+@app.post("/api/skill-creator/validate")
+async def api_skill_creator_validate(req: SkillValidateRequest):
+    """Validate a SKILL.md file structure and quality."""
+    import re as _re
+    p = Path(req.skill_path)
+    skill_md = p / "SKILL.md" if p.is_dir() else p
+    skill_dir = skill_md.parent
+
+    if not skill_md.exists():
+        raise HTTPException(404, f"SKILL.md not found at {req.skill_path}")
+
+    content = skill_md.read_text(errors="replace")
+    lines = content.split("\n")
+    issues, suggestions = [], []
+    score = 100
+
+    has_frontmatter = content.startswith("---")
+    if not has_frontmatter:
+        issues.append("Missing YAML frontmatter")
+        score -= 30
+    else:
+        fm_end = content.find("---", 3)
+        if fm_end == -1:
+            issues.append("Unclosed YAML frontmatter")
+            score -= 20
+        else:
+            fm = content[3:fm_end].strip()
+            if "name:" not in fm:
+                issues.append("Missing 'name' in frontmatter")
+                score -= 15
+            if "description:" not in fm:
+                issues.append("Missing 'description' in frontmatter")
+                score -= 20
+            else:
+                desc_match = _re.search(r'description:\s*(.+?)(?:\n[a-z]|\n---)', fm, _re.DOTALL)
+                if desc_match:
+                    desc = desc_match.group(1).strip().strip('"').strip("'")
+                    if len(desc) < 30:
+                        issues.append(f"Description too short ({len(desc)} chars)")
+                        score -= 10
+                    if "use when" not in desc.lower() and "use for" not in desc.lower():
+                        suggestions.append("Add 'Use when...' trigger hints to description")
+
+    line_count = len(lines)
+    if line_count > 500:
+        issues.append(f"SKILL.md is {line_count} lines — max recommended is 500")
+        score -= 10
+
+    for subdir, label in [(skill_dir / "references", "references"), (skill_dir / "scripts", "scripts"), (skill_dir / "assets", "assets")]:
+        if subdir.exists():
+            for f in subdir.iterdir():
+                if f.is_file():
+                    proper_link = f"(./{label}/{f.name})"
+                    if proper_link not in content and f.name not in content:
+                        issues.append(f"Bundled file {label}/{f.name} not referenced in SKILL.md")
+                        score -= 5
+
+    must_count = len(_re.findall(r'\bMUST\b', content))
+    never_count = len(_re.findall(r'\bNEVER\b', content))
+    always_count = len(_re.findall(r'\bALWAYS\b', content))
+    if must_count + never_count + always_count > 10:
+        suggestions.append(f"Found {must_count + never_count + always_count} heavy-handed directives — consider explaining WHY instead")
+
+    score = max(0, min(100, score))
+    return {
+        "valid": len(issues) == 0,
+        "score": score,
+        "line_count": line_count,
+        "issues": issues,
+        "suggestions": suggestions,
+        "has_frontmatter": has_frontmatter,
+    }
+
+
+@app.post("/api/skill-creator/benchmark")
+async def api_skill_creator_benchmark(req: BenchmarkRequest):
+    """Aggregate grading results from workspace into benchmark stats."""
+    ws = Path(req.workspace_dir)
+    if not ws.is_dir():
+        raise HTTPException(404, f"Directory not found: {req.workspace_dir}")
+
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / ".claude" / "skill-creator" / "skills" / "skill-creator"))
+        from scripts.aggregate_benchmark import generate_benchmark
+        benchmark = generate_benchmark(ws, req.skill_name)
+        return benchmark
+    except ImportError:
+        raise HTTPException(503, "aggregate_benchmark module not available")
+    except Exception as e:
+        raise HTTPException(500, f"Benchmark error: {e}")
+
+
+@app.get("/api/skill-creator/search")
+async def api_skill_creator_search(query: str = "", max_results: int = 10):
+    """Search existing skills by keyword."""
+    if not query:
+        return []
+    try:
+        from tools.dynamic_skills import search_skills
+        return search_skills(query, max_results=max_results)
+    except Exception as e:
+        raise HTTPException(500, f"Search error: {e}")
 
 
 # ── Workflow Engine Endpoints ────────────────────────────────────
@@ -3599,10 +3807,7 @@ async def apply_agent_learning(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Apply learning failed: {e}")
 
-# ── 8. Tool Usage Analytics ─────────────────────────────────────
-
-_TOOL_USAGE: list[dict] = []
-
+# ── 8. Tool Usage Analytics — PostgreSQL Persistence ───────────
 
 @app.post("/api/analytics/tool-usage")
 async def record_tool_usage(
@@ -3614,20 +3819,21 @@ async def record_tool_usage(
     user: dict = Depends(get_current_user),
 ):
     """Record a tool usage event for analytics."""
-    entry = {
-        "id": f"tu-{len(_TOOL_USAGE)}",
-        "tool_name": tool_name,
-        "agent_role": agent_role,
-        "latency_ms": latency_ms,
-        "success": success,
-        "tokens_used": tokens_used,
-        "timestamp": _utcnow().isoformat(),
-        "user_id": user["user_id"],
-    }
-    _TOOL_USAGE.append(entry)
-    if len(_TOOL_USAGE) > 500:
-        _TOOL_USAGE[:] = _TOOL_USAGE[-500:]
-    return {"recorded": True, "total": len(_TOOL_USAGE)}
+    from tools.pg_connection import get_pg_connection
+    uid = user["user_id"]
+    conn = get_pg_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO tool_usage
+                   (tool_name, agent_role, latency_ms, success, tokens_used, user_id, timestamp)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (tool_name, agent_role, latency_ms, 1 if success else 0, tokens_used, uid, _utcnow().isoformat())
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"recorded": True}
 
 
 @app.get("/api/analytics/tool-usage")
@@ -3637,81 +3843,103 @@ async def get_tool_usage_analytics(
     user: dict = Depends(get_current_user),
 ):
     """Get tool usage analytics with aggregation."""
+    from tools.pg_connection import get_pg_connection
     _audit("tool_analytics_view", user["user_id"])
+    uid = user["user_id"]
+    conn = get_pg_connection()
+    try:
+        with conn.cursor() as cur:
+            # Aggregate by tool
+            if agent_role:
+                cur.execute(
+                    """SELECT tool_name, COUNT(*) as count,
+                              SUM(success) as success_count,
+                              SUM(latency_ms) as total_latency_ms,
+                              SUM(tokens_used) as total_tokens,
+                              STRING_AGG(DISTINCT agent_role, ',') as agents
+                       FROM tool_usage WHERE user_id = %s AND agent_role = %s
+                       GROUP BY tool_name ORDER BY count DESC LIMIT %s""",
+                    (uid, agent_role, limit)
+                )
+            else:
+                cur.execute(
+                    """SELECT tool_name, COUNT(*) as count,
+                              SUM(success) as success_count,
+                              SUM(latency_ms) as total_latency_ms,
+                              SUM(tokens_used) as total_tokens,
+                              STRING_AGG(DISTINCT agent_role, ',') as agents
+                       FROM tool_usage WHERE user_id = %s
+                       GROUP BY tool_name ORDER BY count DESC LIMIT %s""",
+                    (uid, limit)
+                )
+            tool_rows = cur.fetchall()
 
-    filtered = _TOOL_USAGE.copy()
-    if agent_role:
-        filtered = [t for t in filtered if t["agent_role"] == agent_role]
+            tool_stats = []
+            for row in tool_rows:
+                count = row[0]
+                tool_stats.append({
+                    "tool_name": row[1],
+                    "count": count,
+                    "success_rate": round(row[2] / max(count, 1) * 100, 1),
+                    "avg_latency_ms": round(row[3] / max(count, 1), 1),
+                    "total_tokens": row[4],
+                    "agents": row[5].split(",") if row[5] else [],
+                })
 
-    # Aggregate by tool
-    tool_stats: dict[str, dict] = {}
-    for entry in filtered:
-        name = entry["tool_name"]
-        if name not in tool_stats:
-            tool_stats[name] = {"tool_name": name, "count": 0, "success_count": 0, "total_latency_ms": 0, "total_tokens": 0, "agents": set()}
-        tool_stats[name]["count"] += 1
-        if entry["success"]:
-            tool_stats[name]["success_count"] += 1
-        tool_stats[name]["total_latency_ms"] += entry["latency_ms"]
-        tool_stats[name]["total_tokens"] += entry["tokens_used"]
-        tool_stats[name]["agents"].add(entry["agent_role"])
+            # Aggregate by agent
+            cur.execute(
+                """SELECT agent_role, COUNT(*) as tool_calls,
+                          SUM(success) as success_count,
+                          SUM(latency_ms) as total_latency_ms,
+                          SUM(tokens_used) as total_tokens,
+                          STRING_AGG(DISTINCT tool_name, ',') as tools_used
+                   FROM tool_usage WHERE user_id = %s
+                   GROUP BY agent_role ORDER BY tool_calls DESC LIMIT %s""",
+                (uid, limit)
+            )
+            agent_rows = cur.fetchall()
 
-    # Convert sets to lists for JSON
-    summary = []
-    for ts in tool_stats.values():
-        count = ts["count"]
-        summary.append({
-            "tool_name": ts["tool_name"],
-            "count": count,
-            "success_rate": round(ts["success_count"] / max(count, 1) * 100, 1),
-            "avg_latency_ms": round(ts["total_latency_ms"] / max(count, 1), 1),
-            "total_tokens": ts["total_tokens"],
-            "agents": list(ts["agents"]),
-        })
-    summary.sort(key=lambda x: x["count"], reverse=True)
+            agent_stats = []
+            for row in agent_rows:
+                count = row[1]
+                agent_stats.append({
+                    "agent_role": row[0],
+                    "tool_calls": count,
+                    "success_rate": round(row[2] / max(count, 1) * 100, 1),
+                    "avg_latency_ms": round(row[3] / max(count, 1), 1),
+                    "total_tokens": row[4],
+                    "tools_used": row[5].split(",") if row[5] else [],
+                })
 
-    # Aggregate by agent
-    agent_stats: dict[str, dict] = {}
-    for entry in filtered:
-        role = entry["agent_role"]
-        if role not in agent_stats:
-            agent_stats[role] = {"agent_role": role, "tool_calls": 0, "success_count": 0, "total_latency_ms": 0, "total_tokens": 0, "tools_used": set()}
-        agent_stats[role]["tool_calls"] += 1
-        if entry["success"]:
-            agent_stats[role]["success_count"] += 1
-        agent_stats[role]["total_latency_ms"] += entry["latency_ms"]
-        agent_stats[role]["total_tokens"] += entry["tokens_used"]
-        agent_stats[role]["tools_used"].add(entry["tool_name"])
+            # Recent entries
+            cur.execute(
+                """SELECT * FROM tool_usage WHERE user_id = %s
+                   ORDER BY timestamp DESC LIMIT %s""",
+                (uid, limit)
+            )
+            recent_rows = cur.fetchall()
+            col_names = [desc[0] for desc in cur.description]
+            recent = [dict(zip(col_names, row)) for row in recent_rows]
 
-    agent_summary = []
-    for ag in agent_stats.values():
-        count = ag["tool_calls"]
-        agent_summary.append({
-            "agent_role": ag["agent_role"],
-            "tool_calls": count,
-            "success_rate": round(ag["success_count"] / max(count, 1) * 100, 1),
-            "avg_latency_ms": round(ag["total_latency_ms"] / max(count, 1), 1),
-            "total_tokens": ag["total_tokens"],
-            "tools_used": list(ag["tools_used"]),
-        })
-    agent_summary.sort(key=lambda x: x["tool_calls"], reverse=True)
+            # Total count
+            cur.execute(
+                "SELECT COUNT(*) FROM tool_usage WHERE user_id = %s", (uid,)
+            )
+            total = cur.fetchone()[0]
 
-    recent = filtered[-min(limit, len(filtered)):]
-    recent.reverse()
+    finally:
+        conn.close()
 
     return {
-        "total_events": len(filtered),
-        "by_tool": summary,
-        "by_agent": agent_summary,
+        "total_events": total,
+        "by_tool": tool_stats,
+        "by_agent": agent_stats,
         "recent": recent,
         "timestamp": _utcnow().isoformat(),
     }
 
 
-# ── 9. User Behavior Tracking ──────────────────────────────────
-
-_USER_BEHAVIORS: list[dict] = []
-
+# ── 9. User Behavior Tracking — PostgreSQL Persistence ─────────
 
 @app.post("/api/analytics/user-behavior")
 async def record_user_behavior(
@@ -3721,18 +3949,21 @@ async def record_user_behavior(
     user: dict = Depends(get_current_user),
 ):
     """Record user behavior event."""
-    entry = {
-        "id": f"ub-{len(_USER_BEHAVIORS)}",
-        "action": action,
-        "context": context,
-        "metadata": metadata or {},
-        "timestamp": _utcnow().isoformat(),
-        "user_id": user["user_id"],
-    }
-    _USER_BEHAVIORS.append(entry)
-    if len(_USER_BEHAVIORS) > 500:
-        _USER_BEHAVIORS[:] = _USER_BEHAVIORS[-500:]
-    return {"recorded": True, "total": len(_USER_BEHAVIORS)}
+    from tools.pg_connection import get_pg_connection
+    uid = user["user_id"]
+    conn = get_pg_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO user_behavior
+                   (action, context, metadata, user_id, timestamp)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (action, context, json.dumps(metadata or {}), uid, _utcnow().isoformat())
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"recorded": True}
 
 
 @app.get("/api/analytics/user-behavior")
@@ -3741,23 +3972,43 @@ async def get_user_behavior_analytics(
     user: dict = Depends(get_current_user),
 ):
     """Get user behavior analytics."""
+    from tools.pg_connection import get_pg_connection
     _audit("user_behavior_view", user["user_id"])
-
     uid = user["user_id"]
-    filtered = [b for b in _USER_BEHAVIORS if b["user_id"] == uid]
+    conn = get_pg_connection()
+    try:
+        with conn.cursor() as cur:
+            # Aggregate by action
+            cur.execute(
+                """SELECT action, COUNT(*) as count
+                   FROM user_behavior WHERE user_id = %s
+                   GROUP BY action ORDER BY count DESC""",
+                (uid,)
+            )
+            action_rows = cur.fetchall()
+            action_summary = [{"action": row[0], "count": row[1]} for row in action_rows]
 
-    # Aggregate by action
-    action_counts: dict[str, int] = {}
-    for entry in filtered:
-        action_counts[entry["action"]] = action_counts.get(entry["action"], 0) + 1
+            # Recent entries
+            cur.execute(
+                """SELECT * FROM user_behavior WHERE user_id = %s
+                   ORDER BY timestamp DESC LIMIT %s""",
+                (uid, limit)
+            )
+            recent_rows = cur.fetchall()
+            col_names = [desc[0] for desc in cur.description]
+            recent = [dict(zip(col_names, row)) for row in recent_rows]
 
-    action_summary = [{"action": k, "count": v} for k, v in sorted(action_counts.items(), key=lambda x: x[1], reverse=True)]
+            # Total count
+            cur.execute(
+                "SELECT COUNT(*) FROM user_behavior WHERE user_id = %s", (uid,)
+            )
+            total = cur.fetchone()[0]
 
-    recent = filtered[-min(limit, len(filtered)):]
-    recent.reverse()
+    finally:
+        conn.close()
 
     return {
-        "total_events": len(filtered),
+        "total_events": total,
         "by_action": action_summary,
         "recent": recent,
         "timestamp": _utcnow().isoformat(),

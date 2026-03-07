@@ -39,6 +39,7 @@ import {
   Info,
   Map,
   Package,
+  Sparkles,
 } from "lucide-react";
 import { SystemGuideDialog } from "./system-guide-dialog";
 import { RoadmapDialog } from "./roadmap-dialog";
@@ -231,6 +232,13 @@ const WorkflowHistoryPanel = dynamic(
   () =>
     import("@/components/workflow-history-panel").then((m) => ({
       default: m.WorkflowHistoryPanel,
+    })),
+  { ssr: false },
+);
+const SkillCreatorPanel = dynamic(
+  () =>
+    import("@/components/skill-creator-panel").then((m) => ({
+      default: m.SkillCreatorPanel,
     })),
   { ssr: false },
 );
@@ -608,6 +616,18 @@ const APPS: DesktopApp[] = [
     defaultW: 750,
     defaultH: 550,
     render: () => <XpMarketplacePanel />,
+  },
+  {
+    id: "skill-creator",
+    title: "Skill Creator",
+    icon: <Sparkles className="w-8 h-8" />,
+    color: "#f59e0b",
+    group: "Araçlar",
+    description:
+      "Skill oluşturun, test edin ve iteratif olarak geliştirin. Grading, benchmarking, validation ve eval viewer araçları.",
+    defaultW: 700,
+    defaultH: 500,
+    render: () => <SkillCreatorPanel />,
   },
 ];
 

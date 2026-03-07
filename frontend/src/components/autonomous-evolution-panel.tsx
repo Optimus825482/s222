@@ -8,35 +8,7 @@ import type {
   FailureLearning,
   ApplyLearningResult,
 } from "@/lib/types";
-
-// ── Shared Constants ────────────────────────────────────────────
-
-const AGENT_ROLES: AgentRole[] = [
-  "orchestrator",
-  "thinker",
-  "speed",
-  "researcher",
-  "reasoner",
-  "critic",
-];
-
-const ROLE_ICON: Record<AgentRole, string> = {
-  orchestrator: "🧠",
-  thinker: "🔬",
-  speed: "⚡",
-  researcher: "🔍",
-  reasoner: "🌊",
-  critic: "🎯",
-};
-
-const ROLE_COLOR: Record<AgentRole, string> = {
-  orchestrator: "#ec4899",
-  thinker: "#00e5ff",
-  speed: "#a78bfa",
-  researcher: "#f59e0b",
-  reasoner: "#10b981",
-  critic: "#06b6d4",
-};
+import { ROLE_ICON, ROLE_COLOR, AGENT_ROLES } from "@/lib/constants";
 
 const PRIORITY_STYLES: Record<string, string> = {
   critical: "bg-red-500/20 text-red-400 border-red-500/40",

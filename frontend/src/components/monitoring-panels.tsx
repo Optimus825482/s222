@@ -10,40 +10,7 @@ import type {
   SystemStats,
   AnomalyReport,
 } from "@/lib/types";
-
-// ── Shared Helpers ──────────────────────────────────────────────
-
-const ROLE_ICON: Record<AgentRole, string> = {
-  orchestrator: "🧠",
-  thinker: "🔬",
-  speed: "⚡",
-  researcher: "🔍",
-  reasoner: "🌊",
-  critic: "🎯",
-};
-
-const ROLE_COLOR: Record<AgentRole, string> = {
-  orchestrator: "#ec4899",
-  thinker: "#00e5ff",
-  speed: "#a78bfa",
-  researcher: "#f59e0b",
-  reasoner: "#10b981",
-  critic: "#06b6d4",
-};
-
-const STATUS_DOT: Record<AgentStatus, string> = {
-  active: "bg-green-400",
-  idle: "bg-yellow-400",
-  error: "bg-red-400",
-  offline: "bg-gray-500",
-};
-
-const STATUS_LABEL: Record<AgentStatus, string> = {
-  active: "Aktif",
-  idle: "Boşta",
-  error: "Hata",
-  offline: "Çevrimdışı",
-};
+import { ROLE_ICON, ROLE_COLOR, STATUS_DOT, STATUS_LABEL } from "@/lib/constants";
 
 function Skeleton({ className = "" }: { className?: string }) {
   return (

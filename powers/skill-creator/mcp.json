@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "skill-creator-server": {
+      "command": "python",
+      "args": ["server/skill_creator_server.py"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "disabled": false,
+      "autoApprove": ["validate_skill", "search_skills", "aggregate_benchmark"]
+    }
+  }
+}

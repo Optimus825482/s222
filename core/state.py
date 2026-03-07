@@ -36,13 +36,19 @@ def save_thread(thread: Thread, user_id: str | None = None) -> str:
 def load_thread(thread_id: str, user_id: str | None = None) -> Thread | None:
     """Load thread from JSON file."""
     path = _threads_dir(user_id) / f"{thread_id}.json"
-    if not path.exists():
-        # Fallback: try root threads dir (backward compat)
-        path = THREADS_DIR / f"{thread_id}.json"
-        if not path.exists():
-            return None
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return Thread.model_validate(data)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return Thread.model_validate(data)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    # Fallback: try root threads dir (backward compat)
+    path = THREADS_DIR / f"{thread_id}.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return Thread.model_validate(data)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
 
 
 def list_threads(limit: int = 50, user_id: str | None = None) -> list[dict]:
