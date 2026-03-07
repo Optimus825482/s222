@@ -784,11 +784,6 @@ export const costApi = {
 };
 
 function authHeaders(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem("ops-center-auth");
-    const parsed = raw ? JSON.parse(raw) : null;
-    return parsed?.token ? { Authorization: `Bearer ${parsed.token}` } : {};
-  } catch {
-    return {};
-  }
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
