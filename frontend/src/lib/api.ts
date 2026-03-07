@@ -524,18 +524,14 @@ export const benchmarkApi = {
   async getScenarios(category?: string) {
     const q = category ? `?category=${category}` : "";
     const url = `${BASE}/api/benchmarks/scenarios${q}`;
-    console.log("[DEBUG] benchmarkApi.getScenarios →", url);
     const res = await fetch(url, { headers: authHeaders() });
-    console.log("[DEBUG] benchmarkApi.getScenarios ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
 
   async getLeaderboard() {
     const url = `${BASE}/api/benchmarks/leaderboard`;
-    console.log("[DEBUG] benchmarkApi.getLeaderboard →", url);
     const res = await fetch(url, { headers: authHeaders() });
-    console.log("[DEBUG] benchmarkApi.getLeaderboard ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -545,9 +541,7 @@ export const benchmarkApi = {
     if (agentRole) params.set("agent_role", agentRole);
     params.set("limit", String(limit));
     const url = `${BASE}/api/benchmarks/results?${params}`;
-    console.log("[DEBUG] benchmarkApi.getResults →", url);
     const res = await fetch(url, { headers: authHeaders() });
-    console.log("[DEBUG] benchmarkApi.getResults ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -586,13 +580,11 @@ export const errorPatternApi = {
     context?: Record<string, unknown>;
   }) {
     const url = `${BASE}/api/errors/record`;
-    console.log("[DEBUG errorPatternApi.recordError] POST", url);
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body),
     });
-    console.log("[DEBUG errorPatternApi.recordError] status:", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -602,9 +594,7 @@ export const errorPatternApi = {
     if (agentRole) params.set("agent_role", agentRole);
     params.set("hours", String(hours));
     const url = `${BASE}/api/errors/stats?${params}`;
-    console.log("[DEBUG errorPatternApi.getStats] GET", url);
     const res = await fetch(url, { headers: authHeaders() });
-    console.log("[DEBUG errorPatternApi.getStats] status:", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -676,9 +666,7 @@ export const errorPatternApi = {
 export const optimizerApi = {
   async getStats() {
     const url = `${BASE}/api/optimizer/stats`;
-    console.log("[DEBUG] optimizerApi.getStats →", url);
     const res = await fetch(url, { headers: authHeaders() });
-    console.log("[DEBUG] optimizerApi.getStats ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -692,18 +680,14 @@ export const optimizerApi = {
     if (category) params.set("category", category);
     if (priority) params.set("priority", priority);
     const url = `${BASE}/api/optimizer/recommendations?${params}`;
-    console.log("[DEBUG] optimizerApi.getRecommendations →", url);
     const res = await fetch(url, { headers: authHeaders() });
-    console.log("[DEBUG] optimizerApi.getRecommendations ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
 
   async analyze() {
     const url = `${BASE}/api/optimizer/analyze`;
-    console.log("[DEBUG] optimizerApi.analyze →", url);
     const res = await fetch(url, { method: "POST", headers: authHeaders() });
-    console.log("[DEBUG] optimizerApi.analyze ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -744,14 +728,113 @@ export const optimizerApi = {
   },
 };
 
+// ── Adaptive Tool Selection API ───────────────────────────────────
+
+export const toolSelectorApi = {
+  async getToolPatterns() {
+    const res = await fetch(`${BASE}/api/optimizer/tool-patterns`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getSuggestedTools(taskContext: string) {
+    const res = await fetch(
+      `${BASE}/api/optimizer/suggested-tools?task_context=${encodeURIComponent(taskContext)}`,
+      { headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async applyToolSuggestion(
+    taskInput: string,
+    toolName: string,
+    agentRole: string,
+    success = true,
+  ) {
+    const res = await fetch(`${BASE}/api/optimizer/apply-tool-suggestion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({
+        task_input: taskInput,
+        tool_name: toolName,
+        agent_role: agentRole,
+        success,
+      }),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getAgentToolMatrix() {
+    const res = await fetch(`${BASE}/api/optimizer/agent-tool-matrix`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
+
+// ── Workflow Optimizer API ───────────────────────────────────────
+
+export const workflowOptimizerApi = {
+  async getStats() {
+    const res = await fetch(`${BASE}/api/workflow-optimizer/stats`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getSuggestions(templateName?: string) {
+    const url = templateName
+      ? `${BASE}/api/workflow-optimizer/suggestions?template_name=${encodeURIComponent(templateName)}`
+      : `${BASE}/api/workflow-optimizer/suggestions`;
+    const res = await fetch(url, { headers: authHeaders() });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getWorkflowStats(workflowId: string) {
+    const res = await fetch(`${BASE}/api/workflow-optimizer/workflow/${encodeURIComponent(workflowId)}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async optimizeTemplate(
+    templateName: string,
+    autoApply = false,
+  ) {
+    const res = await fetch(`${BASE}/api/workflow-optimizer/optimize-template`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ template_name: templateName, auto_apply: autoApply }),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async recordExecution(execution: Record<string, unknown>) {
+    const res = await fetch(`${BASE}/api/workflow-optimizer/record-execution`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(execution),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
+
 // ── Cost Tracker API ────────────────────────────────────────────
 
 export const costTrackerApi = {
   async getSummary(hours = 24) {
     const url = `${BASE}/api/costs/summary?hours=${hours}`;
-    console.log("[DEBUG costTrackerApi.getSummary] GET", url);
     const res = await fetch(url, { headers: authHeaders() });
-    console.log("[DEBUG costTrackerApi.getSummary] status:", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },

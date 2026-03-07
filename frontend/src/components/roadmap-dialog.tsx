@@ -243,10 +243,10 @@ export const PHASES: Phase[] = [
     id: "f9",
     title: "Faz 9 — Kişiselleştirme",
     icon: "👤",
-    status: "wip",
-    color: "text-violet-400",
-    border: "border-violet-400/30",
-    progress: 75,
+    status: "done",
+    color: "text-emerald-400",
+    border: "border-emerald-400/30",
+    progress: 100,
     items: [
       {
         done: true,
@@ -254,8 +254,16 @@ export const PHASES: Phase[] = [
       },
       { done: true, label: "User behavior tracking" },
       { done: true, label: "Proaktif skill önerisi" },
-      { done: false, label: "Adaptive tool selection" },
-      { done: false, label: "Workflow auto-optimization" },
+      {
+        done: true,
+        label:
+          "Adaptive tool selection (4-tab: kullanım, öneriler, matris, tercihler)",
+      },
+      {
+        done: true,
+        label:
+          "Workflow auto-optimization (4-tab: genel bakış, öneriler, detay, pattern kütüphanesi)",
+      },
     ],
   },
   {
@@ -536,7 +544,7 @@ export function RoadmapDialog({ open, onClose }: Props) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-slate-800 text-center text-[10px] text-slate-600">
-          Son güncelleme: 2026-03-08 · Her sprint sonunda güncellenir
+          Son güncelleme: 2026-03-07 · Her sprint sonunda güncellenir
         </div>
       </div>
     </div>

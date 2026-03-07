@@ -787,13 +787,13 @@ def get_workflow_templates() -> list[dict[str, Any]]:
     """Return metadata for all available workflow templates."""
     return [
         {
-            "id": wf.workflow_id,
+            "id": key,
             "name": wf.name,
             "description": wf.description,
             "step_count": len(wf.steps),
             "required_variables": list(wf.variables.keys()),
         }
-        for wf in WORKFLOW_TEMPLATES.values()
+        for key, wf in WORKFLOW_TEMPLATES.items()
     ]
 
 

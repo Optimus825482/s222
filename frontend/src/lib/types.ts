@@ -613,3 +613,102 @@ export interface ChartListItem {
   created_at: string;
   size_bytes: number;
 }
+
+// ── Adaptive Tool Selection Types ─────────────────────────────────
+
+export interface ToolUsageStats {
+  tool: string;
+  count: number;
+  success: number;
+  success_rate: number;
+}
+
+export interface AgentToolStats {
+  total_calls: number;
+  top_tools: ToolUsageStats[];
+  tool_diversity: number;
+}
+
+export interface ToolPatternAnalysis {
+  pattern_matrix: Record<string, AgentToolStats>;
+  learned_preferences: Record<string, unknown>;
+  context_categories: string[];
+}
+
+export interface ContextRecommendation {
+  input_summary: string;
+  context_analysis: {
+    primary_type: string;
+    key_requirements: string[];
+  };
+  context_scores: { tool: string; score: number }[];
+  user_suggestion: string | null;
+  suggested_agent: string;
+  confidence: number;
+}
+
+export interface ToolSuggestionHistory {
+  task_input: string;
+  tool_used: string;
+  agent_used: string;
+  success: boolean;
+  timestamp: string;
+}
+
+// ── Workflow Optimizer Types ─────────────────────────────────────
+
+export interface WorkflowPattern {
+  pattern_id: string;
+  name: string;
+  type: string;
+  frequency: number;
+  optimization_suggestion: string;
+  affected_workflows: string[];
+}
+
+export interface OptimizationSuggestion {
+  suggestion_id: string;
+  workflow_id: string;
+  workflow_name: string;
+  type: string;
+  current_state: string;
+  suggested_change: string;
+  estimated_impact: string;
+  confidence: number;
+  automated: boolean;
+}
+
+export interface WorkflowOptimizerStats {
+  total_executions_analyzed: number;
+  slow_workflows: number;
+  error_workflows: number;
+  global_patterns: {
+    type: string;
+    pattern: string;
+    occurrence_count: number;
+    suggestion: string;
+  }[];
+}
+
+export interface WorkflowOptimizationResult {
+  original_steps: Array<{ step_id: string; step_type: string }>;
+  suggestions: {
+    type: string;
+    severity: string;
+    current: string;
+    suggestion: string;
+    affected_steps: string[];
+  }[];
+  optimized_steps: Array<{ step_id: string; step_type: string }>;
+  applied: string[];
+  recommendations: string[];
+}
+
+export interface WorkflowOptimizationHistory {
+  id: number;
+  workflow_id: string;
+  suggestion_id: string;
+  action: string;
+  notes: string;
+  performed_at: string;
+}

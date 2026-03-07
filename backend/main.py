@@ -1008,15 +1008,26 @@ async def api_run_workflow(req: WorkflowRunRequest, user: dict = Depends(get_cur
         )
         from core.models import Thread as ThreadModel
 
-        if req.template != "custom" and req.template in WORKFLOW_TEMPLATES:
-            template = WORKFLOW_TEMPLATES[req.template]
-            steps = [WorkflowStep(**s) for s in template["steps"]]
+        # Support both dict key ("research-and-report") and workflow_id ("tpl-research-and-report")
+        resolved_key = None
+        if req.template != "custom":
+            if req.template in WORKFLOW_TEMPLATES:
+                resolved_key = req.template
+            else:
+                # Lookup by workflow_id (e.g. "tpl-research-and-report")
+                for k, wf in WORKFLOW_TEMPLATES.items():
+                    if wf.workflow_id == req.template:
+                        resolved_key = k
+                        break
+
+        if resolved_key is not None:
+            tpl_workflow = WORKFLOW_TEMPLATES[resolved_key]
             workflow = Workflow(
-                workflow_id=f"{req.template}-{int(__import__('time').time())}",
-                name=template["name"],
-                description=template["description"],
-                steps=steps,
-                variables=req.variables,
+                workflow_id=f"{resolved_key}-{int(__import__('time').time())}",
+                name=tpl_workflow.name,
+                description=tpl_workflow.description,
+                steps=list(tpl_workflow.steps),
+                variables={**tpl_workflow.variables, **(req.variables or {})},
             )
         elif req.template == "custom" and req.custom_steps:
             steps = [WorkflowStep(**s) for s in req.custom_steps]
@@ -4485,6 +4496,143 @@ async def optimizer_history(
     """Get optimization action history."""
     history = _auto_optimizer.get_optimization_history(limit=limit)
     return {"history": history, "total": len(history)}
+
+
+# ── Adaptive Tool Selection API ───────────────────────────────────
+
+try:
+    from tools.adaptive_tool_selector import get_adaptive_tool_selector
+    _tool_selector = get_adaptive_tool_selector()
+    print("[Backend] adaptive_tool_selector loaded OK")
+except Exception as _e:
+    print(f"[Backend] WARNING: adaptive_tool_selector import failed: {_e}")
+    _tool_selector = None
+
+
+@app.get("/api/optimizer/tool-patterns")
+async def tool_pattern_analysis(user: dict = Depends(get_current_user)):
+    """Get tool usage patterns across all agents."""
+    if _tool_selector is None:
+        raise HTTPException(status_code=503, detail="Tool selector not available")
+    stats = _tool_selector.get_statistics()
+    return stats
+
+
+@app.get("/api/optimizer/suggested-tools")
+async def get_suggested_tools(
+    task_context: str,
+    user: dict = Depends(get_current_user),
+):
+    """Get tool recommendations based on task context."""
+    if _tool_selector is None:
+        raise HTTPException(status_code=503, detail="Tool selector not available")
+    recommendation = _tool_selector.analyze_task(task_context)
+    return {"recommendation": recommendation}
+
+
+@app.post("/api/optimizer/apply-tool-suggestion")
+async def apply_tool_suggestion(
+    task_input: str,
+    tool_name: str,
+    agent_role: str,
+    success: bool = True,
+    user: dict = Depends(get_current_user),
+):
+    """Apply a tool suggestion and learn from the outcome."""
+    if _tool_selector is None:
+        raise HTTPException(status_code=503, detail="Tool selector not available")
+    if success:
+        _tool_selector.record_success(agent_role, tool_name, task_input)
+    else:
+        _tool_selector.record_failure(agent_role, tool_name, task_input, "User feedback")
+    return {"status": "learned", "recorded": success}
+
+
+@app.get("/api/optimizer/agent-tool-matrix")
+async def get_agent_tool_matrix(user: dict = Depends(get_current_user)):
+    """Get agent-to-tool effectiveness matrix."""
+    if _tool_selector is None:
+        raise HTTPException(status_code=503, detail="Tool selector not available")
+    stats = _tool_selector.get_statistics()
+    return {"matrix": stats.get("pattern_matrix", {}), "categories": stats.get("context_categories", [])}
+
+
+# ── Workflow Optimizer API ─────────────────────────────────────────
+
+try:
+    from tools.workflow_optimizer import get_workflow_optimizer
+    _workflow_optimizer = get_workflow_optimizer()
+    print("[Backend] workflow_optimizer loaded OK")
+except Exception as _e:
+    print(f"[Backend] WARNING: workflow_optimizer import failed: {_e}")
+    _workflow_optimizer = None
+
+
+@app.get("/api/workflow-optimizer/stats")
+async def workflow_optimizer_stats(user: dict = Depends(get_current_user)):
+    """Get workflow optimization statistics."""
+    if _workflow_optimizer is None:
+        raise HTTPException(status_code=503, detail="Workflow optimizer not available")
+    return _workflow_optimizer.get_statistics()
+
+
+@app.get("/api/workflow-optimizer/suggestions")
+async def workflow_optimizer_suggestions(
+    template_name: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Get workflow optimization suggestions."""
+    if _workflow_optimizer is None:
+        raise HTTPException(status_code=503, detail="Workflow optimizer not available")
+    suggestions = _workflow_optimizer.generate_suggestions(template_name=template_name)
+    return {"suggestions": suggestions, "total": len(suggestions)}
+
+
+@app.get("/api/workflow-optimizer/workflow/{workflow_id}")
+async def workflow_optimizer_workflow(
+    workflow_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Get detailed stats for a specific workflow."""
+    if _workflow_optimizer is None:
+        raise HTTPException(status_code=503, detail="Workflow optimizer not available")
+    return _workflow_optimizer.get_workflow_stats(workflow_id)
+
+
+@app.post("/api/workflow-optimizer/optimize-template")
+async def optimize_workflow_template(
+    template_name: str,
+    auto_apply: bool = False,
+    user: dict = Depends(get_current_user),
+):
+    """Analyze and optimize a workflow template."""
+    if _workflow_optimizer is None:
+        raise HTTPException(status_code=503, detail="Workflow optimizer not available")
+
+    from tools.workflow_engine import WORKFLOW_TEMPLATES
+    if template_name not in WORKFLOW_TEMPLATES:
+        raise HTTPException(status_code=404, detail=f"Template '{template_name}' not found")
+
+    wf = WORKFLOW_TEMPLATES[template_name]
+    steps = [{"step_id": s.step_id, "step_type": s.step_type} for s in wf.steps]
+
+    result = _workflow_optimizer.optimize_workflow(
+        wf.workflow_id, steps, auto_apply=auto_apply
+    )
+    return result
+
+
+@app.post("/api/workflow-optimizer/record-execution")
+async def record_workflow_execution(
+    execution: dict[str, Any],
+    user: dict = Depends(get_current_user),
+):
+    """Record a workflow execution for optimization learning."""
+    if _workflow_optimizer is None:
+        raise HTTPException(status_code=503, detail="Workflow optimizer not available")
+    _workflow_optimizer.record_execution(execution)
+    return {"status": "recorded"}
+
 
 # ── Section 14 · Chart Generation ────────────────────────────────
 
