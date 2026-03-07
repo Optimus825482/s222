@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import startupSrc from "@/assets/sounds/startup.mp3";
+import errorSrc from "@/assets/sounds/error.mp3";
+import shutdownSrc from "@/assets/sounds/shutdown.mp3";
 
 const SOUNDS = {
-  startup: "/api/voices/startup.mp3",
-  error: "/api/voices/error.mp3",
-  shutdown: "/api/voices/shutdown.mp3",
+  startup: startupSrc,
+  error: errorSrc,
+  shutdown: shutdownSrc,
 } as const;
 
 type SoundName = keyof typeof SOUNDS;
