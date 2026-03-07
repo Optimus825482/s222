@@ -64,12 +64,19 @@ export function MemoryTimelinePanel() {
   const [hours, setHours] = useState<TimeRange>(168);
 
   const fetchTimeline = useCallback(async () => {
+    console.debug("[MemoryTimeline] Fetching timeline...", { hours, groupBy });
     try {
       const result = await api.getMemoryTimeline(hours, groupBy);
+      console.debug("[MemoryTimeline] API response:", {
+        resultLength: result?.length,
+        result,
+      });
       setData(result);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Veri alınamadı");
+      const msg = e instanceof Error ? e.message : "Veri alınamadı";
+      console.error("[MemoryTimeline] Fetch error:", msg, e);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -211,15 +218,23 @@ export function MemoryCorrelationPanel() {
 
   const search = useCallback(async (q: string) => {
     if (!q.trim()) return;
+    console.debug("[MemoryCorrelation] Searching...", { query: q });
     setLoading(true);
     setError(null);
     try {
       const result = await api.correlateMemories(q, 10);
+      console.debug("[MemoryCorrelation] API response:", {
+        clustersCount: result.clusters?.length,
+        totalFound: result.total_found,
+        clusters: result.clusters,
+      });
       setClusters(result.clusters as Cluster[]);
       setTotalFound(result.total_found);
       setExpandedIdx(new Set());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Arama başarısız");
+      const msg = e instanceof Error ? e.message : "Arama başarısız";
+      console.error("[MemoryCorrelation] Search error:", msg, e);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -233,6 +248,7 @@ export function MemoryCorrelationPanel() {
 
   // Auto-load recent memories on mount
   useEffect(() => {
+    console.debug("[MemoryCorrelation] Component mounted, auto-searching '*'");
     search("*");
     setSubmittedQuery("*");
     // eslint-disable-next-line react-hooks/exhaustive-deps

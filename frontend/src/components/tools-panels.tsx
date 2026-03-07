@@ -689,11 +689,14 @@ export function MemoryPanel() {
         getMemoryLayers() as Promise<MemoryLayers>,
         getDbHealth() as Promise<{ status: string; backend?: string }>,
       ]);
+      console.log("[MemoryPanel] stats:", JSON.stringify(s));
+      console.log("[MemoryPanel] layers:", JSON.stringify(l));
+      console.log("[MemoryPanel] dbHealth:", JSON.stringify(h));
       setStats(s);
       setLayers(l);
       setDbHealth(h);
-    } catch {
-      /* backend offline */
+    } catch (err) {
+      console.error("[MemoryPanel] loadData error:", err);
     }
     setLoading(false);
   }, []);

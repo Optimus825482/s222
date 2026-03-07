@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, HelpCircle, LogOut, Map, Menu } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
@@ -38,22 +38,22 @@ interface TG {
 const PRIMARY_TABS: { key: NavTab; label: string; color: string }[] = [
   {
     key: "chat",
-    label: "💬 Sohbet",
+    label: "Sohbet",
     color: "text-blue-400 border-blue-400 bg-blue-400/5",
   },
   {
     key: "monitor",
-    label: "📊 Görev",
+    label: "Görev Merkezi",
     color: "text-sky-400 border-sky-400 bg-sky-400/5",
   },
   {
     key: "insights",
-    label: "⚙️ Sistem",
+    label: "Sistem",
     color: "text-emerald-400 border-emerald-400 bg-emerald-400/5",
   },
   {
     key: "memory",
-    label: "🧠 Bellek",
+    label: "Bellek",
     color: "text-purple-400 border-purple-400 bg-purple-400/5",
   },
 ];
@@ -151,7 +151,7 @@ function NavDropdown(props: {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`whitespace-nowrap px-3 py-2 text-xs font-medium transition-colors border-b-2 flex items-center gap-1 ${
+        className={`whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-1 ${
           match
             ? `${group.color} bg-white/5`
             : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"
@@ -179,7 +179,7 @@ function NavDropdown(props: {
                   onSelect(item.key);
                   setOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${
+                className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
                   sel
                     ? `${item.color} bg-white/5 font-medium`
                     : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
@@ -277,9 +277,9 @@ export function CockpitHeader({
           </div>
         )}
       </div>
-      {/* Desktop: all tabs flat — no dropdowns */}
+      {/* Desktop: primary tabs + grouped dropdowns */}
       <nav
-        className="hidden lg:flex items-center overflow-x-auto scrollbar-hide px-1"
+        className="hidden lg:flex items-center overflow-x-auto scrollbar-hide px-2 gap-1"
         aria-label="Ana navigasyon"
       >
         {PRIMARY_TABS.map((tab) => (
@@ -287,33 +287,19 @@ export function CockpitHeader({
             key={tab.key}
             type="button"
             onClick={() => onTabChange(tab.key)}
-            className={`whitespace-nowrap px-2 py-1.5 text-[11px] font-medium transition-colors border-b-2 ${activeTab === tab.key ? tab.color : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"}`}
+            className={`whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.key ? tab.color : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"}`}
           >
             {tab.label}
           </button>
         ))}
+        <div className="w-px h-5 bg-slate-700/50 mx-1 shrink-0" aria-hidden />
         {TAB_GROUPS.map((g) => (
-          <Fragment key={g.id}>
-            <div
-              className="w-px h-4 bg-slate-700/50 mx-0.5 shrink-0"
-              aria-hidden
-            />
-            {g.items.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => onTabChange(item.key)}
-                className={`whitespace-nowrap px-1.5 py-1.5 text-[11px] font-medium transition-colors border-b-2 flex items-center gap-0.5 ${
-                  activeTab === item.key
-                    ? `${item.color} border-current bg-white/5`
-                    : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"
-                }`}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </Fragment>
+          <NavDropdown
+            key={g.id}
+            group={g}
+            activeTab={activeTab}
+            onSelect={onTabChange}
+          />
         ))}
       </nav>
 

@@ -1,6 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import {
+  MessageSquare,
+  BarChart3,
+  Settings,
+  Brain,
+  TrendingUp,
+  Link2,
+  Globe,
+  Bot,
+  Radio,
+  Trophy,
+  Bug,
+  Zap,
+  DollarSign,
+  Wrench,
+} from "lucide-react";
 import type { NavTab } from "@/components/cockpit-header";
 
 interface Props {
@@ -10,23 +26,31 @@ interface Props {
   liveEventCount: number;
 }
 
-const MOBILE_TABS: { id: NavTab; label: string; emoji: string }[] = [
-  { id: "chat", label: "Sohbet", emoji: "💬" },
-  { id: "monitor", label: "Görev", emoji: "📊" },
-  { id: "insights", label: "Sistem", emoji: "⚙️" },
-  { id: "memory", label: "Bellek", emoji: "🧠" },
+const MOBILE_TABS: { id: NavTab; label: string; icon: React.ReactNode }[] = [
+  { id: "chat", label: "Sohbet", icon: <MessageSquare className="w-5 h-5" /> },
+  { id: "monitor", label: "Görev", icon: <BarChart3 className="w-5 h-5" /> },
+  { id: "insights", label: "Sistem", icon: <Settings className="w-5 h-5" /> },
+  { id: "memory", label: "Bellek", icon: <Brain className="w-5 h-5" /> },
 ];
 
-const MORE_ITEMS: { id: NavTab; label: string; emoji: string }[] = [
-  { id: "evolution", label: "Gelişim", emoji: "📈" },
-  { id: "coordination", label: "Koordinasyon", emoji: "🔗" },
-  { id: "ecosystem", label: "Ekosistem", emoji: "🌐" },
-  { id: "autonomous", label: "Özerk", emoji: "🤖" },
-  { id: "comms", label: "İletişim", emoji: "📡" },
-  { id: "benchmark", label: "Benchmark", emoji: "🏆" },
-  { id: "errors", label: "Hatalar", emoji: "🐛" },
-  { id: "optimizer", label: "Optimizer", emoji: "⚡" },
-  { id: "costs", label: "Maliyet", emoji: "💰" },
+const MORE_ITEMS: { id: NavTab; label: string; icon: React.ReactNode }[] = [
+  {
+    id: "evolution",
+    label: "Gelişim",
+    icon: <TrendingUp className="w-5 h-5" />,
+  },
+  {
+    id: "coordination",
+    label: "Koordinasyon",
+    icon: <Link2 className="w-5 h-5" />,
+  },
+  { id: "ecosystem", label: "Ekosistem", icon: <Globe className="w-5 h-5" /> },
+  { id: "autonomous", label: "Özerk", icon: <Bot className="w-5 h-5" /> },
+  { id: "comms", label: "İletişim", icon: <Radio className="w-5 h-5" /> },
+  { id: "benchmark", label: "Benchmark", icon: <Trophy className="w-5 h-5" /> },
+  { id: "errors", label: "Hatalar", icon: <Bug className="w-5 h-5" /> },
+  { id: "optimizer", label: "Optimizer", icon: <Zap className="w-5 h-5" /> },
+  { id: "costs", label: "Maliyet", icon: <DollarSign className="w-5 h-5" /> },
 ];
 
 const MORE_KEYS = new Set(MORE_ITEMS.map((i) => i.id));
@@ -58,7 +82,7 @@ export function MobileNav({
             <span className="text-xs font-medium text-slate-300">Araçlar</span>
           </div>
           <div className="grid grid-cols-3 gap-1 p-3">
-            {MORE_ITEMS.map(({ id, label, emoji }) => {
+            {MORE_ITEMS.map(({ id, label, icon }) => {
               const isActive = activeTab === id;
               return (
                 <button
@@ -73,8 +97,8 @@ export function MobileNav({
                       : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                   }`}
                 >
-                  <span className="text-lg">{emoji}</span>
-                  <span className="text-[10px] font-medium">{label}</span>
+                  {icon}
+                  <span className="text-xs font-medium">{label}</span>
                 </button>
               );
             })}
@@ -87,7 +111,7 @@ export function MobileNav({
         className="lg:hidden flex border-t border-border bg-surface-raised safe-bottom"
         aria-label="Mobil navigasyon"
       >
-        {MOBILE_TABS.map(({ id, label, emoji }) => {
+        {MOBILE_TABS.map(({ id, label, icon }) => {
           const isActive = activeTab === id && !moreOpen;
           return (
             <button
@@ -104,8 +128,8 @@ export function MobileNav({
                 ${isActive ? "text-blue-400" : "text-slate-500 hover:text-slate-300"}
               `}
             >
-              <span className="relative text-base">
-                {emoji}
+              <span className="relative">
+                {icon}
                 {id === "monitor" && isProcessing && liveEventCount > 0 && (
                   <span
                     className="absolute -top-1 -right-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse"
@@ -129,7 +153,7 @@ export function MobileNav({
             ${isMoreActive || moreOpen ? "text-cyan-400" : "text-slate-500 hover:text-slate-300"}
           `}
         >
-          <span className="text-base">🔧</span>
+          <Wrench className="w-5 h-5" />
           <span>Araçlar</span>
         </button>
       </nav>
