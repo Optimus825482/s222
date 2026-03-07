@@ -89,6 +89,7 @@ import type {
   AgentLeaderboardEntry,
   AutoDiscoveryResult,
   SkillRecommendation,
+  ProactiveSuggestionsResponse,
   AuditLogEntry,
   SystemStats,
   AnomalyReport,
@@ -107,6 +108,8 @@ import type {
   WorkflowTemplate,
   WorkflowRunResult,
   ScheduledWorkflow,
+  ChartResult,
+  ChartListItem,
 } from "./types";
 
 export const api = {
@@ -250,6 +253,8 @@ export const api = {
     fetcher<SkillRecommendation[]>(
       `/api/skills/recommendations${query ? `?query=${encodeURIComponent(query)}` : ""}`,
     ),
+  getProactiveSkillSuggestions: () =>
+    fetcher<ProactiveSuggestionsResponse>("/api/skills/proactive-suggestions"),
 
   // Security & Monitoring
   getAuditLog: (limit = 50) =>
@@ -429,6 +434,40 @@ export const api = {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ enabled }),
+    }),
+
+  // ── Chart API ──
+  generateChart: (
+    chartType: string,
+    data: Record<string, unknown>,
+    title: string = "Chart",
+    width: number = 800,
+    height: number = 450,
+  ) =>
+    fetcher<ChartResult>("/api/charts/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({
+        chart_type: chartType,
+        data,
+        title,
+        width,
+        height,
+      }),
+    }),
+
+  listCharts: (limit: number = 30) =>
+    fetcher<ChartListItem[]>(`/api/charts?limit=${limit}`),
+
+  getChart: (chartId: string) =>
+    fetcher<{ chart_id: string; image_base64: string }>(
+      `/api/charts/${chartId}`,
+    ),
+
+  deleteChart: (chartId: string) =>
+    fetcher<{ status: string; chart_id: string }>(`/api/charts/${chartId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
     }),
 };
 

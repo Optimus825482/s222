@@ -246,14 +246,14 @@ export const PHASES: Phase[] = [
     status: "wip",
     color: "text-violet-400",
     border: "border-violet-400/30",
-    progress: 55,
+    progress: 75,
     items: [
       {
         done: true,
         label: "Teachability + Dynamic Skills + Skill Hygiene + Reflexion",
       },
       { done: true, label: "User behavior tracking" },
-      { done: false, label: "Proaktif skill önerisi" },
+      { done: true, label: "Proaktif skill önerisi" },
       { done: false, label: "Adaptive tool selection" },
       { done: false, label: "Workflow auto-optimization" },
     ],

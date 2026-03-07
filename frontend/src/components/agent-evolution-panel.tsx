@@ -7,6 +7,7 @@ import type {
   AgentRole,
   SkillRecommendation,
   AutoDiscoveryResult,
+  ProactiveSuggestionsResponse,
 } from "@/lib/types";
 
 // ── Shared Constants ────────────────────────────────────────────
@@ -165,7 +166,201 @@ function AgentPerformanceChart() {
   );
 }
 
-// ── Section 2: Skill Recommendations ────────────────────────────
+// ── Section 2: Proactive Skill Suggestions ─────────────────────
+
+const CATEGORY_STYLE: Record<
+  string,
+  { bg: string; border: string; text: string }
+> = {
+  usage_pattern: {
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/30",
+    text: "text-blue-400",
+  },
+  error_recovery: {
+    bg: "bg-red-500/10",
+    border: "border-red-500/30",
+    text: "text-red-400",
+  },
+  behavior_insight: {
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/30",
+    text: "text-purple-400",
+  },
+  teaching_based: {
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/30",
+    text: "text-amber-400",
+  },
+  trending: {
+    bg: "bg-orange-500/10",
+    border: "border-orange-500/30",
+    text: "text-orange-400",
+  },
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  usage_pattern: "Kullanım Deseni",
+  error_recovery: "Hata Kurtarma",
+  behavior_insight: "Davranış Analizi",
+  teaching_based: "Öğretim Bazlı",
+  trending: "Trend",
+};
+
+const ACTION_LABEL: Record<string, { label: string; cls: string }> = {
+  install: {
+    label: "Yükle",
+    cls: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  },
+  learn: {
+    label: "Öğren",
+    cls: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+  },
+  activate: {
+    label: "Etkinleştir",
+    cls: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+  },
+};
+
+function ProactiveSkillSuggestions() {
+  const [data, setData] = useState<ProactiveSuggestionsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchSuggestions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.getProactiveSkillSuggestions();
+      setData(res);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Veri alınamadı");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSuggestions();
+  }, [fetchSuggestions]);
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-20 rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) return <InlineError message={error} />;
+
+  const suggestions = data?.suggestions ?? [];
+  const summary = data?.analysis_summary;
+
+  return (
+    <div className="space-y-3">
+      {/* Analysis summary */}
+      {summary && (
+        <div className="flex flex-wrap gap-2 text-[10px] text-slate-500">
+          <span>🔧 {summary.tools_analyzed} araç</span>
+          <span>·</span>
+          <span>👤 {summary.behaviors_analyzed} davranış</span>
+          <span>·</span>
+          <span>📚 {summary.teachings_count} öğreti</span>
+          <span>·</span>
+          <span>💬 {summary.threads_scanned} sohbet</span>
+        </div>
+      )}
+
+      {suggestions.length === 0 ? (
+        <div className="text-xs text-slate-500 text-center py-6 space-y-1">
+          <span className="text-2xl block">🔮</span>
+          <p>Henüz yeterli veri yok — sistemi kullandıkça öneriler oluşacak.</p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+          {suggestions.map((s) => {
+            const style = CATEGORY_STYLE[s.category] ?? CATEGORY_STYLE.trending;
+            const action =
+              ACTION_LABEL[s.suggested_action] ?? ACTION_LABEL.learn;
+            return (
+              <article
+                key={s.id}
+                className={`${style.bg} border ${style.border} rounded-lg p-3 space-y-2 hover:brightness-110 transition-all`}
+                aria-label={`Öneri: ${s.skill_name}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base shrink-0" aria-hidden="true">
+                      {s.icon}
+                    </span>
+                    <h4
+                      className={`text-xs font-semibold truncate ${style.text}`}
+                    >
+                      {s.skill_name}
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${action.cls}`}
+                    >
+                      {action.label}
+                    </span>
+                    <span className="text-[10px] font-bold tabular-nums text-emerald-400">
+                      %{Math.round(s.confidence * 100)}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  {s.reason}
+                </p>
+
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-[9px] px-1.5 py-0.5 rounded-sm ${style.bg} ${style.text} border ${style.border}`}
+                  >
+                    {CATEGORY_LABEL[s.category] ?? s.category}
+                  </span>
+                  <span className="text-[9px] text-slate-600 truncate max-w-[140px]">
+                    {s.source_data}
+                  </span>
+                </div>
+
+                {/* Confidence bar */}
+                <div className="h-1 rounded-full bg-slate-700/50 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-500"
+                    style={{ width: `${Math.min(s.confidence * 100, 100)}%` }}
+                    role="progressbar"
+                    aria-valuenow={s.confidence * 100}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Güven: %${Math.round(s.confidence * 100)}`}
+                  />
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Refresh button */}
+      <button
+        onClick={fetchSuggestions}
+        disabled={loading}
+        className="w-full py-2 text-[11px] font-medium text-slate-400 bg-slate-800/40 border border-slate-700/50 rounded-lg hover:bg-slate-700/40 hover:text-slate-200 disabled:opacity-40 transition-colors"
+        aria-label="Önerileri yenile"
+      >
+        🔄 Analizi Yenile
+      </button>
+    </div>
+  );
+}
+
+// ── Section 3: Skill Recommendations ────────────────────────────
 
 function SkillRecommendations() {
   const [skills, setSkills] = useState<SkillRecommendation[]>([]);
@@ -396,7 +591,18 @@ export function AgentEvolutionPanel() {
 
       <hr className="border-border" />
 
-      {/* Section 2: Skill Recommendations */}
+      {/* Section 2: Proactive Skill Suggestions */}
+      <div>
+        <h3 className="text-xs font-semibold text-slate-200 mb-3 flex items-center gap-1.5">
+          <span aria-hidden="true">🔮</span>
+          Proaktif Skill Önerileri
+        </h3>
+        <ProactiveSkillSuggestions />
+      </div>
+
+      <hr className="border-border" />
+
+      {/* Section 3: Skill Recommendations */}
       <div>
         <h3 className="text-xs font-semibold text-slate-200 mb-3 flex items-center gap-1.5">
           <span aria-hidden="true">💡</span>
@@ -407,7 +613,7 @@ export function AgentEvolutionPanel() {
 
       <hr className="border-border" />
 
-      {/* Section 3: Auto Discovery */}
+      {/* Section 4: Auto Discovery */}
       <div>
         <h3 className="text-xs font-semibold text-slate-200 mb-3 flex items-center gap-1.5">
           <span aria-hidden="true">🔎</span>

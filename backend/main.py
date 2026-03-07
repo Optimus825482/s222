@@ -506,6 +506,223 @@ async def api_skill_hygiene(dry_run: bool = False):
     except Exception as e:
         raise HTTPException(503, f"Skill hygiene error: {e}")
 
+@app.get("/api/skills/proactive-suggestions")
+async def api_proactive_skill_suggestions(user: dict = Depends(get_current_user)):
+    """Analyze usage patterns, behaviors, teachings, and threads to proactively suggest skills."""
+    try:
+        _audit("proactive_skill_suggestions", user["user_id"])
+        uid = user["user_id"]
+        suggestions: list[dict] = []
+        tools_analyzed = 0
+        behaviors_analyzed = 0
+        teachings_count = 0
+        threads_scanned = 0
+
+        # ── 1. Tool usage analysis: most-used & failing tools ────────
+        try:
+            user_tools = [t for t in _TOOL_USAGE if t.get("user_id") == uid]
+            tools_analyzed = len(user_tools)
+
+            if user_tools:
+                # Most-used tools
+                tool_freq: dict[str, int] = {}
+                tool_failures: dict[str, int] = {}
+                for t in user_tools:
+                    name = t.get("tool_name", "unknown")
+                    tool_freq[name] = tool_freq.get(name, 0) + 1
+                    if not t.get("success", True):
+                        tool_failures[name] = tool_failures.get(name, 0) + 1
+
+                top_tools = sorted(tool_freq.items(), key=lambda x: x[1], reverse=True)[:5]
+                for tool_name, count in top_tools:
+                    try:
+                        from tools.dynamic_skills import search_skills
+                        matches = search_skills(tool_name, max_results=1)
+                        if matches:
+                            suggestions.append({
+                                "id": f"up-{tool_name}",
+                                "skill_name": matches[0]["name"],
+                                "reason": f"'{tool_name}' aracını {count} kez kullandın — bu skill iş akışını hızlandırabilir.",
+                                "category": "usage_pattern",
+                                "confidence": round(min(0.5 + count * 0.05, 0.95), 2),
+                                "source_data": f"tool_usage: {tool_name} ({count}x)",
+                                "suggested_action": "activate",
+                                "icon": "🔧",
+                            })
+                    except Exception:
+                        pass
+
+                # Failing tools
+                top_failures = sorted(tool_failures.items(), key=lambda x: x[1], reverse=True)[:3]
+                for tool_name, fail_count in top_failures:
+                    try:
+                        from tools.dynamic_skills import search_skills
+                        matches = search_skills(f"{tool_name} error fix", max_results=1)
+                        if matches:
+                            suggestions.append({
+                                "id": f"er-{tool_name}",
+                                "skill_name": matches[0]["name"],
+                                "reason": f"'{tool_name}' aracı {fail_count} kez hata verdi — bu skill hata kurtarma sağlayabilir.",
+                                "category": "error_recovery",
+                                "confidence": round(min(0.6 + fail_count * 0.08, 0.95), 2),
+                                "source_data": f"tool_failures: {tool_name} ({fail_count} failures)",
+                                "suggested_action": "install",
+                                "icon": "🛠️",
+                            })
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # ── 2. User behavior analysis ────────────────────────────────
+        try:
+            user_behaviors = [b for b in _USER_BEHAVIORS if b.get("user_id") == uid]
+            behaviors_analyzed = len(user_behaviors)
+
+            if user_behaviors:
+                action_freq: dict[str, int] = {}
+                for b in user_behaviors:
+                    action = b.get("action", "unknown")
+                    action_freq[action] = action_freq.get(action, 0) + 1
+
+                top_actions = sorted(action_freq.items(), key=lambda x: x[1], reverse=True)[:3]
+                for action, count in top_actions:
+                    try:
+                        from tools.dynamic_skills import search_skills
+                        matches = search_skills(action, max_results=1)
+                        if matches:
+                            suggestions.append({
+                                "id": f"bi-{action}",
+                                "skill_name": matches[0]["name"],
+                                "reason": f"'{action}' eylemini sık kullanıyorsun ({count}x) — bu skill bu alışkanlığı destekleyebilir.",
+                                "category": "behavior_insight",
+                                "confidence": round(min(0.4 + count * 0.06, 0.90), 2),
+                                "source_data": f"behavior: {action} ({count}x)",
+                                "suggested_action": "learn",
+                                "icon": "🧠",
+                            })
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # ── 3. Teachings analysis ────────────────────────────────────
+        try:
+            from tools.teachability import get_all_teachings
+            teachings = get_all_teachings()
+            if isinstance(teachings, list):
+                teachings_count = len(teachings)
+            elif isinstance(teachings, dict):
+                teachings_count = len(teachings.get("teachings", teachings.get("items", [])))
+                teachings = teachings.get("teachings", teachings.get("items", []))
+            else:
+                teachings = []
+
+            for teaching in teachings[:5]:
+                content = teaching.get("content", "") if isinstance(teaching, dict) else str(teaching)
+                if not content:
+                    continue
+                keywords = " ".join(content.split()[:6])
+                try:
+                    from tools.dynamic_skills import search_skills
+                    matches = search_skills(keywords, max_results=1)
+                    if matches:
+                        snippet = content[:60] + ("..." if len(content) > 60 else "")
+                        suggestions.append({
+                            "id": f"tb-{hashlib.md5(content[:50].encode()).hexdigest()[:8]}",
+                            "skill_name": matches[0]["name"],
+                            "reason": f"Öğretmen notun '{snippet}' ile ilgili — bu skill faydalı olabilir.",
+                            "category": "teaching_based",
+                            "confidence": round(min(0.55 + teachings_count * 0.02, 0.85), 2),
+                            "source_data": f"teaching: {snippet}",
+                            "suggested_action": "learn",
+                            "icon": "📚",
+                        })
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # ── 4. Recent threads analysis (trending topics) ─────────────
+        try:
+            all_threads = list_threads()
+            recent_threads = sorted(
+                all_threads,
+                key=lambda t: t.get("updated_at", t.get("created_at", "")),
+                reverse=True,
+            )[:10]
+            threads_scanned = len(recent_threads)
+
+            topic_freq: dict[str, int] = {}
+            for t_meta in recent_threads:
+                thread_id = t_meta.get("thread_id", t_meta.get("id", ""))
+                if not thread_id:
+                    continue
+                try:
+                    thread = load_thread(thread_id)
+                    title = ""
+                    if isinstance(thread, dict):
+                        title = thread.get("title", thread.get("name", ""))
+                    elif hasattr(thread, "title"):
+                        title = thread.title or ""
+                    if title:
+                        for word in title.lower().split():
+                            if len(word) > 3:
+                                topic_freq[word] = topic_freq.get(word, 0) + 1
+                except Exception:
+                    pass
+
+            top_topics = sorted(topic_freq.items(), key=lambda x: x[1], reverse=True)[:3]
+            for topic, count in top_topics:
+                if count < 2:
+                    continue
+                try:
+                    from tools.dynamic_skills import search_skills
+                    matches = search_skills(topic, max_results=1)
+                    if matches:
+                        suggestions.append({
+                            "id": f"tr-{topic}",
+                            "skill_name": matches[0]["name"],
+                            "reason": f"Son görevlerinde '{topic}' konusu {count} kez geçiyor — trend skill önerisi.",
+                            "category": "trending",
+                            "confidence": round(min(0.45 + count * 0.1, 0.90), 2),
+                            "source_data": f"thread_topic: {topic} ({count}x)",
+                            "suggested_action": "activate",
+                            "icon": "🔥",
+                        })
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # ── Deduplicate by skill_name, keep highest confidence ───────
+        seen: dict[str, dict] = {}
+        for s in suggestions:
+            name = s["skill_name"]
+            if name not in seen or s["confidence"] > seen[name]["confidence"]:
+                seen[name] = s
+        suggestions = list(seen.values())
+
+        # ── Sort by confidence desc, limit to 12 ────────────────────
+        suggestions.sort(key=lambda x: x["confidence"], reverse=True)
+        suggestions = suggestions[:12]
+
+        return {
+            "suggestions": suggestions,
+            "analysis_summary": {
+                "tools_analyzed": tools_analyzed,
+                "behaviors_analyzed": behaviors_analyzed,
+                "teachings_count": teachings_count,
+                "threads_scanned": threads_scanned,
+            },
+            "generated_at": _utcnow().isoformat(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Proactive suggestion error: {e}")
+
+
 
 @app.get("/api/skills/hygiene/validate/{skill_id}")
 async def api_validate_skill(skill_id: str):
@@ -4018,6 +4235,70 @@ async def optimizer_history(
     history = _auto_optimizer.get_optimization_history(limit=limit)
     return {"history": history, "total": len(history)}
 
+# ── Section 14 · Chart Generation ────────────────────────────────
+
+
+class ChartGenerateRequest(BaseModel):
+    chart_type: str = "bar"
+    data: dict = {}
+    title: str = "Chart"
+    width: int = 800
+    height: int = 450
+
+
+@app.post("/api/charts/generate")
+async def api_generate_chart(req: ChartGenerateRequest, user: dict = Depends(get_current_user)):
+    from tools.chart_generator import generate_chart
+    result = generate_chart(
+        chart_type=req.chart_type,
+        data=req.data,
+        title=req.title,
+        width=req.width,
+        height=req.height,
+    )
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    _audit("chart_generate", user["user_id"], f"type={req.chart_type} title={req.title}")
+    return result
+
+
+@app.get("/api/charts")
+async def api_list_charts(limit: int = 30, user: dict = Depends(get_current_user)):
+    from tools.chart_generator import list_charts
+    return list_charts(limit=limit)
+
+
+@app.get("/api/charts/{chart_id}")
+async def api_get_chart(chart_id: str, user: dict = Depends(get_current_user)):
+    from tools.chart_generator import get_chart_base64
+    b64 = get_chart_base64(chart_id)
+    if b64 is None:
+        raise HTTPException(status_code=404, detail="Chart not found")
+    return {"chart_id": chart_id, "image_base64": b64}
+
+
+@app.delete("/api/charts/{chart_id}")
+async def api_delete_chart(chart_id: str, user: dict = Depends(get_current_user)):
+    import os
+    from tools.chart_generator import CHART_DIR
+    path = os.path.join(CHART_DIR, f"{chart_id}.png")
+    if os.path.exists(path):
+        os.remove(path)
+        _audit("chart_delete", user["user_id"], f"chart_id={chart_id}")
+        return {"status": "deleted", "chart_id": chart_id}
+    raise HTTPException(status_code=404, detail="Chart not found")
+
+
+@app.get("/api/charts/{chart_id}/download")
+async def api_download_chart(chart_id: str, user: dict = Depends(get_current_user)):
+    import os
+    from tools.chart_generator import CHART_DIR
+    path = os.path.join(CHART_DIR, f"{chart_id}.png")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Chart not found")
+    return FileResponse(path, media_type="image/png", filename=f"{chart_id}.png")
+
+
 # ── Startup Diagnostic ───────────────────────────────────────────
 _all_api_routes = [r.path for r in app.routes if hasattr(r, 'path') and '/api/' in r.path]
 print(f"[Backend] Total API routes registered: {len(_all_api_routes)}")
@@ -4025,5 +4306,6 @@ print(f"[Backend] Benchmark routes: {any('benchmark' in r for r in _all_api_rout
 print(f"[Backend] Error routes: {any('/errors/' in r for r in _all_api_routes)}")
 print(f"[Backend] Cost routes: {any('/costs/' in r for r in _all_api_routes)}")
 print(f"[Backend] Optimizer routes: {any('/optimizer/' in r for r in _all_api_routes)}")
+print(f"[Backend] Chart routes: {any('/charts/' in r for r in _all_api_routes)}")
 print(f"[Backend] Identity routes: {any('/identity/' in r for r in _all_api_routes)}")
 print(f"[Backend] ✓ All {len(_all_api_routes)} routes loaded successfully")

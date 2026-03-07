@@ -227,6 +227,33 @@ export interface SkillRecommendation {
   recommended_agent: AgentRole | null;
 }
 
+export interface ProactiveSkillSuggestion {
+  id: string;
+  skill_name: string;
+  reason: string;
+  category:
+    | "usage_pattern"
+    | "error_recovery"
+    | "behavior_insight"
+    | "teaching_based"
+    | "trending";
+  confidence: number;
+  source_data: string;
+  suggested_action: "install" | "learn" | "activate";
+  icon: string;
+}
+
+export interface ProactiveSuggestionsResponse {
+  suggestions: ProactiveSkillSuggestion[];
+  analysis_summary: {
+    tools_analyzed: number;
+    behaviors_analyzed: number;
+    teachings_count: number;
+    threads_scanned: number;
+  };
+  generated_at: string;
+}
+
 export interface AutoDiscoveryResult {
   discovered: number;
   skills: { skill_id: string; name: string; pattern: string }[];
@@ -569,4 +596,20 @@ export interface ScheduledWorkflow {
   last_run: string | null;
   next_run: string | null;
   run_count: number;
+}
+
+export interface ChartResult {
+  chart_id: string;
+  chart_type: string;
+  title: string;
+  image_base64: string;
+  width: number;
+  height: number;
+  error?: string;
+}
+
+export interface ChartListItem {
+  chart_id: string;
+  created_at: string;
+  size_bytes: number;
 }

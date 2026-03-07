@@ -14,6 +14,7 @@ import { XpWindow, type WindowState } from "./xp-window";
 import { XpTaskbar } from "./xp-taskbar";
 import {
   MessageSquare,
+  BarChart2,
   BarChart3,
   Settings,
   Brain,
@@ -216,6 +217,13 @@ const WorkflowBuilderPanel = dynamic(
   () =>
     import("@/components/workflow-builder-panel").then((m) => ({
       default: m.WorkflowBuilderPanel,
+    })),
+  { ssr: false },
+);
+const ChartPanel = dynamic(
+  () =>
+    import("@/components/chart-panel").then((m) => ({
+      default: m.ChartPanel,
     })),
   { ssr: false },
 );
@@ -572,6 +580,22 @@ const APPS: DesktopApp[] = [
     defaultW: 700,
     defaultH: 550,
     render: () => <XpRoadmapPanel />,
+  },
+  {
+    id: "charts",
+    title: "Grafikler",
+    icon: <BarChart2 className="w-8 h-8" />,
+    color: "#06b6d4",
+    group: "Analitik",
+    description:
+      "Veri görselleştirme ve grafik oluşturma. Bar, çizgi, pasta, dağılım, histogram, alan ve ısı haritası grafikleri oluşturun. JSON veri girişi ile özelleştirilebilir grafikler üretin.",
+    defaultW: 700,
+    defaultH: 550,
+    render: () => (
+      <div className="overflow-hidden h-full">
+        <ChartPanel />
+      </div>
+    ),
   },
   {
     id: "marketplace",

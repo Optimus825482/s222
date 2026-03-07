@@ -701,6 +701,50 @@ GENERATE_IMAGE_TOOL = {
     },
 }
 
+GENERATE_CHART_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "generate_chart",
+        "description": (
+            "Generate a chart/graph from structured data using matplotlib. "
+            "Supports bar, line, pie, scatter, histogram, area, heatmap chart types. "
+            "Returns a base64-encoded PNG image. Use when the user asks for data visualization, "
+            "charts, graphs, or when analysis results should be presented visually."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chart_type": {
+                    "type": "string",
+                    "enum": ["bar", "line", "pie", "scatter", "histogram", "area", "heatmap"],
+                    "description": "Type of chart to generate",
+                },
+                "data": {
+                    "type": "object",
+                    "description": (
+                        "Chart data. For bar/line/area: {labels: [...], values: [...]} or {labels: [...], datasets: [{label, values}]}. "
+                        "For pie: {labels: [...], values: [...]}. For scatter: {x: [...], y: [...]}. "
+                        "For histogram: {values: [...], bins: 20}. For heatmap: {matrix: [[...]], xlabels, ylabels}."
+                    ),
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Chart title",
+                },
+                "width": {
+                    "type": "integer",
+                    "description": "Image width in pixels (default 800)",
+                },
+                "height": {
+                    "type": "integer",
+                    "description": "Image height in pixels (default 450)",
+                },
+            },
+            "required": ["chart_type", "data"],
+        },
+    },
+}
+
 # ── Workflow Engine Tools ─────────────────────────────────────────
 
 RUN_WORKFLOW_TOOL = {
@@ -937,6 +981,7 @@ ORCHESTRATOR_TOOLS = [
     CREATE_SKILL_TOOL,
     RESEARCH_CREATE_SKILL_TOOL,
     GENERATE_IMAGE_TOOL,
+    GENERATE_CHART_TOOL,
     RUN_WORKFLOW_TOOL,
     LIST_WORKFLOWS_TOOL,
     DOMAIN_EXPERT_TOOL,
@@ -989,6 +1034,7 @@ RESEARCHER_TOOLS = [
     RAG_LIST_DOCUMENTS_TOOL,
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
+    GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
 ]
@@ -1010,6 +1056,7 @@ THINKER_TOOLS = [
     LIST_TEACHINGS_TOOL,
     GET_AGENT_BASELINE_TOOL,
     GENERATE_IMAGE_TOOL,
+    GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
 ]
@@ -1031,6 +1078,7 @@ SPEED_TOOLS = [
     RAG_LIST_DOCUMENTS_TOOL,
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
+    GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
 ]
@@ -1051,6 +1099,7 @@ REASONER_TOOLS = [
     RAG_LIST_DOCUMENTS_TOOL,
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
+    GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
 ]
@@ -1071,6 +1120,7 @@ CRITIC_TOOLS = [
     MEMORY_STATS_TOOL,
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
+    GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
 ]
