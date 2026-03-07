@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const SOUNDS = {
-  startup: "/voices/Windows XP Açılış Sesi.mp3",
-  error: "/voices/Windows Xp Hata   Sesi.mp3",
-  shutdown: "/voices/Windows XP Kapanış Sesi.mp3",
+  startup: "/voices/startup.mp3",
+  error: "/voices/error.mp3",
+  shutdown: "/voices/shutdown.mp3",
 } as const;
 
 type SoundName = keyof typeof SOUNDS;
