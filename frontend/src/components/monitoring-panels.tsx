@@ -5,8 +5,6 @@ import { api } from "@/lib/api";
 import type {
   AgentHealth,
   AgentLeaderboardEntry,
-  AgentRole,
-  AgentStatus,
   SystemStats,
   AnomalyReport,
 } from "@/lib/types";

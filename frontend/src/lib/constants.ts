@@ -1,7 +1,7 @@
 // Shared constants for frontend
 // Centralized to avoid duplication across components
 
-import { AgentRole, AgentStatus } from "./types";
+import type { AgentRole, AgentStatus } from "./types";
 
 export const AGENT_ROLES: AgentRole[] = [
   "orchestrator",
@@ -12,14 +12,13 @@ export const AGENT_ROLES: AgentRole[] = [
   "critic",
 ];
 
-// Unicode emoji constants for agent roles
 export const ROLE_ICON: Record<AgentRole, string> = {
-  orchestrator: "\uD83E\uDDE0", // 🧠
-  thinker: "\uD83D\uDD2C",      // 🔬
-  speed: "\u26A1",              // ⚡
-  researcher: "\uD83D\uDD0D",   // 🔍
-  reasoner: "\uD83C\uDF0A",     // 🌊
-  critic: "\uD83C\uDFAF",       // 🎯
+  orchestrator: "🧠",
+  thinker: "🔬",
+  speed: "⚡",
+  researcher: "🔍",
+  reasoner: "🌊",
+  critic: "🎯",
 };
 
 export const ROLE_COLOR: Record<AgentRole, string> = {

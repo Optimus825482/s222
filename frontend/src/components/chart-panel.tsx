@@ -354,6 +354,7 @@ export function ChartPanel() {
                   </button>
                 </div>
                 <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-2 flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
                   <img
                     src={`data:image/png;base64,${result.image_base64}`}
                     alt={result.title}
@@ -374,7 +375,7 @@ export function ChartPanel() {
               </div>
             ) : charts.length === 0 ? (
               <div className="text-center py-12 text-zinc-500 text-sm">
-                <Image className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <Image className="w-10 h-10 mx-auto mb-2 opacity-30" aria-hidden="true" />
                 Henüz grafik oluşturulmamış
               </div>
             ) : (
@@ -409,6 +410,7 @@ export function ChartPanel() {
                         </button>
                       </div>
                     </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`data:image/png;base64,${selectedImage}`}
                       alt={selectedChart}
@@ -502,7 +504,7 @@ export function ChartPanel() {
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
               <h3 className="text-white font-semibold flex items-center gap-2">
-                <Image className="w-4 h-4 text-purple-400" />
+                <Image className="w-4 h-4 text-purple-400" aria-hidden="true" />
                 Galeri
               </h3>
               <p className="text-zinc-400 text-xs leading-relaxed">

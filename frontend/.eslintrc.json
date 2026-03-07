@@ -2,5 +2,13 @@
   "extends": [
     "next/core-web-vitals",
     "next/typescript"
-  ]
+  ],
+  "rules": {
+    "jsx-a11y/alt-text": [
+      "warn",
+      {
+        "ignore": [{"tags": ["Image"]}]
+      }
+    ]
+  }
 }
