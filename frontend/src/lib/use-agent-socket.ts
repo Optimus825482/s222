@@ -147,6 +147,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
 
     ws.onclose = (ev) => {
       setStatus("idle");
+      setWSStatus("idle");
 
       // 4001 = backend auth rejected. Do not reconnect-loop with stale token.
       if (ev.code === 4001) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAgentSocket } from "@/lib/use-agent-socket";
 import { useAuth } from "@/lib/auth";
 import type { Thread, PipelineType } from "@/lib/types";
@@ -9,6 +9,7 @@ import { ChatArea } from "@/components/chat-area";
 import { ChatInput } from "@/components/chat-input";
 import { LiveEventLog } from "@/components/live-event-log";
 import { api } from "@/lib/api";
+import { consumePendingThread } from "@/lib/ws-store";
 
 export default function ChatDesktopPanel() {
   const { user } = useAuth();
@@ -25,7 +26,20 @@ export default function ChatDesktopPanel() {
     onError: (msg) => setLastError(msg),
   });
 
-  // Listen for "open-thread" custom events from XpSessionsPanel
+  // On mount: check if a pending thread was set before this panel mounted
+  useEffect(() => {
+    const pending = consumePendingThread();
+    if (pending) {
+      api
+        .getThread(pending)
+        .then((loaded) => setThread(loaded))
+        .catch((err) =>
+          console.error("[ChatDesktopPanel] pending thread load error:", err),
+        );
+    }
+  }, []);
+
+  // Listen for "open-thread" custom events from XpSessionsPanel (when already mounted)
   useEffect(() => {
     const handler = async (e: Event) => {
       const threadId = (e as CustomEvent<string>).detail;

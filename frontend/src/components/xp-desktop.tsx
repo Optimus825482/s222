@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { getWSSnapshot, subscribeWS } from "@/lib/ws-store";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { getWSSnapshot, subscribeWS, setPendingThread } from "@/lib/ws-store";
 import { LiveEventLog } from "@/components/live-event-log";
 import dynamic from "next/dynamic";
 import { XpWindow, type WindowState } from "./xp-window";
@@ -582,18 +588,12 @@ const APPS: DesktopApp[] = [
 ];
 
 function XpLiveLogPanel() {
-  const [, forceUpdate] = useState(0);
-  const snapshotRef = useRef(getWSSnapshot());
-
-  useEffect(() => {
-    const unsub = subscribeWS(() => {
-      snapshotRef.current = getWSSnapshot();
-      forceUpdate((n) => n + 1);
-    });
-    return unsub;
-  }, []);
-
-  const { status, liveEvents } = snapshotRef.current;
+  const snapshot = useSyncExternalStore(
+    subscribeWS,
+    getWSSnapshot,
+    getWSSnapshot,
+  );
+  const { status, liveEvents } = snapshot;
 
   // Determine connection state for display
   const isConnected =
@@ -805,11 +805,12 @@ function XpSessionsPanel() {
             key={t.id}
             className="flex items-start gap-2 p-3 hover:bg-slate-800/40 transition-colors group cursor-pointer"
             onClick={() => {
-              // Dispatch custom event to open this thread in chat window
+              // Store thread ID in global store so ChatDesktopPanel picks it up on mount
+              setPendingThread(t.id);
+              // Also fire event for already-mounted chat panel
               window.dispatchEvent(
                 new CustomEvent("open-thread", { detail: t.id }),
               );
-              // Also dispatch open-app to ensure chat window is visible
               window.dispatchEvent(
                 new CustomEvent("open-app", { detail: "chat" }),
               );
@@ -819,6 +820,7 @@ function XpSessionsPanel() {
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
+                setPendingThread(t.id);
                 window.dispatchEvent(
                   new CustomEvent("open-thread", { detail: t.id }),
                 );
