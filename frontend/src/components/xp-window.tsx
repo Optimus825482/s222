@@ -150,25 +150,15 @@ export function XpWindow({
   if (state.minimized) return null;
 
   const style: React.CSSProperties = isMobile
-    ? state.maximized
-      ? {
-          // Mobilde maximize: tam ekran, taskbar (36px) hariç
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "calc(100dvh - 36px)",
-          zIndex: state.zIndex,
-          borderRadius: 0,
-        }
-      : {
-          // Mobilde normal: neredeyse tam ekran, ortalanmış
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: "95vw",
-          height: "80dvh",
-          zIndex: state.zIndex,
-        }
+    ? {
+        // Mobilde her zaman tam ekran (tablet modu), taskbar (36px) hariç
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "calc(100dvh - 36px)",
+        zIndex: state.zIndex,
+        borderRadius: 0,
+      }
     : state.maximized
       ? {
           top: 0,
@@ -196,7 +186,7 @@ export function XpWindow({
     >
       {/* ── XP Title Bar ── */}
       <div
-        className={`xp-titlebar shrink-0 flex items-center ${isMobile ? "h-[26px]" : "h-[30px]"} px-[3px] cursor-move rounded-t-lg`}
+        className={`xp-titlebar shrink-0 flex items-center relative ${isMobile ? "h-[26px]" : "h-[30px]"} px-[3px] cursor-move rounded-t-lg`}
         onMouseDown={handleDragStart}
         onDoubleClick={() => onMaximize(state.id)}
       >
@@ -206,6 +196,21 @@ export function XpWindow({
           </span>
           {state.title}
         </span>
+
+        {/* ── Mobile minimize pill (iPad-style swipe indicator) ── */}
+        {isMobile && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMinimize(state.id);
+            }}
+            className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center w-12 h-5 z-10"
+            aria-label="Küçült"
+          >
+            <span className="block w-10 h-[5px] rounded-full bg-white/50 active:bg-white/80 transition-colors" />
+          </button>
+        )}
+
         <div className="flex items-center gap-[2px] shrink-0">
           <button
             onClick={(e) => {
