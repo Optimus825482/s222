@@ -552,17 +552,17 @@ export interface WorkflowRunResult {
   id?: number;
   workflow_id: string;
   status: "completed" | "failed" | "rolled_back" | "partial";
-  step_results: Record<string, any>;
+  step_results: Record<string, unknown>;
   error: string | null;
   duration_ms: number;
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
   created_at?: string;
 }
 
 export interface ScheduledWorkflow {
   schedule_id: string;
   template: string;
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
   cron_expression: string;
   enabled: boolean;
   created_at: string;

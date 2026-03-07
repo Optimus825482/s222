@@ -1137,32 +1137,35 @@ export function XpDesktop() {
 
   // Initialize icon positions in a grid layout
   useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+    const gap = isMobile ? 80 : 96;
+    const rowH = isMobile ? 84 : 100;
+    const cols = Math.max(1, Math.floor((window.innerHeight - 80) / rowH));
+
+    // Build default grid positions for all apps
+    const defaults: Record<string, { x: number; y: number }> = {};
+    APPS.forEach((app, i) => {
+      const col = Math.floor(i / cols);
+      const row = i % cols;
+      defaults[app.id] = { x: 8 + col * gap, y: 8 + row * rowH };
+    });
+
+    // Merge with stored positions — keep existing, add missing
     const stored = localStorage.getItem("xp-icon-positions");
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        // Validate that all current apps have positions
-        const hasAll = APPS.every((a) => parsed[a.id]);
-        if (hasAll) {
-          setIconPositions(parsed);
-          return;
+        const merged = { ...defaults };
+        for (const app of APPS) {
+          if (parsed[app.id]) merged[app.id] = parsed[app.id];
         }
+        setIconPositions(merged);
+        return;
       } catch {
         /* ignore */
       }
     }
-    // Default grid layout — responsive for mobile
-    const isMobile = window.innerWidth < 768;
-    const gap = isMobile ? 80 : 96;
-    const rowH = isMobile ? 84 : 100;
-    const cols = Math.floor((window.innerHeight - 80) / rowH);
-    const positions: Record<string, { x: number; y: number }> = {};
-    APPS.forEach((app, i) => {
-      const col = Math.floor(i / cols);
-      const row = i % cols;
-      positions[app.id] = { x: 8 + col * gap, y: 8 + row * rowH };
-    });
-    setIconPositions(positions);
+    setIconPositions(defaults);
   }, []);
 
   // Save positions to localStorage when they change

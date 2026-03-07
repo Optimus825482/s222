@@ -53,8 +53,8 @@ export const PHASES: Phase[] = [
     title: "Faz 1 — Workflow Engine",
     icon: "⚡",
     status: "done",
-    color: "text-amber-400",
-    border: "border-amber-400/30",
+    color: "text-emerald-400",
+    border: "border-emerald-400/30",
     progress: 100,
     items: [
       { done: true, label: "Workflow Engine core" },
@@ -95,8 +95,8 @@ export const PHASES: Phase[] = [
     title: "Faz 2.5 — Browser Use",
     icon: "🌐",
     status: "planned",
-    color: "text-lime-400",
-    border: "border-lime-400/30",
+    color: "text-sky-400",
+    border: "border-sky-400/30",
     progress: 0,
     items: [
       {
@@ -118,27 +118,6 @@ export const PHASES: Phase[] = [
         done: false,
         label: "Frontend Browser Panel UI (canlı önizleme + geçmiş)",
       },
-    ],
-  },
-  {
-    id: "f2.5",
-    title: "Faz 2.5 — Browser Use",
-    icon: "🌐",
-    status: "planned",
-    color: "text-sky-400",
-    border: "border-sky-400/30",
-    progress: 0,
-    items: [
-      { done: false, label: "Browser Use Engine (Playwright tabanlı)" },
-      { done: false, label: "Sayfa navigasyonu ve içerik çıkarma" },
-      { done: false, label: "Form doldurma ve buton tıklama" },
-      { done: false, label: "Ekran görüntüsü alma ve görsel analiz" },
-      { done: false, label: "JavaScript çalıştırma" },
-      { done: false, label: "Cookie/session yönetimi" },
-      { done: false, label: "Orchestrator entegrasyonu (browse_web tool)" },
-      { done: false, label: "Backend API endpoints" },
-      { done: false, label: "Anti-bot koruması ve rate limiting" },
-      { done: false, label: "Frontend Browser Panel UI" },
     ],
   },
   {
@@ -557,7 +536,7 @@ export function RoadmapDialog({ open, onClose }: Props) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-slate-800 text-center text-[10px] text-slate-600">
-          Son güncelleme: 2026-03-07 · Her sprint sonunda güncellenir
+          Son güncelleme: 2026-03-08 · Her sprint sonunda güncellenir
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAgentSocket } from "@/lib/use-agent-socket";
 import { useAuth } from "@/lib/auth";
 import type { Thread, PipelineType } from "@/lib/types";

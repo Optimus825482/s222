@@ -1,6 +1,6 @@
 # 🗺️ Multi-Agent Ops Center — Sistem Geliştirme Yol Haritası
 
-> Son güncelleme: 2026-03-07
+> Son güncelleme: 2026-03-08
 > Durum: Aktif geliştirme
 
 ## Renk Kodları
@@ -33,7 +33,7 @@
 
 ---
 
-## Faz 1 — Akış İşleme ve Otomasyon Motoru ⚡ `[🟡 DEVAM EDİYOR]`
+## Faz 1 — Akış İşleme ve Otomasyon Motoru ⚡ `[🟢 TAMAMLANDI]`
 
 Birden fazla aracı zincirleme, koşullu dallanma, hata yönetimi ve rollback özellikli iş akışı motoru.
 
@@ -45,11 +45,11 @@ Birden fazla aracı zincirleme, koşullu dallanma, hata yönetimi ve rollback ö
 - 🟢 Workflow şablonları (research-and-report, code-review-pipeline)
 - 🟢 Orchestrator entegrasyonu (run_workflow tool)
 - 🟢 Backend API endpoints (`/api/workflows/templates`, `/run`, `/history`)
-- 🔴 Frontend Workflow Builder UI (İş Akışı sekmesi)
-- 🔴 Workflow execution history & replay
-- 🔴 Cron/zamanlı workflow tetikleme
+- 🟢 Frontend Workflow Builder UI (`workflow-builder-panel.tsx`)
+- 🟢 Workflow execution history & replay (`workflow-history-panel.tsx`)
+- 🟢 Cron/zamanlı workflow tetikleme (`tools/workflow_scheduler.py`)
 
-## Faz 2 — Uzmanlık Alanı Skill'leri 🧠 `[🟡 DEVAM EDİYOR]`
+## Faz 2 — Uzmanlık Alanı Skill'leri 🧠 `[🟢 TAMAMLANDI]`
 
 Finance, hukuk, tıp, mühendislik gibi alanlarda derin hesaplama ve bilgi erişimi.
 
@@ -60,8 +60,8 @@ Finance, hukuk, tıp, mühendislik gibi alanlarda derin hesaplama ve bilgi eriş
 - 🟢 Akademik modülü (literatür tarama şablonu, atıf analizi, metodoloji önerisi)
 - 🟢 Orchestrator entegrasyonu (domain_expert tool)
 - 🟢 Backend API endpoints (`/api/domains`, `/api/domains/{id}/tools`, `/api/domains/execute`)
-- 🔴 Domain skill auto-discovery (kullanıcı sorgusundan otomatik domain tespiti)
-- 🔴 Skill marketplace (topluluk skill paylaşımı)
+- 🟢 Domain skill auto-discovery (kullanıcı sorgusundan otomatik domain tespiti)
+- 🟢 Skill marketplace (topluluk skill paylaşımı)
 
 ## Faz 2.5 — Browser Use Entegrasyonu 🌐 `[🔴 PLANLANMIŞ]`
 
@@ -295,13 +295,13 @@ Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power e
 | Faz                          | Durum           | İlerleme          |
 | ---------------------------- | --------------- | ----------------- |
 | Mevcut v2.0                  | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 1 — Workflow Engine      | 🟡 Devam ediyor | ████████░░░░ 73%  |
-| Faz 2 — Domain Skills        | 🟡 Devam ediyor | ████████░░░░ 70%  |
+| Faz 1 — Workflow Engine      | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 2 — Domain Skills        | 🟢 Tamamlandı   | ████████████ 100% |
 | Faz 2.5 — Browser Use        | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
 | Faz 3 — Veri Analizi         | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
 | Faz 4 — Gelişmiş RAG         | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
 | Faz 5 — Güvenlik             | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
-| Faz 6 — Performans           | 🟡 Kısmi        | ████████░░░░ 70%  |
+| Faz 6 — Performans           | 🟢 Tamamlandı   | ████████████ 100% |
 | Faz 7 — API Entegrasyon      | 🟡 Kısmi        | ███░░░░░░░░░ 30%  |
 | Faz 8 — Multimedya           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
 | Faz 9 — Kişiselleştirme      | 🟡 Kısmi        | ██████░░░░░░ 55%  |

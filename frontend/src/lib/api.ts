@@ -394,8 +394,8 @@ export const api = {
 
   runWorkflow: (
     template: string,
-    variables: Record<string, any> = {},
-    customSteps?: any[],
+    variables: Record<string, unknown> = {},
+    customSteps?: unknown[],
   ) =>
     fetcher<WorkflowRunResult>("/api/workflows/run", {
       method: "POST",
@@ -408,7 +408,7 @@ export const api = {
   addSchedule: (data: {
     schedule_id: string;
     template: string;
-    variables?: Record<string, any>;
+    variables?: Record<string, unknown>;
     cron_expression: string;
     enabled?: boolean;
   }) =>
