@@ -6,6 +6,7 @@ compact errors (#9), small focused agents (#10).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import sys
@@ -89,10 +90,10 @@ class BaseAgent(ABC):
     model_key: str
 
     # Max seconds per LLM request and per agent run (avoid endless hangs)
-    LLM_TIMEOUT = 90
-    AGENT_EXECUTE_TIMEOUT = 120
+    LLM_TIMEOUT = 120
+    AGENT_EXECUTE_TIMEOUT = 180
     # Extended timeout for reasoning models (chain-of-thought takes longer)
-    LLM_TIMEOUT_REASONING = 180
+    LLM_TIMEOUT_REASONING = 300
 
     def __init__(self) -> None:
         self.cfg = MODELS[self.model_key]
@@ -168,14 +169,15 @@ class BaseAgent(ABC):
         # Image generation capability — injected into ALL agents
         image_capability = (
             "\n\n## IMAGE GENERATION CAPABILITY:\n"
-            "You can generate images using the `generate_image` tool.\n"
-            "- Use when the user asks for a visual, image, illustration, diagram, or infographic.\n"
-            "- Use in reports when a visual would add value (architecture diagrams, concept illustrations, etc.).\n"
+            "You have a `generate_image` tool — USE IT ACTIVELY.\n"
+            "- ALWAYS use it when the user asks for a visual, image, illustration, diagram, or infographic.\n"
+            "- In reports: add 1-3 relevant images using generate_image to make the report visually rich.\n"
+            "- If the user's request involves any visual content, you MUST call generate_image.\n"
             "- Prompt must be in ENGLISH, descriptive, and specific.\n"
             "- The tool returns a markdown image embed and a downloadable link.\n"
-            "- For reports: embed images inline using ![description](url) markdown syntax.\n"
-            "- Add images sparingly: 1-3 per report, only where they genuinely help.\n"
+            "- Embed images inline using ![description](url) markdown syntax.\n"
             "- Example prompt: 'Professional diagram showing microservices architecture with API gateway'\n"
+            "- DO NOT skip image generation — if a visual would help, generate it.\n"
         )
 
         # Faz 11.6 — SOUL.md identity injection
@@ -771,31 +773,41 @@ class BaseAgent(ABC):
             os.makedirs(images_dir, exist_ok=True)
             filename = f"img_{uuid.uuid4().hex[:10]}.jpg"
             filepath = os.path.join(images_dir, filename)
-            try:
-                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                    resp = await client.get(image_url)
-                    if resp.status_code == 200:
-                        with open(filepath, "wb") as f:
-                            f.write(resp.content)
-                        download_url = f"/api/images/{filename}/download"
-                        return (
-                            f"Image generated successfully.\n\n"
-                            f"![{prompt}]({image_url})\n\n"
-                            f"**Download:** [{filename}]({download_url})\n\n"
-                            f"Direct URL: {image_url}"
-                        )
-                    else:
-                        return (
-                            f"Image generated (direct URL only, download failed with status {resp.status_code}).\n\n"
-                            f"![{prompt}]({image_url})\n\n"
-                            f"Direct URL: {image_url}"
-                        )
-            except Exception as e:
-                return (
-                    f"Image URL generated but download failed: {e}\n\n"
-                    f"![{prompt}]({image_url})\n\n"
-                    f"Direct URL: {image_url}"
-                )
+            # Retry up to 3 times — Pollinations can be slow on first request
+            last_error = None
+            for attempt in range(3):
+                try:
+                    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+                        resp = await client.get(image_url)
+                        if resp.status_code == 200 and len(resp.content) > 1000:
+                            with open(filepath, "wb") as f:
+                                f.write(resp.content)
+                            download_url = f"/api/images/{filename}/download"
+                            return (
+                                f"Image generated successfully.\n\n"
+                                f"![{prompt}]({image_url})\n\n"
+                                f"**Download:** [{filename}]({download_url})\n\n"
+                                f"Direct URL: {image_url}"
+                            )
+                        elif resp.status_code == 200:
+                            # Got 200 but tiny response — likely placeholder, retry
+                            last_error = "Response too small, retrying..."
+                            await asyncio.sleep(2)
+                            continue
+                        else:
+                            last_error = f"HTTP {resp.status_code}"
+                            await asyncio.sleep(2)
+                            continue
+                except Exception as e:
+                    last_error = str(e)
+                    await asyncio.sleep(2)
+                    continue
+            # All retries failed — still return the URL for direct access
+            return (
+                f"Image URL generated (download failed after 3 attempts: {last_error}).\n\n"
+                f"![{prompt}]({image_url})\n\n"
+                f"Direct URL: {image_url}"
+            )
 
         if fn_name == "create_skill":
             from tools.dynamic_skills import create_skill_package

@@ -3438,3 +3438,376 @@ async def list_identity_agents(user: dict = Depends(get_current_user)):
     """List agents that have identity files."""
     agents = _identity_mgr.list_agents()
     return {"agents": agents}
+
+
+# ── 11. Performance Benchmarking Suite ───────────────────────────
+
+from tools.benchmark_suite import BenchmarkRunner, get_scenarios, BENCHMARK_SCENARIOS
+
+_bench_runner = BenchmarkRunner()
+
+
+class BenchmarkRunRequest(BaseModel):
+    agent_role: str | None = None
+    scenario_id: str | None = None
+    category: str | None = None
+
+
+@app.get("/api/benchmarks/scenarios")
+async def list_benchmark_scenarios(
+    category: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """List available benchmark scenarios."""
+    scenarios = get_scenarios(category)
+    return {"scenarios": scenarios, "total": len(scenarios)}
+
+
+@app.get("/api/benchmarks/leaderboard")
+async def benchmark_leaderboard(user: dict = Depends(get_current_user)):
+    """Get agent leaderboard based on benchmark scores."""
+    lb = _bench_runner.get_leaderboard()
+    return {"leaderboard": lb}
+
+
+@app.get("/api/benchmarks/results")
+async def benchmark_results(
+    agent_role: str | None = None,
+    limit: int = 50,
+    user: dict = Depends(get_current_user),
+):
+    """Get benchmark results with optional agent filter."""
+    results = _bench_runner.get_results(agent_role=agent_role, limit=limit)
+    return {"results": results, "total": len(results)}
+
+
+@app.post("/api/benchmarks/run")
+async def run_benchmark(body: BenchmarkRunRequest, user: dict = Depends(get_current_user)):
+    """Run benchmark scenario(s) for an agent."""
+    _audit("run_benchmark", user["user_id"], detail=f"role={body.agent_role}, scenario={body.scenario_id}, cat={body.category}")
+    try:
+        if body.scenario_id and body.agent_role:
+            # Single scenario run
+            result = await _bench_runner.run_single(body.agent_role, body.scenario_id)
+            return {"result": result, "type": "single"}
+        else:
+            # Suite run
+            summary = await _bench_runner.run_suite(
+                agent_role=body.agent_role,
+                category=body.category,
+            )
+            return {"summary": summary, "type": "suite"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Benchmark failed: {e}")
+
+
+@app.get("/api/benchmarks/compare")
+async def compare_agents_benchmark(
+    role_a: str,
+    role_b: str,
+    user: dict = Depends(get_current_user),
+):
+    """Compare two agents head-to-head on benchmark scores."""
+    try:
+        comparison = _bench_runner.compare_agents(role_a, role_b)
+        return {"comparison": comparison}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/benchmarks/history")
+async def benchmark_history(
+    agent_role: str,
+    scenario_id: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Get historical benchmark scores for trend analysis."""
+    history = _bench_runner.get_history(agent_role, scenario_id)
+    return {"history": history, "agent_role": agent_role}
+
+
+# ── 12. Error Pattern Analysis ───────────────────────────────────
+
+from tools.error_patterns import get_error_analyzer
+
+_error_analyzer = get_error_analyzer()
+
+# ── 13. Cost Tracking ────────────────────────────────────────────
+
+from tools.cost_tracker import get_cost_tracker
+
+_cost_tracker = get_cost_tracker()
+
+
+class RecordErrorRequest(BaseModel):
+    agent_role: str
+    error_message: str
+    task_type: str = "general"
+    context: dict | None = None
+
+
+class ResolvePatternRequest(BaseModel):
+    resolution_notes: str = ""
+
+
+@app.post("/api/errors/record")
+async def record_error_event(body: RecordErrorRequest, user: dict = Depends(get_current_user)):
+    """Record an error event and auto-classify it."""
+    try:
+        event = _error_analyzer.record_error(
+            agent_role=body.agent_role,
+            error_message=body.error_message,
+            task_type=body.task_type,
+            context=body.context,
+        )
+        return {"event": event}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Record error failed: {e}")
+
+
+@app.get("/api/errors/stats")
+async def error_stats(
+    agent_role: str | None = None,
+    hours: int = 24,
+    user: dict = Depends(get_current_user),
+):
+    """Get aggregated error statistics."""
+    stats = _error_analyzer.get_error_stats(agent_role=agent_role, hours=hours)
+    return {"stats": stats}
+
+
+@app.get("/api/errors/timeline")
+async def error_timeline(
+    hours: int = 24,
+    user: dict = Depends(get_current_user),
+):
+    """Get hourly error counts for timeline chart."""
+    timeline = _error_analyzer.get_error_timeline(hours=hours)
+    return {"timeline": timeline}
+
+
+@app.get("/api/errors/patterns")
+async def list_error_patterns(
+    status: str | None = None,
+    agent_role: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """List detected error patterns."""
+    patterns = _error_analyzer.get_patterns(status=status, agent_role=agent_role)
+    return {"patterns": patterns, "total": len(patterns)}
+
+
+@app.post("/api/errors/detect")
+async def detect_error_patterns(
+    hours: int = 24,
+    user: dict = Depends(get_current_user),
+):
+    """Run pattern detection on recent errors."""
+    _audit("detect_error_patterns", user["user_id"], detail=f"hours={hours}")
+    new_patterns = _error_analyzer.detect_patterns(window_hours=hours)
+    return {"new_patterns": new_patterns, "total_new": len(new_patterns)}
+
+
+@app.get("/api/errors/recommendations")
+async def error_recommendations(user: dict = Depends(get_current_user)):
+    """Get optimization recommendations based on active error patterns."""
+    recs = _error_analyzer.get_recommendations()
+    return {"recommendations": recs, "total": len(recs)}
+
+
+@app.post("/api/errors/patterns/{pattern_id}/resolve")
+async def resolve_error_pattern(
+    pattern_id: int,
+    body: ResolvePatternRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Mark an error pattern as resolved."""
+    _audit("resolve_pattern", user["user_id"], detail=f"pattern={pattern_id}")
+    success = _error_analyzer.resolve_pattern(pattern_id, body.resolution_notes)
+    if not success:
+        raise HTTPException(status_code=404, detail="Pattern not found")
+    return {"resolved": True, "pattern_id": pattern_id}
+
+
+@app.post("/api/errors/patterns/{pattern_id}/suppress")
+async def suppress_error_pattern(
+    pattern_id: int,
+    user: dict = Depends(get_current_user),
+):
+    """Suppress a noisy error pattern."""
+    _audit("suppress_pattern", user["user_id"], detail=f"pattern={pattern_id}")
+    success = _error_analyzer.suppress_pattern(pattern_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Pattern not found")
+    return {"suppressed": True, "pattern_id": pattern_id}
+
+# ── 13. Cost Tracking Endpoints ──────────────────────────────────
+
+
+class RecordUsageRequest(BaseModel):
+    agent_role: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    task_type: str = "general"
+    metadata: dict | None = None
+
+
+class SetBudgetRequest(BaseModel):
+    agent_role: str | None = None
+    daily_limit: float
+    alert_threshold: float = 0.8
+
+
+@app.post("/api/costs/record")
+async def record_usage_event(body: RecordUsageRequest, user: dict = Depends(get_current_user)):
+    """Record a token usage event."""
+    try:
+        event = _cost_tracker.record_usage(
+            agent_role=body.agent_role,
+            model=body.model,
+            input_tokens=body.input_tokens,
+            output_tokens=body.output_tokens,
+            task_type=body.task_type,
+            metadata=body.metadata,
+        )
+        return {"event": event}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Record usage failed: {e}")
+
+
+@app.get("/api/costs/summary")
+async def cost_summary(hours: int = 24, user: dict = Depends(get_current_user)):
+    """Get aggregated cost summary."""
+    return _cost_tracker.get_cost_summary(hours=hours)
+
+
+@app.get("/api/costs/timeline")
+async def cost_timeline(hours: int = 24, granularity: str = "hour", user: dict = Depends(get_current_user)):
+    """Get cost timeline data."""
+    return {"timeline": _cost_tracker.get_cost_timeline(hours=hours, granularity=granularity)}
+
+
+@app.get("/api/costs/agent/{agent_role}")
+async def agent_costs(agent_role: str, hours: int = 24, user: dict = Depends(get_current_user)):
+    """Get detailed cost breakdown for a specific agent."""
+    return _cost_tracker.get_agent_costs(agent_role=agent_role, hours=hours)
+
+
+@app.get("/api/costs/top-consumers")
+async def top_consumers(hours: int = 24, limit: int = 10, user: dict = Depends(get_current_user)):
+    """Get agents ranked by cost."""
+    return {"consumers": _cost_tracker.get_top_consumers(hours=hours, limit=limit)}
+
+
+@app.post("/api/costs/budget")
+async def set_budget(body: SetBudgetRequest, user: dict = Depends(get_current_user)):
+    """Set or update a daily budget."""
+    _audit("set_budget", user["user_id"], detail=f"agent={body.agent_role} limit={body.daily_limit}")
+    return _cost_tracker.set_budget(
+        agent_role=body.agent_role,
+        daily_limit=body.daily_limit,
+        alert_threshold=body.alert_threshold,
+    )
+
+
+@app.get("/api/costs/budget")
+async def check_budget(agent_role: str | None = None, user: dict = Depends(get_current_user)):
+    """Check budget status."""
+    return _cost_tracker.check_budget(agent_role=agent_role)
+
+
+@app.get("/api/costs/forecast")
+async def cost_forecast(days: int = 7, user: dict = Depends(get_current_user)):
+    """Get cost forecast based on trends."""
+    return _cost_tracker.get_cost_forecast(days=days)
+
+
+@app.get("/api/costs/stats")
+async def usage_stats(user: dict = Depends(get_current_user)):
+    """Get overall usage statistics."""
+    return _cost_tracker.get_usage_stats()
+
+
+# ── Auto-Optimizer API ───────────────────────────────────────────
+
+from tools.auto_optimizer import get_auto_optimizer
+
+_auto_optimizer = get_auto_optimizer()
+
+
+@app.get("/api/optimizer/stats")
+async def optimizer_stats(user: dict = Depends(get_current_user)):
+    """Get optimization statistics summary."""
+    stats = _auto_optimizer.get_optimization_stats()
+    return stats
+
+
+@app.get("/api/optimizer/recommendations")
+async def optimizer_recommendations(
+    category: str | None = None,
+    priority: str | None = None,
+    status: str = "pending",
+    user: dict = Depends(get_current_user),
+):
+    """List recommendations with optional filters."""
+    recs = _auto_optimizer.get_recommendations(
+        category=category, priority=priority, status=status
+    )
+    return {"recommendations": recs, "total": len(recs)}
+
+
+@app.post("/api/optimizer/analyze")
+async def optimizer_analyze(user: dict = Depends(get_current_user)):
+    """Run full analysis and generate new recommendations."""
+    _audit("optimizer_analyze", user["user_id"])
+    new_recs = _auto_optimizer.analyze_and_recommend()
+    return {"new_recommendations": new_recs, "total_new": len(new_recs)}
+
+
+@app.post("/api/optimizer/recommendations/{rec_id}/apply")
+async def optimizer_apply(
+    rec_id: int,
+    user: dict = Depends(get_current_user),
+):
+    """Apply a pending recommendation."""
+    _audit("optimizer_apply", user["user_id"], detail=f"rec={rec_id}")
+    result = _auto_optimizer.apply_recommendation(rec_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/api/optimizer/recommendations/{rec_id}/dismiss")
+async def optimizer_dismiss(
+    rec_id: int,
+    user: dict = Depends(get_current_user),
+):
+    """Dismiss a pending recommendation."""
+    _audit("optimizer_dismiss", user["user_id"], detail=f"rec={rec_id}")
+    result = _auto_optimizer.dismiss_recommendation(rec_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/api/optimizer/agent/{agent_role}")
+async def optimizer_agent_profile(
+    agent_role: str,
+    user: dict = Depends(get_current_user),
+):
+    """Get optimization profile for a specific agent."""
+    profile = _auto_optimizer.get_agent_optimization_profile(agent_role)
+    return profile
+
+
+@app.get("/api/optimizer/history")
+async def optimizer_history(
+    limit: int = 50,
+    user: dict = Depends(get_current_user),
+):
+    """Get optimization action history."""
+    history = _auto_optimizer.get_optimization_history(limit=limit)
+    return {"history": history, "total": len(history)}

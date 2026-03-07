@@ -38,7 +38,7 @@ const PHASES: Phase[] = [
       { done: true, label: "RAG, Dynamic Skills, Teachability, MCP Client" },
       { done: true, label: "Sunum üretimi (MINI/MIDI/MAXI)" },
       { done: true, label: "Idea-to-Project pipeline" },
-      { done: true, label: "Frontend: Next.js cockpit (9 tab)" },
+      { done: true, label: "Frontend: Next.js cockpit (10 tab)" },
       {
         done: true,
         label:
@@ -142,18 +142,36 @@ const PHASES: Phase[] = [
     id: "f6",
     title: "Faz 6 — Performans",
     icon: "�",
-    status: "wip",
+    status: "done",
     color: "text-amber-400",
     border: "border-amber-400/30",
-    progress: 55,
+    progress: 100,
     items: [
       { done: true, label: "Agent başarı oranı tracking + Confidence scoring" },
       { done: true, label: "Circuit breaker" },
       { done: true, label: "Tool usage analytics dashboard" },
       { done: true, label: "User behavior tracking" },
-      { done: false, label: "Hata pattern analizi" },
-      { done: false, label: "Otomatik optimizasyon önerileri" },
-      { done: false, label: "Cost tracking (token → maliyet)" },
+      {
+        done: true,
+        label: "Performance Benchmarking Suite (8 senaryo, 5 kategori, SQLite)",
+      },
+      {
+        done: true,
+        label: "Benchmark UI paneli (Sıralama/Test/Sonuçlar/Karşılaştır)",
+      },
+      { done: true, label: "Benchmark backend API (7 endpoint)" },
+      {
+        done: true,
+        label: "Hata pattern analizi (8 hata tipi, clustering, öneri motoru)",
+      },
+      {
+        done: true,
+        label: "Otomatik optimizasyon önerileri (6 analiz, 4 kategori, 7 API)",
+      },
+      {
+        done: true,
+        label: "Cost tracking (token/maliyet takibi, bütçe, tahmin, 9 API)",
+      },
     ],
   },
   {

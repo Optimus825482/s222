@@ -197,6 +197,60 @@ const AgentCommsPanel = dynamic(
     ),
   },
 );
+const BenchmarkPanel = dynamic(
+  () =>
+    import("@/components/benchmark-panel").then((m) => ({
+      default: m.BenchmarkPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+const ErrorPatternsPanel = dynamic(
+  () => import("@/components/error-patterns-panel"),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+const CostTrackerPanel = dynamic(
+  () => import("@/components/cost-tracker-panel"),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
+const AutoOptimizerPanel = dynamic(
+  () =>
+    import("@/components/auto-optimizer-panel").then((m) => ({
+      default: m.AutoOptimizerPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
 
 export default function Home() {
   const router = useRouter();
@@ -466,6 +520,30 @@ export default function Home() {
         return (
           <div className="flex-1 overflow-hidden">
             <AgentCommsPanel />
+          </div>
+        );
+      case "benchmark":
+        return (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <BenchmarkPanel />
+          </div>
+        );
+      case "errors":
+        return (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <ErrorPatternsPanel />
+          </div>
+        );
+      case "optimizer":
+        return (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <AutoOptimizerPanel />
+          </div>
+        );
+      case "costs":
+        return (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <CostTrackerPanel />
           </div>
         );
       default:

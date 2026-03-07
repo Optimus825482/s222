@@ -13,7 +13,11 @@ export type NavTab =
   | "coordination"
   | "ecosystem"
   | "autonomous"
-  | "comms";
+  | "comms"
+  | "benchmark"
+  | "errors"
+  | "optimizer"
+  | "costs";
 
 const NAV_TABS: { key: NavTab; label: string; color: string }[] = [
   {
@@ -60,6 +64,26 @@ const NAV_TABS: { key: NavTab; label: string; color: string }[] = [
     key: "comms",
     label: "📡 İletişim",
     color: "text-cyan-400 border-cyan-400 bg-cyan-400/5",
+  },
+  {
+    key: "benchmark",
+    label: "🏆 Benchmark",
+    color: "text-yellow-400 border-yellow-400 bg-yellow-400/5",
+  },
+  {
+    key: "errors",
+    label: "🐛 Hatalar",
+    color: "text-red-400 border-red-400 bg-red-400/5",
+  },
+  {
+    key: "optimizer",
+    label: "⚡ Optimizer",
+    color: "text-orange-400 border-orange-400 bg-orange-400/5",
+  },
+  {
+    key: "costs",
+    label: "💰 Maliyet",
+    color: "text-emerald-400 border-emerald-400 bg-emerald-400/5",
   },
 ];
 

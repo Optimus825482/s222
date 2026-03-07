@@ -58,22 +58,27 @@ ROLE_ALLOWLIST: dict[str, set[str]] = {
     "thinker": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
-        "self_evaluate", "mcp_call", "mcp_list_tools",
+        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
     },
     "speed": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
-        "self_evaluate", "mcp_call", "mcp_list_tools",
+        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
     },
     "researcher": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "rag_ingest",
-        "code_execute", "self_evaluate", "mcp_call", "mcp_list_tools",
+        "code_execute", "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
     },
     "reasoner": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
-        "self_evaluate", "mcp_call", "mcp_list_tools",
+        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
+    },
+    "observer": {
+        "web_search", "web_fetch", "save_memory", "recall_memory",
+        "find_skill", "use_skill", "rag_query", "code_execute",
+        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
     },
 }
 

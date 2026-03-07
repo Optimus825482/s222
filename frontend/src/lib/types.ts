@@ -495,3 +495,38 @@ export interface AgentIdentity {
 }
 
 export type IdentityFileType = "soul" | "user" | "memory" | "bootstrap";
+
+// ── Benchmark Types ─────────────────────────────────────────────
+
+export interface BenchmarkScenario {
+  id: string;
+  name: string;
+  category: string;
+  prompt: string;
+  expected_traits: string[];
+  max_score: number;
+  timeout_sec: number;
+}
+
+export interface BenchmarkResult {
+  agent_role: string;
+  scenario_id: string;
+  scenario_name: string;
+  category: string;
+  score: number;
+  max_score: number;
+  latency_ms: number;
+  tokens_used: number;
+  output_preview: string;
+  dimensions: Record<string, number>;
+  created_at: string;
+}
+
+export interface BenchmarkLeaderboardEntry {
+  agent_role: string;
+  avg_score: number;
+  total_runs: number;
+  avg_latency_ms: number;
+  best_category: string;
+  worst_category: string;
+}

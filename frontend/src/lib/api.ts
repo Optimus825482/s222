@@ -427,3 +427,368 @@ export async function getDbHealth() {
     return { status: "error" };
   }
 }
+
+// ── Benchmark API ───────────────────────────────────────────────
+
+export const benchmarkApi = {
+  async getScenarios(category?: string) {
+    const q = category ? `?category=${category}` : "";
+    const res = await fetch(`${BASE}/api/benchmarks/scenarios${q}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getLeaderboard() {
+    const res = await fetch(`${BASE}/api/benchmarks/leaderboard`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getResults(agentRole?: string, limit = 50) {
+    const params = new URLSearchParams();
+    if (agentRole) params.set("agent_role", agentRole);
+    params.set("limit", String(limit));
+    const res = await fetch(`${BASE}/api/benchmarks/results?${params}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async run(body: {
+    agent_role?: string;
+    scenario_id?: string;
+    category?: string;
+  }) {
+    const res = await fetch(`${BASE}/api/benchmarks/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async compare(roleA: string, roleB: string) {
+    const res = await fetch(
+      `${BASE}/api/benchmarks/compare?role_a=${roleA}&role_b=${roleB}`,
+      { headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
+
+// ── Error Pattern Analysis API ──────────────────────────────────
+
+export const errorPatternApi = {
+  async recordError(body: {
+    agent_role: string;
+    error_message: string;
+    task_type?: string;
+    context?: Record<string, unknown>;
+  }) {
+    const res = await fetch(`${BASE}/api/errors/record`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getStats(agentRole?: string, hours = 24) {
+    const params = new URLSearchParams();
+    if (agentRole) params.set("agent_role", agentRole);
+    params.set("hours", String(hours));
+    const res = await fetch(`${BASE}/api/errors/stats?${params}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getTimeline(hours = 24) {
+    const res = await fetch(`${BASE}/api/errors/timeline?hours=${hours}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getPatterns(status?: string, agentRole?: string) {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (agentRole) params.set("agent_role", agentRole);
+    const res = await fetch(`${BASE}/api/errors/patterns?${params}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async detectPatterns(hours = 24) {
+    const res = await fetch(`${BASE}/api/errors/detect?hours=${hours}`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getRecommendations() {
+    const res = await fetch(`${BASE}/api/errors/recommendations`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async resolvePattern(patternId: number, resolutionNotes = "") {
+    const res = await fetch(
+      `${BASE}/api/errors/patterns/${patternId}/resolve`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ resolution_notes: resolutionNotes }),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async suppressPattern(patternId: number) {
+    const res = await fetch(
+      `${BASE}/api/errors/patterns/${patternId}/suppress`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
+
+// ── Auto-Optimizer API ──────────────────────────────────────────
+
+export const optimizerApi = {
+  async getStats() {
+    const res = await fetch(`${BASE}/api/optimizer/stats`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getRecommendations(
+    status = "pending",
+    category?: string,
+    priority?: string,
+  ) {
+    const params = new URLSearchParams({ status });
+    if (category) params.set("category", category);
+    if (priority) params.set("priority", priority);
+    const res = await fetch(`${BASE}/api/optimizer/recommendations?${params}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async analyze() {
+    const res = await fetch(`${BASE}/api/optimizer/analyze`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async apply(recId: number) {
+    const res = await fetch(
+      `${BASE}/api/optimizer/recommendations/${recId}/apply`,
+      { method: "POST", headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async dismiss(recId: number) {
+    const res = await fetch(
+      `${BASE}/api/optimizer/recommendations/${recId}/dismiss`,
+      { method: "POST", headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getAgentProfile(role: string) {
+    const res = await fetch(
+      `${BASE}/api/optimizer/agent/${encodeURIComponent(role)}`,
+      { headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getHistory(limit = 50) {
+    const res = await fetch(`${BASE}/api/optimizer/history?limit=${limit}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
+
+// ── Cost Tracker API ────────────────────────────────────────────
+
+export const costTrackerApi = {
+  async getSummary(hours = 24) {
+    const res = await fetch(`${BASE}/api/costs/summary?hours=${hours}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getTimeline(hours = 24) {
+    const res = await fetch(`${BASE}/api/costs/timeline?hours=${hours}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getTopConsumers(limit = 10) {
+    const res = await fetch(`${BASE}/api/costs/top-consumers?limit=${limit}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getBudgetStatus(agentRole?: string) {
+    const params = new URLSearchParams();
+    if (agentRole) params.set("agent_role", agentRole);
+    const res = await fetch(`${BASE}/api/costs/budget?${params}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
+
+// ── Cost Tracking API ───────────────────────────────────────────
+
+export const costApi = {
+  async recordUsage(body: {
+    agent_role: string;
+    model: string;
+    input_tokens: number;
+    output_tokens: number;
+    task_type?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const res = await fetch(`${BASE}/api/costs/record`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getSummary(hours = 24) {
+    const res = await fetch(`${BASE}/api/costs/summary?hours=${hours}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getTimeline(hours = 24, granularity = "hour") {
+    const params = new URLSearchParams({ hours: String(hours), granularity });
+    const res = await fetch(`${BASE}/api/costs/timeline?${params}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getAgentCosts(agentRole: string, hours = 24) {
+    const res = await fetch(
+      `${BASE}/api/costs/agent/${encodeURIComponent(agentRole)}?hours=${hours}`,
+      { headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getTopConsumers(hours = 24, limit = 10) {
+    const params = new URLSearchParams({
+      hours: String(hours),
+      limit: String(limit),
+    });
+    const res = await fetch(`${BASE}/api/costs/top-consumers?${params}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async setBudget(body: {
+    agent_role?: string | null;
+    daily_limit: number;
+    alert_threshold?: number;
+  }) {
+    const res = await fetch(`${BASE}/api/costs/budget`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async checkBudget(agentRole?: string) {
+    const params = agentRole
+      ? `?agent_role=${encodeURIComponent(agentRole)}`
+      : "";
+    const res = await fetch(`${BASE}/api/costs/budget${params}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getForecast(days = 7) {
+    const res = await fetch(`${BASE}/api/costs/forecast?days=${days}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getUsageStats() {
+    const res = await fetch(`${BASE}/api/costs/stats`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
+
+function authHeaders(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem("ops-center-auth");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed?.token ? { Authorization: `Bearer ${parsed.token}` } : {};
+  } catch {
+    return {};
+  }
+}
