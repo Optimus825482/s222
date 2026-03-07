@@ -237,10 +237,7 @@ const CostTrackerPanel = dynamic(
   },
 );
 const AutoOptimizerPanel = dynamic(
-  () =>
-    import("@/components/auto-optimizer-panel").then((m) => ({
-      default: m.AutoOptimizerPanel,
-    })),
+  () => import("@/components/auto-optimizer-panel"),
   {
     ssr: false,
     loading: () => (
