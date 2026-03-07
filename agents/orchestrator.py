@@ -103,12 +103,13 @@ class OrchestratorAgent(BaseAgent):
     def system_prompt(self) -> str:
         return (
             "You are the Orchestrator of a multi-agent deep research system. "
-            "You coordinate 4 specialist agents that work IN PARALLEL.\n\n"
+            "You coordinate 5 specialist agents that work IN PARALLEL.\n\n"
             "AGENTS (delegate via decompose_task — these are NOT tools):\n"
             "- researcher (GLM 4.7): Web search, current info, data gathering, fact-checking\n"
             "- thinker (MiniMax M2.1): Deep analysis, complex reasoning, planning, architecture\n"
             "- reasoner (Nemotron 3 Nano): Math, logic, chain-of-thought, verification\n"
-            "- speed (Step 3.5 Flash): Quick answers, code generation, formatting\n\n"
+            "- speed (Step 3.5 Flash): Quick answers, code generation, formatting\n"
+            "- critic (DeepSeek): Code review, fact-checking, quality assurance, verification — use as the final quality gate\n\n"
             "CRITICAL RULES:\n"
             "1. For ANY research, analysis, or complex question: ALWAYS use decompose_task with "
             "pipeline_type='parallel' and assign MULTIPLE agents (minimum 3).\n"
@@ -125,7 +126,8 @@ class OrchestratorAgent(BaseAgent):
             "- researcher: Search web, gather current data and sources\n"
             "- thinker: Deep analysis, pros/cons, strategic evaluation\n"
             "- reasoner: Verify facts, check logic, find inconsistencies\n"
-            "- speed: Format output, generate code/tables if needed\n\n"
+            "- speed: Format output, generate code/tables if needed\n"
+            "- critic: Review quality, find weaknesses, suggest improvements\n\n"
             "YOUR TOOLS:\n"
             "- decompose_task: Break work into sub-tasks and assign to agents (ALWAYS prefer parallel)\n"
             "- spawn_subagent: Create and run a ONE-OFF specialist on ANY topic (custom role + optional skills). Use when the fixed 4 agents are not the right fit or you need a domain expert (crypto, legal, etc.). You can create a skill first with research_create_skill then pass skill_ids to spawn_subagent.\n"
@@ -243,7 +245,7 @@ class OrchestratorAgent(BaseAgent):
         return messages
 
     # Agent names that the model might call directly as tools
-    _AGENT_NAMES = {"thinker", "speed", "researcher", "reasoner"}
+    _AGENT_NAMES = {"thinker", "speed", "researcher", "reasoner", "critic"}
 
     # ── Deep Research Detection ──────────────────────────────────
 
@@ -351,6 +353,15 @@ class OrchestratorAgent(BaseAgent):
                 ),
                 "assigned_agent": "speed",
                 "priority": 1,
+            },
+            {
+                "description": (
+                    f"Critically evaluate all findings about: {user_input}\n"
+                    "Find weaknesses, missing perspectives, unsupported claims. "
+                    "Suggest concrete improvements. Rate overall quality."
+                ),
+                "assigned_agent": "critic",
+                "priority": 2,
             },
         ]
 
@@ -1305,7 +1316,7 @@ class OrchestratorAgent(BaseAgent):
                     assigned_agent=role,
                     priority=1,
                 )
-                for role in [AgentRole.THINKER, AgentRole.RESEARCHER, AgentRole.REASONER, AgentRole.SPEED]
+                for role in [AgentRole.THINKER, AgentRole.RESEARCHER, AgentRole.REASONER, AgentRole.SPEED, AgentRole.CRITIC]
             ]
 
             task = Task(
@@ -1510,6 +1521,7 @@ class OrchestratorAgent(BaseAgent):
                             "thinker": ["researcher"],
                             "reasoner": ["thinker"],
                             "speed": ["researcher"],
+                            "critic": ["thinker"],
                         }
                     else:
                         complement = {
@@ -1517,6 +1529,7 @@ class OrchestratorAgent(BaseAgent):
                             "thinker": ["researcher", "reasoner"],
                             "reasoner": ["thinker", "researcher"],
                             "speed": ["thinker", "researcher"],
+                            "critic": ["thinker", "researcher"],
                         }
                     for agent_name in complement.get(existing_agent, ["thinker", "researcher"]):
                         current_task.sub_tasks.append(SubTask(

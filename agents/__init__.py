@@ -1,8 +1,8 @@
 # Agents module - Orchestrator + Specialist agents
 from agents.synthesizer import SynthesizerAgent
-from agents.observer import ObserverAgent
+from agents.critic import CriticAgent
 
-__all__ = ["SynthesizerAgent", "ObserverAgent", "create_agent"]
+__all__ = ["SynthesizerAgent", "CriticAgent", "create_agent"]
 
 _AGENT_REGISTRY: dict[str, type] = {}
 
@@ -23,7 +23,7 @@ def _ensure_registry() -> None:
         SpeedAgent,
         ResearcherAgent,
         ReasonerAgent,
-        ObserverAgent,
+        CriticAgent,
         SynthesizerAgent,
     ]:
         _AGENT_REGISTRY[cls.role.value if hasattr(cls.role, "value") else str(cls.role)] = cls

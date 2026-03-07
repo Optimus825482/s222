@@ -75,7 +75,7 @@ ROLE_ALLOWLIST: dict[str, set[str]] = {
         "find_skill", "use_skill", "rag_query", "code_execute",
         "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
     },
-    "observer": {
+    "critic": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
         "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",

@@ -1779,7 +1779,7 @@ async def health():
 from collections import deque as _deque
 
 _AUDIT_LOG: _deque[dict[str, Any]] = _deque(maxlen=1000)
-_AGENT_ROLES = ["orchestrator", "thinker", "speed", "researcher", "reasoner", "observer"]
+_AGENT_ROLES = ["orchestrator", "thinker", "speed", "researcher", "reasoner", "critic"]
 
 
 def _audit(event_type: str, user_id: str, detail: str = "", **extra: Any) -> None:
@@ -2681,7 +2681,7 @@ _AUTONOMOUS_CONVERSATIONS: list[dict] = []
 _AUTO_CHAT_CONFIG: dict = {
     "enabled": True,
     "max_exchanges": 4,
-    "enabled_agents": ["orchestrator", "thinker", "speed", "researcher", "reasoner", "observer"],
+    "enabled_agents": ["orchestrator", "thinker", "speed", "researcher", "reasoner", "critic"],
     "topics": ["sistem performansı", "görev optimizasyonu", "yeni stratejiler", "hata analizi", "işbirliği fırsatları", "teknoloji trendleri"],
     "personality_prompts": {
         "orchestrator": "Sen Qwen3, orkestratör ajansın. Görevleri koordine eder, büyük resmi görürsün. Diğer ajanlara liderlik edersin ama saygılısın.",
@@ -2689,7 +2689,7 @@ _AUTO_CHAT_CONFIG: dict = {
         "speed": "Sen Step Flash, hız ajanısın. Pratik, hızlı çözümler üretirsin. Enerjik ve aksiyona yöneliksin.",
         "researcher": "Sen GLM, araştırmacı ajansın. Veri odaklı, meraklı ve detaycısın. Her şeyi araştırmak istersin.",
         "reasoner": "Sen Nemotron, mantık ajanısın. Matematiksel ve mantıksal düşünürsün. Kanıta dayalı konuşursun.",
-        "observer": "Sen DeepSeek, gözlemci ajansın. Sistemi izler, kalite kontrol yaparsın. Sessiz ama keskin gözlemlisin.",
+        "critic": "Sen DeepSeek, eleştirmen ajansın. Kalite kontrol yapar, eksikleri bulur, iyileştirme önerileri sunarsın. Yapıcı ama acımasız bir eleştirmensin.",
     },
 }
 
@@ -2922,10 +2922,10 @@ def _generate_post_task_meeting(
             "Doğrulama adımlarım başarılı geçti. Matematiksel/mantıksal hataya rastlamadım.",
             "Akıl yürütme zinciri temizdi. Bir sonraki görevde daha karmaşık senaryoları ele alabiliriz.",
         ],
-        "observer": [
-            "Sistem metrikleri normal seyretti. Anomali tespit etmedim.",
-            "Kalite kontrol açısından çıktı standartlarımıza uygundu.",
-            "Gözlemlerime göre ekip koordinasyonu iyiydi. Token verimliliği makul seviyede.",
+        "critic": [
+            "Çıktı kalitesi genel olarak iyi, ama birkaç iyileştirme noktası var.",
+            "Kaynak doğrulaması yapıldı, tutarsızlık tespit edilmedi.",
+            "Eleştirel değerlendirmem: argümanlar sağlam, kanıt yeterli.",
         ],
     }
 

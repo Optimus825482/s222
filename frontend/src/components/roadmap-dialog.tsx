@@ -27,7 +27,7 @@ export const PHASES: Phase[] = [
       {
         done: true,
         label:
-          "6 Agent (Orchestrator, Thinker, Speed, Researcher, Reasoner, Observer)",
+          "6 Agent (Orchestrator, Thinker, Speed, Researcher, Reasoner, Critic)",
       },
       {
         done: true,

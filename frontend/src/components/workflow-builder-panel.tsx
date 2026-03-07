@@ -57,7 +57,7 @@ const AGENTS = [
   "speed",
   "researcher",
   "reasoner",
-  "observer",
+  "critic",
 ] as const;
 
 const OPERATORS = ["eq", "neq", "contains", "gt", "lt"] as const;

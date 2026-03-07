@@ -17,7 +17,7 @@
 
 Çalışan altyapı:
 
-- 🟢 6 Agent (Orchestrator, Thinker, Speed, Researcher, Reasoner, Observer)
+- 🟢 6 Agent (Orchestrator, Thinker, Speed, Researcher, Reasoner, Critic)
 - 🟢 Pipeline Engine (sequential, parallel, consensus, iterative, deep_research, brainstorm)
 - 🟢 PostgreSQL + pgvector bellek sistemi
 - 🟢 RAG, Dynamic Skills, Teachability, MCP Client

@@ -6,7 +6,7 @@ export type AgentRole =
   | "speed"
   | "researcher"
   | "reasoner"
-  | "observer";
+  | "critic";
 
 export interface ModelConfig {
   id: string;

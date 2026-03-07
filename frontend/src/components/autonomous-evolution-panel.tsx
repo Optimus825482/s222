@@ -17,7 +17,7 @@ const AGENT_ROLES: AgentRole[] = [
   "speed",
   "researcher",
   "reasoner",
-  "observer",
+  "critic",
 ];
 
 const ROLE_ICON: Record<AgentRole, string> = {
@@ -26,7 +26,7 @@ const ROLE_ICON: Record<AgentRole, string> = {
   speed: "⚡",
   researcher: "🔍",
   reasoner: "🌊",
-  observer: "👁️",
+  critic: "🎯",
 };
 
 const ROLE_COLOR: Record<AgentRole, string> = {
@@ -35,7 +35,7 @@ const ROLE_COLOR: Record<AgentRole, string> = {
   speed: "#a78bfa",
   researcher: "#f59e0b",
   reasoner: "#10b981",
-  observer: "#06b6d4",
+  critic: "#06b6d4",
 };
 
 const PRIORITY_STYLES: Record<string, string> = {

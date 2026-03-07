@@ -837,6 +837,7 @@ ORCHESTRATOR_TOOLS = [
                                         "speed",
                                         "researcher",
                                         "reasoner",
+                                        "critic",
                                     ],
                                     "description": "Which specialist agent to assign",
                                 },
@@ -1054,13 +1055,24 @@ REASONER_TOOLS = [
     LIST_DOMAIN_TOOLS_TOOL,
 ]
 
-# ── Observer Tools ────────────────────────────────────────────────
+# ── Critic Tools (DeepSeek) ────────────────────────────────────────
 
-OBSERVER_TOOLS = [
+CRITIC_TOOLS = [
     WEB_SEARCH_TOOL,
+    WEB_FETCH_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
     RAG_QUERY_TOOL,
+    RAG_LIST_DOCUMENTS_TOOL,
+    CODE_EXECUTE_TOOL,
+    RECALL_MEMORY_TOOL,
+    SAVE_MEMORY_TOOL,
+    LIST_MEMORIES_TOOL,
+    MEMORY_STATS_TOOL,
+    LIST_TEACHINGS_TOOL,
+    GENERATE_IMAGE_TOOL,
+    DOMAIN_EXPERT_TOOL,
+    LIST_DOMAIN_TOOLS_TOOL,
 ]
 
 # ── Agent → Tools Mapping ────────────────────────────────────────
@@ -1071,5 +1083,5 @@ AGENT_TOOLS: dict[str, list[dict[str, Any]]] = {
     "speed": SPEED_TOOLS,
     "researcher": RESEARCHER_TOOLS,
     "reasoner": REASONER_TOOLS,
-    "observer": OBSERVER_TOOLS,
+    "critic": CRITIC_TOOLS,
 }

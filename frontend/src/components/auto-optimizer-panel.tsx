@@ -96,7 +96,7 @@ const AGENTS = [
   "researcher",
   "synthesizer",
   "reasoner",
-  "observer",
+  "critic",
   "thinker",
   "speed",
 ];

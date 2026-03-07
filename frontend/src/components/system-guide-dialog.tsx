@@ -108,13 +108,13 @@ const AGENTS = [
     desc: "Mantıksal çıkarım, doğrulama, tutarlılık kontrolü. Sonuçları denetler.",
   },
   {
-    icon: "👁️",
-    title: "Observer",
+    icon: "🎯",
+    title: "Critic",
     color: "text-cyan-400",
     border: "border-cyan-400/30",
-    tag: "Gözlemci",
+    tag: "Eleştirmen",
     tagColor: "bg-cyan-400/10 text-cyan-400 border-cyan-400/30",
-    desc: "Sistem izleme, anomali tespiti, kalite güvencesi. DeepSeek Chat modeli.",
+    desc: "Kalite denetimi, fact-checking, çıktı doğrulama. DeepSeek Critic modeli.",
   },
 ];
 

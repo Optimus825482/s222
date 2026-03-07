@@ -105,18 +105,18 @@ MODELS = {
         "color": "#10b981",
         "icon": "🌊",
     },
-    "observer": {
+    "critic": {
         "id": "deepseek-chat",
         "name": "DeepSeek Chat",
-        "role": "observer",
-        "description": "Observer — system monitoring, anomaly detection, quality assurance",
+        "role": "critic",
+        "description": "Critic — quality review, fact-checking, weakness detection, improvement suggestions",
         "max_tokens": 4096,
-        "temperature": 0.3,
+        "temperature": 0.5,
         "top_p": 0.9,
         "has_thinking": False,
         "extra_body": None,
         "color": "#06b6d4",
-        "icon": "👁️",
+        "icon": "🎯",
         "base_url": "deepseek",
     },
 }

@@ -9,7 +9,7 @@ export const AGENT_CONFIG: Record<
   speed: { icon: "⚡", color: "#a78bfa", name: "Step 3.5 Flash" },
   researcher: { icon: "🔍", color: "#f59e0b", name: "GLM 4.7" },
   reasoner: { icon: "🌊", color: "#10b981", name: "Nemotron 3 Nano" },
-  observer: { icon: "👁️", color: "#06b6d4", name: "Observer" },
+  critic: { icon: "🎯", color: "#06b6d4", name: "DeepSeek Critic" },
 };
 
 /** Orchestration pattern (Kiro: parallel specialists / pipeline / swarm) */
