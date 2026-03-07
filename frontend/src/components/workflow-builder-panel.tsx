@@ -15,6 +15,7 @@ import {
   Calendar,
   Timer,
   Zap,
+  HelpCircle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type {
@@ -25,7 +26,7 @@ import type {
 
 /* ── Local Types ───────────────────────────────────────────────── */
 type StepType = "tool_call" | "agent_call" | "condition" | "parallel";
-type WfTab = "templates" | "custom" | "scheduler";
+type WfTab = "guide" | "templates" | "custom" | "scheduler";
 
 interface CustomStep {
   step_id: string;
@@ -106,6 +107,7 @@ const makeStep = (index: number): CustomStep => ({
 
 /* ── Tab Definitions ───────────────────────────────────────────── */
 const TABS: { key: WfTab; label: string; icon: typeof Workflow }[] = [
+  { key: "guide", label: "Nasıl Kullanılır", icon: HelpCircle },
   { key: "templates", label: "Şablonlar", icon: Workflow },
   { key: "custom", label: "Özel Workflow", icon: Settings },
   { key: "scheduler", label: "Zamanlayıcı", icon: Calendar },
@@ -116,7 +118,7 @@ const TABS: { key: WfTab; label: string; icon: typeof Workflow }[] = [
    ══════════════════════════════════════════════════════════════════ */
 
 export function WorkflowBuilderPanel() {
-  const [tab, setTab] = useState<WfTab>("templates");
+  const [tab, setTab] = useState<WfTab>("guide");
 
   /* ── Templates state ─────────────────────────────────────────── */
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
@@ -363,6 +365,213 @@ export function WorkflowBuilderPanel() {
             className="ml-auto text-red-500 hover:text-red-300 text-[10px]"
           >
             Kapat
+          </button>
+        </div>
+      )}
+
+      {/* ── Tab: Nasıl Kullanılır ─────────────────────────────── */}
+      {tab === "guide" && (
+        <div className="space-y-3 text-[11px] text-slate-400 leading-relaxed">
+          {/* Hero */}
+          <div
+            className={`${crd} border-cyan-500/20 bg-gradient-to-br from-cyan-950/30 to-slate-800/50`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Workflow className="w-5 h-5 text-cyan-400" />
+              <span className="text-sm font-semibold text-slate-200">
+                İş Akışı Motoru
+              </span>
+            </div>
+            <p>
+              Araştırma, kod inceleme ve derin analiz gibi çok adımlı görevleri
+              otomatikleştirin. Hazır şablonları tek tıkla çalıştırın veya kendi
+              özel pipeline&apos;ınızı oluşturun.
+            </p>
+          </div>
+
+          {/* 1 — Şablonlar */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-cyan-600/30 text-cyan-400 text-[10px] font-bold">
+                1
+              </span>
+              <span className="text-xs font-medium text-slate-200">
+                Şablonlar — Hazır Pipeline&apos;lar
+              </span>
+            </div>
+            <p className="mb-2">
+              <span className="text-cyan-400 font-medium">Şablonlar</span>{" "}
+              sekmesine gidin. Sistem önceden tanımlı workflow&apos;ları
+              listeler:
+            </p>
+            <div className="grid gap-1.5 pl-1">
+              <div className="flex items-start gap-2">
+                <Zap className="w-3 h-3 text-amber-400 mt-0.5 shrink-0" />
+                <span>
+                  <span className="text-slate-300">deep_research</span> — Bir
+                  konuyu web&apos;de araştırır, RAG ile zenginleştirir, rapor
+                  üretir
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Zap className="w-3 h-3 text-amber-400 mt-0.5 shrink-0" />
+                <span>
+                  <span className="text-slate-300">code_review</span> — Kodu
+                  analiz eder, güvenlik/performans önerileri sunar
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Zap className="w-3 h-3 text-amber-400 mt-0.5 shrink-0" />
+                <span>
+                  <span className="text-slate-300">full_analysis</span> —
+                  Araştırma + akıl yürütme + sentez pipeline&apos;ı
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 bg-slate-900/50 rounded p-2 border border-slate-700/30">
+              <span className="text-[10px] text-slate-500">Kullanım:</span>
+              <span className="text-slate-300">
+                {" "}
+                Şablona tıklayın → değişkenleri doldurun (ör. konu, dil) →{" "}
+              </span>
+              <span className="text-cyan-400 font-medium">Çalıştır</span>
+            </div>
+          </div>
+
+          {/* 2 — Özel Workflow */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-purple-600/30 text-purple-400 text-[10px] font-bold">
+                2
+              </span>
+              <span className="text-xs font-medium text-slate-200">
+                Özel Workflow — Kendi Pipeline&apos;ınız
+              </span>
+            </div>
+            <p className="mb-2">
+              <span className="text-purple-400 font-medium">Özel Workflow</span>{" "}
+              sekmesinde adım adım kendi iş akışınızı tasarlayın:
+            </p>
+            <div className="grid gap-1.5 pl-1">
+              <div className="flex items-start gap-2">
+                <ChevronRight className="w-3 h-3 text-slate-500 mt-0.5 shrink-0" />
+                <span>
+                  <span className="text-emerald-400">Araç Çağrısı</span> —
+                  web_search, code_execute, rag_query gibi araçları çağırın
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <ChevronRight className="w-3 h-3 text-slate-500 mt-0.5 shrink-0" />
+                <span>
+                  <span className="text-blue-400">Ajan Çağrısı</span> — thinker,
+                  researcher, critic gibi ajanları görevlendirin
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <ChevronRight className="w-3 h-3 text-slate-500 mt-0.5 shrink-0" />
+                <span>
+                  <span className="text-amber-400">Koşul</span> — Bir önceki
+                  adımın sonucuna göre dallanma yapın
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <ChevronRight className="w-3 h-3 text-slate-500 mt-0.5 shrink-0" />
+                <span>
+                  <span className="text-pink-400">Paralel</span> — Birden fazla
+                  adımı aynı anda çalıştırın
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 bg-slate-900/50 rounded p-2 border border-slate-700/30">
+              <span className="text-[10px] text-slate-500">İpucu:</span>
+              <span className="text-slate-300">
+                {" "}
+                Her adımda hata stratejisi{" "}
+              </span>
+              <span className="text-orange-400">rollback</span>
+              <span className="text-slate-300">
+                {" "}
+                olarak ayarlıdır — bir adım başarısız olursa önceki adımlar geri
+                alınır.
+              </span>
+            </div>
+          </div>
+
+          {/* 3 — Zamanlayıcı */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-green-600/30 text-green-400 text-[10px] font-bold">
+                3
+              </span>
+              <span className="text-xs font-medium text-slate-200">
+                Zamanlayıcı — Otomatik Tetikleme
+              </span>
+            </div>
+            <p className="mb-2">
+              <span className="text-green-400 font-medium">Zamanlayıcı</span>{" "}
+              sekmesinde workflow&apos;ları cron ifadesiyle periyodik
+              çalıştırın:
+            </p>
+            <div className="grid gap-1 pl-1 font-mono text-[10px]">
+              <div className="flex items-center gap-2">
+                <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                <span className="text-slate-300">0 * * * *</span>
+                <span className="text-slate-500 font-sans">
+                  → Her saat başı
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                <span className="text-slate-300">0 9 * * 1-5</span>
+                <span className="text-slate-500 font-sans">
+                  → Hafta içi her sabah 09:00
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                <span className="text-slate-300">*/30 * * * *</span>
+                <span className="text-slate-500 font-sans">
+                  → Her 30 dakikada bir
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 bg-slate-900/50 rounded p-2 border border-slate-700/30">
+              <span className="text-[10px] text-slate-500">Kullanım:</span>
+              <span className="text-slate-300">
+                {" "}
+                Şablon seçin → cron ifadesini girin → değişkenleri JSON olarak
+                yazın →{" "}
+              </span>
+              <span className="text-green-400 font-medium">Ekle</span>
+            </div>
+          </div>
+
+          {/* 4 — Geçmiş */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-slate-600/30 text-slate-300 text-[10px] font-bold">
+                4
+              </span>
+              <span className="text-xs font-medium text-slate-200">
+                Geçmiş — Sonuçları İnceleyin
+              </span>
+            </div>
+            <p>
+              Masaüstündeki{" "}
+              <span className="text-cyan-400">Workflow Geçmişi</span>{" "}
+              penceresinden tüm çalıştırmaları görüntüleyin. Her kayıt adım
+              sonuçlarını, süreyi ve hata detaylarını içerir. Başarısız bir
+              workflow&apos;u tek tıkla tekrar çalıştırabilirsiniz.
+            </p>
+          </div>
+
+          {/* CTA */}
+          <button
+            onClick={() => setTab("templates")}
+            className={`${btnPrimary} w-full justify-center`}
+          >
+            <Play className="w-3.5 h-3.5" />
+            Hadi Başlayalım — Şablonlara Git
           </button>
         </div>
       )}
@@ -959,6 +1168,173 @@ export function WorkflowBuilderPanel() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab: Nasıl Kullanılır ────────────────────────────── */}
+      {tab === "guide" && (
+        <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
+          {/* Hero */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-4 h-4 text-cyan-400" />
+              <span className="text-sm font-semibold text-slate-200">
+                İş Akışları Nedir?
+              </span>
+            </div>
+            <p className="text-slate-400">
+              İş akışları, birden fazla adımı (araç çağrısı, ajan çağrısı,
+              koşul, paralel işlem) tek bir pipeline olarak çalıştırmanızı
+              sağlar. Hazır şablonları kullanabilir, özel workflow oluşturabilir
+              veya zamanlayıcı ile otomatik tetikleyebilirsiniz.
+            </p>
+          </div>
+
+          {/* 1 — Şablonlar */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-2">
+              <Workflow className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[13px] font-semibold text-slate-200">
+                1. Şablonlar
+              </span>
+            </div>
+            <ol className="list-decimal list-inside space-y-1 text-slate-400 ml-1">
+              <li>
+                <span className="text-slate-300">Şablonlar</span> sekmesine
+                gidin ve listeden bir şablon seçin.
+              </li>
+              <li>
+                Gerekli değişkenleri doldurun (ör.{" "}
+                <code className="bg-slate-700/60 px-1 rounded text-cyan-300">
+                  topic
+                </code>
+                ,{" "}
+                <code className="bg-slate-700/60 px-1 rounded text-cyan-300">
+                  code
+                </code>
+                ).
+              </li>
+              <li>
+                <span className="text-cyan-400">▶ Çalıştır</span> butonuna basın
+                ve sonuçları bekleyin.
+              </li>
+            </ol>
+            <div className="mt-2 bg-slate-900/60 rounded p-2 text-[10px] text-slate-500 font-mono">
+              Örnek: &quot;deep_research&quot; şablonu → topic: &quot;yapay zeka
+              trendleri&quot; → Araştırma + Sentez + Rapor
+            </div>
+          </div>
+
+          {/* 2 — Özel Workflow */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-2">
+              <Settings className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[13px] font-semibold text-slate-200">
+                2. Özel Workflow Oluşturma
+              </span>
+            </div>
+            <ol className="list-decimal list-inside space-y-1 text-slate-400 ml-1">
+              <li>
+                <span className="text-slate-300">Özel Workflow</span> sekmesine
+                geçin.
+              </li>
+              <li>
+                Adım ekleyin ve türünü seçin:
+                <ul className="list-disc list-inside ml-4 mt-1 space-y-0.5">
+                  <li>
+                    <span className="text-cyan-300">Araç Çağrısı</span> —
+                    web_search, code_execute, rag_query vb.
+                  </li>
+                  <li>
+                    <span className="text-cyan-300">Ajan Çağrısı</span> —
+                    thinker, researcher, critic vb. bir ajana prompt gönderin.
+                  </li>
+                  <li>
+                    <span className="text-cyan-300">Koşul</span> — Bir önceki
+                    adımın çıktısına göre dallanma yapın.
+                  </li>
+                  <li>
+                    <span className="text-cyan-300">Paralel</span> — Birden
+                    fazla adımı eş zamanlı çalıştırın.
+                  </li>
+                </ul>
+              </li>
+              <li>
+                Adımları sıralayın ve{" "}
+                <span className="text-cyan-400">▶ Özel Workflow Çalıştır</span>{" "}
+                butonuna basın.
+              </li>
+            </ol>
+            <div className="mt-2 bg-slate-900/60 rounded p-2 text-[10px] text-slate-500 font-mono">
+              Örnek: web_search(&quot;Next.js 15&quot;) → agent:researcher
+              (analiz et) → agent:thinker (özetle)
+            </div>
+          </div>
+
+          {/* 3 — Zamanlayıcı */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-[13px] font-semibold text-slate-200">
+                3. Zamanlayıcı (Cron)
+              </span>
+            </div>
+            <ol className="list-decimal list-inside space-y-1 text-slate-400 ml-1">
+              <li>
+                <span className="text-slate-300">Zamanlayıcı</span> sekmesine
+                gidin.
+              </li>
+              <li>Bir şablon adı, cron ifadesi ve değişkenler girin.</li>
+              <li>
+                <span className="text-cyan-400">Zamanlama Ekle</span> butonuna
+                basın.
+              </li>
+              <li>Eklenen zamanlamayı açıp/kapatabilir veya silebilirsiniz.</li>
+            </ol>
+            <div className="mt-2 bg-slate-900/60 rounded p-2 text-[10px] text-slate-500 font-mono space-y-0.5">
+              <div>
+                <span className="text-slate-400">Her saat:</span>{" "}
+                <span className="text-cyan-300">0 * * * *</span>
+              </div>
+              <div>
+                <span className="text-slate-400">Her gün 09:00:</span>{" "}
+                <span className="text-cyan-300">0 9 * * *</span>
+              </div>
+              <div>
+                <span className="text-slate-400">Her 30 dk:</span>{" "}
+                <span className="text-cyan-300">*/30 * * * *</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 — İpuçları */}
+          <div className={crd}>
+            <div className="flex items-center gap-2 mb-2">
+              <HelpCircle className="w-3.5 h-3.5 text-sky-400" />
+              <span className="text-[13px] font-semibold text-slate-200">
+                İpuçları
+              </span>
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-slate-400 ml-1">
+              <li>
+                Hata durumunda tüm adımlar otomatik{" "}
+                <span className="text-orange-300">rollback</span> yapılır.
+              </li>
+              <li>
+                <span className="text-slate-300">Workflow Geçmişi</span>{" "}
+                penceresinden önceki çalıştırmaları inceleyebilir ve tekrar
+                çalıştırabilirsiniz.
+              </li>
+              <li>
+                Ajan çağrısında prompt ne kadar net olursa sonuç o kadar iyi
+                olur.
+              </li>
+              <li>
+                Paralel adımlar bağımsız işler için idealdir — birbirine bağımlı
+                adımları sıralı tutun.
+              </li>
+            </ul>
           </div>
         </div>
       )}
