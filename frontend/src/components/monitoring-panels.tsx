@@ -357,9 +357,21 @@ export function SystemStatsPanel() {
     value: string;
     accent?: string;
   }[] = [
-    { icon: "🧵", label: "Aktif Thread", value: String(stats.active_threads) },
-    { icon: "📋", label: "Toplam Görev", value: String(stats.total_tasks) },
-    { icon: "📡", label: "Toplam Olay", value: String(stats.total_events) },
+    {
+      icon: "🧵",
+      label: "Aktif Thread",
+      value: String(stats.active_threads ?? 0),
+    },
+    {
+      icon: "📋",
+      label: "Toplam Görev",
+      value: String(stats.total_tasks ?? 0),
+    },
+    {
+      icon: "📡",
+      label: "Toplam Olay",
+      value: String(stats.total_events ?? 0),
+    },
     {
       icon: "💾",
       label: "Bellek",
@@ -374,12 +386,12 @@ export function SystemStatsPanel() {
     {
       icon: "⏱️",
       label: "Çalışma Süresi",
-      value: formatUptime(stats.uptime_seconds),
+      value: formatUptime(stats.uptime_seconds ?? 0),
     },
     {
       icon: "🤖",
       label: "Aktif Agent",
-      value: `${stats.agents_active}/${stats.agents_total}`,
+      value: `${stats.agents_active ?? 0}/${stats.agents_total ?? 0}`,
     },
   ];
 

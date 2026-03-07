@@ -433,17 +433,19 @@ export async function getDbHealth() {
 export const benchmarkApi = {
   async getScenarios(category?: string) {
     const q = category ? `?category=${category}` : "";
-    const res = await fetch(`${BASE}/api/benchmarks/scenarios${q}`, {
-      headers: authHeaders(),
-    });
+    const url = `${BASE}/api/benchmarks/scenarios${q}`;
+    console.log("[DEBUG] benchmarkApi.getScenarios →", url);
+    const res = await fetch(url, { headers: authHeaders() });
+    console.log("[DEBUG] benchmarkApi.getScenarios ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
 
   async getLeaderboard() {
-    const res = await fetch(`${BASE}/api/benchmarks/leaderboard`, {
-      headers: authHeaders(),
-    });
+    const url = `${BASE}/api/benchmarks/leaderboard`;
+    console.log("[DEBUG] benchmarkApi.getLeaderboard →", url);
+    const res = await fetch(url, { headers: authHeaders() });
+    console.log("[DEBUG] benchmarkApi.getLeaderboard ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -452,9 +454,10 @@ export const benchmarkApi = {
     const params = new URLSearchParams();
     if (agentRole) params.set("agent_role", agentRole);
     params.set("limit", String(limit));
-    const res = await fetch(`${BASE}/api/benchmarks/results?${params}`, {
-      headers: authHeaders(),
-    });
+    const url = `${BASE}/api/benchmarks/results?${params}`;
+    console.log("[DEBUG] benchmarkApi.getResults →", url);
+    const res = await fetch(url, { headers: authHeaders() });
+    console.log("[DEBUG] benchmarkApi.getResults ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -492,11 +495,14 @@ export const errorPatternApi = {
     task_type?: string;
     context?: Record<string, unknown>;
   }) {
-    const res = await fetch(`${BASE}/api/errors/record`, {
+    const url = `${BASE}/api/errors/record`;
+    console.log("[DEBUG errorPatternApi.recordError] POST", url);
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body),
     });
+    console.log("[DEBUG errorPatternApi.recordError] status:", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -505,9 +511,10 @@ export const errorPatternApi = {
     const params = new URLSearchParams();
     if (agentRole) params.set("agent_role", agentRole);
     params.set("hours", String(hours));
-    const res = await fetch(`${BASE}/api/errors/stats?${params}`, {
-      headers: authHeaders(),
-    });
+    const url = `${BASE}/api/errors/stats?${params}`;
+    console.log("[DEBUG errorPatternApi.getStats] GET", url);
+    const res = await fetch(url, { headers: authHeaders() });
+    console.log("[DEBUG errorPatternApi.getStats] status:", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -578,9 +585,10 @@ export const errorPatternApi = {
 
 export const optimizerApi = {
   async getStats() {
-    const res = await fetch(`${BASE}/api/optimizer/stats`, {
-      headers: authHeaders(),
-    });
+    const url = `${BASE}/api/optimizer/stats`;
+    console.log("[DEBUG] optimizerApi.getStats →", url);
+    const res = await fetch(url, { headers: authHeaders() });
+    console.log("[DEBUG] optimizerApi.getStats ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -593,18 +601,19 @@ export const optimizerApi = {
     const params = new URLSearchParams({ status });
     if (category) params.set("category", category);
     if (priority) params.set("priority", priority);
-    const res = await fetch(`${BASE}/api/optimizer/recommendations?${params}`, {
-      headers: authHeaders(),
-    });
+    const url = `${BASE}/api/optimizer/recommendations?${params}`;
+    console.log("[DEBUG] optimizerApi.getRecommendations →", url);
+    const res = await fetch(url, { headers: authHeaders() });
+    console.log("[DEBUG] optimizerApi.getRecommendations ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
 
   async analyze() {
-    const res = await fetch(`${BASE}/api/optimizer/analyze`, {
-      method: "POST",
-      headers: authHeaders(),
-    });
+    const url = `${BASE}/api/optimizer/analyze`;
+    console.log("[DEBUG] optimizerApi.analyze →", url);
+    const res = await fetch(url, { method: "POST", headers: authHeaders() });
+    console.log("[DEBUG] optimizerApi.analyze ←", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -649,9 +658,10 @@ export const optimizerApi = {
 
 export const costTrackerApi = {
   async getSummary(hours = 24) {
-    const res = await fetch(`${BASE}/api/costs/summary?hours=${hours}`, {
-      headers: authHeaders(),
-    });
+    const url = `${BASE}/api/costs/summary?hours=${hours}`;
+    console.log("[DEBUG costTrackerApi.getSummary] GET", url);
+    const res = await fetch(url, { headers: authHeaders() });
+    console.log("[DEBUG costTrackerApi.getSummary] status:", res.status);
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -778,6 +788,87 @@ export const costApi = {
     const res = await fetch(`${BASE}/api/costs/stats`, {
       headers: authHeaders(),
     });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
+
+// ── Domain & Marketplace API ────────────────────────────────────
+
+export const domainApi = {
+  async listDomains() {
+    const res = await fetch(`${BASE}/api/domains`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getDomainTools(domainId: string) {
+    const res = await fetch(
+      `${BASE}/api/domains/${encodeURIComponent(domainId)}/tools`,
+      {
+        headers: authHeaders(),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async autoDetect(query: string, topK = 3) {
+    const res = await fetch(`${BASE}/api/domains/auto-detect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ query, top_k: topK }),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getMarketplaceCatalog(category?: string, search?: string) {
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    if (search) params.set("search", search);
+    const q = params.toString() ? `?${params}` : "";
+    const res = await fetch(`${BASE}/api/marketplace/catalog${q}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getMarketplaceStats() {
+    const res = await fetch(`${BASE}/api/marketplace/stats`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getMarketplace() {
+    const res = await fetch(`${BASE}/api/domains/marketplace`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async discoverSkills() {
+    const res = await fetch(`${BASE}/api/domains/discover`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async toggleDomain(domainId: string, enabled: boolean) {
+    const res = await fetch(
+      `${BASE}/api/domains/${encodeURIComponent(domainId)}/toggle`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ enabled }),
+      },
+    );
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },

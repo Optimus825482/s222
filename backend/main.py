@@ -2,6 +2,7 @@
 Multi-Agent Ops Center — FastAPI Backend.
 WebSocket streaming + REST API wrapping existing agent/pipeline/tool infrastructure.
 """
+# RELOAD_TRIGGER: force uvicorn reload — 2026-03-07
 
 import sys
 from pathlib import Path
@@ -654,6 +655,106 @@ async def api_execute_domain_tool(req: DomainExpertRequest, user: dict = Depends
         return result
     except Exception as e:
         raise HTTPException(503, f"Domain execution error: {e}")
+
+# ── Domain Auto-Discovery & Marketplace ──────────────────────────
+
+class DomainDetectRequest(BaseModel):
+    query: str
+    top_k: int = 3
+
+@app.post("/api/domains/auto-detect")
+async def api_auto_detect_domain(req: DomainDetectRequest, user: dict = Depends(get_current_user)):
+    """Auto-detect relevant domain(s) from a user query."""
+    try:
+        from tools.domain_skills import auto_detect_domain
+        results = auto_detect_domain(req.query, req.top_k)
+        return {"query": req.query, "matches": results, "count": len(results)}
+    except Exception as e:
+        raise HTTPException(503, f"Domain detection error: {e}")
+
+@app.get("/api/domains/marketplace")
+async def api_domain_marketplace():
+    """Get all domain skills with marketplace metadata."""
+    try:
+        from tools.domain_skills import get_marketplace_data
+        return get_marketplace_data()
+    except Exception as e:
+        raise HTTPException(503, f"Marketplace error: {e}")
+
+@app.post("/api/domains/discover")
+async def api_discover_domains(user: dict = Depends(get_current_user)):
+    """Trigger domain skill auto-discovery scan."""
+    try:
+        from tools.domain_skills import discover_domain_skills
+        return discover_domain_skills()
+    except Exception as e:
+        raise HTTPException(503, f"Discovery error: {e}")
+
+@app.post("/api/domains/{domain_id}/toggle")
+async def api_toggle_domain(domain_id: str, body: dict, user: dict = Depends(get_current_user)):
+    """Enable or disable a domain skill."""
+    try:
+        from tools.domain_skills import toggle_domain_skill
+        enabled = body.get("enabled", True)
+        return toggle_domain_skill(domain_id, enabled)
+    except Exception as e:
+        raise HTTPException(503, f"Toggle error: {e}")
+
+@app.get("/api/marketplace/catalog")
+async def api_marketplace_catalog(
+    category: str | None = None,
+    search: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Get unified skill marketplace catalog."""
+    try:
+        from tools.domain_skills import get_marketplace_catalog
+        catalog = get_marketplace_catalog()
+
+        # Filter by category
+        if category and category != "all":
+            catalog = [item for item in catalog if item.get("category") == category]
+
+        # Search filter
+        if search:
+            search_lower = search.lower()
+            catalog = [
+                item for item in catalog
+                if search_lower in item.get("name", "").lower()
+                or search_lower in item.get("name_tr", "").lower()
+                or search_lower in item.get("description", "").lower()
+                or any(search_lower in tag.lower() for tag in item.get("tags", []))
+            ]
+
+        return {
+            "items": catalog,
+            "total": len(catalog),
+            "categories": list(set(item.get("category", "other") for item in catalog)),
+        }
+    except Exception as e:
+        raise HTTPException(503, f"Marketplace error: {e}")
+
+@app.get("/api/marketplace/stats")
+async def api_marketplace_stats(user: dict = Depends(get_current_user)):
+    """Get marketplace statistics."""
+    try:
+        from tools.domain_skills import list_domains, get_marketplace_catalog
+        domains = list_domains()
+        catalog = get_marketplace_catalog()
+        domain_items = [c for c in catalog if c["type"] == "domain"]
+        skill_items = [c for c in catalog if c["type"] == "skill"]
+        total_tools = sum(d.get("tool_count", 0) for d in domains)
+        return {
+            "total_items": len(catalog),
+            "domain_count": len(domain_items),
+            "skill_count": len(skill_items),
+            "total_tools": total_tools,
+            "categories": list(set(c.get("category", "other") for c in catalog)),
+            "installed_count": len([c for c in catalog if c.get("installed")]),
+        }
+    except Exception as e:
+        raise HTTPException(503, f"Marketplace stats error: {e}")
+
 
 
 @app.get("/api/mcp/servers")
@@ -3365,9 +3466,12 @@ async def get_user_behavior_analytics(
 # 10. Agent Identity — SOUL.md Pattern (Faz 11.6)
 # ---------------------------------------------------------------------------
 
-from tools.agent_identity import IdentityManager as _IdentityManager
-
-_identity_mgr = _IdentityManager()
+try:
+    from tools.agent_identity import IdentityManager as _IdentityManager
+    _identity_mgr = _IdentityManager()
+except Exception as _e:
+    print(f"[Backend] WARNING: agent_identity import failed: {_e}")
+    _identity_mgr = None
 
 
 class IdentityFileUpdate(BaseModel):
@@ -3442,9 +3546,15 @@ async def list_identity_agents(user: dict = Depends(get_current_user)):
 
 # ── 11. Performance Benchmarking Suite ───────────────────────────
 
-from tools.benchmark_suite import BenchmarkRunner, get_scenarios, BENCHMARK_SCENARIOS
-
-_bench_runner = BenchmarkRunner()
+try:
+    from tools.benchmark_suite import BenchmarkRunner, get_scenarios, BENCHMARK_SCENARIOS
+    _bench_runner = BenchmarkRunner()
+    print("[Backend] benchmark_suite loaded OK")
+except Exception as _e:
+    print(f"[Backend] WARNING: benchmark_suite import failed: {_e}")
+    _bench_runner = None
+    BENCHMARK_SCENARIOS = {}
+    def get_scenarios(cat=None): return []
 
 
 class BenchmarkRunRequest(BaseModel):
@@ -3530,15 +3640,23 @@ async def benchmark_history(
 
 # ── 12. Error Pattern Analysis ───────────────────────────────────
 
-from tools.error_patterns import get_error_analyzer
-
-_error_analyzer = get_error_analyzer()
+try:
+    from tools.error_patterns import get_error_analyzer
+    _error_analyzer = get_error_analyzer()
+    print("[Backend] error_patterns loaded OK")
+except Exception as _e:
+    print(f"[Backend] WARNING: error_patterns import failed: {_e}")
+    _error_analyzer = None
 
 # ── 13. Cost Tracking ────────────────────────────────────────────
 
-from tools.cost_tracker import get_cost_tracker
-
-_cost_tracker = get_cost_tracker()
+try:
+    from tools.cost_tracker import get_cost_tracker
+    _cost_tracker = get_cost_tracker()
+    print("[Backend] cost_tracker loaded OK")
+except Exception as _e:
+    print(f"[Backend] WARNING: cost_tracker import failed: {_e}")
+    _cost_tracker = None
 
 
 class RecordErrorRequest(BaseModel):
@@ -3733,9 +3851,13 @@ async def usage_stats(user: dict = Depends(get_current_user)):
 
 # ── Auto-Optimizer API ───────────────────────────────────────────
 
-from tools.auto_optimizer import get_auto_optimizer
-
-_auto_optimizer = get_auto_optimizer()
+try:
+    from tools.auto_optimizer import get_auto_optimizer
+    _auto_optimizer = get_auto_optimizer()
+    print("[Backend] auto_optimizer loaded OK")
+except Exception as _e:
+    print(f"[Backend] WARNING: auto_optimizer import failed: {_e}")
+    _auto_optimizer = None
 
 
 @app.get("/api/optimizer/stats")
@@ -3811,3 +3933,13 @@ async def optimizer_history(
     """Get optimization action history."""
     history = _auto_optimizer.get_optimization_history(limit=limit)
     return {"history": history, "total": len(history)}
+
+# ── Startup Diagnostic ───────────────────────────────────────────
+_all_api_routes = [r.path for r in app.routes if hasattr(r, 'path') and '/api/' in r.path]
+print(f"[Backend] Total API routes registered: {len(_all_api_routes)}")
+print(f"[Backend] Benchmark routes: {any('benchmark' in r for r in _all_api_routes)}")
+print(f"[Backend] Error routes: {any('/errors/' in r for r in _all_api_routes)}")
+print(f"[Backend] Cost routes: {any('/costs/' in r for r in _all_api_routes)}")
+print(f"[Backend] Optimizer routes: {any('/optimizer/' in r for r in _all_api_routes)}")
+print(f"[Backend] Identity routes: {any('/identity/' in r for r in _all_api_routes)}")
+print(f"[Backend] ✓ All {len(_all_api_routes)} routes loaded successfully")

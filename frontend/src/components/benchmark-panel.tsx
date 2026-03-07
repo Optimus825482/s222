@@ -28,10 +28,11 @@ const BENCH_TABS: { key: BenchTab; label: string; icon: string }[] = [
 
 /* ── API helpers ───────────────────────────────────────────────── */
 async function bApi<T>(path: string): Promise<T> {
-  const token = localStorage.getItem("ops-center-auth");
-  const parsed = token ? JSON.parse(token) : null;
+  const raw = localStorage.getItem("ops-center-auth");
+  const parsed = raw ? JSON.parse(raw) : null;
+  const token = parsed?.state?.user?.token;
   const res = await fetch(`${BASE}${path}`, {
-    headers: parsed?.token ? { Authorization: `Bearer ${parsed.token}` } : {},
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
@@ -41,13 +42,14 @@ async function bPost<T>(
   path: string,
   body: Record<string, unknown>,
 ): Promise<T> {
-  const token = localStorage.getItem("ops-center-auth");
-  const parsed = token ? JSON.parse(token) : null;
+  const raw = localStorage.getItem("ops-center-auth");
+  const parsed = raw ? JSON.parse(raw) : null;
+  const token = parsed?.state?.user?.token;
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(parsed?.token ? { Authorization: `Bearer ${parsed.token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
   });

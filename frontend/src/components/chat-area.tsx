@@ -322,7 +322,7 @@ export function ChatArea({ thread, isProcessing, status }: Props) {
 
   return (
     <div
-      className="flex-1 overflow-y-auto px-3 md:px-6 py-4 space-y-3"
+      className="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-4 space-y-3"
       role="log"
       aria-label="Sohbet geçmişi"
       aria-live="polite"
@@ -358,7 +358,7 @@ function WelcomeScreen({
         : null;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4">
+    <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4">
       {statusLabel && (
         <div
           className="mb-4 flex items-center gap-2 rounded-full bg-blue-500/10 border border-blue-500/20 px-4 py-2 text-sm text-blue-300"

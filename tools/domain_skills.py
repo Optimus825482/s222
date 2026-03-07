@@ -953,6 +953,381 @@ async def execute_domain_tool(domain: str, tool_name: str, arguments: dict) -> d
             result = await fn(**arguments)
         else:
             result = fn(**arguments)
+        increment_usage(domain)
         return {"success": True, "result": result}
     except Exception as e:
         return {"error": f"Tool execution failed: {e}"}
+
+
+# ── Domain Auto-Discovery ────────────────────────────────────────
+
+DOMAIN_KEYWORDS: dict[str, list[str]] = {
+    "finance": [
+        "finans", "finance", "valuation", "değerleme", "dcf", "npv", "irr",
+        "wacc", "nakit akışı", "cash flow", "portföy", "portfolio", "risk",
+        "bilanço", "balance sheet", "gelir tablosu", "income", "revenue",
+        "kâr", "profit", "zarar", "loss", "yatırım", "investment", "borç",
+        "debt", "özsermaye", "equity", "faiz", "interest", "bütçe", "budget",
+        "maliyet", "cost", "break-even", "başabaş", "oran", "ratio",
+        "likidite", "liquidity", "varlık", "asset", "sermaye", "capital",
+    ],
+    "legal": [
+        "hukuk", "legal", "sözleşme", "contract", "kvkk", "gdpr", "kişisel veri",
+        "personal data", "uyumluluk", "compliance", "mahkeme", "court",
+        "dava", "lawsuit", "kanun", "law", "yönetmelik", "regulation",
+        "madde", "clause", "ihlal", "violation", "ceza", "penalty",
+        "gizlilik", "privacy", "telif", "copyright", "patent", "marka",
+        "trademark", "lisans", "license", "sorumluluk", "liability",
+    ],
+    "engineering": [
+        "mühendislik", "engineering", "mimari", "architecture", "sistem tasarımı",
+        "system design", "yük", "load", "kapasite", "capacity", "ölçekleme",
+        "scaling", "performans", "performance", "sunucu", "server", "api",
+        "microservice", "mikro servis", "database", "veritabanı", "cache",
+        "cdn", "latency", "gecikme", "throughput", "rps", "concurrent",
+        "eşzamanlı", "availability", "erişilebilirlik", "uptime",
+    ],
+    "academic": [
+        "akademik", "academic", "araştırma", "research", "literatür",
+        "literature", "makale", "paper", "atıf", "citation", "metodoloji",
+        "methodology", "tez", "thesis", "hipotez", "hypothesis", "analiz",
+        "analysis", "veri toplama", "data collection", "örneklem", "sample",
+        "istatistik", "statistics", "nitel", "qualitative", "nicel",
+        "quantitative", "kaynak", "source", "referans", "reference",
+    ],
+}
+
+
+def auto_detect_domain(query: str, top_k: int = 3) -> list[dict]:
+    """
+    Analyze a user query and detect which domain(s) are most relevant.
+    Returns ranked list of matching domains with scores and suggested tools.
+    """
+    if not query or not query.strip():
+        return []
+
+    query_lower = query.lower()
+    query_words = set(re.findall(r'\w+', query_lower))
+    results = []
+
+    for domain_id, domain in DOMAINS.items():
+        score = 0.0
+        matched_keywords: list[str] = []
+
+        # 1) Check domain keywords (highest weight)
+        domain_kws = DOMAIN_KEYWORDS.get(domain_id, [])
+        for kw in domain_kws:
+            kw_lower = kw.lower()
+            if kw_lower in query_lower:
+                score += 3.0
+                matched_keywords.append(kw)
+            elif any(w in kw_lower.split() for w in query_words if len(w) > 2):
+                score += 1.0
+                matched_keywords.append(kw)
+
+        # 2) Check capabilities
+        for cap in domain.capabilities:
+            cap_lower = cap.lower()
+            cap_words = set(cap_lower.split())
+            overlap = query_words & cap_words
+            if overlap:
+                score += len(overlap) * 1.5
+                matched_keywords.append(cap)
+
+        # 3) Check tool names and descriptions
+        suggested_tools: list[dict] = []
+        for tool in domain.tools:
+            tool_name_lower = tool["name"].lower().replace("_", " ")
+            tool_desc_lower = tool.get("description", "").lower()
+            tool_score = 0.0
+
+            for w in query_words:
+                if len(w) > 2:
+                    if w in tool_name_lower:
+                        tool_score += 2.0
+                    if w in tool_desc_lower:
+                        tool_score += 1.0
+
+            if tool_score > 0:
+                score += tool_score
+                suggested_tools.append({
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "relevance": round(tool_score, 1),
+                })
+
+        # 4) Check description match
+        desc_lower = domain.description.lower()
+        for w in query_words:
+            if len(w) > 3 and w in desc_lower:
+                score += 0.5
+
+        if score > 0:
+            # Sort suggested tools by relevance
+            suggested_tools.sort(key=lambda t: t["relevance"], reverse=True)
+            results.append({
+                "domain_id": domain_id,
+                "name": domain.name,
+                "name_tr": domain.name_tr,
+                "score": round(score, 1),
+                "matched_keywords": list(set(matched_keywords))[:10],
+                "suggested_tools": suggested_tools[:5],
+                "capabilities": domain.capabilities,
+            })
+
+    # Sort by score descending
+    results.sort(key=lambda r: r["score"], reverse=True)
+    return results[:top_k]
+
+
+def get_marketplace_catalog() -> list[dict]:
+    """
+    Return a unified marketplace catalog combining domain modules and dynamic skills.
+    """
+    catalog: list[dict] = []
+
+    # Domain modules
+    for domain_id, domain in DOMAINS.items():
+        catalog.append({
+            "id": f"domain:{domain_id}",
+            "type": "domain",
+            "name": domain.name,
+            "name_tr": domain.name_tr,
+            "description": domain.description,
+            "capabilities": domain.capabilities,
+            "tool_count": len(domain.tools),
+            "tools": domain.tools,
+            "installed": True,  # built-in domains are always installed
+            "rating": 4.5,
+            "downloads": 0,
+            "category": "domain",
+            "tags": DOMAIN_KEYWORDS.get(domain_id, [])[:8],
+        })
+
+    # Dynamic skills from DB
+    try:
+        from tools.dynamic_skills import list_skills
+        skills = list_skills(limit=100)
+        for skill in skills:
+            catalog.append({
+                "id": f"skill:{skill.get('id', '')}",
+                "type": "skill",
+                "name": skill.get("name", "Unnamed"),
+                "name_tr": skill.get("name", "Unnamed"),
+                "description": skill.get("description", ""),
+                "capabilities": skill.get("keywords", []),
+                "tool_count": 0,
+                "tools": [],
+                "installed": True,
+                "rating": skill.get("rating", 0),
+                "downloads": skill.get("usage_count", 0),
+                "category": skill.get("category", "custom"),
+                "tags": skill.get("keywords", []),
+            })
+    except Exception as e:
+        logger.warning("Failed to load dynamic skills for marketplace: %s", e)
+
+    return catalog
+
+
+# ══════════════════════════════════════════════════════════════════
+#  AUTO-DISCOVERY & MARKETPLACE
+# ══════════════════════════════════════════════════════════════════
+
+import importlib.util
+import sqlite3
+from pathlib import Path
+from datetime import datetime
+
+DISCOVERY_DIR = Path("data/domain_skills")
+MARKETPLACE_DB = Path("data/dynamic_skills.db")
+
+
+def _ensure_marketplace_db():
+    """Create marketplace tables if not exist."""
+    MARKETPLACE_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(MARKETPLACE_DB))
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS domain_skill_registry (
+            domain_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            name_tr TEXT NOT NULL,
+            description TEXT,
+            source TEXT DEFAULT 'discovered',
+            enabled INTEGER DEFAULT 1,
+            installed_at TEXT,
+            usage_count INTEGER DEFAULT 0,
+            rating REAL DEFAULT 0.0,
+            version TEXT DEFAULT '1.0.0',
+            author TEXT DEFAULT 'community'
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def _register_builtin_domains():
+    """Register built-in domains in marketplace DB."""
+    _ensure_marketplace_db()
+    conn = sqlite3.connect(str(MARKETPLACE_DB))
+    now = datetime.utcnow().isoformat()
+    for d in DOMAINS.values():
+        conn.execute("""
+            INSERT OR IGNORE INTO domain_skill_registry 
+            (domain_id, name, name_tr, description, source, enabled, installed_at, version, author)
+            VALUES (?, ?, ?, ?, 'builtin', 1, ?, '2.0.0', 'system')
+        """, (d.domain_id, d.name, d.name_tr, d.description, now))
+    conn.commit()
+    conn.close()
+
+
+def discover_domain_skills() -> dict:
+    """Scan data/domain_skills/ for new domain modules and register them."""
+    _ensure_marketplace_db()
+    _register_builtin_domains()
+
+    DISCOVERY_DIR.mkdir(parents=True, exist_ok=True)
+    discovered = []
+    errors = []
+
+    for py_file in DISCOVERY_DIR.glob("*.py"):
+        if py_file.name.startswith("_"):
+            continue
+        try:
+            spec = importlib.util.spec_from_file_location(
+                f"domain_plugin_{py_file.stem}", str(py_file)
+            )
+            if spec is None or spec.loader is None:
+                continue
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            config = getattr(module, "DOMAIN_CONFIG", None)
+            if not config or not isinstance(config, dict):
+                continue
+
+            domain_id = config.get("domain_id", py_file.stem)
+
+            # Build DomainModule
+            dm = DomainModule(
+                domain_id=domain_id,
+                name=config.get("name", domain_id),
+                name_tr=config.get("name_tr", config.get("name", domain_id)),
+                description=config.get("description", ""),
+                capabilities=config.get("capabilities", []),
+                tools=config.get("tools", []),
+            )
+
+            # Register in DOMAINS
+            DOMAINS[domain_id] = dm
+
+            # Register tool functions
+            for tool_def in config.get("tools", []):
+                fn = getattr(module, tool_def["name"], None)
+                if fn:
+                    _TOOL_MAP[tool_def["name"]] = fn
+
+            # Save to DB
+            conn = sqlite3.connect(str(MARKETPLACE_DB))
+            now = datetime.utcnow().isoformat()
+            conn.execute("""
+                INSERT OR REPLACE INTO domain_skill_registry
+                (domain_id, name, name_tr, description, source, enabled, installed_at,
+                 version, author)
+                VALUES (?, ?, ?, ?, 'discovered', 1, ?,
+                        ?, ?)
+            """, (
+                domain_id, dm.name, dm.name_tr, dm.description, now,
+                config.get("version", "1.0.0"), config.get("author", "community")
+            ))
+            conn.commit()
+            conn.close()
+
+            discovered.append(domain_id)
+            logger.info(f"Discovered domain skill: {domain_id}")
+
+        except Exception as e:
+            errors.append({"file": py_file.name, "error": str(e)})
+            logger.warning(f"Failed to load domain skill {py_file.name}: {e}")
+
+    return {
+        "discovered": discovered,
+        "errors": errors,
+        "total_domains": len(DOMAINS),
+    }
+
+
+def toggle_domain_skill(domain_id: str, enabled: bool) -> dict:
+    """Enable or disable a domain skill."""
+    _ensure_marketplace_db()
+    conn = sqlite3.connect(str(MARKETPLACE_DB))
+    cur = conn.execute(
+        "UPDATE domain_skill_registry SET enabled = ? WHERE domain_id = ?",
+        (1 if enabled else 0, domain_id)
+    )
+    conn.commit()
+    conn.close()
+
+    if cur.rowcount == 0:
+        return {"error": f"Domain not found: {domain_id}"}
+
+    # If disabling, remove from active DOMAINS (but keep builtin)
+    if not enabled and domain_id in DOMAINS:
+        _conn = sqlite3.connect(str(MARKETPLACE_DB))
+        row = _conn.execute(
+            "SELECT source FROM domain_skill_registry WHERE domain_id = ?",
+            (domain_id,)
+        ).fetchone()
+        _conn.close()
+        if row and row[0] == "discovered":
+            del DOMAINS[domain_id]
+    elif enabled and domain_id not in DOMAINS:
+        # Re-discover to reload
+        discover_domain_skills()
+
+    return {"domain_id": domain_id, "enabled": enabled}
+
+
+def increment_usage(domain_id: str):
+    """Increment usage counter for a domain skill."""
+    try:
+        _ensure_marketplace_db()
+        conn = sqlite3.connect(str(MARKETPLACE_DB))
+        conn.execute(
+            "UPDATE domain_skill_registry SET usage_count = usage_count + 1 WHERE domain_id = ?",
+            (domain_id,)
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def get_marketplace_data() -> list[dict]:
+    """Get all domain skills with marketplace metadata."""
+    _ensure_marketplace_db()
+    _register_builtin_domains()
+
+    conn = sqlite3.connect(str(MARKETPLACE_DB))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("SELECT * FROM domain_skill_registry ORDER BY source, domain_id").fetchall()
+    conn.close()
+
+    result = []
+    for row in rows:
+        d = dict(row)
+        # Enrich with live data from DOMAINS registry
+        domain = DOMAINS.get(d["domain_id"])
+        if domain:
+            d["capabilities"] = domain.capabilities
+            d["tool_count"] = len(domain.tools)
+            d["tools"] = domain.tools
+            d["active"] = True
+        else:
+            d["capabilities"] = []
+            d["tool_count"] = 0
+            d["tools"] = []
+            d["active"] = False
+        result.append(d)
+
+    return result

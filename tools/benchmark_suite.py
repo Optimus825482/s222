@@ -367,8 +367,10 @@ class BenchmarkRunner:
         if agent_role:
             roles = [agent_role]
         else:
-            # Fallback: run for a default set (caller should specify)
-            roles = ["assistant"]
+            # Fallback: run for all registered agents
+            from agents import _AGENT_REGISTRY, _ensure_registry
+            _ensure_registry()
+            roles = list(_AGENT_REGISTRY.keys())
 
         all_results: list[dict] = []
         for role in roles:

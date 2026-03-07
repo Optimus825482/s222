@@ -63,6 +63,21 @@ Finance, hukuk, tıp, mühendislik gibi alanlarda derin hesaplama ve bilgi eriş
 - 🔴 Domain skill auto-discovery (kullanıcı sorgusundan otomatik domain tespiti)
 - 🔴 Skill marketplace (topluluk skill paylaşımı)
 
+## Faz 2.5 — Browser Use Entegrasyonu 🌐 `[🔴 PLANLANMIŞ]`
+
+Agent'ların web tarayıcısını otonom olarak kullanarak bilgi toplama, form doldurma, ekran görüntüsü alma ve web otomasyon görevleri.
+
+- 🔴 Browser Use Engine (`tools/browser_use.py` — Playwright/Puppeteer tabanlı)
+- 🔴 Sayfa navigasyonu ve içerik çıkarma (URL açma, metin/tablo okuma)
+- 🔴 Form doldurma ve buton tıklama (web otomasyon)
+- 🔴 Ekran görüntüsü alma ve görsel analiz
+- 🔴 JavaScript çalıştırma (sayfa içi script execution)
+- 🔴 Cookie/session yönetimi (oturum bazlı tarama)
+- 🔴 Orchestrator entegrasyonu (`browse_web` tool)
+- 🔴 Backend API endpoints (`/api/browser/navigate`, `/screenshot`, `/execute`, `/extract`)
+- 🔴 Anti-bot koruması ve rate limiting
+- 🔴 Frontend Browser Panel UI (canlı önizleme + geçmiş)
+
 ## Faz 3 — Gelişmiş Veri Analizi ve Görselleştirme 📊 `[🔴 PLANLANMIŞ]`
 
 Büyük veri kümeleri için otomatik özetleme, istatistiksel analiz ve interaktif dashboard.
@@ -282,6 +297,7 @@ Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power e
 | Mevcut v2.0                  | 🟢 Tamamlandı   | ████████████ 100% |
 | Faz 1 — Workflow Engine      | 🟡 Devam ediyor | ████████░░░░ 73%  |
 | Faz 2 — Domain Skills        | 🟡 Devam ediyor | ████████░░░░ 70%  |
+| Faz 2.5 — Browser Use        | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
 | Faz 3 — Veri Analizi         | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
 | Faz 4 — Gelişmiş RAG         | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
 | Faz 5 — Güvenlik             | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |

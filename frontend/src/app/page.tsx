@@ -248,6 +248,21 @@ const AutoOptimizerPanel = dynamic(
     ),
   },
 );
+const DomainMarketplacePanel = dynamic(
+  () =>
+    import("@/components/domain-marketplace-panel").then((m) => ({
+      default: m.DomainMarketplacePanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-48 bg-surface/50 animate-pulse rounded-lg"
+        aria-hidden
+      />
+    ),
+  },
+);
 
 export default function Home() {
   const router = useRouter();
@@ -290,45 +305,8 @@ export default function Home() {
       router.replace("/login");
       return;
     }
-    const token = user.token?.trim();
-    if (!token) {
-      setAuthValidated(false);
-      router.replace("/login");
-      return;
-    }
-    if (lastValidatedTokenRef.current === token) {
-      setAuthValidated(true);
-      return;
-    }
-    const sessionKey = "auth:validated-token";
-    if (
-      typeof window !== "undefined" &&
-      sessionStorage.getItem(sessionKey) === token
-    ) {
-      lastValidatedTokenRef.current = token;
-      setAuthValidated(true);
-      return;
-    }
-    let cancelled = false;
-    const validate = async () => {
-      try {
-        await api.me();
-      } catch {
-        await new Promise((r) => setTimeout(r, 350));
-        await api.me();
-      }
-      if (cancelled) return;
-      lastValidatedTokenRef.current = token;
-      if (typeof window !== "undefined")
-        sessionStorage.setItem(sessionKey, token);
-      setAuthValidated(true);
-    };
-    validate().catch(() => {
-      if (!cancelled) setAuthValidated(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    // Redirect authenticated users to desktop (main interface)
+    router.replace("/desktop");
   }, [router, user]);
 
   useEffect(() => {
@@ -541,6 +519,12 @@ export default function Home() {
         return (
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <CostTrackerPanel />
+          </div>
+        );
+      case "marketplace":
+        return (
+          <div className="flex-1 overflow-hidden">
+            <DomainMarketplacePanel />
           </div>
         );
       default:

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 /* ── Phase data ── */
-interface Phase {
+export interface Phase {
   id: string;
   title: string;
   icon: string;
@@ -14,7 +14,7 @@ interface Phase {
   items: { done: boolean; label: string }[];
 }
 
-const PHASES: Phase[] = [
+export const PHASES: Phase[] = [
   {
     id: "v2",
     title: "Mevcut Durum (v2.0)",
@@ -91,6 +91,57 @@ const PHASES: Phase[] = [
     ],
   },
   {
+    id: "f2_5",
+    title: "Faz 2.5 — Browser Use",
+    icon: "🌐",
+    status: "planned",
+    color: "text-lime-400",
+    border: "border-lime-400/30",
+    progress: 0,
+    items: [
+      {
+        done: false,
+        label: "Browser Use Engine (Playwright/Puppeteer tabanlı)",
+      },
+      { done: false, label: "Sayfa navigasyonu ve içerik çıkarma" },
+      { done: false, label: "Form doldurma ve buton tıklama (web otomasyon)" },
+      { done: false, label: "Ekran görüntüsü alma ve görsel analiz" },
+      {
+        done: false,
+        label: "JavaScript çalıştırma (sayfa içi script execution)",
+      },
+      { done: false, label: "Cookie/session yönetimi (oturum bazlı tarama)" },
+      { done: false, label: "Orchestrator entegrasyonu (browse_web tool)" },
+      { done: false, label: "Backend API endpoints (/api/browser/*)" },
+      { done: false, label: "Anti-bot koruması ve rate limiting" },
+      {
+        done: false,
+        label: "Frontend Browser Panel UI (canlı önizleme + geçmiş)",
+      },
+    ],
+  },
+  {
+    id: "f2.5",
+    title: "Faz 2.5 — Browser Use",
+    icon: "🌐",
+    status: "planned",
+    color: "text-sky-400",
+    border: "border-sky-400/30",
+    progress: 0,
+    items: [
+      { done: false, label: "Browser Use Engine (Playwright tabanlı)" },
+      { done: false, label: "Sayfa navigasyonu ve içerik çıkarma" },
+      { done: false, label: "Form doldurma ve buton tıklama" },
+      { done: false, label: "Ekran görüntüsü alma ve görsel analiz" },
+      { done: false, label: "JavaScript çalıştırma" },
+      { done: false, label: "Cookie/session yönetimi" },
+      { done: false, label: "Orchestrator entegrasyonu (browse_web tool)" },
+      { done: false, label: "Backend API endpoints" },
+      { done: false, label: "Anti-bot koruması ve rate limiting" },
+      { done: false, label: "Frontend Browser Panel UI" },
+    ],
+  },
+  {
     id: "f3",
     title: "Faz 3 — Veri Analizi",
     icon: "📊",
@@ -109,7 +160,7 @@ const PHASES: Phase[] = [
   {
     id: "f4",
     title: "Faz 4 — Gelişmiş RAG",
-    icon: "�",
+    icon: "🔍",
     status: "planned",
     color: "text-indigo-400",
     border: "border-indigo-400/30",
@@ -125,7 +176,7 @@ const PHASES: Phase[] = [
   {
     id: "f5",
     title: "Faz 5 — Güvenlik",
-    icon: "�",
+    icon: "🛡️",
     status: "wip",
     color: "text-red-400",
     border: "border-red-400/30",
@@ -141,7 +192,7 @@ const PHASES: Phase[] = [
   {
     id: "f6",
     title: "Faz 6 — Performans",
-    icon: "�",
+    icon: "🚀",
     status: "done",
     color: "text-amber-400",
     border: "border-amber-400/30",
@@ -177,13 +228,17 @@ const PHASES: Phase[] = [
   {
     id: "f7",
     title: "Faz 7 — API Entegrasyon",
-    icon: "�",
+    icon: "🔗",
     status: "wip",
     color: "text-cyan-400",
     border: "border-cyan-400/30",
-    progress: 30,
+    progress: 25,
     items: [
       { done: true, label: "MCP Client + Web fetch + SearXNG" },
+      {
+        done: false,
+        label: "Browser Use Tool — web otomasyon (form, scrape, screenshot)",
+      },
       { done: false, label: "Webhook receiver/sender" },
       { done: false, label: "Generic REST API connector" },
       { done: false, label: "Slack/Discord entegrasyonu" },
@@ -208,7 +263,7 @@ const PHASES: Phase[] = [
   {
     id: "f9",
     title: "Faz 9 — Kişiselleştirme",
-    icon: "�",
+    icon: "👤",
     status: "wip",
     color: "text-violet-400",
     border: "border-violet-400/30",
@@ -245,7 +300,7 @@ const PHASES: Phase[] = [
   {
     id: "f11",
     title: "Faz 11 — Otonom Agent Ekosistemi",
-    icon: "�",
+    icon: "🤖",
     status: "wip",
     color: "text-orange-400",
     border: "border-orange-400/30",
@@ -328,7 +383,7 @@ const PHASES: Phase[] = [
   },
 ];
 
-const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+export const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   done: {
     label: "Tamamlandı",
     cls: "bg-emerald-400/10 text-emerald-400 border-emerald-400/30",

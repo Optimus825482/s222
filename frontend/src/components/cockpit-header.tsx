@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, HelpCircle, LogOut, Map, Menu } from "lucide-react";
+import {
+  ChevronDown,
+  HelpCircle,
+  LogOut,
+  Map,
+  Menu,
+  Monitor,
+} from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
@@ -18,7 +26,8 @@ export type NavTab =
   | "benchmark"
   | "errors"
   | "optimizer"
-  | "costs";
+  | "costs"
+  | "marketplace";
 
 interface DI {
   key: NavTab;
@@ -112,6 +121,12 @@ const TAB_GROUPS: TG[] = [
         color: "text-orange-400",
       },
       { key: "costs", label: "Maliyet", icon: "💰", color: "text-emerald-400" },
+      {
+        key: "marketplace",
+        label: "Marketplace",
+        icon: "🧩",
+        color: "text-purple-400",
+      },
     ],
   },
 ];
@@ -241,6 +256,14 @@ export function CockpitHeader({
           Qwen3 80B • 4 Agents
         </span>
         <div className="flex-1" />
+        <Link
+          href="/desktop"
+          className="hidden sm:flex p-2 min-w-[36px] min-h-[36px] items-center justify-center rounded-lg hover:bg-surface-overlay text-slate-500 hover:text-slate-300 transition-colors"
+          aria-label="XP Masaüstü Modu"
+          title="XP Masaüstü Modu"
+        >
+          <Monitor className="w-4 h-4" />
+        </Link>
         {onRoadmapOpen && (
           <button
             onClick={onRoadmapOpen}
