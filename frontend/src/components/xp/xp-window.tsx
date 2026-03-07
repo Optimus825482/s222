@@ -35,7 +35,6 @@ interface Props {
   onMaximize: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (x: number, y: number, w: number, h: number) => void;
-  desktopRect: DOMRect | null;
 }
 
 type Dir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
@@ -53,7 +52,6 @@ export function XpWindow({
   onMaximize,
   onMove,
   onResize,
-  desktopRect,
 }: Props) {
   const dragRef = useRef<{
     startX: number;

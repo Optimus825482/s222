@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { XpWindow, type WindowState } from "./xp-window";
 import { XpTaskbar, DESKTOP_APPS } from "./xp-taskbar";
 import "./xp-styles.css";
@@ -39,20 +33,7 @@ export function XpDesktop({ contentMap, onHelpOpen, onRoadmapOpen }: Props) {
   const [windows, setWindows] = useState<WindowState[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const desktopRef = useRef<HTMLDivElement>(null);
-  const [desktopRect, setDesktopRect] = useState<DOMRect | null>(null);
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
-
-  /* Track desktop size */
-  useEffect(() => {
-    const el = desktopRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() =>
-      setDesktopRect(el.getBoundingClientRect()),
-    );
-    ro.observe(el);
-    setDesktopRect(el.getBoundingClientRect());
-    return () => ro.disconnect();
-  }, []);
 
   /* ── Open / Focus window ── */
   const openApp = useCallback((appId: string) => {
@@ -215,7 +196,6 @@ export function XpDesktop({ contentMap, onHelpOpen, onRoadmapOpen }: Props) {
             onMaximize={() => maximizeWindow(win.id)}
             onMove={(x, y) => moveWindow(win.id, x, y)}
             onResize={(x, y, w, h) => resizeWindow(win.id, x, y, w, h)}
-            desktopRect={desktopRect}
           >
             {contentMap[win.id] || (
               <div className="p-4 text-sm text-gray-500">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAgentSocket } from "@/lib/use-agent-socket";
@@ -268,8 +268,8 @@ export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const [authValidated, setAuthValidated] = useState(false);
-  const lastValidatedTokenRef = useRef<string | null>(null);
+  const [authValidated] = useState(false);
+
   const [thread, setThread] = useState<Thread | null>(null);
   const [threadList, setThreadList] = useState<ThreadSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineType>("auto");
