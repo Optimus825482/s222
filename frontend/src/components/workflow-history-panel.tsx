@@ -100,7 +100,7 @@ export function WorkflowHistoryPanel() {
 
   const replay = useCallback(
     async (ex: WorkflowExecution) => {
-      setReplayId(ex.id);
+      setReplayId(ex.id ?? null);
       try {
         const v = Object.fromEntries(
           Object.entries(ex.variables).map(([k, val]) => [k, String(val)]),
@@ -161,18 +161,22 @@ export function WorkflowHistoryPanel() {
         </div>
       )}
 
-      {execs.map((ex) => {
+      {execs.map((ex, idx) => {
         const s = ST[ex.status] ?? FALLBACK;
         const Icon = s.i;
-        const open = openId === ex.id;
+        const open = openId === (ex.id ?? null);
         const steps = ex.step_results ? Object.entries(ex.step_results) : [];
         return (
           <div
-            key={ex.id}
+            key={ex.id ?? idx}
             className="bg-slate-800/40 border border-slate-700/40 rounded-lg overflow-hidden"
           >
             <button
-              onClick={() => setOpenId((p) => (p === ex.id ? null : ex.id))}
+              onClick={() =>
+                setOpenId((p) =>
+                  p === (ex.id ?? null) ? null : (ex.id ?? null),
+                )
+              }
               className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-700/30 transition-colors"
               aria-expanded={open}
             >
@@ -194,7 +198,7 @@ export function WorkflowHistoryPanel() {
                 {dur(ex.duration_ms)}
               </span>
               <span className="text-[10px] text-slate-600 w-28 text-right shrink-0 hidden sm:block">
-                {fdt(ex.created_at)}
+                {fdt(ex.created_at ?? "")}
               </span>
             </button>
 
@@ -238,7 +242,7 @@ export function WorkflowHistoryPanel() {
                 )}
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[10px] text-slate-600 sm:hidden">
-                    {fdt(ex.created_at)}
+                    {fdt(ex.created_at ?? "")}
                   </span>
                   <button
                     onClick={(e) => {

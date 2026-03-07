@@ -549,14 +549,14 @@ export interface WorkflowStepResult {
 }
 
 export interface WorkflowRunResult {
-  id?: number;
+  id: number;
   workflow_id: string;
   status: "completed" | "failed" | "rolled_back" | "partial";
   step_results: Record<string, unknown>;
   error: string | null;
   duration_ms: number;
   variables: Record<string, unknown>;
-  created_at?: string;
+  created_at: string;
 }
 
 export interface ScheduledWorkflow {
