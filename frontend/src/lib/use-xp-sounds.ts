@@ -1,14 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import startupSrc from "@/assets/sounds/startup.mp3";
-import errorSrc from "@/assets/sounds/error.mp3";
-import shutdownSrc from "@/assets/sounds/shutdown.mp3";
 
+// Sound files served from public/voices/ via start.js custom server
 const SOUNDS = {
-  startup: startupSrc,
-  error: errorSrc,
-  shutdown: shutdownSrc,
+  startup: "/voices/startup.mp3",
+  error: "/voices/error.mp3",
+  shutdown: "/voices/shutdown.mp3",
 } as const;
 
 type SoundName = keyof typeof SOUNDS;
