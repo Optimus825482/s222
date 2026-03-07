@@ -1,5 +1,5 @@
-// Wrapper around Next.js standalone server.js that also serves public/ files.
-// Next.js standalone mode does NOT serve the public/ directory by default.
+// Wrapper around Next.js standalone server that serves public/ and _next/static/ files.
+// Next.js standalone mode does NOT serve these directories by default.
 const http = require("http");
 const { parse } = require("url");
 const path = require("path");
@@ -23,10 +23,28 @@ const MIME = {
   ".woff": "font/woff",
   ".woff2": "font/woff2",
   ".ttf": "font/ttf",
+  ".map": "application/json",
   ".webmanifest": "application/manifest+json",
 };
 
 const PUBLIC_DIR = path.join(__dirname, "public");
+const STATIC_DIR = path.join(__dirname, ".next", "static");
+
+function tryServeFile(filePath, res) {
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.isFile()) {
+      const ext = path.extname(filePath).toLowerCase();
+      res.setHeader("Content-Type", MIME[ext] || "application/octet-stream");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      fs.createReadStream(filePath).pipe(res);
+      return true;
+    }
+  } catch {
+    // file not found
+  }
+  return false;
+}
 
 // Import the Next.js request handler from standalone output
 const nextApp = require("next/dist/server/next-server");
@@ -49,33 +67,24 @@ nextServer.prepare().then(() => {
       const parsedUrl = parse(req.url, true);
       const pathname = decodeURIComponent(parsedUrl.pathname || "/");
 
-      // Try serving from public/ first
+      // Serve _next/static/* files directly from .next/static/
+      if (pathname.startsWith("/_next/static/")) {
+        const relativePath = pathname.replace("/_next/static/", "");
+        const filePath = path.join(STATIC_DIR, relativePath);
+        if (tryServeFile(filePath, res)) return;
+      }
+
+      // Serve public/ files (voices, icons, manifest, etc.)
       if (
         pathname !== "/" &&
         !pathname.startsWith("/_next") &&
         !pathname.startsWith("/api")
       ) {
         const filePath = path.join(PUBLIC_DIR, pathname);
-        try {
-          const stat = fs.statSync(filePath);
-          if (stat.isFile()) {
-            const ext = path.extname(filePath).toLowerCase();
-            res.setHeader(
-              "Content-Type",
-              MIME[ext] || "application/octet-stream",
-            );
-            res.setHeader(
-              "Cache-Control",
-              "public, max-age=31536000, immutable",
-            );
-            fs.createReadStream(filePath).pipe(res);
-            return;
-          }
-        } catch {
-          // file doesn't exist, fall through to Next.js
-        }
+        if (tryServeFile(filePath, res)) return;
       }
 
+      // Everything else goes to Next.js handler (SSR, API rewrites)
       handler(req, res, parsedUrl);
     })
     .listen(3000, "0.0.0.0", () => {
