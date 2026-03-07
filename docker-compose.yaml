@@ -9,6 +9,14 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agent_secret_2024}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agent -d multiagent"]
       interval: 10s
@@ -27,6 +35,14 @@ services:
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng-pwcsc8ow08oks0ggokwoo8ww.77.42.68.4.sslip.io}
     volumes:
       - app-data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,6 +71,14 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=https://ykok0ckoooo880w0cwo0w0w0.77.42.68.4.sslip.io
       - NEXT_PUBLIC_WS_URL=wss://ykok0ckoooo880w0cwo0w0w0.77.42.68.4.sslip.io/api/ws/chat
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
     depends_on:
       backend:
         condition: service_healthy

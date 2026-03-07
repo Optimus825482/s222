@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ChevronDown, HelpCircle, LogOut, Map, Menu } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
@@ -277,8 +277,49 @@ export function CockpitHeader({
           </div>
         )}
       </div>
+      {/* Desktop: all tabs flat */}
       <nav
-        className="flex items-center overflow-x-auto scrollbar-hide"
+        className="hidden lg:flex items-center overflow-x-auto scrollbar-hide"
+        aria-label="Ana navigasyon"
+      >
+        {PRIMARY_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => onTabChange(tab.key)}
+            className={`whitespace-nowrap px-3 py-2 text-xs font-medium transition-colors border-b-2 ${activeTab === tab.key ? tab.color : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+        {TAB_GROUPS.map((g) => (
+          <Fragment key={g.id}>
+            <div
+              className="w-px h-5 bg-slate-700/50 mx-1 shrink-0"
+              aria-hidden
+            />
+            {g.items.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => onTabChange(item.key)}
+                className={`whitespace-nowrap px-2.5 py-2 text-xs font-medium transition-colors border-b-2 flex items-center gap-1 ${
+                  activeTab === item.key
+                    ? `${item.color} border-current bg-white/5`
+                    : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"
+                }`}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </Fragment>
+        ))}
+      </nav>
+
+      {/* Mobile: primary tabs + grouped dropdowns */}
+      <nav
+        className="lg:hidden flex items-center overflow-x-auto scrollbar-hide"
         aria-label="Ana navigasyon"
       >
         {PRIMARY_TABS.map((tab) => (
