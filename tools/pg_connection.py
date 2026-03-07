@@ -88,8 +88,6 @@ CREATE TABLE IF NOT EXISTS memories (
 CREATE INDEX IF NOT EXISTS idx_memories_category  ON memories(category);
 CREATE INDEX IF NOT EXISTS idx_memories_layer     ON memories(memory_layer);
 CREATE INDEX IF NOT EXISTS idx_memories_created   ON memories(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_memories_embedding ON memories
-    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 CREATE TABLE IF NOT EXISTS teachings (
     id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -126,8 +124,6 @@ CREATE TABLE IF NOT EXISTS chunks (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_chunks_doc       ON chunks(doc_id);
-CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON chunks
-    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 CREATE TABLE IF NOT EXISTS skills (
     id          TEXT PRIMARY KEY,
@@ -154,6 +150,15 @@ CREATE INDEX IF NOT EXISTS idx_docs_hash ON documents(doc_hash);
 CREATE INDEX IF NOT EXISTS idx_docs_user ON documents(user_id);
 """
 
+# Vector indexes — separated because ivfflat requires rows to exist.
+# HNSW works on empty tables, so prefer it for initial creation.
+_VECTOR_INDEXES = [
+    """CREATE INDEX IF NOT EXISTS idx_memories_embedding ON memories
+       USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)""",
+    """CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON chunks
+       USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)""",
+]
+
 
 def init_database() -> None:
     """Create all tables and extensions. Safe to call multiple times."""
@@ -164,6 +169,18 @@ def init_database() -> None:
             cur.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS user_id TEXT")
             cur.execute(_SCHEMA_DOC_INDEXES)
         conn.commit()
+
+    # Vector indexes may fail on empty tables (ivfflat needs rows).
+    # Create them separately so table creation is never blocked.
+    for idx_sql in _VECTOR_INDEXES:
+        try:
+            with db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(idx_sql)
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Vector index creation deferred (will retry on next start): {e}")
+
     logger.info("Database schema initialized")
 
 

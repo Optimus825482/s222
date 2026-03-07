@@ -277,9 +277,9 @@ export function CockpitHeader({
           </div>
         )}
       </div>
-      {/* Desktop: all tabs flat */}
+      {/* Desktop: all tabs flat — no dropdowns */}
       <nav
-        className="hidden lg:flex items-center overflow-x-auto scrollbar-hide"
+        className="hidden lg:flex items-center overflow-x-auto scrollbar-hide px-1"
         aria-label="Ana navigasyon"
       >
         {PRIMARY_TABS.map((tab) => (
@@ -287,7 +287,7 @@ export function CockpitHeader({
             key={tab.key}
             type="button"
             onClick={() => onTabChange(tab.key)}
-            className={`whitespace-nowrap px-3 py-2 text-xs font-medium transition-colors border-b-2 ${activeTab === tab.key ? tab.color : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"}`}
+            className={`whitespace-nowrap px-2 py-1.5 text-[11px] font-medium transition-colors border-b-2 ${activeTab === tab.key ? tab.color : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"}`}
           >
             {tab.label}
           </button>
@@ -295,7 +295,7 @@ export function CockpitHeader({
         {TAB_GROUPS.map((g) => (
           <Fragment key={g.id}>
             <div
-              className="w-px h-5 bg-slate-700/50 mx-1 shrink-0"
+              className="w-px h-4 bg-slate-700/50 mx-0.5 shrink-0"
               aria-hidden
             />
             {g.items.map((item) => (
@@ -303,7 +303,7 @@ export function CockpitHeader({
                 key={item.key}
                 type="button"
                 onClick={() => onTabChange(item.key)}
-                className={`whitespace-nowrap px-2.5 py-2 text-xs font-medium transition-colors border-b-2 flex items-center gap-1 ${
+                className={`whitespace-nowrap px-1.5 py-1.5 text-[11px] font-medium transition-colors border-b-2 flex items-center gap-0.5 ${
                   activeTab === item.key
                     ? `${item.color} border-current bg-white/5`
                     : "text-slate-500 border-transparent hover:text-slate-300 hover:bg-white/5"
