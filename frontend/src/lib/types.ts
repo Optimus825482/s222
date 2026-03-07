@@ -530,3 +530,43 @@ export interface BenchmarkLeaderboardEntry {
   best_category: string;
   worst_category: string;
 }
+
+// ── Workflow Types ──
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string;
+  step_count: number;
+  required_variables: string[];
+}
+
+export interface WorkflowStepResult {
+  step_id: string;
+  status: string;
+  output?: string;
+  error?: string;
+  duration_ms?: number;
+}
+
+export interface WorkflowRunResult {
+  id?: number;
+  workflow_id: string;
+  status: "completed" | "failed" | "rolled_back" | "partial";
+  step_results: Record<string, any>;
+  error: string | null;
+  duration_ms: number;
+  variables: Record<string, any>;
+  created_at?: string;
+}
+
+export interface ScheduledWorkflow {
+  schedule_id: string;
+  template: string;
+  variables: Record<string, any>;
+  cron_expression: string;
+  enabled: boolean;
+  created_at: string;
+  last_run: string | null;
+  next_run: string | null;
+  run_count: number;
+}

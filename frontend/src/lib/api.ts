@@ -104,6 +104,9 @@ import type {
   AutonomousConversation,
   AutoChatConfig,
   PostTaskMeeting,
+  WorkflowTemplate,
+  WorkflowRunResult,
+  ScheduledWorkflow,
 } from "./types";
 
 export const api = {
@@ -379,6 +382,54 @@ export const api = {
     ),
   listIdentityAgents: () =>
     fetcher<{ agents: string[] }>("/api/agents/identity/list"),
+
+  // ── Workflow API ──
+  getTemplates: () => fetcher<WorkflowTemplate[]>("/api/workflows/templates"),
+
+  getHistory: (limit = 20) =>
+    fetcher<WorkflowRunResult[]>(`/api/workflows/history?limit=${limit}`),
+
+  getWorkflowDetail: (workflowId: string) =>
+    fetcher<WorkflowRunResult>(`/api/workflows/history/${workflowId}`),
+
+  runWorkflow: (
+    template: string,
+    variables: Record<string, any> = {},
+    customSteps?: any[],
+  ) =>
+    fetcher<WorkflowRunResult>("/api/workflows/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ template, variables, custom_steps: customSteps }),
+    }),
+
+  getSchedules: () => fetcher<ScheduledWorkflow[]>("/api/workflows/schedules"),
+
+  addSchedule: (data: {
+    schedule_id: string;
+    template: string;
+    variables?: Record<string, any>;
+    cron_expression: string;
+    enabled?: boolean;
+  }) =>
+    fetcher<ScheduledWorkflow>("/api/workflows/schedules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(data),
+    }),
+
+  removeSchedule: (scheduleId: string) =>
+    fetcher<{ status: string }>(`/api/workflows/schedules/${scheduleId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    }),
+
+  toggleSchedule: (scheduleId: string, enabled: boolean) =>
+    fetcher<ScheduledWorkflow>(`/api/workflows/schedules/${scheduleId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ enabled }),
+    }),
 };
 
 // ── Memory API (uses fetcher for consistent auth + 401 handling) ─
@@ -871,6 +922,98 @@ export const domainApi = {
     );
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
+  },
+
+  // ── Workflow Engine API ──
+
+  async getWorkflowTemplates() {
+    return fetcher<
+      {
+        id: string;
+        name: string;
+        description: string;
+        step_count: number;
+        required_variables: string[];
+      }[]
+    >("/api/workflows/templates");
+  },
+
+  async getWorkflowHistory(limit = 20) {
+    return fetcher<
+      {
+        id: number;
+        workflow_id: string;
+        status: string;
+        step_results: Record<string, unknown>;
+        error: string | null;
+        duration_ms: number;
+        variables: Record<string, unknown>;
+        created_at: string;
+      }[]
+    >(`/api/workflows/history?limit=${limit}`);
+  },
+
+  async runWorkflow(
+    template: string,
+    variables: Record<string, string> = {},
+    customSteps?: Record<string, unknown>[],
+  ) {
+    return fetcher<{
+      workflow_id: string;
+      status: string;
+      step_results: Record<string, unknown>;
+      error: string | null;
+      duration_ms: number;
+      variables: Record<string, unknown>;
+    }>("/api/workflows/run", {
+      method: "POST",
+      body: JSON.stringify({ template, variables, custom_steps: customSteps }),
+    });
+  },
+
+  async getScheduledWorkflows() {
+    return fetcher<
+      {
+        id: string;
+        template: string;
+        cron: string;
+        variables: Record<string, string>;
+        enabled: boolean;
+        next_run: string | null;
+        last_run: string | null;
+      }[]
+    >("/api/workflows/schedules");
+  },
+
+  async createScheduledWorkflow(
+    template: string,
+    cron: string,
+    variables: Record<string, string> = {},
+  ) {
+    return fetcher<{ id: string; message: string }>(
+      "/api/workflows/schedules",
+      {
+        method: "POST",
+        body: JSON.stringify({ template, cron, variables }),
+      },
+    );
+  },
+
+  async deleteScheduledWorkflow(scheduleId: string) {
+    return fetcher<{ message: string }>(
+      `/api/workflows/schedules/${scheduleId}`,
+      { method: "DELETE" },
+    );
+  },
+
+  async toggleScheduledWorkflow(scheduleId: string, enabled: boolean) {
+    return fetcher<{ message: string }>(
+      `/api/workflows/schedules/${scheduleId}/toggle`,
+      {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      },
+    );
   },
 };
 

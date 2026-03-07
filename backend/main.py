@@ -84,6 +84,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] MCP seed failed (non-critical): {e}")
 
+    # Workflow cron scheduler (APScheduler + SQLite)
+    try:
+        from tools.workflow_scheduler import init_scheduler
+        await init_scheduler()
+        print("[Backend] Workflow scheduler initialized")
+    except Exception as e:
+        print(f"[Backend] Workflow scheduler failed (non-critical): {e}")
+
     yield
 
 
@@ -611,6 +619,82 @@ async def api_run_workflow(req: WorkflowRunRequest, user: dict = Depends(get_cur
         raise
     except Exception as e:
         raise HTTPException(503, f"Workflow execution error: {e}")
+
+
+@app.get("/api/workflows/history/{workflow_id}")
+async def api_workflow_detail(workflow_id: str, user: dict = Depends(get_current_user)):
+    """Get detailed execution result for a specific workflow run."""
+    try:
+        from tools.workflow_engine import list_workflow_results
+        results = list_workflow_results(limit=200)
+        match = next((r for r in results if r.get("workflow_id") == workflow_id), None)
+        if not match:
+            raise HTTPException(404, "Workflow result not found")
+        return match
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"Error: {e}")
+
+
+class ScheduleCreateRequest(BaseModel):
+    template: str
+    cron: str  # crontab expression: "*/30 * * * *"
+    variables: dict = {}
+
+
+@app.get("/api/workflows/schedules")
+async def api_list_schedules(user: dict = Depends(get_current_user)):
+    """List all scheduled workflows."""
+    try:
+        from tools.workflow_scheduler import list_schedules
+        return list_schedules()
+    except Exception as e:
+        return []
+
+
+@app.post("/api/workflows/schedules")
+async def api_create_schedule(req: ScheduleCreateRequest, user: dict = Depends(get_current_user)):
+    """Create a new cron-scheduled workflow."""
+    try:
+        from tools.workflow_scheduler import add_schedule
+        return add_schedule(
+            schedule_id=None,
+            template=req.template,
+            cron_expr=req.cron,
+            variables=req.variables,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, f"Schedule error: {e}")
+
+
+@app.delete("/api/workflows/schedules/{schedule_id}")
+async def api_delete_schedule(schedule_id: str, user: dict = Depends(get_current_user)):
+    """Delete a scheduled workflow."""
+    try:
+        from tools.workflow_scheduler import remove_schedule
+        ok = remove_schedule(schedule_id)
+        if not ok:
+            raise HTTPException(404, "Schedule not found")
+        return {"status": "deleted", "schedule_id": schedule_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"Error: {e}")
+
+
+@app.post("/api/workflows/schedules/{schedule_id}/toggle")
+async def api_toggle_schedule(schedule_id: str, user: dict = Depends(get_current_user)):
+    """Toggle a scheduled workflow on/off."""
+    try:
+        from tools.workflow_scheduler import toggle_schedule
+        return toggle_schedule(schedule_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(503, f"Error: {e}")
 
 
 # ── Domain Expert Endpoints ──────────────────────────────────────

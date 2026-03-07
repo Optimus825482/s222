@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAgentSocket } from "@/lib/use-agent-socket";
+import { getWSSnapshot, subscribeWS } from "@/lib/ws-store";
 import { LiveEventLog } from "@/components/live-event-log";
 import dynamic from "next/dynamic";
 import { XpWindow, type WindowState } from "./xp-window";
@@ -203,6 +203,20 @@ const XpMarketplacePanel = dynamic(
   () =>
     import("@/components/xp-marketplace-panel").then((m) => ({
       default: m.XpMarketplacePanel,
+    })),
+  { ssr: false },
+);
+const WorkflowBuilderPanel = dynamic(
+  () =>
+    import("@/components/workflow-builder-panel").then((m) => ({
+      default: m.WorkflowBuilderPanel,
+    })),
+  { ssr: false },
+);
+const WorkflowHistoryPanel = dynamic(
+  () =>
+    import("@/components/workflow-history-panel").then((m) => ({
+      default: m.WorkflowHistoryPanel,
     })),
   { ssr: false },
 );
@@ -474,6 +488,38 @@ const APPS: DesktopApp[] = [
     ),
   },
   {
+    id: "workflows",
+    title: "İş Akışları",
+    icon: <Zap className="w-8 h-8" />,
+    color: "#f59e0b",
+    group: "Ana",
+    description:
+      "Workflow şablonlarını çalıştırın, geçmişi görüntüleyin ve zamanlı tetikleyiciler oluşturun. Araştırma, kod inceleme ve derin analiz pipeline'larını yönetin.",
+    defaultW: 750,
+    defaultH: 550,
+    render: () => (
+      <div className="overflow-hidden h-full">
+        <WorkflowBuilderPanel />
+      </div>
+    ),
+  },
+  {
+    id: "workflow-history",
+    title: "Workflow Geçmişi",
+    icon: <History className="w-8 h-8" />,
+    color: "#06b6d4",
+    group: "Ana",
+    description:
+      "Workflow çalışma geçmişini görüntüleyin. Tamamlanan, başarısız ve geri alınan workflow'ları inceleyin ve tekrar çalıştırın.",
+    defaultW: 700,
+    defaultH: 500,
+    render: () => (
+      <div className="overflow-hidden h-full">
+        <WorkflowHistoryPanel />
+      </div>
+    ),
+  },
+  {
     id: "agents",
     title: "Agentlar",
     icon: <Users className="w-8 h-8" />,
@@ -536,7 +582,18 @@ const APPS: DesktopApp[] = [
 ];
 
 function XpLiveLogPanel() {
-  const { status, liveEvents, reconnect } = useAgentSocket({ enabled: true });
+  const [, forceUpdate] = useState(0);
+  const snapshotRef = useRef(getWSSnapshot());
+
+  useEffect(() => {
+    const unsub = subscribeWS(() => {
+      snapshotRef.current = getWSSnapshot();
+      forceUpdate((n) => n + 1);
+    });
+    return unsub;
+  }, []);
+
+  const { status, liveEvents } = snapshotRef.current;
 
   // Determine connection state for display
   const isConnected =
@@ -592,7 +649,7 @@ function XpLiveLogPanel() {
                   Backend&apos;in çalıştığından emin olun (port 8001)
                 </p>
                 <button
-                  onClick={reconnect}
+                  onClick={() => window.location.reload()}
                   className="mt-1 text-[10px] px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 transition-colors"
                 >
                   Yeniden Bağlan
@@ -746,7 +803,30 @@ function XpSessionsPanel() {
         {threads.map((t) => (
           <div
             key={t.id}
-            className="flex items-start gap-2 p-3 hover:bg-slate-800/40 transition-colors group"
+            className="flex items-start gap-2 p-3 hover:bg-slate-800/40 transition-colors group cursor-pointer"
+            onClick={() => {
+              // Dispatch custom event to open this thread in chat window
+              window.dispatchEvent(
+                new CustomEvent("open-thread", { detail: t.id }),
+              );
+              // Also dispatch open-app to ensure chat window is visible
+              window.dispatchEvent(
+                new CustomEvent("open-app", { detail: "chat" }),
+              );
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                window.dispatchEvent(
+                  new CustomEvent("open-thread", { detail: t.id }),
+                );
+                window.dispatchEvent(
+                  new CustomEvent("open-app", { detail: "chat" }),
+                );
+              }
+            }}
           >
             <div className="flex-1 min-w-0">
               <div className="text-xs text-slate-300 truncate">
@@ -758,7 +838,10 @@ function XpSessionsPanel() {
               </div>
             </div>
             <button
-              onClick={() => handleDelete(t.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(t.id);
+              }}
               className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300 transition-all"
               aria-label="Oturumu sil"
             >
@@ -839,18 +922,18 @@ function EmbeddedRoadmap() {
     {
       title: "Faz 1 — Workflow Engine",
       icon: "⚡",
-      status: "wip" as const,
-      progress: 73,
+      status: "done" as const,
+      progress: 100,
       color: "text-amber-400",
-      bar: "bg-amber-400",
+      bar: "bg-emerald-500",
     },
     {
       title: "Faz 2 — Domain Skills",
       icon: "🧠",
-      status: "wip" as const,
-      progress: 70,
+      status: "done" as const,
+      progress: 100,
       color: "text-purple-400",
-      bar: "bg-purple-400",
+      bar: "bg-emerald-500",
     },
     {
       title: "Faz 2.5 — Browser Use",
@@ -1170,6 +1253,16 @@ export function XpDesktop() {
       return [...prev, newWin];
     });
   }, []);
+
+  // Listen for "open-app" custom events (e.g. from XpSessionsPanel)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const appId = (e as CustomEvent<string>).detail;
+      if (appId) openApp(appId);
+    };
+    window.addEventListener("open-app", handler);
+    return () => window.removeEventListener("open-app", handler);
+  }, [openApp]);
 
   const closeWindow = useCallback((id: string) => {
     setWindows((prev) => prev.filter((w) => w.id !== id));

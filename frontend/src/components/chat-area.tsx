@@ -82,7 +82,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
         parts.push(
           <code
             key={i++}
-            className="bg-slate-800 text-pink-300 px-1 py-0.5 rounded text-xs font-mono"
+            className="bg-slate-800 text-pink-300 px-1 py-0.5 rounded text-xs font-mono break-all"
           >
             {code[2]}
           </code>,
@@ -96,7 +96,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
             href={link[3]}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-400 underline hover:text-blue-300"
+            className="text-blue-400 underline hover:text-blue-300 break-words"
           >
             {link[2]}
           </a>,
@@ -126,9 +126,11 @@ function renderMarkdown(text: string): React.ReactNode[] {
         nodes.push(
           <pre
             key={key++}
-            className="bg-slate-900 rounded-lg p-3 my-2 overflow-x-auto text-xs font-mono text-slate-300 border border-slate-700"
+            className="bg-slate-900 rounded-lg p-2 md:p-3 my-2 overflow-x-auto text-[11px] md:text-xs font-mono text-slate-300 border border-slate-700 max-w-full"
           >
-            <code>{codeBuf.join("\n")}</code>
+            <code className="whitespace-pre-wrap break-words md:whitespace-pre md:break-normal">
+              {codeBuf.join("\n")}
+            </code>
           </pre>,
         );
         codeBuf = [];
@@ -158,7 +160,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       nodes.push(
         <h4
           key={key++}
-          className="text-sm font-semibold text-slate-300 mt-3 mb-1"
+          className="text-xs md:text-sm font-semibold text-slate-300 mt-3 mb-1"
         >
           {inlineFormat(stripped.slice(5))}
         </h4>,
@@ -167,7 +169,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       nodes.push(
         <h3
           key={key++}
-          className="text-base font-bold text-slate-200 mt-4 mb-1.5"
+          className="text-sm md:text-base font-bold text-slate-200 mt-3 md:mt-4 mb-1.5"
         >
           {inlineFormat(stripped.slice(4))}
         </h3>,
@@ -176,7 +178,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       nodes.push(
         <h2
           key={key++}
-          className="text-lg font-bold text-white mt-5 mb-2 border-b border-slate-700 pb-1"
+          className="text-base md:text-lg font-bold text-white mt-4 md:mt-5 mb-2 border-b border-slate-700 pb-1"
         >
           {inlineFormat(stripped.slice(3))}
         </h2>,
@@ -185,7 +187,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       nodes.push(
         <h1
           key={key++}
-          className="text-xl font-bold text-white mt-5 mb-2 border-b border-slate-600 pb-1"
+          className="text-lg md:text-xl font-bold text-white mt-4 md:mt-5 mb-2 border-b border-slate-600 pb-1"
         >
           {inlineFormat(stripped.slice(2))}
         </h1>,
@@ -266,9 +268,11 @@ function renderMarkdown(text: string): React.ReactNode[] {
     nodes.push(
       <pre
         key={key++}
-        className="bg-slate-900 rounded-lg p-3 my-2 overflow-x-auto text-xs font-mono text-slate-300 border border-slate-700"
+        className="bg-slate-900 rounded-lg p-2 md:p-3 my-2 overflow-x-auto text-[11px] md:text-xs font-mono text-slate-300 border border-slate-700 max-w-full"
       >
-        <code>{codeBuf.join("\n")}</code>
+        <code className="whitespace-pre-wrap break-words md:whitespace-pre md:break-normal">
+          {codeBuf.join("\n")}
+        </code>
       </pre>,
     );
   }
@@ -461,7 +465,7 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
         </div>
 
         {/* Content */}
-        <div className="text-sm text-slate-300 leading-relaxed break-words">
+        <div className="text-sm text-slate-300 leading-relaxed break-words overflow-hidden">
           {renderMarkdown(event.content)}
         </div>
 

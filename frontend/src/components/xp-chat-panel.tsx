@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAgentSocket } from "@/lib/use-agent-socket";
 import { useAuth } from "@/lib/auth";
 import type { Thread, PipelineType } from "@/lib/types";
@@ -8,6 +8,7 @@ import { PipelineSelector } from "@/components/pipeline-selector";
 import { ChatArea } from "@/components/chat-area";
 import { ChatInput } from "@/components/chat-input";
 import { LiveEventLog } from "@/components/live-event-log";
+import { api } from "@/lib/api";
 
 export default function ChatDesktopPanel() {
   const { user } = useAuth();
@@ -23,6 +24,22 @@ export default function ChatDesktopPanel() {
     },
     onError: (msg) => setLastError(msg),
   });
+
+  // Listen for "open-thread" custom events from XpSessionsPanel
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const threadId = (e as CustomEvent<string>).detail;
+      if (!threadId) return;
+      try {
+        const loaded = await api.getThread(threadId);
+        setThread(loaded);
+      } catch (err) {
+        console.error("[ChatDesktopPanel] load thread error:", err);
+      }
+    };
+    window.addEventListener("open-thread", handler);
+    return () => window.removeEventListener("open-thread", handler);
+  }, []);
 
   const isProcessing = status === "running" || status === "connecting";
 

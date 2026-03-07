@@ -52,10 +52,10 @@ export const PHASES: Phase[] = [
     id: "f1",
     title: "Faz 1 — Workflow Engine",
     icon: "⚡",
-    status: "wip",
+    status: "done",
     color: "text-amber-400",
     border: "border-amber-400/30",
-    progress: 73,
+    progress: 100,
     items: [
       { done: true, label: "Workflow Engine core" },
       {
@@ -66,19 +66,19 @@ export const PHASES: Phase[] = [
       { done: true, label: "Koşullu dallanma + Hata yönetimi + Rollback" },
       { done: true, label: "Workflow şablonları + Orchestrator entegrasyonu" },
       { done: true, label: "Backend API endpoints" },
-      { done: false, label: "Frontend Workflow Builder UI" },
-      { done: false, label: "Workflow execution history & replay" },
-      { done: false, label: "Cron/zamanlı workflow tetikleme" },
+      { done: true, label: "Frontend Workflow Builder UI" },
+      { done: true, label: "Workflow execution history & replay" },
+      { done: true, label: "Cron/zamanlı workflow tetikleme" },
     ],
   },
   {
     id: "f2",
     title: "Faz 2 — Domain Skills",
     icon: "🧠",
-    status: "wip",
+    status: "done",
     color: "text-purple-400",
     border: "border-purple-400/30",
-    progress: 70,
+    progress: 100,
     items: [
       {
         done: true,
@@ -86,8 +86,8 @@ export const PHASES: Phase[] = [
           "Domain Skills Engine + Finans/Hukuk/Mühendislik/Akademik modülleri",
       },
       { done: true, label: "Orchestrator entegrasyonu + Backend API" },
-      { done: false, label: "Domain skill auto-discovery" },
-      { done: false, label: "Skill marketplace" },
+      { done: true, label: "Domain skill auto-discovery" },
+      { done: true, label: "Skill marketplace" },
     ],
   },
   {

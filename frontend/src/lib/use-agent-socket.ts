@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WSMessage, WSLiveEvent, Thread, PipelineType } from "./types";
 import { useAuth } from "@/lib/auth";
+import { setWSStatus, pushWSLiveEvent, clearWSLiveEvents } from "./ws-store";
 
 const INITIAL_RECONNECT_MS = 1_000;
 const MAX_RECONNECT_MS = 30_000;
@@ -90,6 +91,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
       // Reset backoff on successful connection
       reconnectAttempts.current = 0;
       setStatus("idle");
+      setWSStatus("idle");
     };
 
     ws.onmessage = (ev) => {
@@ -99,19 +101,24 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
         switch (msg.type) {
           case "live_event":
             setLiveEvents((prev) => [...prev, msg]);
+            pushWSLiveEvent(msg);
             optsRef.current.onLiveEvent?.(msg);
             break;
           case "monitor_start":
             setStatus("running");
             setLiveEvents([]);
+            setWSStatus("running");
+            clearWSLiveEvents();
             optsRef.current.onStatusChange?.("running");
             break;
           case "monitor_complete":
             setStatus("complete");
+            setWSStatus("complete");
             optsRef.current.onStatusChange?.("complete");
             break;
           case "monitor_error":
             setStatus("error");
+            setWSStatus("error");
             optsRef.current.onError?.(msg.message);
             optsRef.current.onStatusChange?.("error");
             break;
@@ -120,6 +127,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
             break;
           case "error":
             setStatus("error");
+            setWSStatus("error");
             optsRef.current.onError?.(msg.message);
             optsRef.current.onStatusChange?.("error");
             break;

@@ -908,3 +908,105 @@ def list_workflow_results(limit: int = 20) -> list[dict[str, Any]]:
             return [dict(r) for r in rows] if rows else []
     finally:
         release_conn(conn)
+
+# ── Scheduled Workflows (Cron) ─────────────────────────────────
+
+_SCHEDULED_WORKFLOWS: dict[str, dict[str, Any]] = {}
+_SCHEDULER_TASK: asyncio.Task | None = None
+
+
+def add_scheduled_workflow(
+    schedule_id: str,
+    template: str,
+    variables: dict[str, Any],
+    cron_expression: str,
+    enabled: bool = True,
+) -> dict[str, Any]:
+    """Register a workflow to run on a schedule."""
+    entry = {
+        "schedule_id": schedule_id,
+        "template": template,
+        "variables": variables,
+        "cron_expression": cron_expression,
+        "enabled": enabled,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "last_run": None,
+        "next_run": None,
+        "run_count": 0,
+    }
+    _SCHEDULED_WORKFLOWS[schedule_id] = entry
+    _compute_next_run(entry)
+    return entry
+
+
+def remove_scheduled_workflow(schedule_id: str) -> bool:
+    return _SCHEDULED_WORKFLOWS.pop(schedule_id, None) is not None
+
+
+def list_scheduled_workflows() -> list[dict[str, Any]]:
+    return list(_SCHEDULED_WORKFLOWS.values())
+
+
+def toggle_scheduled_workflow(schedule_id: str, enabled: bool) -> dict[str, Any] | None:
+    entry = _SCHEDULED_WORKFLOWS.get(schedule_id)
+    if entry:
+        entry["enabled"] = enabled
+    return entry
+
+
+def _compute_next_run(entry: dict[str, Any]) -> None:
+    """Simple cron parser: supports 'every Xm', 'every Xh', 'every Xd' format."""
+    expr = entry["cron_expression"].strip().lower()
+    now = datetime.now(timezone.utc)
+
+    m = re.match(r"every\s+(\d+)\s*(m|min|h|hour|d|day)s?", expr)
+    if m:
+        val = int(m.group(1))
+        unit = m.group(2)[0]  # m, h, or d
+        from datetime import timedelta
+        delta = timedelta(minutes=val) if unit == "m" else timedelta(hours=val) if unit == "h" else timedelta(days=val)
+        entry["next_run"] = (now + delta).isoformat()
+    else:
+        # Default: every 1 hour
+        from datetime import timedelta
+        entry["next_run"] = (now + timedelta(hours=1)).isoformat()
+
+
+async def _scheduler_loop() -> None:
+    """Background loop that checks and runs scheduled workflows."""
+    while True:
+        await asyncio.sleep(30)  # Check every 30 seconds
+        now = datetime.now(timezone.utc)
+        for entry in list(_SCHEDULED_WORKFLOWS.values()):
+            if not entry["enabled"] or not entry["next_run"]:
+                continue
+            next_run = datetime.fromisoformat(entry["next_run"])
+            if now >= next_run:
+                try:
+                    tpl = get_template(entry["template"], entry["variables"])
+                    thread = Thread()
+                    result = await execute_workflow(tpl, thread)
+                    save_workflow_result(result)
+                    entry["last_run"] = now.isoformat()
+                    entry["run_count"] += 1
+                    _compute_next_run(entry)
+                    logger.info(f"Scheduled workflow '{entry['schedule_id']}' completed: {result.status}")
+                except Exception as exc:
+                    logger.error(f"Scheduled workflow '{entry['schedule_id']}' failed: {exc}")
+                    _compute_next_run(entry)
+
+
+def start_scheduler() -> None:
+    """Start the background scheduler loop (call once at app startup)."""
+    global _SCHEDULER_TASK
+    if _SCHEDULER_TASK is None or _SCHEDULER_TASK.done():
+        _SCHEDULER_TASK = asyncio.create_task(_scheduler_loop())
+        logger.info("Workflow scheduler started")
+
+
+def stop_scheduler() -> None:
+    """Stop the background scheduler."""
+    global _SCHEDULER_TASK
+    if _SCHEDULER_TASK and not _SCHEDULER_TASK.done():
+        _SCHEDULER_TASK.cancel()
+        _SCHEDULER_TASK = None
