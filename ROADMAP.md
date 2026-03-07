@@ -135,7 +135,6 @@ REST API'lar, webhook'lar, CRM/ERP sistemleri ile entegrasyon.
 - 🟢 SearXNG arama entegrasyonu (`tools/search.py`)
 - 🔴 Webhook receiver/sender
 - 🔴 Generic REST API connector
-- 🔴 Slack/Discord entegrasyonu
 - 🔴 Email gönderimi (SMTP)
 - 🔴 Scheduled task runner
 

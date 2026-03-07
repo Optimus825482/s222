@@ -211,16 +211,12 @@ export const PHASES: Phase[] = [
     status: "wip",
     color: "text-cyan-400",
     border: "border-cyan-400/30",
-    progress: 25,
+    progress: 30,
     items: [
       { done: true, label: "MCP Client + Web fetch + SearXNG" },
-      {
-        done: false,
-        label: "Browser Use Tool — web otomasyon (form, scrape, screenshot)",
-      },
       { done: false, label: "Webhook receiver/sender" },
       { done: false, label: "Generic REST API connector" },
-      { done: false, label: "Slack/Discord entegrasyonu" },
+      { done: false, label: "Email gönderimi (SMTP)" },
       { done: false, label: "Scheduled task runner" },
     ],
   },

@@ -203,7 +203,11 @@ function PatternsTab() {
                     key={ti}
                     v={t.count}
                     mx={stats.total_calls}
-                    c={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][ti % 5]}
+                    c={
+                      ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][
+                        ti % 5
+                      ]
+                    }
                     l={`${t.tool} (${t.success_rate}%)`}
                   />
                 ))}
@@ -264,7 +268,12 @@ function RecommendationsTab() {
   ) => {
     if (!taskInput.trim() || !tool || !agent) return;
     try {
-      await toolSelectorApi.applyToolSuggestion(taskInput, tool, agent, success);
+      await toolSelectorApi.applyToolSuggestion(
+        taskInput,
+        tool,
+        agent,
+        success,
+      );
       // Refresh suggestion
       const data = await toolSelectorApi.getSuggestedTools(taskInput);
       setSuggestion(JSON.stringify(data, null, 2));
@@ -375,37 +384,54 @@ function AgentToolMatrixTab() {
             <thead>
               <tr className="border-b border-slate-700/50">
                 <th className="px-2 py-2 text-left text-slate-400">Agent</th>
-                <th className="px-2 py-2 text-left text-slate-400">Toplam Call</th>
-                <th className="px-2 py-2 text-left text-slate-400">Çeşitlilik</th>
-                <th className="px-2 py-2 text-left text-slate-400">En İyi Tools</th>
+                <th className="px-2 py-2 text-left text-slate-400">
+                  Toplam Call
+                </th>
+                <th className="px-2 py-2 text-left text-slate-400">
+                  Çeşitlilik
+                </th>
+                <th className="px-2 py-2 text-left text-slate-400">
+                  En İyi Tools
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/30">
-              {Object.entries(matrix).map(([agent, stats]: [string, any]) => (
-                <tr key={agent} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-2 py-2 text-cyan-400">{agent}</td>
-                  <td className="px-2 py-2 text-slate-300">{stats.total_calls}</td>
-                  <td className="px-2 py-2 text-slate-300">
-                    {stats.tool_diversity} tool
-                  </td>
-                  <td className="px-2 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {stats.top_tools?.slice(0, 3).map((t: any, i: number) => (
-                        <span
-                          key={i}
-                          className="px-1.5 py-0.5 bg-slate-700/60 text-slate-400 rounded text-[8px]"
-                        >
-                          {t.tool} ({t.success_rate}%)
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {Object.entries(matrix).map(
+                ([agent, stats]: [string, AgentToolStats]) => (
+                  <tr
+                    key={agent}
+                    className="hover:bg-slate-800/30 transition-colors"
+                  >
+                    <td className="px-2 py-2 text-cyan-400">{agent}</td>
+                    <td className="px-2 py-2 text-slate-300">
+                      {stats.total_calls}
+                    </td>
+                    <td className="px-2 py-2 text-slate-300">
+                      {stats.tool_diversity} tool
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {stats.top_tools?.slice(0, 3).map((t, i: number) => (
+                          <span
+                            key={i}
+                            className="px-1.5 py-0.5 bg-slate-700/60 text-slate-400 rounded text-[8px]"
+                          >
+                            {t.tool} ({t.success_rate}%)
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ),
+              )}
               {Object.keys(matrix).length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-2 py-4 text-center text-slate-500">
-                    Veri yok - ilk task'ınızdyı tamamladıktan sonra burada veriler göreceksiniz
+                  <td
+                    colSpan={4}
+                    className="px-2 py-4 text-center text-slate-500"
+                  >
+                    Veri yok - ilk task'ınızdyı tamamladıktan sonra burada
+                    veriler göreceksiniz
                   </td>
                 </tr>
               )}
@@ -476,7 +502,8 @@ function PreferencesTab() {
               Kullanıcı tercihleri burada görünecek
             </p>
             <p className="text-[10px] text-slate-500 mt-1">
-              ÖğrenilenكافالارBu alan, necessity_fixed_task patterns'leri otomatik olarak öğrenilecektir
+              ÖğrenilenكافالارBu alan, necessity_fixed_task patterns'leri
+              otomatik olarak öğrenilecektir
             </p>
           </div>
         ) : (

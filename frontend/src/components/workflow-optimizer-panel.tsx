@@ -30,9 +30,26 @@ interface WorkflowOptimizerStats {
   }[];
 }
 
+interface WorkflowExecution {
+  execution_id: string;
+  workflow_id: string;
+  status: string;
+  duration_ms: number;
+  step_count: number;
+  started_at: string;
+  error?: string;
+}
+
+interface WorkflowPattern {
+  type: string;
+  pattern: string;
+  occurrence_count: number;
+  suggestion: string;
+}
+
 interface WorkflowStats {
   name: string;
-  executions: any[];
+  executions: WorkflowExecution[];
   stats: {
     total_executions: number;
     success_count: number;
@@ -217,10 +234,30 @@ function OverviewTab() {
   if (!stats) return null;
 
   const byCategory = [
-    { label: "Performans", value: stats.global_patterns.filter((p: any) => p.type.includes("performance")).length, color: "#3b82f6" },
-    { label: "Güvenilirlik", value: stats.global_patterns.filter((p: any) => p.type.includes("reliability")).length, color: "#10b981" },
-    { label: "Tekrarlayan", value: stats.global_patterns.filter((p: any) => p.type.includes("sequential")).length, color: "#f59e0b" },
-    { label: "Hız", value: stats.global_patterns.filter((p: any) => p.type.includes("slow")).length, color: "#ef4444" },
+    {
+      label: "Performans",
+      value: stats.global_patterns.filter((p) => p.type.includes("performance"))
+        .length,
+      color: "#3b82f6",
+    },
+    {
+      label: "Güvenilirlik",
+      value: stats.global_patterns.filter((p) => p.type.includes("reliability"))
+        .length,
+      color: "#10b981",
+    },
+    {
+      label: "Tekrarlayan",
+      value: stats.global_patterns.filter((p) => p.type.includes("sequential"))
+        .length,
+      color: "#f59e0b",
+    },
+    {
+      label: "Hız",
+      value: stats.global_patterns.filter((p) => p.type.includes("slow"))
+        .length,
+      color: "#ef4444",
+    },
   ];
   const maxCat = Math.max(...byCategory.map((c) => c.value), 1);
 
@@ -272,7 +309,7 @@ function OverviewTab() {
             En Yaygın Pattern'ler
           </h4>
           <div className="space-y-2 max-h-[250px] overflow-y-auto">
-            {stats.global_patterns.map((p: any, i: number) => (
+            {stats.global_patterns.map((p, i: number) => (
               <div
                 key={i}
                 className="bg-slate-900/30 rounded-lg p-3 text-[10px]"
@@ -284,7 +321,9 @@ function OverviewTab() {
                   <div className="space-y-1 flex-1">
                     <div className="flex justify-between">
                       <code className="text-cyan-300">{p.pattern}</code>
-                      <span className="text-slate-500">x{p.occurrence_count}</span>
+                      <span className="text-slate-500">
+                        x{p.occurrence_count}
+                      </span>
                     </div>
                     <p className="text-slate-400">{p.suggestion}</p>
                   </div>
@@ -324,7 +363,9 @@ function SuggestionsTab() {
     try {
       setE("");
       setLd(true);
-      const { suggestions: s } = await workflowOptimizerApi.getSuggestions(template || undefined);
+      const { suggestions: s } = await workflowOptimizerApi.getSuggestions(
+        template || undefined,
+      );
       setSuggestions(Array.isArray(s) ? s : []);
     } catch (x) {
       setE(x instanceof Error ? x.message : "Veri yüklenemedi");
@@ -362,16 +403,22 @@ function SuggestionsTab() {
         <div className="text-3xl mb-2">💡</div>
         <p className="text-xs text-slate-500">Öneri Yok</p>
         <p className="text-[10px] text-slate-600 mt-1">
-          "Patterns" sekmesinden global pattern'leri seeing
-          veya bir template seçin
+          "Patterns" sekmesinden global pattern'leri seeing veya bir template
+          seçin
         </p>
       </div>
     );
   }
 
   const getImpactColor = (impact: string) => {
-    if (impact.includes("30%") || impact.includes("40%") || impact.includes("50%")) return "text-emerald-400";
-    if (impact.includes("20%") || impact.includes("25%")) return "text-amber-400";
+    if (
+      impact.includes("30%") ||
+      impact.includes("40%") ||
+      impact.includes("50%")
+    )
+      return "text-emerald-400";
+    if (impact.includes("20%") || impact.includes("25%"))
+      return "text-amber-400";
     return "text-slate-400";
   };
 
@@ -434,7 +481,9 @@ function SuggestionsTab() {
                   disabled={applied.has(s.suggestion_id)}
                   className="px-2 py-1 text-[9px] bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 rounded border border-emerald-500/20 transition-colors disabled:opacity-40"
                 >
-                  {applied.has(s.suggestion_id) ? "✓ Uygulandı" : "Otomatik Uygula"}
+                  {applied.has(s.suggestion_id)
+                    ? "✓ Uygulandı"
+                    : "Otomatik Uygula"}
                 </button>
               ) : (
                 <span className="text-[9px] text-slate-500 px-2">
@@ -534,7 +583,11 @@ function WorkflowDetailedTab() {
             <StatCard
               label="Hata Oranı"
               value={`${stats.stats.error_rate_pct}%`}
-              accent={stats.stats.error_rate_pct > 20 ? "text-red-400" : "text-slate-200"}
+              accent={
+                stats.stats.error_rate_pct > 20
+                  ? "text-red-400"
+                  : "text-slate-200"
+              }
             />
           </div>
 
@@ -545,16 +598,20 @@ function WorkflowDetailedTab() {
             </h4>
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {stats.executions.length === 0 && (
-                <p className="text-xs text-slate-600 text-center py-4">Henüz execution yok</p>
+                <p className="text-xs text-slate-600 text-center py-4">
+                  Henüz execution yok
+                </p>
               )}
-              {stats.executions.map((exec: any, i: number) => (
+              {stats.executions.map((exec, i: number) => (
                 <div
                   key={i}
                   className="flex items-center gap-2 text-[10px] p-2 rounded bg-slate-900/30"
                 >
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      exec.status === "completed" ? "bg-emerald-500" : "bg-red-500"
+                      exec.status === "completed"
+                        ? "bg-emerald-500"
+                        : "bg-red-500"
                     }`}
                   />
                   <span className="flex-1 text-slate-400 truncate">
@@ -563,9 +620,7 @@ function WorkflowDetailedTab() {
                   <span className="text-slate-500 tabular-nums">
                     {exec.duration_ms}ms
                   </span>
-                  <span className="text-slate-500">
-                    {exec.step_count} step
-                  </span>
+                  <span className="text-slate-500">{exec.step_count} step</span>
                 </div>
               ))}
             </div>
@@ -614,21 +669,39 @@ function PatternLibraryTab() {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <h5 className="text-[10px] text-blue-400">Performance</h5>
-            {patterns.filter((p: any) => p.type.includes("slow") || p.type.includes("performance")).map((p: any, i: number) => (
-              <div key={i} className="text-[10px] bg-blue-500/10 px-2 py-1.5 rounded border border-blue-500/20">
-                <div className="font-semibold text-blue-300">{p.pattern}</div>
-                <div className="text-slate-500 mt-0.5">{p.suggestion}</div>
-              </div>
-            ))}
+            {patterns
+              .filter(
+                (p) =>
+                  p.type.includes("slow") || p.type.includes("performance"),
+              )
+              .map((p, i: number) => (
+                <div
+                  key={i}
+                  className="text-[10px] bg-blue-500/10 px-2 py-1.5 rounded border border-blue-500/20"
+                >
+                  <div className="font-semibold text-blue-300">{p.pattern}</div>
+                  <div className="text-slate-500 mt-0.5">{p.suggestion}</div>
+                </div>
+              ))}
           </div>
           <div className="space-y-2">
             <h5 className="text-[10px] text-amber-400">Reliability</h5>
-            {patterns.filter((p: any) => p.type.includes("reliability") || p.type.includes("error")).map((p: any, i: number) => (
-              <div key={i} className="text-[10px] bg-amber-500/10 px-2 py-1.5 rounded border border-amber-500/20">
-                <div className="font-semibold text-amber-300">{p.pattern}</div>
-                <div className="text-slate-500 mt-0.5">{p.suggestion}</div>
-              </div>
-            ))}
+            {patterns
+              .filter(
+                (p) =>
+                  p.type.includes("reliability") || p.type.includes("error"),
+              )
+              .map((p, i: number) => (
+                <div
+                  key={i}
+                  className="text-[10px] bg-amber-500/10 px-2 py-1.5 rounded border border-amber-500/20"
+                >
+                  <div className="font-semibold text-amber-300">
+                    {p.pattern}
+                  </div>
+                  <div className="text-slate-500 mt-0.5">{p.suggestion}</div>
+                </div>
+              ))}
           </div>
         </div>
       </div>
@@ -638,20 +711,24 @@ function PatternLibraryTab() {
           Tekrarlayan Pattern'ler
         </h4>
         <div className="space-y-2">
-          {patterns.filter((p: any) => p.type.includes("sequential") || p.type.includes("tool")).map((p: any, i: number) => (
-            <div
-              key={i}
-              className="bg-slate-900/30 border border-slate-700/30 rounded-lg p-3"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded border border-purple-500/30">
-                  x{p.occurrence_count}
-                </span>
-                <code className="text-xs text-cyan-300">{p.pattern}</code>
+          {patterns
+            .filter(
+              (p) => p.type.includes("sequential") || p.type.includes("tool"),
+            )
+            .map((p, i: number) => (
+              <div
+                key={i}
+                className="bg-slate-900/30 border border-slate-700/30 rounded-lg p-3"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[9px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded border border-purple-500/30">
+                    x{p.occurrence_count}
+                  </span>
+                  <code className="text-xs text-cyan-300">{p.pattern}</code>
+                </div>
+                <p className="text-[10px] text-slate-400">{p.suggestion}</p>
               </div>
-              <p className="text-[10px] text-slate-400">{p.suggestion}</p>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
     </div>
