@@ -38,8 +38,8 @@ interface TG {
 const PRIMARY_TABS: { key: NavTab; label: string; color: string }[] = [
   {
     key: "chat",
-    label: "� Sohbet",
-    color: "text-blue-4,00 border-blue-400 bg-blue-400/5",
+    label: "💬 Sohbet",
+    color: "text-blue-400 border-blue-400 bg-blue-400/5",
   },
   {
     key: "monitor",
@@ -68,7 +68,7 @@ const TAB_GROUPS: TG[] = [
       {
         key: "evolution",
         label: "Gelişim",
-        icon: "�",
+        icon: "📈",
         color: "text-amber-400",
       },
       {
