@@ -59,10 +59,21 @@ export function XpWindow({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
 
+  // ── Mobile detect (resize listener ile) ──
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   // ── Drag ──
   const handleDragStart = useCallback(
     (e: React.MouseEvent) => {
       if (state.maximized) return;
+      // Disable drag on mobile — windows are always fullscreen
+      if (typeof window !== "undefined" && window.innerWidth < 640) return;
       e.preventDefault();
       onFocus(state.id);
       dragRef.current = {
@@ -138,21 +149,41 @@ export function XpWindow({
 
   if (state.minimized) return null;
 
-  const style: React.CSSProperties = state.maximized
-    ? {
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "calc(100% - 40px)",
-        zIndex: state.zIndex,
-      }
-    : {
-        top: state.y,
-        left: state.x,
-        width: state.w,
-        height: state.h,
-        zIndex: state.zIndex,
-      };
+  const style: React.CSSProperties = isMobile
+    ? state.maximized
+      ? {
+          // Mobilde maximize: tam ekran, taskbar (36px) hariç
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "calc(100dvh - 36px)",
+          zIndex: state.zIndex,
+          borderRadius: 0,
+        }
+      : {
+          // Mobilde normal: neredeyse tam ekran, ortalanmış
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: "95vw",
+          height: "80dvh",
+          zIndex: state.zIndex,
+        }
+    : state.maximized
+      ? {
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "calc(100% - 40px)",
+          zIndex: state.zIndex,
+        }
+      : {
+          top: state.y,
+          left: state.x,
+          width: state.w,
+          height: state.h,
+          zIndex: state.zIndex,
+        };
 
   return (
     <div
@@ -165,7 +196,7 @@ export function XpWindow({
     >
       {/* ── XP Title Bar ── */}
       <div
-        className="xp-titlebar shrink-0 flex items-center h-[30px] px-[3px] cursor-move rounded-t-lg"
+        className={`xp-titlebar shrink-0 flex items-center ${isMobile ? "h-[26px]" : "h-[30px]"} px-[3px] cursor-move rounded-t-lg`}
         onMouseDown={handleDragStart}
         onDoubleClick={() => onMaximize(state.id)}
       >
@@ -221,7 +252,7 @@ export function XpWindow({
       </div>
 
       {/* ── Resize Handle ── */}
-      {!state.maximized && (
+      {!state.maximized && !isMobile && (
         <div
           className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-10"
           onMouseDown={handleResizeStart}

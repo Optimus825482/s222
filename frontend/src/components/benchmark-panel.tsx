@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AGENT_CONFIG } from "@/lib/agents";
 import type { AgentRole } from "@/lib/types";
 
@@ -165,8 +165,10 @@ function RunTab() {
   const [category, setCategory] = useState("");
   const [scenario, setScenario] = useState("");
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<AnyData | null>(null);
   const [error, setError] = useState("");
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     bApi<{ scenarios: AnyData[] }>("/api/benchmarks/scenarios")
@@ -174,10 +176,28 @@ function RunTab() {
       .catch(() => {});
   }, []);
 
+  // Cleanup progress interval on unmount
+  useEffect(() => {
+    return () => {
+      if (progressRef.current) clearInterval(progressRef.current);
+    };
+  }, []);
+
   const run = useCallback(async () => {
     setRunning(true);
     setResult(null);
     setError("");
+    setProgress(0);
+
+    // Simulate progress: fast 0-60% (~3s), slow 60-90% (~5s), never 100% until done
+    progressRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 90) return prev;
+        if (prev < 60) return prev + Math.random() * 6 + 4; // ~3s to reach 60%
+        return prev + Math.random() * 1.5 + 0.5; // ~5s for 60→90%
+      });
+    }, 300);
+
     try {
       const body: Record<string, unknown> = {};
       if (agent) body.agent_role = agent;
@@ -185,15 +205,28 @@ function RunTab() {
       if (category) body.category = category;
       const r = await bPost<AnyData>("/api/benchmarks/run", body);
       setResult(r.summary ?? r.result ?? r);
+      if (progressRef.current) clearInterval(progressRef.current);
+      progressRef.current = null;
+      setProgress(100);
+      // Brief 100% display before hiding
+      await new Promise((res) => setTimeout(res, 500));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bilinmeyen hata");
+      if (progressRef.current) clearInterval(progressRef.current);
+      progressRef.current = null;
+      setProgress(0);
     } finally {
       setRunning(false);
     }
   }, [agent, category, scenario]);
 
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4"
+      onPointerDown={(e) => {
+        if (running) e.stopPropagation();
+      }}
+    >
       <div className={`${crd} space-y-3`}>
         <div className="grid grid-cols-3 gap-3">
           <div>
@@ -208,6 +241,7 @@ function RunTab() {
               className={sCls + " w-full"}
               value={agent}
               onChange={(e) => setAgent(e.target.value)}
+              disabled={running}
               aria-label="Agent seçimi"
             >
               <option value="">Tümü</option>
@@ -230,6 +264,7 @@ function RunTab() {
               className={sCls + " w-full"}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
+              disabled={running}
               aria-label="Kategori seçimi"
             >
               <option value="">Tümü</option>
@@ -252,6 +287,7 @@ function RunTab() {
               className={sCls + " w-full"}
               value={scenario}
               onChange={(e) => setScenario(e.target.value)}
+              disabled={running}
               aria-label="Senaryo seçimi"
             >
               <option value="">Tümü (Suite)</option>
@@ -263,6 +299,7 @@ function RunTab() {
             </select>
           </div>
         </div>
+
         <button
           onClick={run}
           disabled={running}
@@ -278,6 +315,38 @@ function RunTab() {
             "▶️ Başlat"
           )}
         </button>
+
+        {/* XP-style Progress bar */}
+        {(running || progress === 100) && (
+          <div
+            className="space-y-1.5"
+            role="progressbar"
+            aria-valuenow={Math.round(progress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Benchmark ilerleme durumu"
+          >
+            <div className="flex justify-between text-[10px]">
+              <span className="text-blue-400 font-medium">
+                {progress === 100 ? "Tamamlandı!" : "Test çalışıyor…"}
+              </span>
+              <span className="text-slate-400 font-mono">
+                %{Math.round(progress)}
+              </span>
+            </div>
+            <div className="h-3 bg-gray-600 border border-gray-500 rounded-sm overflow-hidden shadow-inner">
+              <div
+                className="h-full rounded-sm transition-all duration-300 ease-out"
+                style={{
+                  width: `${Math.min(progress, 100)}%`,
+                  background:
+                    "linear-gradient(180deg, #3b82f6 0%, #1d4ed8 40%, #1e40af 100%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3)",
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -291,7 +360,10 @@ function RunTab() {
 
       {result && (
         <div className={crd}>
-          <h4 className="text-xs text-slate-400 mb-2">Sonuç</h4>
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="text-xs text-slate-400">Sonuç</h4>
+            <span className="text-[10px] text-emerald-400">✓ Tamamlandı</span>
+          </div>
           <pre className="text-[10px] text-slate-300 overflow-auto max-h-60 whitespace-pre-wrap">
             {JSON.stringify(result, null, 2)}
           </pre>

@@ -1067,7 +1067,7 @@ export function XpDesktop() {
       }
     }
     // Default grid layout — responsive for mobile
-    const isMobile = window.innerWidth < 640;
+    const isMobile = window.innerWidth < 768;
     const gap = isMobile ? 80 : 96;
     const rowH = isMobile ? 84 : 100;
     const cols = Math.floor((window.innerHeight - 80) / rowH);
@@ -1154,7 +1154,7 @@ export function XpDesktop() {
       const app = APPS.find((a) => a.id === appId);
       if (!app) return prev;
       const pos = cascade(prev.length);
-      const isMobile = window.innerWidth < 640;
+      const isMobile = window.innerWidth < 768;
       const newWin: WindowState = {
         id: app.id,
         title: app.title,
@@ -1162,7 +1162,7 @@ export function XpDesktop() {
         x: isMobile ? 0 : pos.x,
         y: isMobile ? 0 : pos.y,
         w: isMobile ? window.innerWidth : app.defaultW,
-        h: isMobile ? window.innerHeight - 40 : app.defaultH,
+        h: isMobile ? window.innerHeight - 36 : app.defaultH,
         minimized: false,
         maximized: isMobile,
         zIndex: nextZ(),
@@ -1268,11 +1268,11 @@ export function XpDesktop() {
               key={app.id}
               onMouseDown={(e) => {
                 // Skip drag on touch devices
-                if (window.innerWidth >= 640) handleIconDragStart(e, app.id);
+                if (window.innerWidth >= 768) handleIconDragStart(e, app.id);
               }}
               onClick={() => {
                 // Single tap opens on mobile
-                if (window.innerWidth < 640) openApp(app.id);
+                if (window.innerWidth < 768) openApp(app.id);
               }}
               onDoubleClick={() => openApp(app.id)}
               onContextMenu={(e) => {
@@ -1383,7 +1383,7 @@ export function XpDesktop() {
             <button
               onClick={() => {
                 setCtxMenu(null);
-                const isMobile = window.innerWidth < 640;
+                const isMobile = window.innerWidth < 768;
                 const gap = isMobile ? 80 : 96;
                 const rowH = isMobile ? 84 : 100;
                 const cols = Math.floor((window.innerHeight - 80) / rowH);
