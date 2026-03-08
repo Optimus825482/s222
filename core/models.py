@@ -80,6 +80,12 @@ class EventType(str, Enum):
     TASK_DELEGATION_RESULT = "task_delegation_result"
     BUS_MESSAGE = "bus_message"
 
+    # Skill Marketplace & Self-Improvement Loop (Faz 16)
+    METRIC_RECORDED = "metric_recorded"
+    EXPERIMENT_CONCLUDED = "experiment_concluded"
+    OPTIMIZATION_APPLIED = "optimization_applied"
+    ROUTING_WEIGHT_LOW = "routing_weight_low"
+
 
 # ── Event ────────────────────────────────────────────────────────
 

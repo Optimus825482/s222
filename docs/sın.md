@@ -267,10 +267,10 @@ calendar-mcp ( Düşük )
 
 ### **Orta Vadeli (1-2 Ay)**
 
-1. **Skill Marketplace**
-   - Skill discovery API (`list_skills`, `search_skills`)
-   - Skill rating/review sistemi
-   - Skill template library
+1. ✅ **Skill Marketplace** → TAMAMLANDI (09 Mar 2026, Faz 16)
+   - ~~Skill discovery API~~ → `backend/routes/marketplace.py` (10 endpoint: list, search, detail, ratings, templates, export/import/fork)
+   - ~~Skill rating/review sistemi~~ → `skill_ratings` tablosu + POST/GET rating endpoint'leri
+   - ~~Skill template library~~ → 9 kategori seed template (research, coding, analysis, reasoning, writing, security, architecture, performance, domain-specific)
 
 2. ✅ **Event Bus Implementation** → TAMAMLANDI (09 Mar 2026)
    - ~~Redis Pub/Sub veya RabbitMQ~~ → In-process async EventBus (Redis-ready interface)
@@ -282,10 +282,10 @@ calendar-mcp ( Düşük )
    - Fallback logic (primary → secondary → SearXNG)
    - Turkish language optimization (query rewriting)
 
-4. **Kullanıcı Profil Sistemi**
-   - Preference learning (tercihleri otomatik yakala)
-   - Adaptive behavior (kullanıcı feedback'e göre skill kullanımı)
-   - A/B testing framework
+4. ✅ **Kullanıcı Profil Sistemi** → BÜYÜK ÖLÇÜDE TAMAMLANDI (09 Mar 2026, Faz 16)
+   - ~~A/B testing framework~~ → `tools/ab_testing.py` (Welch's t-test, deterministic assignment, auto-conclude)
+   - ~~Adaptive behavior~~ → `tools/dynamic_router.py` (softmax routing) + `tools/feedback_loop.py` (auto re-rank)
+   - ⬜ Preference learning (kullanıcı tercihlerini otomatik yakala) — ayrı sprint
 
 ---
 
@@ -301,10 +301,12 @@ calendar-mcp ( Düşük )
    - Dynamic agent spawning
    - Skill chaining automation
 
-3. **Self-Improvement Loop**
-   - Performance metrics → skill optimization
-   - Automated A/B testing of prompt strategies
-   - Reinforcement learning for agent routing
+3. ✅ **Self-Improvement Loop** → TAMAMLANDI (09 Mar 2026, Faz 16)
+   - ~~Performance metrics → skill optimization~~ → `tools/performance_collector.py` + `tools/optimization_engine.py` (Skill_Score formula + exploration bonus)
+   - ~~Automated A/B testing of prompt strategies~~ → `tools/ab_testing.py` + `tools/prompt_strategies.py` (auto-versioning, Welch's t-test)
+   - ~~Reinforcement learning for agent routing~~ → `tools/dynamic_router.py` (softmax routing weights + exploration_rate 0.1)
+   - Self-Improvement API: `backend/routes/self_improvement.py` (12 endpoint: metrics, experiments, strategies, routing, dashboard)
+   - Closed feedback loop: `tools/feedback_loop.py` (event bus → rolling window → auto re-rank → optimization log)
 
 ---
 
@@ -319,6 +321,9 @@ Level 2: Tool-Enhanced Agents ✅ (Tamamlandı)
 
 Level 3: Collaborative Multi-Agent ✅ (Tamamlandı — 09 Mar 2026)
    └─ Event bus + message queue + pub-sub + handoff + task delegation
+
+Level 3.5: Self-Improving Multi-Agent ✅ (Tamamlandı — 09 Mar 2026, Faz 16)
+   └─ Performance metrics + A/B testing + dynamic routing + skill marketplace + feedback loop
 
 Level 4: Self-Organizing System (Hedef: 6 ay)
    └─ Otomatik agent composition + self-optimizing
@@ -362,10 +367,14 @@ Level 4: Self-Organizing System (Hedef: 6 ay)
 **Sıradaki öncelikler (Orta Vadeli):**
 
 - ~~Event Bus (ajan-arası iletişim)~~ → ✅ TAMAMLANDI
+- ~~Skill Marketplace~~ → ✅ TAMAMLANDI (Faz 16)
+- ~~Self-Improvement Loop~~ → ✅ TAMAMLANDI (Faz 16)
+- ~~A/B Testing Framework~~ → ✅ TAMAMLANDI (Faz 16)
 - web_search multi-provider fallback
-- Skill Marketplace UI
 - Cost tracking (token usage)
+- Multi-Tenant Isolation
+- Automatic Agent Composition
 
-Ekosistem **Level 3: Collaborative Multi-Agent** seviyesine ulaştı. Agent'lar artık birbirleriyle event bus üzerinden iletişim kurabiliyor, iş devredebiliyor (handoff) ve asenkron görev atayabiliyor (delegation). Sıradaki hedef: Level 4 — Self-Organizing System.
+Ekosistem **Level 3.5: Collaborative + Self-Improving Multi-Agent** seviyesine ulaştı. Agent'lar artık birbirleriyle event bus üzerinden iletişim kurabiliyor, iş devredebiliyor (handoff), asenkron görev atayabiliyor (delegation), ve performanslarını otomatik olarak ölçüp optimize edebiliyor (self-improvement loop). Sıradaki hedef: Level 4 — Self-Organizing System.
 
 ---

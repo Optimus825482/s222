@@ -331,10 +331,12 @@ class PipelineEngine:
         subtask.result = result
 
         # Auto-evaluate agent output quality
+        eval_score = 3.0  # default neutral score
+        task_type = "general"
         try:
             from tools.agent_eval import score_agent_output, detect_task_type
             task_type = detect_task_type(subtask.description)
-            score_agent_output(
+            eval_result = score_agent_output(
                 agent_role=subtask.assigned_agent.value,
                 task_type=task_type,
                 output=result,
@@ -342,8 +344,26 @@ class PipelineEngine:
                 latency_ms=subtask.latency_ms,
                 task_preview=subtask.description[:200],
             )
+            if isinstance(eval_result, (int, float)):
+                eval_score = float(eval_result)
+            elif isinstance(eval_result, dict) and "score" in eval_result:
+                eval_score = float(eval_result["score"])
         except Exception:
             pass  # Never break pipeline for evaluation
+
+        # Faz 16: Record performance metric for self-improvement loop
+        try:
+            from tools.performance_collector import get_performance_collector
+            get_performance_collector().record(
+                agent_role=subtask.assigned_agent.value,
+                task_type=task_type,
+                score=eval_score,
+                latency_ms=subtask.latency_ms,
+                tokens_used=subtask.token_usage,
+                skill_ids_used=subtask.skills or [],
+            )
+        except Exception:
+            pass  # Never break pipeline for metrics collection
 
         return result
 

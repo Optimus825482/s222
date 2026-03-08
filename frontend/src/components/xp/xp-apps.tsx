@@ -222,6 +222,20 @@ const XpMarketplacePanel = dynamic(
     })),
   { ssr: false },
 );
+const SharedWorkspacePanel = dynamic(
+  () =>
+    import("@/components/shared-workspace-panel").then((m) => ({
+      default: m.SharedWorkspacePanel,
+    })),
+  { ssr: false },
+);
+const McpUsagePanel = dynamic(
+  () =>
+    import("@/components/mcp-usage-panel").then((m) => ({
+      default: m.McpUsagePanel,
+    })),
+  { ssr: false },
+);
 
 // ── Panel imports from xp/panels ──
 import { XpAgentsPanel } from "./panels/xp-agents-panel";
@@ -288,6 +302,59 @@ function XpWorkflowsWrapper() {
           <WorkflowBuilderPanel />
         ) : (
           <WorkflowHistoryPanel />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── MCP wrapper with usage tab ──
+function XpMcpWrapper() {
+  const [tab, setTab] = useState<"servers" | "usage">("servers");
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div
+        style={{
+          display: "flex",
+          borderBottom: "1px solid #d6d2c2",
+          background: "#ECE9D8",
+          padding: "0 4px",
+        }}
+      >
+        {[
+          { id: "servers" as const, label: "MCP Sunucuları" },
+          { id: "usage" as const, label: "Kullanım İstatistikleri" },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              padding: "6px 14px",
+              fontSize: 11,
+              fontFamily: "Tahoma, sans-serif",
+              fontWeight: tab === t.id ? 600 : 400,
+              background: tab === t.id ? "#fff" : "transparent",
+              border:
+                tab === t.id ? "1px solid #d6d2c2" : "1px solid transparent",
+              borderBottom:
+                tab === t.id ? "1px solid #fff" : "1px solid #d6d2c2",
+              borderRadius: "3px 3px 0 0",
+              marginBottom: -1,
+              cursor: "pointer",
+              color: tab === t.id ? "#000" : "#555",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 overflow-auto">
+        {tab === "servers" ? (
+          <div className="p-4">
+            <McpPanel />
+          </div>
+        ) : (
+          <McpUsagePanel />
         )}
       </div>
     </div>
@@ -639,14 +706,11 @@ export const APPS: DesktopApp[] = [
     icon: <FeatherIcon name="server" color="#0ea5e9" />,
     color: "#0ea5e9",
     group: "Araçlar",
-    description: "Model Context Protocol sunucularını yönetin.",
-    defaultW: 550,
-    defaultH: 500,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <McpPanel />
-      </div>
-    ),
+    description:
+      "MCP sunucularını yönetin ve kullanım istatistiklerini görüntüleyin.",
+    defaultW: 600,
+    defaultH: 550,
+    render: () => <XpMcpWrapper />,
   },
   {
     id: "context-board",
@@ -706,6 +770,22 @@ export const APPS: DesktopApp[] = [
     render: () => (
       <div className="h-full">
         <WorktreePanel />
+      </div>
+    ),
+  },
+  {
+    id: "shared-workspace",
+    title: "Shared Workspace",
+    icon: <FeatherIcon name="folder-plus" color="#14b8a6" />,
+    color: "#14b8a6",
+    group: "İşbirliği",
+    description:
+      "Paylaşımlı çalışma alanları — notlar, kodlar, kararlar ve bulgular.",
+    defaultW: 800,
+    defaultH: 560,
+    render: () => (
+      <div className="h-full">
+        <SharedWorkspacePanel />
       </div>
     ),
   },

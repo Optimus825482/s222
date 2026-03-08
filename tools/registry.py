@@ -848,6 +848,57 @@ LIST_DOMAIN_TOOLS_TOOL = {
     },
 }
 
+# ── Budget Check Tool ─────────────────────────────────────────────
+
+CHECK_BUDGET_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "check_budget",
+        "description": (
+            "Check current API cost budget status before expensive operations. "
+            "Returns remaining budget, current spend, and whether the operation is within limits. "
+            "Use proactively before spawning multiple sub-agents or running large workflows."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "hours": {
+                    "type": "integer",
+                    "description": "Time window in hours to check (default 24)",
+                },
+            },
+        },
+    },
+}
+
+# ── Error Pattern Check Tool ─────────────────────────────────────
+
+CHECK_ERROR_PATTERNS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "check_error_patterns",
+        "description": (
+            "Check for known recurring error patterns and get recommendations. "
+            "Use when encountering errors to see if they match known patterns, "
+            "or proactively before starting tasks to be aware of current system issues."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "hours": {
+                    "type": "integer",
+                    "description": "Time window in hours to analyze (default 24)",
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low"],
+                    "description": "Filter by minimum severity (optional)",
+                },
+            },
+        },
+    },
+}
+
 # ── Orchestrator Tools ───────────────────────────────────────────
 
 ORCHESTRATOR_TOOLS = [
@@ -986,6 +1037,8 @@ ORCHESTRATOR_TOOLS = [
     LIST_WORKFLOWS_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
+    CHECK_BUDGET_TOOL,
+    CHECK_ERROR_PATTERNS_TOOL,
     {
         "type": "function",
         "function": {

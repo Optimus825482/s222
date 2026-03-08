@@ -171,3 +171,114 @@ async def mcp_status(user: dict = Depends(get_current_user)):
         "unchecked": len(active_servers) - len([s for s in active_servers if s["id"] in _health_cache]),
         "last_check_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(last_check)) if last_check else None,
     }
+
+
+# ── MCP Usage Statistics ─────────────────────────────────────────
+
+
+@router.get("/usage-stats")
+async def mcp_usage_stats(user: dict = Depends(get_current_user)):
+    """Get MCP server usage statistics from tool_usage table.
+    Returns per-server call counts, per-model breakdown, and daily timeline."""
+    from tools.pg_connection import get_conn, release_conn
+
+    uid = user["user_id"]
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            # Get all known MCP server names
+            servers = list_servers(active_only=False)
+            server_names = [s.get("name") or s["id"] for s in servers]
+            server_ids = [s["id"] for s in servers]
+
+            # Per-server usage counts (match tool_name containing server id or name)
+            server_stats = []
+            for s in servers:
+                sid = s["id"]
+                sname = s.get("name") or sid
+                cur.execute(
+                    """SELECT COUNT(*) as cnt,
+                              SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as ok,
+                              SUM(latency_ms) as lat,
+                              SUM(tokens_used) as tok
+                       FROM tool_usage
+                       WHERE user_id = %s
+                         AND (tool_name ILIKE %s OR tool_name ILIKE %s)""",
+                    (uid, f"%{sid}%", f"%{sname}%"),
+                )
+                row = cur.fetchone()
+                cnt = row[0] if row else 0
+                if cnt > 0:
+                    server_stats.append({
+                        "server_id": sid,
+                        "server_name": sname,
+                        "call_count": cnt,
+                        "success_count": row[1] or 0,
+                        "total_latency_ms": round(row[2] or 0, 1),
+                        "total_tokens": row[3] or 0,
+                    })
+
+            # Also get generic tool_usage grouped by tool_name for MCP-like tools
+            cur.execute(
+                """SELECT tool_name, COUNT(*) as cnt,
+                          SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as ok,
+                          SUM(latency_ms) as lat,
+                          SUM(tokens_used) as tok
+                   FROM tool_usage WHERE user_id = %s
+                   GROUP BY tool_name ORDER BY cnt DESC LIMIT 50""",
+                (uid,),
+            )
+            all_tools = []
+            for row in cur.fetchall():
+                all_tools.append({
+                    "tool_name": row[0],
+                    "call_count": row[1],
+                    "success_count": row[2] or 0,
+                    "total_latency_ms": round(row[3] or 0, 1),
+                    "total_tokens": row[4] or 0,
+                })
+
+            # Per-model (agent_role) breakdown
+            cur.execute(
+                """SELECT agent_role, tool_name, COUNT(*) as cnt
+                   FROM tool_usage WHERE user_id = %s
+                   GROUP BY agent_role, tool_name
+                   ORDER BY cnt DESC LIMIT 200""",
+                (uid,),
+            )
+            model_breakdown = {}
+            for row in cur.fetchall():
+                role = row[0]
+                tool = row[1]
+                cnt = row[2]
+                if tool not in model_breakdown:
+                    model_breakdown[tool] = {}
+                model_breakdown[tool][role] = cnt
+
+            # Daily timeline (last 30 days)
+            cur.execute(
+                """SELECT DATE(timestamp) as day, tool_name, COUNT(*) as cnt
+                   FROM tool_usage
+                   WHERE user_id = %s
+                     AND timestamp >= NOW() - INTERVAL '30 days'
+                   GROUP BY DATE(timestamp), tool_name
+                   ORDER BY day ASC""",
+                (uid,),
+            )
+            timeline = {}
+            for row in cur.fetchall():
+                day = str(row[0])
+                tool = row[1]
+                if day not in timeline:
+                    timeline[day] = {}
+                timeline[day][tool] = row[2]
+
+    finally:
+        release_conn(conn)
+
+    return {
+        "server_stats": server_stats,
+        "all_tools": all_tools,
+        "model_breakdown": model_breakdown,
+        "timeline": timeline,
+    }

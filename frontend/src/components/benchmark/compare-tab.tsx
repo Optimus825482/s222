@@ -22,7 +22,28 @@ export function CompareTab() {
       const r = await fetcher<{ comparison: AnyData }>(
         `/api/benchmarks/compare?role_a=${roleA}&role_b=${roleB}`,
       );
-      setData(r.comparison);
+      // Normalize API response to { a_avg, b_avg, categories: {cat: {a, b}}, winner }
+      const raw = r.comparison;
+      const aStats = raw[roleA] ?? {};
+      const bStats = raw[roleB] ?? {};
+      const catRaw = raw.category_comparison ?? {};
+      const categories: Record<string, { a: number; b: number }> = {};
+      for (const [cat, vals] of Object.entries(catRaw) as [string, AnyData][]) {
+        categories[cat] = {
+          a: Number(vals?.[roleA] ?? 0),
+          b: Number(vals?.[roleB] ?? 0),
+        };
+      }
+      setData({
+        a_avg: Number(aStats.avg_score ?? 0),
+        b_avg: Number(bStats.avg_score ?? 0),
+        a_runs: aStats.total_runs ?? 0,
+        b_runs: bStats.total_runs ?? 0,
+        a_latency: aStats.avg_latency_ms ?? 0,
+        b_latency: bStats.avg_latency_ms ?? 0,
+        categories,
+        winner: raw.overall_winner ?? null,
+      });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Karşılaştırma başarısız");
       setData(null);
@@ -86,6 +107,11 @@ export function CompareTab() {
               <p className={`text-lg font-bold ${scoreText(data.a_avg ?? 0)}`}>
                 {(data.a_avg ?? 0).toFixed(2)}
               </p>
+              {data.a_runs != null && (
+                <p className="text-[10px] text-slate-500">
+                  {data.a_runs} test · {Math.round(data.a_latency ?? 0)}ms
+                </p>
+              )}
             </div>
             <span className="text-slate-600 text-xl">vs</span>
             <div className="text-center flex-1">
@@ -94,6 +120,11 @@ export function CompareTab() {
               <p className={`text-lg font-bold ${scoreText(data.b_avg ?? 0)}`}>
                 {(data.b_avg ?? 0).toFixed(2)}
               </p>
+              {data.b_runs != null && (
+                <p className="text-[10px] text-slate-500">
+                  {data.b_runs} test · {Math.round(data.b_latency ?? 0)}ms
+                </p>
+              )}
             </div>
           </div>
           {data.categories &&

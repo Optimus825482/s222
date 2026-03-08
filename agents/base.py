@@ -208,6 +208,29 @@ class BaseAgent(ABC):
         if skill_injection:
             system_content += skill_injection
 
+        # Faz 16: Inject active prompt strategy if available
+        try:
+            from tools.prompt_strategies import get_prompt_strategy_manager
+            from tools.agent_eval import detect_task_type
+            ps_task_type = detect_task_type(task_input)
+            active_strategy = get_prompt_strategy_manager().get_active(
+                self.role.value, ps_task_type
+            )
+            if active_strategy:
+                strategy_injection = "\n\n## ACTIVE PROMPT STRATEGY:\n"
+                if active_strategy.get("cot_instructions"):
+                    strategy_injection += f"Chain-of-Thought: {active_strategy['cot_instructions']}\n"
+                if active_strategy.get("few_shot_examples"):
+                    strategy_injection += "Few-shot examples:\n"
+                    for ex in active_strategy["few_shot_examples"][:3]:
+                        if isinstance(ex, dict):
+                            strategy_injection += f"- Input: {ex.get('input', '')}\n  Output: {ex.get('output', '')}\n"
+                        else:
+                            strategy_injection += f"- {ex}\n"
+                system_content += strategy_injection
+        except Exception:
+            pass  # Never break agent for strategy injection
+
         messages = [
             {"role": "system", "content": system_content},
         ]
@@ -1477,6 +1500,43 @@ class BaseAgent(ABC):
                     str(e),
                     "Check chart_type and data format, then retry.",
                 )
+
+        if fn_name == "check_budget":
+            from tools.cost_tracker import get_cost_tracker
+            tracker = get_cost_tracker()
+            hours = fn_args.get("hours", 24)
+            summary = tracker.get_cost_summary(hours=hours)
+            budget = tracker.check_budget()
+            return (
+                f"Cost summary (last {hours}h): "
+                f"total=${summary.get('total_cost', 0):.4f}, "
+                f"requests={summary.get('total_requests', 0)}, "
+                f"input_tokens={summary.get('total_input_tokens', 0)}, "
+                f"output_tokens={summary.get('total_output_tokens', 0)}. "
+                f"Budget status: {'WITHIN LIMITS' if budget.get('within_budget', True) else 'OVER BUDGET'}. "
+                f"Remaining: ${budget.get('remaining', 'unlimited')}"
+            )
+
+        if fn_name == "check_error_patterns":
+            from tools.error_patterns import get_error_analyzer
+            analyzer = get_error_analyzer()
+            hours = fn_args.get("hours", 24)
+            severity = fn_args.get("severity")
+            patterns = analyzer.get_patterns(hours=hours, severity=severity)
+            recommendations = analyzer.get_recommendations(hours=hours)
+            if not patterns:
+                return f"No error patterns detected in the last {hours}h."
+            lines = [f"Found {len(patterns)} error patterns (last {hours}h):"]
+            for p in patterns[:10]:
+                lines.append(
+                    f"- [{p.get('severity', '?')}] {p.get('pattern_type', '?')}: "
+                    f"{p.get('message_sample', '')[:120]} (count={p.get('occurrence_count', 0)})"
+                )
+            if recommendations:
+                lines.append(f"\nRecommendations ({len(recommendations)}):")
+                for r in recommendations[:5]:
+                    lines.append(f"- {r.get('recommendation', '')[:150]}")
+            return "\n".join(lines)
 
         if fn_name == "create_skill":
             from tools.dynamic_skills import create_skill_package
