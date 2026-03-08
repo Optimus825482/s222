@@ -1425,11 +1425,16 @@ export async function fetchBlob(
   init?: RequestInit,
 ): Promise<Blob> {
   const token = getAuthToken();
+  const authHeaders: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
+  const initHeaders =
+    init?.headers instanceof Headers
+      ? Object.fromEntries(init.headers.entries())
+      : (init?.headers as Record<string, string> | undefined) ?? {};
   const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
     ...init,
+    headers: { ...authHeaders, ...initHeaders },
   });
   if (!res.ok) {
     if (res.status === 401) {

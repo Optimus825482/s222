@@ -1,6 +1,6 @@
 # 🗺️ Multi-Agent Ops Center — Sistem Geliştirme Yol Haritası
 
-> Son güncelleme: 2026-03-08
+> Son güncelleme: 2026-03-08 (Faz 14 — pi-mono entegrasyonu eklendi)
 > Durum: Aktif geliştirme
 
 ## Renk Kodları
@@ -331,27 +331,118 @@ Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power e
 | `tailwind-ui-patterns`  | Responsive agent dashboard layout              |
 | `power-builder`         | Custom power oluşturma (13.1)                  |
 
+## Faz 14 — pi-mono Entegrasyonu (Unified LLM Gateway & Advanced UI) 🔌 `[🔴 PLANLANMIŞ]`
+
+[badlogic/pi-mono](https://github.com/badlogic/pi-mono) monorepo entegrasyonu.
+Mevcut 2-provider (NVIDIA + DeepSeek) sistemini 20+ provider destekli unified gateway'e dönüştürme,
+gelişmiş chat UI, agent runtime framework ve coding agent yetenekleri ekleme.
+
+### 14.1 — pi-ai LLM Gateway (Unified Provider Abstraction) `[🔴]`
+
+Mevcut `AsyncOpenAI` client'ı pi-ai gateway üzerinden 20+ provider'a yönlendirme.
+
+- 🔴 pi-ai Gateway Service (Hono tabanlı TypeScript microservice)
+- 🔴 OpenAI-uyumlu proxy endpoint (`/v1/chat/completions` — Python backend'in mevcut client'ı ile uyumlu)
+- 🔴 Provider registry (OpenAI, Anthropic, Google, Groq, Mistral, xAI, Cerebras, OpenRouter, MiniMax, Amazon Bedrock)
+- 🔴 Model auto-discovery ve katalog API'si (`/api/models` — tüm provider'lardan mevcut modelleri listele)
+- 🔴 API key yönetimi (provider başına key, `.env` veya runtime config)
+- 🔴 Provider fallback (birincil provider çökerse otomatik yedek provider'a geçiş)
+- 🔴 Docker container + Compose entegrasyonu (`services/pi-gateway/`)
+- 🔴 `config.py` güncelleme — multi-provider model tanımları, gateway base_url
+- 🔴 `agents/base.py` `call_llm` — gateway routing, provider-aware error handling
+
+### 14.2 — Granüler Streaming & Thinking Display `[🔴]`
+
+pi-ai'nin `AssistantMessageEventStream` yapısını backend ve frontend'e entegre etme.
+
+- 🔴 SSE streaming endpoint (`/api/stream` — `text_delta`, `thinking_delta`, `toolcall_delta` event'leri ayrı)
+- 🔴 Frontend streaming handler — thinking content'i ayrı panel/bölümde gösterme
+- 🔴 Tool execution animasyonu — `toolcall_start` → `toolcall_delta` → `toolcall_end` akışı UI'da canlı
+- 🔴 Provider-agnostic reasoning desteği (`streamSimple` + `ThinkingLevel` — tüm provider'larda unified thinking)
+- 🔴 WebSocket stream adapter (mevcut `/ws/progress` ile entegrasyon)
+
+### 14.3 — TypeBox Tool Validation `[🔴]`
+
+pi-ai'nin TypeBox tabanlı tool schema validation'ını Python agent'lara entegre etme.
+
+- 🔴 Gateway tarafında tool argument validation (TypeBox schema → AJV)
+- 🔴 Python tarafında validation sonuçlarını işleme (invalid args → retry with correction prompt)
+- 🔴 `_parse_text_tool_calls` fallback'i gateway'e taşıma (text-based tool call parsing gateway'de)
+- 🔴 Tool schema registry — tüm agent tool'larının JSON Schema tanımları gateway'de merkezi
+
+### 14.4 — Dinamik Model Routing (Per-Agent Optimal Model) `[🔴]`
+
+Her agent'a görev tipine ve performans verilerine göre en uygun modeli dinamik atama.
+
+- 🔴 Agent-Model mapping konfigürasyonu (critic → Claude, researcher → Gemini, speed → Groq, vb.)
+- 🔴 Benchmark verilerine dayalı otomatik model önerisi (Faz 6 benchmark_suite entegrasyonu)
+- 🔴 Runtime model switching — agent çalışırken model değiştirme (A/B test desteği)
+- 🔴 Cost-aware routing — bütçeye göre ucuz/pahalı model seçimi (Faz 6 cost_tracker entegrasyonu)
+- 🔴 Frontend Model Manager UI — provider/model listesi, agent-model eşleme, maliyet karşılaştırma
+
+### 14.5 — pi-web-ui Chat Components Entegrasyonu `[🔴]`
+
+pi-web-ui'nin hazır chat componentlerini frontend'e ekleme.
+
+- 🔴 ChatPanel / AgentInterface web component embed (React wrapper)
+- 🔴 Artifacts paneli — agent çıktılarını interaktif gösterme (HTML, SVG, Markdown render)
+- 🔴 Attachment desteği — PDF, DOCX, XLSX, PPTX, görsel yükleme ve agent'a analiz ettirme
+- 🔴 Document extraction — yüklenen dosyalardan metin çıkarma ve context'e ekleme
+- 🔴 IndexedDB session persistence — tarayıcı tarafında konuşma geçmişi saklama
+- 🔴 CORS proxy konfigürasyonu (browser'dan doğrudan provider çağrısı için)
+
+### 14.6 — pi-agent-core Patterns (Advanced Agent Runtime) `[🔴]`
+
+pi-agent-core'un gelişmiş agent runtime pattern'lerini Python agent'lara uyarlama.
+
+- 🔴 Context Transformer pattern — mesaj dizisini LLM'e göndermeden önce dönüştürme (context window optimization)
+- 🔴 Steering Messages — kullanıcının agent çalışırken araya girmesi (interrupt & redirect)
+- 🔴 Follow-up Messages — agent durduğunda otomatik devam ettirme (auto-continue)
+- 🔴 Otomatik multi-turn tool execution — tool result → next LLM call döngüsü pi-agent-core tarzı
+- 🔴 `agents/agentic_loop.py` güncelleme — context transformer hook, steering message injection
+
+### 14.7 — Coding Agent Yetenekleri `[🔴]`
+
+pi-coding-agent'ın dosya işleme ve kod düzenleme pattern'lerini sisteme ekleme.
+
+- 🔴 File tools — `read`, `write`, `edit` (find/replace), `bash` tool'ları agent'lara ekleme
+- 🔴 Project understanding — `AGENTS.md` / proje context dosyaları otomatik yükleme
+- 🔴 Session branching — konuşma dallanması (alternatif çözüm yolları deneme)
+- 🔴 Session compaction — uzun konuşmalarda otomatik özetleme ve sıkıştırma
+- 🔴 Skills sistemi — on-demand capability paketleri (pi-coding-agent skill format desteği)
+
+### 14.8 — Multi-Channel Gateway Genişletme `[🔴]`
+
+pi-mom (Slack bot) pattern'ini kullanarak Faz 11.5 multi-channel gateway'i hızlandırma.
+
+- 🔴 Slack entegrasyonu (pi-mom pattern — mention/DM → agent response)
+- 🔴 Discord bot adaptörü (aynı pattern)
+- 🔴 Telegram bot adaptörü
+- 🔴 Kanal-bağımsız mesaj normalizasyonu (pi-agent-core message format)
+- 🔴 Docker sandbox isolation (kanal başına izole çalışma ortamı)
+
 ---
 
 ## Özet Tablo
 
-| Faz                          | Durum           | İlerleme          |
-| ---------------------------- | --------------- | ----------------- |
-| Mevcut v2.0                  | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 1 — Workflow Engine      | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 2 — Domain Skills        | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 2.5 — Browser Use        | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
-| Faz 3 — Veri Analizi         | 🟡 Kısmi        | ██░░░░░░░░░░ 17%  |
-| Faz 4 — Gelişmiş RAG         | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
-| Faz 5 — Güvenlik             | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
-| Faz 6 — Performans           | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 7 — API Entegrasyon      | 🟡 Kısmi        | ███░░░░░░░░░ 30%  |
-| Faz 8 — Multimedya           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
-| Faz 9 — Kişiselleştirme      | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 10 — İşbirliği           | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 11 — Otonom Ekosistem 🦞 | 🟡 Kısmi        | █████░░░░░░░ 50%  |
-| Faz 12 — Kolektif Bilinç 🧬  | 🟡 Kısmi         | █████░░░░░░░ 40%  |
-| Faz 13 — Kiro Entegrasyon 🔮 | 🟡 Devam ediyor | ███░░░░░░░░░ 30%  |
+| Faz                             | Durum           | İlerleme          |
+| ------------------------------- | --------------- | ----------------- |
+| Mevcut v2.0                     | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 1 — Workflow Engine         | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 2 — Domain Skills           | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 2.5 — Browser Use           | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz 3 — Veri Analizi            | 🟡 Kısmi        | ██░░░░░░░░░░ 17%  |
+| Faz 4 — Gelişmiş RAG            | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz 5 — Güvenlik                | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
+| Faz 6 — Performans              | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 7 — API Entegrasyon         | 🟡 Kısmi        | ███░░░░░░░░░ 30%  |
+| Faz 8 — Multimedya              | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
+| Faz 9 — Kişiselleştirme         | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 10 — İşbirliği              | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 11 — Otonom Ekosistem 🦞    | 🟡 Kısmi        | █████░░░░░░░ 50%  |
+| Faz 12 — Kolektif Bilinç 🧬     | 🟡 Kısmi        | █████░░░░░░░ 40%  |
+| Faz 13 — Kiro Entegrasyon 🔮    | 🟡 Devam ediyor | ███░░░░░░░░░ 30%  |
+| Faz 14 — pi-mono Entegrasyon 🔌 | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
 
 ---
 
@@ -364,4 +455,5 @@ Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power e
 - Her sprint sonunda bu dosya güncellenir
 - Faz 11-12: OpenClaw / Moltbook ekosisteminden ilham alınmıştır
 - Faz 13: Kiro IDE skill ve power entegrasyonu — geliştirme hızını artırmak için
-- İlham kaynakları: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com) · [Forbes: Crustafarianism](https://www.forbes.com/sites/johnkoetsier/2026/01/30/ai-agents-created-their-own-religion-crustafarianism-on-an-agent-only-social-network/)
+- Faz 14: [badlogic/pi-mono](https://github.com/badlogic/pi-mono) entegrasyonu — 20+ LLM provider, unified gateway, gelişmiş chat UI, agent runtime framework
+- İlham kaynakları: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com) · [Forbes: Crustafarianism](https://www.forbes.com/sites/johnkoetsier/2026/01/30/ai-agents-created-their-own-religion-crustafarianism-on-an-agent-only-social-network/) · [pi-mono](https://github.com/badlogic/pi-mono)
