@@ -37,6 +37,8 @@ interface Skill {
   source: string;
   use_count?: number;
   active?: boolean;
+  knowledge?: string;
+  keywords?: string[];
 }
 
 type SkillsHubTab = "skills" | "creator" | "marketplace" | "patterns";
@@ -111,8 +113,26 @@ function SkillDetailView({
   skill: Skill;
   onBack: () => void;
 }) {
+  const [full, setFull] = useState<Skill | null>(skill);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!skill?.id) return;
+    setFull(null);
+    setLoading(true);
+    api
+      .getSkill(skill.id)
+      .then((s) => setFull(s as Skill))
+      .catch(() => setFull(skill))
+      .finally(() => setLoading(false));
+  }, [skill?.id]);
+
+  const s = full ?? skill;
+  const knowledge = s.knowledge;
+  const keywords = s.keywords ?? [];
+
   return (
-    <div style={{ padding: 12 }}>
+    <div style={{ padding: 12, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <button
         onClick={onBack}
         style={{
@@ -123,48 +143,89 @@ function SkillDetailView({
           fontSize: 11,
           cursor: "pointer",
           marginBottom: 8,
+          flexShrink: 0,
         }}
       >
         ← Geri
       </button>
-      <div
-        style={{
-          background: "#fffff0",
-          border: "1px solid #d6d2c2",
-          borderRadius: 4,
-          padding: 12,
-        }}
-      >
-        <h3
+      {loading ? (
+        <div style={{ fontSize: 12, color: "#666" }}>Yükleniyor…</div>
+      ) : (
+        <div
           style={{
-            margin: "0 0 6px",
-            fontSize: 14,
-            fontWeight: 700,
-            color: "#000",
+            background: "#fffff0",
+            border: "1px solid #d6d2c2",
+            borderRadius: 4,
+            padding: 12,
+            flex: 1,
+            minHeight: 0,
+            overflow: "auto",
           }}
         >
-          {skill.name}
-        </h3>
-        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-          <CategoryBadge category={skill.category} />
-          <SourceBadge source={skill.source} />
+          <h3 style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700, color: "#000" }}>
+            {s.name}
+          </h3>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+            <CategoryBadge category={s.category} />
+            <SourceBadge source={s.source} />
+          </div>
+          {s.description && (
+            <section style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#555", marginBottom: 4 }}>Açıklama</div>
+              <p style={{ fontSize: 12, color: "#333", margin: 0, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                {s.description}
+              </p>
+            </section>
+          )}
+          {keywords.length > 0 && (
+            <section style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#555", marginBottom: 4 }}>Anahtar kelimeler</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {keywords.map((k) => (
+                  <span
+                    key={k}
+                    style={{
+                      background: "#e8e6d9",
+                      color: "#444",
+                      padding: "2px 6px",
+                      borderRadius: 3,
+                      fontSize: 10,
+                    }}
+                  >
+                    {k}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+          {knowledge && (
+            <section style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#555", marginBottom: 4 }}>İçerik / Bilgi</div>
+              <pre
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  color: "#333",
+                  lineHeight: 1.5,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  background: "#f9f9f0",
+                  border: "1px solid #e0ddd0",
+                  borderRadius: 3,
+                  padding: 8,
+                  maxHeight: 320,
+                  overflow: "auto",
+                }}
+              >
+                {knowledge}
+              </pre>
+            </section>
+          )}
+          <div style={{ fontSize: 11, color: "#666", marginTop: 8 }}>
+            Kullanım: {s.use_count ?? 0} kez
+          </div>
         </div>
-        {skill.description && (
-          <p
-            style={{
-              fontSize: 12,
-              color: "#333",
-              margin: "0 0 6px",
-              lineHeight: 1.5,
-            }}
-          >
-            {skill.description}
-          </p>
-        )}
-        <div style={{ fontSize: 11, color: "#666" }}>
-          Kullanım: {skill.use_count ?? 0} kez
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -661,27 +722,32 @@ export function XpSkillsHubPanel() {
   const [hygieneResult, setHygieneResult] = useState<{
     checked: number;
     healthy: number;
-    deactivated: unknown[];
-    deleted: unknown[];
+    deactivated: Array<{ id: string; name: string; issues: string[]; action: string }>;
+    deleted: Array<{ id: string; name: string; issues: string[]; action: string }>;
     dry_run: boolean;
+    timestamp?: string;
   } | null>(null);
+  const [hygieneError, setHygieneError] = useState<string | null>(null);
 
   const runHygiene = async (dryRun: boolean) => {
     setHygieneRunning(true);
     setHygieneResult(null);
+    setHygieneError(null);
     try {
       const res = await api.runSkillHygiene(dryRun);
-      setHygieneResult(res as typeof hygieneResult);
+      setHygieneResult({
+        checked: res.checked,
+        healthy: res.healthy,
+        deactivated: res.deactivated ?? [],
+        deleted: res.deleted ?? [],
+        dry_run: res.dry_run,
+        timestamp: res.timestamp,
+      });
       if (!dryRun)
         window.dispatchEvent(new CustomEvent("skills-hub-refresh"));
-    } catch {
-      setHygieneResult({
-        checked: 0,
-        healthy: 0,
-        deactivated: [],
-        deleted: [],
-        dry_run: dryRun,
-      });
+    } catch (e) {
+      setHygieneError(e instanceof Error ? e.message : "İstek başarısız");
+      setHygieneResult(null);
     } finally {
       setHygieneRunning(false);
     }
@@ -754,22 +820,53 @@ export function XpSkillsHubPanel() {
           </button>
         </div>
       </div>
-      {hygieneResult && (
+      {hygieneError && (
         <div
           style={{
             padding: "6px 10px",
+            fontSize: 11,
+            background: "#fee2e2",
+            borderBottom: "1px solid #d6d2c2",
+            color: "#b91c1c",
+          }}
+        >
+          Hata: {hygieneError}
+        </div>
+      )}
+      {hygieneResult && (
+        <div
+          style={{
+            padding: "8px 10px",
             fontSize: 11,
             background: hygieneResult.dry_run ? "#fef3c7" : "#dcfce7",
             borderBottom: "1px solid #d6d2c2",
             color: "#333",
           }}
         >
-          {hygieneResult.dry_run ? "Kuru çalıştırma: " : "Tamamlandı: "}
-          {hygieneResult.checked} kontrol, {hygieneResult.healthy} sağlıklı
-          {hygieneResult.deactivated.length > 0 &&
-            `, ${hygieneResult.deactivated.length} devre dışı`}
-          {hygieneResult.deleted.length > 0 &&
-            `, ${hygieneResult.deleted.length} silindi`}
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>
+            {hygieneResult.dry_run ? "Kuru çalıştırma (değişiklik yapılmadı)" : "Tamamlandı"}
+            {hygieneResult.timestamp && (
+              <span style={{ fontWeight: 400, color: "#666", marginLeft: 6 }}>
+                — {new Date(hygieneResult.timestamp).toLocaleTimeString("tr-TR")}
+              </span>
+            )}
+          </div>
+          <div style={{ marginBottom: 4 }}>
+            {hygieneResult.checked} yetenek kontrol edildi, {hygieneResult.healthy} sağlıklı
+            {hygieneResult.deactivated.length > 0 &&
+              `, ${hygieneResult.deactivated.length} devre dışı bırakıldı`}
+            {hygieneResult.deleted.length > 0 &&
+              `, ${hygieneResult.deleted.length} silindi (devre dışı)`}
+          </div>
+          {(hygieneResult.deactivated.length > 0 || hygieneResult.deleted.length > 0) && (
+            <div style={{ marginTop: 6, fontSize: 10, color: "#555" }}>
+              {[...hygieneResult.deactivated, ...hygieneResult.deleted].map((e) => (
+                <div key={e.id} style={{ marginBottom: 2 }}>
+                  <strong>{e.name}</strong> ({e.id}): {e.issues?.join(", ") ?? e.action}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

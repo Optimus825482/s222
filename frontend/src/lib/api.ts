@@ -331,7 +331,7 @@ export const api = {
       skipped_builtin: number;
       dry_run: boolean;
       timestamp?: string;
-    }>(`/api/skills/hygiene?dry_run=${dryRun}`.toLowerCase(), { method: "POST" }),
+    }>(`/api/skills/hygiene?dry_run=${String(dryRun).toLowerCase()}`, { method: "POST" }),
 
   // MCP
   mcpServers: () => fetcher("/api/mcp/servers"),

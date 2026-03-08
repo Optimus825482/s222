@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from pydantic import BaseModel
 import sys, hashlib
 from pathlib import Path
@@ -279,7 +279,7 @@ async def get_skill_recommendations(
 
 @router.post("/api/skills/hygiene")
 async def api_skill_hygiene(
-    dry_run: bool = False,
+    dry_run: bool = Query(False, description="True = sadece rapor, değişiklik yapma"),
     user: dict = Depends(get_current_user),
 ):
     """Run autonomous skill hygiene check — validates and cleans junk skills. Manual trigger from Yetenek Merkezi."""
