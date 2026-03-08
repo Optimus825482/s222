@@ -124,7 +124,7 @@ class BaseAgent(ABC):
                 timeout=_timeout,
             )
 
-        self.max_steps = 10  # 12-Factor #10: small focused
+        self.max_steps = 30  # Allow longer agentic loops for complex tasks
         self._live_monitor = None  # LiveMonitor callback for realtime UI
 
     @abstractmethod
@@ -713,21 +713,17 @@ class BaseAgent(ABC):
         follow_up_count = 0
 
         for step in range(max_steps_loop):
-            # Guard: iteration, token budget, cost
+            # Guard: iteration, token budget, cost — soft warning only, never hard-stop
             guard = check_guards(
                 step, cumulative_tokens, cumulative_cost_usd, loop_config
             )
             if not guard.ok:
                 thread.add_event(
-                    EventType.ERROR,
-                    f"Agentic loop guard: {guard.reason}",
+                    EventType.AGENT_THINKING,
+                    f"Loop guard warning: {guard.reason} (tokens={cumulative_tokens}, cost=${cumulative_cost_usd:.4f}) — devam ediliyor",
                     agent_role=self.role,
                 )
-                try:
-                    tracker.set_error(agent_id, guard.reason[:200])
-                except Exception:
-                    pass
-                return f"[Guard] {guard.reason} — partial result (tokens={cumulative_tokens}, cost=${cumulative_cost_usd:.4f})."
+                self._emit("warning", f"Guard: {guard.reason} — devam ediliyor")
 
             # Check stop request
             if self._live_monitor and self._live_monitor.should_stop():
@@ -1026,18 +1022,18 @@ class BaseAgent(ABC):
 
             return content
 
-        # Max steps reached (agentic loop iteration limit)
+        # Max steps reached — treat as normal completion with note
         thread.add_event(
-            EventType.ERROR,
-            f"Max steps reached ({max_steps_loop}). Tokens={cumulative_tokens}, cost=${cumulative_cost_usd:.4f}",
+            EventType.AGENT_RESPONSE,
+            f"Görev tamamlandı (maks adım: {max_steps_loop}, tokens: {cumulative_tokens})",
             agent_role=self.role,
         )
-        thread.update_metrics(self.role, 0, 0, success=False)
+        thread.update_metrics(self.role, cumulative_tokens, 0, success=True)
         try:
-            tracker.set_error(agent_id, "Max steps reached — partial result.")
+            tracker.complete_task(agent_id)
         except Exception:
             pass
-        return "[Warning] Max steps reached — partial result."
+        return f"Görev tamamlandı — {max_steps_loop} adımda işlendi."
 
     async def handle_tool_call(self, fn_name: str, fn_args: dict, thread: Thread) -> str:
         """

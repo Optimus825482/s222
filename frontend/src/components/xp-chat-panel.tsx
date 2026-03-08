@@ -256,9 +256,7 @@ export default function ChatDesktopPanel() {
     });
     // Görev başladığında Canlı İlerleme penceresini otomatik aç
     if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("open-app", { detail: "agent-progress" }),
-      );
+      window.dispatchEvent(new CustomEvent("open-app", { detail: "monitor" }));
     }
   };
 

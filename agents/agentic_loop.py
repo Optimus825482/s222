@@ -37,13 +37,13 @@ class LoopStatus:
 class LoopConfig:
     """Agentic loop limits — env veya config'den okunabilir."""
     max_iterations: int = field(
-        default_factory=lambda: int(os.getenv("AGENTIC_LOOP_MAX_ITERATIONS", "12"))
+        default_factory=lambda: int(os.getenv("AGENTIC_LOOP_MAX_ITERATIONS", "50"))
     )
     max_tokens_budget: int = field(
-        default_factory=lambda: int(os.getenv("AGENTIC_LOOP_MAX_TOKENS_BUDGET", "80000"))
+        default_factory=lambda: int(os.getenv("AGENTIC_LOOP_MAX_TOKENS_BUDGET", "500000"))
     )
     max_cost_usd: float = field(
-        default_factory=lambda: float(os.getenv("AGENTIC_LOOP_MAX_COST_USD", "0.60"))
+        default_factory=lambda: float(os.getenv("AGENTIC_LOOP_MAX_COST_USD", "5.00"))
     )
     context_compress_threshold: float = field(
         default_factory=lambda: float(os.getenv("AGENTIC_LOOP_CONTEXT_THRESHOLD", "0.75"))

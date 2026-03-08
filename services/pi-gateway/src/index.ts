@@ -2,14 +2,19 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
 import { stream as honoStream } from "hono/streaming";
-import { getModel, stream, complete } from "@mariozechner/pi-ai";
+import { stream, complete } from "@mariozechner/pi-ai";
 import {
   oaiRequestToContext,
   piMessageToOAIResponse,
   piEventToSSEChunk,
   type OAIChatRequest,
 } from "./converter.js";
-import { getConfiguredProviders, getAllAvailableModels } from "./providers.js";
+import {
+  getConfiguredProviders,
+  getAllAvailableModels,
+  resolveModel,
+  getProviderApiKey,
+} from "./providers.js";
 import {
   registerTools,
   validateToolCall,
@@ -101,11 +106,7 @@ function isRetryableError(err: any): boolean {
 
 /** Try to resolve a model, returns null on failure */
 function tryGetModel(provider: string, modelId: string) {
-  try {
-    return getModel(provider as any, modelId as any);
-  } catch {
-    return null;
-  }
+  return resolveModel(provider, modelId);
 }
 
 /** Build the ordered list of models to attempt: primary + fallbacks */
@@ -151,8 +152,13 @@ app.post("/v1/chat/completions", async (c) => {
         const model = tryGetModel(candidate.provider, candidate.modelId);
         if (!model) continue;
 
+        // Resolve API key for this provider (critical for custom providers)
+        const streamOpts = { ...options };
+        const apiKey = getProviderApiKey(candidate.provider);
+        if (apiKey) streamOpts.apiKey = apiKey;
+
         try {
-          const s = stream(model, context, options);
+          const s = stream(model, context, streamOpts);
           // If this is a fallback, notify via SSE comment
           if (candidate.fullId !== body.model) {
             await honoWriter.write(`: fallback_used=${candidate.fullId}\n\n`);
@@ -220,7 +226,12 @@ app.post("/v1/chat/completions", async (c) => {
     }
 
     try {
-      const result = await complete(model, context, options);
+      // Resolve API key for this provider (critical for custom providers)
+      const completeOpts = { ...options };
+      const apiKey = getProviderApiKey(candidate.provider);
+      if (apiKey) completeOpts.apiKey = apiKey;
+
+      const result = await complete(model, context, completeOpts);
       const response = piMessageToOAIResponse(
         result,
         candidate.fullId,

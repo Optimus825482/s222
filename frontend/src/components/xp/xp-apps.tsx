@@ -8,38 +8,10 @@ import { FeatherIcon } from "./xp-feather-icon";
 const ChatDesktopPanel = dynamic(() => import("@/components/xp-chat-panel"), {
   ssr: false,
 });
-const TaskFlowMonitorConnected = dynamic(
+const UnifiedTaskMonitor = dynamic(
   () =>
-    import("@/components/task-flow-monitor-connected").then((m) => ({
-      default: m.TaskFlowMonitorConnected,
-    })),
-  { ssr: false },
-);
-const SystemStatsPanel = dynamic(
-  () =>
-    import("@/components/monitoring-panels").then((m) => ({
-      default: m.SystemStatsPanel,
-    })),
-  { ssr: false },
-);
-const AgentHealthPanel = dynamic(
-  () =>
-    import("@/components/monitoring-panels").then((m) => ({
-      default: m.AgentHealthPanel,
-    })),
-  { ssr: false },
-);
-const AnomalyPanel = dynamic(
-  () =>
-    import("@/components/monitoring-panels").then((m) => ({
-      default: m.AnomalyPanel,
-    })),
-  { ssr: false },
-);
-const HeartbeatPanel = dynamic(
-  () =>
-    import("@/components/monitoring-panels").then((m) => ({
-      default: m.HeartbeatPanel,
+    import("@/components/unified-task-monitor").then((m) => ({
+      default: m.UnifiedTaskMonitor,
     })),
   { ssr: false },
 );
@@ -224,20 +196,7 @@ const WorkflowOptimizerPanel = dynamic(
     })),
   { ssr: false },
 );
-const AgentProgressTrackerPanel = dynamic(
-  () =>
-    import("@/components/agent-progress-tracker-panel").then((m) => ({
-      default: m.AgentProgressTrackerPanel,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center p-8 text-slate-500 text-sm">
-        <span className="animate-pulse">Canlı ilerleme yükleniyor…</span>
-      </div>
-    ),
-  },
-);
+
 const LearningHubPanel = dynamic(
   () =>
     import("@/components/learning-hub-panel").then((m) => ({
@@ -270,7 +229,6 @@ import { XpSessionsPanel } from "./panels/xp-sessions-panel";
 import { XpToolsPanel } from "./panels/xp-tools-panel";
 import { XpSkillsHubPanel } from "./panels/xp-skills-hub-panel";
 import { XpRoadmapPanel } from "./panels/xp-roadmap-panel";
-import { XpLiveLogPanel } from "./panels/xp-live-log-panel";
 
 // ── App definition type ──
 export interface DesktopApp {
@@ -352,19 +310,15 @@ export const APPS: DesktopApp[] = [
   },
   {
     id: "monitor",
-    title: "Görev Merkezi",
+    title: "Görev İzleme",
     icon: <FeatherIcon name="activity" color="#8b5cf6" />,
     color: "#8b5cf6",
     group: "Ana",
     description:
-      "Aktif görevlerin gerçek zamanlı akış diyagramı ve canlı olay akışı (WebSocket ile senkron).",
-    defaultW: 800,
-    defaultH: 500,
-    render: () => (
-      <div className="p-4 h-full min-h-0 flex flex-col">
-        <TaskFlowMonitorConnected />
-      </div>
-    ),
+      "Canlı akış, görev detayı, agent durumu ve sistem izleme — tek sekmeli panel.",
+    defaultW: 850,
+    defaultH: 600,
+    render: () => <UnifiedTaskMonitor />,
   },
   {
     id: "autonomous-oversight",
@@ -382,25 +336,7 @@ export const APPS: DesktopApp[] = [
       </div>
     ),
   },
-  {
-    id: "insights",
-    title: "Sistem Durumu",
-    icon: <FeatherIcon name="cpu" color="#6b7280" />,
-    color: "#6b7280",
-    group: "Ana",
-    description:
-      "Sistem istatistikleri, agent sağlık durumu ve anomali tespiti.",
-    defaultW: 650,
-    defaultH: 550,
-    render: () => (
-      <div className="p-4 space-y-4 overflow-auto h-full">
-        <SystemStatsPanel />
-        <AgentHealthPanel />
-        <AnomalyPanel />
-        <HeartbeatPanel />
-      </div>
-    ),
-  },
+
   {
     id: "memory",
     title: "Bellek",
@@ -819,21 +755,7 @@ export const APPS: DesktopApp[] = [
       </div>
     ),
   },
-  {
-    id: "agent-progress",
-    title: "Canlı İlerleme",
-    icon: <FeatherIcon name="activity" color="#22c55e" />,
-    color: "#22c55e",
-    group: "Agent",
-    description: "Ajanların ilerleme durumunu canlı görüntüleme.",
-    defaultW: 650,
-    defaultH: 500,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <AgentProgressTrackerPanel />
-      </div>
-    ),
-  },
+
   {
     id: "learning-hub",
     title: "Öğrenme Merkezi",
@@ -895,17 +817,5 @@ export const APPS: DesktopApp[] = [
         <XpMarketplacePanel />
       </div>
     ),
-  },
-  {
-    id: "live-log",
-    title: "Canlı Log",
-    icon: <FeatherIcon name="terminal" color="#06b6d4" />,
-    color: "#06b6d4",
-    group: "Ana",
-    description:
-      "WebSocket üzerinden canlı olay akışı — agent aktivitelerini anlık izleyin.",
-    defaultW: 600,
-    defaultH: 500,
-    render: () => <XpLiveLogPanel />,
   },
 ];
