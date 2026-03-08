@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 import { api } from "@/lib/api";
 import { AGENT_CONFIG } from "@/lib/agents";
 import type { AgentRole, IdentityFileType } from "@/lib/types";
 
 const allRoles = Object.keys(AGENT_CONFIG) as AgentRole[];
 const crd = "bg-slate-800/50 border border-slate-700/50 rounded-lg p-4";
+
+/** Strip YAML frontmatter for cleaner preview */
+function stripFrontmatter(md: string): string {
+  const m = md.match(/^---\s*\n[\s\S]*?\n---\s*\n?/);
+  return m ? md.slice(m[0].length) : md;
+}
 
 const FILE_TABS: { key: IdentityFileType; label: string; icon: string }[] = [
   { key: "soul", label: "SOUL", icon: "🧬" },
@@ -30,6 +37,7 @@ export function AgentIdentityEditor() {
   const [success, setSuccess] = useState("");
   const [initializing, setInitializing] = useState(false);
   const [dirty, setDirty] = useState<Set<IdentityFileType>>(new Set());
+  const [preview, setPreview] = useState(false);
 
   const loadIdentity = useCallback(async (r: AgentRole) => {
     setLoading(true);
@@ -180,14 +188,44 @@ export function AgentIdentityEditor() {
         </div>
       ) : (
         <div className={crd}>
-          <textarea
-            value={contents[tab]}
-            onChange={(e) => handleChange(e.target.value)}
-            className="w-full h-64 bg-slate-900/50 border border-slate-700/30 rounded p-3 text-xs text-slate-300 font-mono resize-y focus:outline-none focus:border-cyan-500/50 placeholder-slate-600"
-            placeholder={`${tab}.md içeriğini buraya yazın...`}
-            spellCheck={false}
-            aria-label={`${tab} dosyası editörü`}
-          />
+          {/* Edit / Preview toggle */}
+          <div className="flex items-center gap-1 mb-2">
+            <button
+              onClick={() => setPreview(false)}
+              className={`text-[10px] px-2 py-1 rounded transition-colors ${!preview ? "bg-cyan-600/20 text-cyan-400 border border-cyan-500/30" : "text-slate-500 hover:text-slate-300"}`}
+            >
+              ✏️ Düzenle
+            </button>
+            <button
+              onClick={() => setPreview(true)}
+              className={`text-[10px] px-2 py-1 rounded transition-colors ${preview ? "bg-cyan-600/20 text-cyan-400 border border-cyan-500/30" : "text-slate-500 hover:text-slate-300"}`}
+            >
+              👁 Önizleme
+            </button>
+          </div>
+
+          {preview ? (
+            <div className="w-full h-64 bg-slate-900/50 border border-slate-700/30 rounded p-3 overflow-y-auto select-text cursor-text">
+              {contents[tab].trim() ? (
+                <div className="prose prose-invert prose-sm max-w-none prose-headings:text-slate-200 prose-p:text-slate-300 prose-strong:text-slate-200 prose-code:text-cyan-300 prose-code:bg-slate-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700/30 prose-li:text-slate-300 prose-a:text-cyan-400">
+                  <ReactMarkdown>
+                    {stripFrontmatter(contents[tab])}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <span className="text-xs text-slate-600">İçerik yok</span>
+              )}
+            </div>
+          ) : (
+            <textarea
+              value={contents[tab]}
+              onChange={(e) => handleChange(e.target.value)}
+              className="w-full h-64 bg-slate-900/50 border border-slate-700/30 rounded p-3 text-xs text-slate-300 font-mono resize-y focus:outline-none focus:border-cyan-500/50 placeholder-slate-600"
+              placeholder={`${tab}.md içeriğini buraya yazın...`}
+              spellCheck={false}
+              aria-label={`${tab} dosyası editörü`}
+            />
+          )}
           <div className="flex items-center justify-between mt-2">
             <span className="text-[10px] text-slate-600">
               {contents[tab].length} karakter •{" "}

@@ -963,10 +963,25 @@ class BaseAgent(ABC):
             try:
                 from tools.agent_identity import IdentityManager
                 _role_str = self.role.value if hasattr(self.role, "value") else str(self.role)
-                _summary = task_input[:120].replace("\n", " ")
+                # Clean summary: strip tool_call artifacts, keep meaningful text
+                _raw_summary = task_input[:300].replace("\n", " ").strip()
+                # Remove injected skill/tool noise
+                for _noise in ["--- INJECTED SKILLS ---", "<tool_call>", "<skill "]:
+                    _idx = _raw_summary.find(_noise)
+                    if _idx > 0:
+                        _raw_summary = _raw_summary[:_idx].strip()
+                _summary = _raw_summary[:200]
+
+                _raw_content = content[:300].replace("\n", " ").strip()
+                for _noise in ["<tool_call>", "```json", "```"]:
+                    _idx = _raw_content.find(_noise)
+                    if _idx > 0:
+                        _raw_content = _raw_content[:_idx].strip()
+                _content_preview = _raw_content[:200]
+
                 IdentityManager().update_memory(
                     _role_str,
-                    f"Task completed: {_summary} → {content[:80].replace(chr(10), ' ')}",
+                    f"Task completed: {_summary} → {_content_preview}",
                 )
             except Exception:
                 pass  # non-critical
