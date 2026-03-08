@@ -4,11 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetcher } from "@/lib/api";
 import { Activity, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 
-const WS_BASE =
-  typeof window !== "undefined"
-    ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:8001`
-    : "ws://localhost:8001";
-
 interface AgentProgress {
   agent_id: string;
   agent_role: string;
@@ -22,31 +17,6 @@ interface AgentProgress {
     description: string;
     status: "pending" | "in_progress" | "completed" | "failed";
   }[];
-}
-
-function backendToLive(p: Record<string, unknown>): AgentProgress {
-  const step = (p.current_step as Record<string, unknown>) || {};
-  const steps = ((p.steps as Record<string, unknown>[]) || []) as Array<{
-    step_id?: string;
-    description?: string;
-    status?: string;
-  }>;
-  const mapStatus = (s: string) =>
-    s === "completed" ? "completed" : s === "error" ? "failed" : s === "thinking" || s === "executing" ? "in_progress" : "pending";
-  return {
-    agent_id: (p.agent_id as string) ?? "",
-    agent_role: (p.agent_name as string) ?? (p.agent_id as string) ?? "",
-    current_task: (step.description as string) ?? (p.task_id as string) ?? "",
-    status: (p.status as AgentProgress["status"]) ?? "idle",
-    progress_percentage: (p.overall_progress as number) ?? 0,
-    started_at: (p.started_at as string) ?? "",
-    estimated_completion: (p.updated_at as string) ?? "",
-    sub_tasks: steps.map((st, i) => ({
-      id: st.step_id ?? String(i),
-      description: st.description ?? "",
-      status: mapStatus(st.status ?? "pending") as AgentProgress["sub_tasks"][0]["status"],
-    })),
-  };
 }
 
 export function AgentProgressTrackerPanel() {
@@ -72,42 +42,6 @@ export function AgentProgressTrackerPanel() {
     const interval = setInterval(loadProgress, 3000);
     return () => clearInterval(interval);
   }, [loadProgress]);
-
-  useEffect(() => {
-    const url = `${WS_BASE}/ws/progress`;
-    const ws = new WebSocket(url);
-    ws.onopen = () => {
-      loadProgress();
-    };
-    ws.onmessage = (e) => {
-      try {
-        const p = JSON.parse(e.data) as Record<string, unknown>;
-        const live = backendToLive(p);
-        setAgents((prev) => {
-          const next = prev.filter((a) => a.agent_id !== live.agent_id);
-          next.push(live);
-          next.sort((a, b) => (a.started_at > b.started_at ? -1 : 1));
-          agentsRef.current = next;
-          return next;
-        });
-      } catch {
-        /* ignore */
-      }
-    };
-    ws.onerror = () => {
-      /* connection error; poll will keep data fresh */
-    };
-    return () => {
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
-        ws.close();
-      } else {
-        ws.onmessage = null;
-        ws.onerror = null;
-        ws.onopen = null;
-        ws.onclose = null;
-      }
-    };
-  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {

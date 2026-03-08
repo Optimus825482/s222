@@ -176,7 +176,7 @@ export function XpWindow({
   return (
     <div
       ref={windowRef}
-      className={`absolute flex flex-col select-none ${isDragging || isResizing ? "" : "transition-shadow"}`}
+      className={`absolute flex flex-col ${isDragging || isResizing ? "select-none" : ""} ${isDragging || isResizing ? "" : "transition-shadow"}`}
       style={style}
       onMouseDown={() => onFocus(state.id)}
       role="dialog"
