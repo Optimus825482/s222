@@ -425,7 +425,7 @@ app.post("/v1/cors-proxy", async (c) => {
 const PORT = parseInt(process.env.PORT ?? "3100", 10);
 
 serve({ fetch: app.fetch, port: PORT }, (info) => {
-  console.log(`🚀 pi-gateway listening on http://localhost:${info.port}`);
+  console.log(`🚀 pi-gateway listening on port ${info.port}`);
   const configured = getConfiguredProviders().filter((p) => p.configured);
   console.log(
     `   Providers: ${configured.map((p) => p.provider).join(", ") || "none"}`,

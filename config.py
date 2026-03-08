@@ -26,7 +26,7 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 
 # ── PI AI Gateway ────────────────────────────────────────────────
-PI_GATEWAY_URL = os.getenv("PI_GATEWAY_URL", "http://localhost:3100/v1")
+PI_GATEWAY_URL = os.getenv("PI_GATEWAY_URL", "http://localhost:3100")
 PI_GATEWAY_ENABLED = os.getenv("PI_GATEWAY_ENABLED", "false").lower() == "true"
 PI_GATEWAY_FALLBACK_ENABLED = os.getenv("PI_GATEWAY_FALLBACK_ENABLED", "true").lower() == "true"
 PI_GATEWAY_FALLBACK_MAX_RETRIES = int(os.getenv("PI_GATEWAY_FALLBACK_MAX_RETRIES", "2"))
