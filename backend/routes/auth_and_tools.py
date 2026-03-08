@@ -633,6 +633,104 @@ async def api_delete_skill(skill_id: str):
         raise HTTPException(503, f"Skills module error: {e}")
 
 
+@router.post("/api/skills/{skill_id}/improve")
+async def api_improve_skill(
+    skill_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Improve skill name, description, knowledge and keywords using DeepSeek; update skill and return updated."""
+    import json
+    import re
+
+    import httpx
+    from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+
+    try:
+        from tools.dynamic_skills import get_skill, update_skill
+    except Exception as e:
+        raise HTTPException(503, f"Skills module error: {e}")
+
+    skill = get_skill(skill_id)
+    if not skill:
+        raise HTTPException(404, "Skill not found")
+    if skill.get("source") == "builtin":
+        raise HTTPException(400, "Yerleşik yetenekler düzenlenemez")
+
+    if not DEEPSEEK_API_KEY:
+        raise HTTPException(503, detail="DeepSeek API anahtarı yapılandırılmamış")
+
+    name = (skill.get("name") or "").strip()
+    description = (skill.get("description") or "").strip()
+    knowledge = (skill.get("knowledge") or "").strip()[:4000]
+    keywords = skill.get("keywords") or []
+    if isinstance(keywords, str):
+        try:
+            keywords = json.loads(keywords) if keywords else []
+        except Exception:
+            keywords = []
+    keywords_str = ", ".join(keywords[:15]) if keywords else "yok"
+
+    system = (
+        "You are a skill editor. Improve the given skill for clarity and usefulness. "
+        "Return ONLY a single JSON object with keys: name, description, knowledge, keywords. "
+        "keywords must be an array of strings. Keep the same language (Turkish or English) as the input. "
+        "Do not add markdown or explanation, only the JSON."
+    )
+    user_msg = (
+        f"Current skill:\nname: {name}\ndescription: {description}\nkeywords: {keywords_str}\n\nknowledge:\n{knowledge}\n\n"
+        "Return improved JSON with name, description, knowledge, keywords (array)."
+    )
+
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_msg},
+        ],
+        "max_tokens": 4096,
+        "temperature": 0.4,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            r = await client.post(
+                f"{DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
+            )
+            if r.status_code != 200:
+                raise HTTPException(502, detail=f"DeepSeek hatası: {r.status_code}")
+            data = r.json()
+            choice = (data.get("choices") or [{}])[0]
+            content = (choice.get("message") or {}).get("content") or "{}"
+            content = content.strip()
+            m = re.search(r"\{[\s\S]*\}", content)
+            if m:
+                content = m.group(0)
+            improved = json.loads(content)
+    except json.JSONDecodeError as e:
+        raise HTTPException(502, detail=f"DeepSeek geçersiz JSON döndü: {e}")
+    except HTTPException:
+        raise
+
+    new_name = (improved.get("name") or name).strip() or name
+    new_desc = (improved.get("description") or description).strip() or description
+    new_knowledge = (improved.get("knowledge") or knowledge).strip() or knowledge
+    new_keywords = improved.get("keywords")
+    if not isinstance(new_keywords, list):
+        new_keywords = keywords
+    new_keywords = [str(k).strip() for k in new_keywords[:20] if k]
+
+    update_skill(
+        skill_id,
+        name=new_name,
+        description=new_desc,
+        knowledge=new_knowledge,
+        keywords=new_keywords,
+    )
+    _audit("skill_improve", user["user_id"], skill_id)
+    return get_skill(skill_id)
+
+
 # ── Skill Auto-Discovery ─────────────────────────────────────────
 
 

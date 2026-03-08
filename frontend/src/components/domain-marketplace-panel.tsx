@@ -149,6 +149,7 @@ export function DomainMarketplacePanel() {
           <button
             onClick={handleDiscover}
             disabled={discovering}
+            title="data/domain_skills/ klasöründeki .py dosyalarını tarar; DOMAIN_CONFIG içeren modüller topluluk skill'i olarak eklenir."
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors disabled:opacity-50"
           >
             <RefreshCw
@@ -159,7 +160,7 @@ export function DomainMarketplacePanel() {
         </div>
 
         {/* Stats row */}
-        <div className="flex items-center gap-3 text-[11px] text-slate-500 mb-3">
+        <div className="flex items-center gap-3 text-[11px] text-slate-500 mb-1">
           <span>
             {skills.length} skill · {enabledCount} aktif · {totalTools} araç
           </span>
@@ -167,6 +168,9 @@ export function DomainMarketplacePanel() {
           <span className="text-emerald-500">{builtinCount} yerleşik</span>
           <span className="text-purple-500">{discoveredCount} topluluk</span>
         </div>
+        <p className="text-[10px] text-slate-600 mb-3">
+          Tarama: <code className="bg-slate-800/60 px-1 rounded">data/domain_skills/</code> — .py dosyalarındaki DOMAIN_CONFIG kaydedilir.
+        </p>
 
         {/* Search + Filter */}
         <div className="flex items-center gap-2">

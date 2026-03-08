@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   GraduationCap,
   Package,
@@ -41,10 +41,11 @@ interface Skill {
   keywords?: string[];
 }
 
-type SkillsHubTab = "skills" | "creator" | "marketplace" | "patterns";
+type SkillsHubTab = "skills" | "categories" | "creator" | "marketplace" | "patterns";
 
 const TABS: { key: SkillsHubTab; label: string; icon: string }[] = [
   { key: "skills", label: "Yetenekler", icon: "📚" },
+  { key: "categories", label: "Kategori", icon: "📁" },
   { key: "patterns", label: "Kalıplar", icon: "🔄" },
   { key: "creator", label: "Oluşturucu", icon: "✨" },
   { key: "marketplace", label: "Marketplace", icon: "🏪" },
@@ -109,17 +110,27 @@ function CategoryBadge({ category }: { category: string }) {
 function SkillDetailView({
   skill,
   onBack,
+  showActions = true,
 }: {
   skill: Skill;
   onBack: () => void;
+  showActions?: boolean;
 }) {
   const [full, setFull] = useState<Skill | null>(skill);
   const [loading, setLoading] = useState(false);
+  const [improving, setImproving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const refresh = useCallback(() => {
+    if (!skill?.id) return;
+    api.getSkill(skill.id).then((s) => setFull(s as Skill)).catch(() => setFull(skill));
+  }, [skill?.id]);
 
   useEffect(() => {
     if (!skill?.id) return;
     setFull(null);
     setLoading(true);
+    setActionError(null);
     api
       .getSkill(skill.id)
       .then((s) => setFull(s as Skill))
@@ -127,27 +138,87 @@ function SkillDetailView({
       .finally(() => setLoading(false));
   }, [skill?.id]);
 
+  const handleImprove = useCallback(() => {
+    if (!skill?.id || (full ?? skill).source === "builtin") return;
+    setImproving(true);
+    setActionError(null);
+    api
+      .improveSkill(skill.id)
+      .then((updated) => {
+        setFull(updated as Skill);
+      })
+      .catch((e) => setActionError(e instanceof Error ? e.message : "Geliştirme başarısız"))
+      .finally(() => setImproving(false));
+  }, [skill?.id, full, skill?.source]);
+
+  const handleDelete = useCallback(() => {
+    if (!skill?.id || (full ?? skill).source === "builtin") return;
+    if (!confirm("Bu yeteneği devre dışı bırakmak istediğinize emin misiniz?")) return;
+    setActionError(null);
+    api
+      .deleteSkill(skill.id)
+      .then(() => onBack())
+      .catch((e) => setActionError(e instanceof Error ? e.message : "Silme başarısız"));
+  }, [skill?.id, full, skill?.source, onBack]);
+
   const s = full ?? skill;
   const knowledge = s.knowledge;
   const keywords = s.keywords ?? [];
+  const canEdit = s.source !== "builtin";
 
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      <button
-        onClick={onBack}
-        style={{
-          background: "#ece9d8",
-          border: "1px solid #999",
-          borderRadius: 3,
-          padding: "3px 10px",
-          fontSize: 11,
-          cursor: "pointer",
-          marginBottom: 8,
-          flexShrink: 0,
-        }}
-      >
-        ← Geri
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexShrink: 0 }}>
+        <button
+          onClick={onBack}
+          style={{
+            background: "#ece9d8",
+            border: "1px solid #999",
+            borderRadius: 3,
+            padding: "3px 10px",
+            fontSize: 11,
+            cursor: "pointer",
+          }}
+        >
+          ← Geri
+        </button>
+        {showActions && canEdit && (
+          <>
+            <button
+              onClick={handleImprove}
+              disabled={improving}
+              style={{
+                background: "#6633cc",
+                color: "#fff",
+                border: "none",
+                borderRadius: 3,
+                padding: "3px 10px",
+                fontSize: 11,
+                cursor: improving ? "not-allowed" : "pointer",
+              }}
+            >
+              {improving ? "Geliştiriliyor…" : "Geliştir"}
+            </button>
+            <button
+              onClick={handleDelete}
+              style={{
+                background: "#b91c1c",
+                color: "#fff",
+                border: "none",
+                borderRadius: 3,
+                padding: "3px 10px",
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+            >
+              Sil
+            </button>
+          </>
+        )}
+      </div>
+      {actionError && (
+        <div style={{ fontSize: 11, color: "#b91c1c", marginBottom: 8 }}>{actionError}</div>
+      )}
       {loading ? (
         <div style={{ fontSize: 12, color: "#666" }}>Yükleniyor…</div>
       ) : (
@@ -226,6 +297,141 @@ function SkillDetailView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CategoriesTab() {
+  const [allSkills, setAllSkills] = useState<Skill[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [s, a] = await Promise.all([
+        api.listSkills() as Promise<Skill[]>,
+        getAutoSkills() as Promise<Skill[]>,
+      ]);
+      setAllSkills([...s, ...a]);
+    } catch {
+      setAllSkills([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const onRefresh = () => load();
+    window.addEventListener("skills-hub-refresh", onRefresh);
+    return () => window.removeEventListener("skills-hub-refresh", onRefresh);
+  }, [load]);
+
+  const byCategory = useMemo(() => {
+    const m: Record<string, Skill[]> = {};
+    for (const sk of allSkills) {
+      const cat = sk.category || "custom";
+      if (!m[cat]) m[cat] = [];
+      m[cat].push(sk);
+    }
+    return Object.entries(m).sort((a, b) => b[1].length - a[1].length);
+  }, [allSkills]);
+
+  if (selectedSkill) {
+    return (
+      <SkillDetailView
+        skill={selectedSkill}
+        onBack={() => {
+          setSelectedSkill(null);
+          load();
+        }}
+        showActions={true}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: 12, fontSize: 12, color: "#666" }}>Yükleniyor…</div>
+    );
+  }
+
+  if (selectedCategory) {
+    const list = byCategory.find(([c]) => c === selectedCategory)?.[1] ?? [];
+    return (
+      <div style={{ padding: 12, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+        <button
+          onClick={() => setSelectedCategory(null)}
+          style={{
+            background: "#ece9d8",
+            border: "1px solid #999",
+            borderRadius: 3,
+            padding: "3px 10px",
+            fontSize: 11,
+            cursor: "pointer",
+            marginBottom: 8,
+            alignSelf: "flex-start",
+          }}
+        >
+          ← Kategorilere dön
+        </button>
+        <div style={{ fontSize: 11, color: "#555", marginBottom: 8 }}>
+          {selectedCategory}: {list.length} yetenek
+        </div>
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {list.map((sk) => (
+            <div
+              key={sk.id}
+              onClick={() => setSelectedSkill(sk)}
+              style={{
+                padding: "8px 10px",
+                borderBottom: "1px solid #e0ddd0",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 500 }}>{sk.name}</span>
+              <SourceBadge source={sk.source} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: 12, fontFamily: "Tahoma, sans-serif" }}>
+      <p style={{ fontSize: 11, color: "#555", marginBottom: 10 }}>
+        Kategorilere tıklayarak o kategorideki yetenekleri listeleyebilirsiniz; listeden bir yeteneğe tıklayınca detayı açılır.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {byCategory.map(([cat, list]) => (
+          <div
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 12px",
+              background: "#fffff0",
+              border: "1px solid #d6d2c2",
+              borderRadius: 4,
+              cursor: "pointer",
+            }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>
+              <CategoryBadge category={cat} /> {cat}
+            </span>
+            <span style={{ fontSize: 12, color: "#666" }}>{list.length} yetenek</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -457,7 +663,7 @@ function XpSkillsList() {
             Özel: {custom.length}
           </span>
           {autoSkills.length > 0 && (
-            <span>
+            <span title="Öğrenilmiş yetenekler (Otomatik Keşif veya agent create_skill ile oluşturuldu; tam yetenek olarak find_skill ile kullanılır)">
               <Bot
                 size={12}
                 style={{
@@ -470,6 +676,9 @@ function XpSkillsList() {
             </span>
           )}
         </div>
+        <p style={{ fontSize: 10, color: "#666", margin: "4px 0 0", maxWidth: 420 }}>
+          Otomatik / learned = tam yetenek; agent&apos;lar find_skill ile bulup kullanır.
+        </p>
         <button
           onClick={() => setShowForm(!showForm)}
           style={{
@@ -853,10 +1062,12 @@ export function XpSkillsHubPanel() {
           </div>
           <div style={{ marginBottom: 4 }}>
             {hygieneResult.checked} yetenek kontrol edildi, {hygieneResult.healthy} sağlıklı
-            {hygieneResult.deactivated.length > 0 &&
-              `, ${hygieneResult.deactivated.length} devre dışı bırakıldı`}
-            {hygieneResult.deleted.length > 0 &&
-              `, ${hygieneResult.deleted.length} silindi (devre dışı)`}
+            {(hygieneResult.deactivated.length > 0 || hygieneResult.deleted.length > 0) && (
+              <span>
+                , {hygieneResult.deactivated.length + hygieneResult.deleted.length} kalitesiz yetenek <strong>devre dışı bırakıldı</strong>
+                <span style={{ fontSize: 10, color: "#666", fontWeight: 400 }}> (veritabanından silinmedi, agent’lar artık kullanmıyor)</span>
+              </span>
+            )}
           </div>
           {(hygieneResult.deactivated.length > 0 || hygieneResult.deleted.length > 0) && (
             <div style={{ marginTop: 6, fontSize: 10, color: "#555" }}>
@@ -902,6 +1113,7 @@ export function XpSkillsHubPanel() {
       {/* Content */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {tab === "skills" && <XpSkillsList />}
+        {tab === "categories" && <CategoriesTab />}
         {tab === "patterns" && <PatternsTab />}
         {tab === "creator" && <SkillCreatorPanel />}
         {tab === "marketplace" && <XpMarketplacePanel />}

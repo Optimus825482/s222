@@ -307,6 +307,12 @@ export const api = {
   getSkill: (id: string) => fetcher(`/api/skills/${id}`),
   deleteSkill: (id: string) =>
     fetcher(`/api/skills/${id}`, { method: "DELETE" }),
+  /** Improve skill with DeepSeek; returns updated skill. */
+  improveSkill: (id: string) =>
+    fetcher<{ id: string; name: string; description?: string; knowledge?: string; keywords?: string[]; category: string; source: string; use_count?: number }>(
+      `/api/skills/${encodeURIComponent(id)}/improve`,
+      { method: "POST" },
+    ),
 
   /** Detect repeating execution patterns (3+ same tool sequence). */
   getSelfSkillPatterns: (minOccurrences = 3) =>
