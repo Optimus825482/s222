@@ -176,15 +176,6 @@ function SkillDetailModal({
       .finally(() => setLoading(false));
   }, [skillId]);
 
-  const sourceColor: Record<string, string> = {
-    builtin: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-    user: "bg-green-500/15 text-green-400 border-green-500/30",
-    "auto-learned": "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  };
-  const sourceBadge =
-    sourceColor[skill?.source ?? ""] ??
-    "bg-slate-500/15 text-slate-400 border-slate-500/30";
-
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
@@ -192,72 +183,129 @@ function SkillDetailModal({
       aria-modal="true"
       aria-label="Skill detayı"
     >
-      {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40"
         onClick={onClose}
         aria-hidden="true"
       />
-
-      {/* Modal: min-h-0 so body can shrink and scroll */}
-      <div className="relative z-10 w-full max-w-lg max-h-[85vh] flex flex-col min-h-0 rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border shrink-0">
+      <div
+        className="xp-skill-detail-modal relative z-10 w-full max-w-lg max-h-[85vh] flex flex-col min-h-0 overflow-hidden"
+        style={{
+          background: "#ECE9D8",
+          border: "2px solid #0054E3",
+          borderRadius: "8px 8px 4px 4px",
+          boxShadow: "2px 2px 10px rgba(0,0,0,0.4)",
+          fontFamily: "Tahoma, sans-serif",
+        }}
+      >
+        {/* Title bar */}
+        <div
+          className="flex items-center justify-between px-3 py-1.5 shrink-0"
+          style={{
+            background: "linear-gradient(180deg, #0A246A 0%, #3A6EA5 100%)",
+            borderRadius: "6px 6px 0 0",
+          }}
+        >
           <div className="flex items-center gap-2 min-w-0">
             <Puzzle
-              className="w-4 h-4 text-blue-400 shrink-0"
+              className="w-3.5 h-3.5 text-white shrink-0"
               aria-hidden="true"
             />
-            <span className="text-sm font-semibold text-slate-200 truncate">
+            <span className="text-xs font-bold text-white truncate">
               {loading ? "Yükleniyor..." : (skill?.name ?? "Skill bulunamadı")}
             </span>
           </div>
           <button
             onClick={onClose}
-            aria-label="Modalı kapat"
-            className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer shrink-0 rounded hover:bg-white/5 transition-colors"
+            aria-label="Kapat"
+            className="w-5 h-5 flex items-center justify-center text-white rounded-sm cursor-pointer"
+            style={{
+              background: "#C75050",
+              border: "1px solid #fff",
+              fontSize: "11px",
+              fontWeight: "bold",
+            }}
           >
-            <X className="w-4 h-4" />
+            ✕
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-5 py-4 space-y-4">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3"
+          style={{ color: "#000" }}
+        >
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
+              <Loader2
+                className="w-5 h-5 animate-spin"
+                style={{ color: "#0054E3" }}
+              />
             </div>
           ) : !skill ? (
-            <div className="text-sm text-slate-500 text-center py-8">
+            <div className="text-xs text-center py-8" style={{ color: "#666" }}>
               Skill yüklenemedi
             </div>
           ) : (
             <>
-              {/* Badges row */}
+              {/* Badges */}
               <div className="flex flex-wrap gap-1.5">
-                <span className="px-2 py-0.5 rounded border text-[10px] font-medium bg-teal-500/10 text-teal-400 border-teal-500/30">
+                <span
+                  className="px-2 py-0.5 rounded text-[10px] font-bold"
+                  style={{
+                    background: "#D4EDDA",
+                    color: "#155724",
+                    border: "1px solid #A3D9B1",
+                  }}
+                >
                   {skill.category}
                 </span>
                 <span
-                  className={`px-2 py-0.5 rounded border text-[10px] font-medium ${sourceBadge}`}
+                  className="px-2 py-0.5 rounded text-[10px] font-bold"
+                  style={{
+                    background:
+                      skill.source === "builtin"
+                        ? "#CCE5FF"
+                        : skill.source === "auto-learned"
+                          ? "#FFF3CD"
+                          : "#D4EDDA",
+                    color:
+                      skill.source === "builtin"
+                        ? "#004085"
+                        : skill.source === "auto-learned"
+                          ? "#856404"
+                          : "#155724",
+                    border: `1px solid ${skill.source === "builtin" ? "#9EC5FE" : skill.source === "auto-learned" ? "#FFEAA7" : "#A3D9B1"}`,
+                  }}
                 >
                   {skill.source === "auto-learned"
                     ? "🤖 Otomatik"
                     : skill.source === "builtin"
                       ? "📦 Yerleşik"
-                      : "✏️ Kullanıcı"}
+                      : "✏️ Özel"}
                 </span>
                 {skill.use_count != null && (
-                  <span className="px-2 py-0.5 rounded border text-[10px] bg-surface-raised border-border text-slate-400">
+                  <span
+                    className="px-2 py-0.5 rounded text-[10px]"
+                    style={{
+                      background: "#F0F0F0",
+                      border: "1px solid #CCC",
+                      color: "#333",
+                    }}
+                  >
                     {skill.use_count}x kullanıldı
                   </span>
                 )}
                 {skill.avg_score != null && skill.avg_score > 0 && (
-                  <span className="px-2 py-0.5 rounded border text-[10px] bg-surface-raised border-border text-slate-400 flex items-center gap-1">
-                    <Star
-                      className="w-3 h-3 text-amber-400"
-                      aria-hidden="true"
-                    />
+                  <span
+                    className="px-2 py-0.5 rounded text-[10px] flex items-center gap-1"
+                    style={{
+                      background: "#FFF3CD",
+                      border: "1px solid #FFEAA7",
+                      color: "#856404",
+                    }}
+                  >
+                    <Star className="w-3 h-3" aria-hidden="true" />
                     {(skill.avg_score ?? 0).toFixed(1)}
                   </span>
                 )}
@@ -266,24 +314,39 @@ function SkillDetailModal({
               {/* Description */}
               {skill.description && (
                 <div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">
+                  <div
+                    className="text-[10px] font-bold uppercase mb-1"
+                    style={{ color: "#0054E3" }}
+                  >
                     Açıklama
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
+                  <p
+                    className="text-xs leading-relaxed"
+                    style={{ color: "#000" }}
+                  >
                     {skill.description}
                   </p>
                 </div>
               )}
 
-              {/* Knowledge / Çalışma Metodu */}
+              {/* Knowledge */}
               {skill.knowledge && (
                 <div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <div
+                    className="text-[10px] font-bold uppercase mb-1 flex items-center gap-1"
+                    style={{ color: "#0054E3" }}
+                  >
                     <Brain className="w-3 h-3" aria-hidden="true" /> Çalışma
                     Metodu
                   </div>
-                  <div className="bg-surface rounded-lg border border-border p-3 max-h-48 overflow-y-auto">
-                    <pre className="text-[11px] text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
+                  <div
+                    className="rounded p-2 max-h-48 overflow-y-auto"
+                    style={{ background: "#FFF", border: "1px solid #ACA899" }}
+                  >
+                    <pre
+                      className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed"
+                      style={{ color: "#000" }}
+                    >
                       {skill.knowledge}
                     </pre>
                   </div>
@@ -293,14 +356,22 @@ function SkillDetailModal({
               {/* Keywords */}
               {skill.keywords && skill.keywords.length > 0 && (
                 <div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5">
+                  <div
+                    className="text-[10px] font-bold uppercase mb-1"
+                    style={{ color: "#0054E3" }}
+                  >
                     Anahtar Kelimeler
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {skill.keywords.map((kw) => (
                       <span
                         key={kw}
-                        className="px-1.5 py-0.5 rounded bg-surface-raised border border-border text-[10px] text-slate-400"
+                        className="px-1.5 py-0.5 rounded text-[10px]"
+                        style={{
+                          background: "#E8E8E8",
+                          border: "1px solid #CCC",
+                          color: "#333",
+                        }}
                       >
                         {kw}
                       </span>
@@ -314,14 +385,22 @@ function SkillDetailModal({
 
         {/* Footer */}
         {skill && (
-          <div className="px-5 py-3 border-t border-border shrink-0 flex justify-end">
+          <div
+            className="px-3 py-2 shrink-0 flex justify-end"
+            style={{ borderTop: "1px solid #ACA899" }}
+          >
             <button
               onClick={() => {
                 onDelete(skill.id);
                 onClose();
               }}
               aria-label={`${skill.name} skill'ini sil`}
-              className="flex items-center gap-1.5 px-3 min-h-[36px] rounded text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-3 py-1 rounded text-[11px] font-bold cursor-pointer"
+              style={{
+                background: "#ECE9D8",
+                border: "1px solid #ACA899",
+                color: "#C00",
+              }}
             >
               <Trash2 className="w-3.5 h-3.5" /> Sil
             </button>
@@ -338,7 +417,6 @@ export function SkillsPanel() {
   const [autoSkills, setAutoSkills] = useState<Skill[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
-  const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [form, setForm] = useState({
     skill_id: "",
     name: "",
@@ -419,52 +497,94 @@ export function SkillsPanel() {
         />
       )}
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => setShowSkillsModal(true)}
-          className="text-xs font-medium text-slate-300 flex items-center gap-1.5 cursor-pointer hover:text-slate-200 transition-colors"
-          aria-label="Skills listesini aç"
+        <div
+          className="flex items-center gap-1.5"
+          style={{
+            color: "#000",
+            fontFamily: "Tahoma, sans-serif",
+            fontSize: "12px",
+            fontWeight: 600,
+          }}
         >
-          <Puzzle className="w-4 h-4" aria-hidden="true" /> Skills
-        </button>
+          <Puzzle
+            className="w-4 h-4"
+            style={{ color: "#0054E3" }}
+            aria-hidden="true"
+          />{" "}
+          Skills
+          <span
+            className="text-[10px]"
+            style={{ color: "#666", fontWeight: 400 }}
+          >
+            ({skills.length + autoSkills.length} toplam)
+          </span>
+        </div>
         <button
           onClick={() => setShowForm(!showForm)}
           aria-label={showForm ? "Skill formunu kapat" : "Yeni skill ekle"}
           aria-expanded={showForm}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[10px] text-blue-400 hover:text-blue-300 cursor-pointer"
+          className="flex items-center justify-center px-2 py-1 text-[11px] cursor-pointer rounded"
+          style={{
+            background: "#ECE9D8",
+            border: "1px solid #ACA899",
+            color: "#000",
+            fontFamily: "Tahoma, sans-serif",
+          }}
         >
           {showForm ? (
             <>
-              <X className="w-4 h-4" /> <span className="ml-1">Kapat</span>
+              <X className="w-3 h-3" /> <span className="ml-1">Kapat</span>
             </>
           ) : (
             <>
-              <Plus className="w-4 h-4" /> <span className="ml-1">Yeni</span>
+              <Plus className="w-3 h-3" /> <span className="ml-1">Yeni</span>
             </>
           )}
         </button>
       </div>
 
       {showForm && (
-        <div className="space-y-2 p-2 rounded bg-surface border border-border">
+        <div
+          className="space-y-2 p-2 rounded"
+          style={{ background: "#F5F3E8", border: "1px solid #ACA899" }}
+        >
           <input
             value={form.skill_id}
             onChange={(e) => setForm({ ...form, skill_id: e.target.value })}
             placeholder="Skill ID"
             aria-label="Skill ID"
-            className="w-full bg-surface-raised border border-border rounded px-3 lg:px-4 py-1 min-h-[44px] text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none"
+            className="w-full rounded px-2 py-1 text-[11px] focus:outline-none"
+            style={{
+              background: "#FFF",
+              border: "1px solid #7F9DB9",
+              color: "#000",
+              fontFamily: "Tahoma, sans-serif",
+            }}
           />
           <input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="İsim"
             aria-label="Skill ismi"
-            className="w-full bg-surface-raised border border-border rounded px-3 lg:px-4 py-1 min-h-[44px] text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none"
+            className="w-full rounded px-2 py-1 text-[11px] focus:outline-none"
+            style={{
+              background: "#FFF",
+              border: "1px solid #7F9DB9",
+              color: "#000",
+              fontFamily: "Tahoma, sans-serif",
+            }}
           />
           <select
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
             aria-label="Skill kategorisi"
-            className="w-full bg-surface-raised border border-border rounded px-3 lg:px-4 py-1 min-h-[44px] text-[11px] text-slate-300 focus:outline-none cursor-pointer"
+            className="w-full rounded px-2 py-1 text-[11px] focus:outline-none cursor-pointer"
+            style={{
+              background: "#FFF",
+              border: "1px solid #7F9DB9",
+              color: "#000",
+              fontFamily: "Tahoma, sans-serif",
+            }}
           >
             {[
               "custom",
@@ -486,7 +606,13 @@ export function SkillsPanel() {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="Açıklama"
             aria-label="Skill açıklaması"
-            className="w-full bg-surface-raised border border-border rounded px-3 lg:px-4 py-1 min-h-[44px] text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none"
+            className="w-full rounded px-2 py-1 text-[11px] focus:outline-none"
+            style={{
+              background: "#FFF",
+              border: "1px solid #7F9DB9",
+              color: "#000",
+              fontFamily: "Tahoma, sans-serif",
+            }}
           />
           <textarea
             value={form.knowledge}
@@ -494,149 +620,185 @@ export function SkillsPanel() {
             placeholder="Bilgi / Protokol"
             aria-label="Skill bilgi ve protokolü"
             rows={3}
-            className="w-full bg-surface-raised border border-border rounded px-3 lg:px-4 py-1 text-[11px] text-slate-300 placeholder:text-slate-600 resize-none focus:outline-none"
+            className="w-full rounded px-2 py-1 text-[11px] resize-none focus:outline-none"
+            style={{
+              background: "#FFF",
+              border: "1px solid #7F9DB9",
+              color: "#000",
+              fontFamily: "Tahoma, sans-serif",
+            }}
           />
           <input
             value={form.keywords}
             onChange={(e) => setForm({ ...form, keywords: e.target.value })}
             placeholder="Anahtar kelimeler (virgülle)"
             aria-label="Skill anahtar kelimeleri"
-            className="w-full bg-surface-raised border border-border rounded px-3 lg:px-4 py-1 min-h-[44px] text-[11px] text-slate-300 placeholder:text-slate-600 focus:outline-none"
+            className="w-full rounded px-2 py-1 text-[11px] focus:outline-none"
+            style={{
+              background: "#FFF",
+              border: "1px solid #7F9DB9",
+              color: "#000",
+              fontFamily: "Tahoma, sans-serif",
+            }}
           />
           <button
             onClick={handleCreate}
             aria-label="Skill oluştur"
-            className="w-full min-h-[44px] py-1.5 rounded bg-green-600/20 text-green-400 text-[11px] font-medium hover:bg-green-600/30 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            className="w-full py-1.5 rounded text-[11px] font-bold cursor-pointer flex items-center justify-center gap-1.5"
+            style={{
+              background: "#ECE9D8",
+              border: "1px solid #ACA899",
+              color: "#006400",
+            }}
           >
             <CheckCircle className="w-4 h-4" /> Oluştur
           </button>
         </div>
       )}
 
-      {msg && <div className="text-[10px] text-slate-400">{msg}</div>}
+      {msg && (
+        <div
+          className="text-[10px]"
+          style={{ color: "#333", fontFamily: "Tahoma, sans-serif" }}
+        >
+          {msg}
+        </div>
+      )}
 
-      <div className="text-[10px] text-slate-500 flex flex-wrap gap-2">
+      <div
+        className="text-[10px] flex flex-wrap gap-3"
+        style={{ color: "#333", fontFamily: "Tahoma, sans-serif" }}
+      >
         <span className="flex items-center gap-1">
-          <Package className="w-3 h-3" /> Yerleşik: {builtin.length}
+          <Package className="w-3 h-3" style={{ color: "#0054E3" }} /> Yerleşik:{" "}
+          {builtin.length}
         </span>
         <span className="flex items-center gap-1">
-          <Wrench className="w-3 h-3" /> Özel: {custom.length}
+          <Wrench className="w-3 h-3" style={{ color: "#006400" }} /> Özel:{" "}
+          {custom.length}
         </span>
         {autoSkills.length > 0 && (
           <span className="flex items-center gap-1">
-            <Bot className="w-3 h-3 text-amber-400" /> Otomatik:{" "}
+            <Bot className="w-3 h-3" style={{ color: "#B8860B" }} /> Otomatik:{" "}
             {autoSkills.length}
           </span>
         )}
       </div>
 
-      {showSkillsModal &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Skills listesi"
-          >
-            <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowSkillsModal(false)}
-              aria-hidden="true"
-            />
-            <div className="relative z-10 w-full max-w-3xl max-h-[85vh] flex flex-col min-h-0 rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-                <div className="flex items-center gap-2">
-                  <Puzzle
-                    className="w-4 h-4 text-blue-400"
-                    aria-hidden="true"
-                  />
-                  <span className="text-sm font-semibold text-slate-200">
-                    Skills
-                  </span>
-                  <span className="text-[10px] text-slate-500 bg-surface-raised px-2 py-0.5 rounded border border-border">
-                    {skills.length + autoSkills.length} toplam
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowSkillsModal(false)}
-                  aria-label="Modalı kapat"
-                  className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer rounded hover:bg-white/5 transition-colors"
+      {/* Inline skills table — XP themed */}
+      <div
+        className="overflow-y-auto"
+        style={{ maxHeight: "calc(100vh - 280px)" }}
+      >
+        <table
+          className="w-full text-[11px]"
+          style={{
+            fontFamily: "Tahoma, sans-serif",
+            borderCollapse: "collapse",
+          }}
+        >
+          <thead>
+            <tr style={{ background: "#D6D2C2" }}>
+              <th
+                className="text-left px-2 py-1.5 text-[10px] font-bold uppercase"
+                style={{ color: "#000", borderBottom: "1px solid #ACA899" }}
+              >
+                İsim
+              </th>
+              <th
+                className="text-left px-2 py-1.5 text-[10px] font-bold uppercase"
+                style={{ color: "#000", borderBottom: "1px solid #ACA899" }}
+              >
+                Kategori
+              </th>
+              <th
+                className="text-left px-2 py-1.5 text-[10px] font-bold uppercase"
+                style={{ color: "#000", borderBottom: "1px solid #ACA899" }}
+              >
+                Kaynak
+              </th>
+              <th
+                className="text-right px-2 py-1.5 text-[10px] font-bold uppercase"
+                style={{ color: "#000", borderBottom: "1px solid #ACA899" }}
+              >
+                Kullanım
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...skills, ...autoSkills].map((s, i) => (
+              <tr
+                key={`${s.source}-${s.id}`}
+                onClick={() => setSelectedSkillId(s.id)}
+                className="cursor-pointer"
+                style={{
+                  background: i % 2 === 0 ? "#FFFFFF" : "#F5F3E8",
+                  borderBottom: "1px solid #E0DDD0",
+                }}
+              >
+                <td
+                  className="px-2 py-1.5 font-medium"
+                  style={{ color: "#000" }}
                 >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              {/* Table */}
-              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
-                <table className="w-full text-[11px]">
-                  <thead className="sticky top-0 bg-[#1a1f2e] border-b border-border">
-                    <tr>
-                      <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                        İsim
-                      </th>
-                      <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                        Kategori
-                      </th>
-                      <th className="text-left px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                        Kaynak
-                      </th>
-                      <th className="text-right px-4 py-2.5 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                        Kullanım
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {[...skills, ...autoSkills].map((s) => (
-                      <tr
-                        key={s.id}
-                        onClick={() => {
-                          setSelectedSkillId(s.id);
-                          setShowSkillsModal(false);
-                        }}
-                        className="hover:bg-white/5 cursor-pointer transition-colors"
-                      >
-                        <td className="px-4 py-2.5 text-slate-200 font-medium">
-                          {s.name}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[9px]">
-                            {s.category}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span
-                            className={`px-1.5 py-0.5 rounded border text-[9px] font-medium ${
-                              s.source === "builtin"
-                                ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                                : s.source === "auto-learned"
-                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                  : "bg-green-500/10 text-green-400 border-green-500/20"
-                            }`}
-                          >
-                            {s.source === "auto-learned"
-                              ? "🤖 Otomatik"
-                              : s.source === "builtin"
-                                ? "📦 Yerleşik"
-                                : "✏️ Özel"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-slate-500">
-                          {s.use_count ?? 0}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {skills.length === 0 && autoSkills.length === 0 && (
-                  <div className="text-center py-8 text-[11px] text-slate-600">
-                    Henüz skill yok
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>,
-          document.body,
+                  {s.name}
+                </td>
+                <td className="px-2 py-1.5">
+                  <span
+                    className="px-1.5 py-0.5 rounded text-[9px] font-bold"
+                    style={{
+                      background: "#D4EDDA",
+                      color: "#155724",
+                      border: "1px solid #A3D9B1",
+                    }}
+                  >
+                    {s.category}
+                  </span>
+                </td>
+                <td className="px-2 py-1.5">
+                  <span
+                    className="px-1.5 py-0.5 rounded text-[9px] font-bold"
+                    style={{
+                      background:
+                        s.source === "builtin"
+                          ? "#CCE5FF"
+                          : s.source === "auto-learned"
+                            ? "#FFF3CD"
+                            : "#D4EDDA",
+                      color:
+                        s.source === "builtin"
+                          ? "#004085"
+                          : s.source === "auto-learned"
+                            ? "#856404"
+                            : "#155724",
+                      border: `1px solid ${s.source === "builtin" ? "#9EC5FE" : s.source === "auto-learned" ? "#FFEAA7" : "#A3D9B1"}`,
+                    }}
+                  >
+                    {s.source === "auto-learned"
+                      ? "🤖 Otomatik"
+                      : s.source === "builtin"
+                        ? "📦 Yerleşik"
+                        : "✏️ Özel"}
+                  </span>
+                </td>
+                <td
+                  className="px-2 py-1.5 text-right"
+                  style={{ color: "#333" }}
+                >
+                  {s.use_count ?? 0}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {skills.length === 0 && autoSkills.length === 0 && (
+          <div
+            className="text-center py-6 text-[11px]"
+            style={{ color: "#666" }}
+          >
+            Henüz skill yok
+          </div>
         )}
+      </div>
     </div>
   );
 }

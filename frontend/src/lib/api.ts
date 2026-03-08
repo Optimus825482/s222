@@ -55,7 +55,7 @@ function getCurrentUserId(): string {
   return "";
 }
 
-async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
+export async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAuthToken();
   const res = await fetch(`${BASE}${path}`, {
     headers: {
@@ -76,6 +76,126 @@ async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return res.json();
 }
+
+// ── Collaborative Document API ──────────────────────────────────
+
+export const collabDocApi = {
+  async createDoc(title: string, content = "", language = "python") {
+    const res = await fetch(`${BASE}/api/collab-docs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ title, content, language }),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async listDocs() {
+    const res = await fetch(`${BASE}/api/collab-docs`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getDoc(docId: string) {
+    const res = await fetch(
+      `${BASE}/api/collab-docs/${encodeURIComponent(docId)}`,
+      {
+        headers: authHeaders(),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async updateDoc(
+    docId: string,
+    opType: string,
+    position: number,
+    text = "",
+    length = 0,
+    metadata?: Record<string, unknown>,
+  ) {
+    const res = await fetch(
+      `${BASE}/api/collab-docs/${encodeURIComponent(docId)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          op_type: opType,
+          position,
+          text,
+          length,
+          metadata,
+        }),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async addCollaborator(docId: string, agentId: string) {
+    const res = await fetch(
+      `${BASE}/api/collab-docs/${encodeURIComponent(docId)}/collaborators`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ agent_id: agentId }),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async removeCollaborator(docId: string, agentId: string) {
+    const res = await fetch(
+      `${BASE}/api/collab-docs/${encodeURIComponent(docId)}/collaborators/${encodeURIComponent(agentId)}`,
+      {
+        method: "DELETE",
+        headers: authHeaders(),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getHistory(docId: string) {
+    const res = await fetch(
+      `${BASE}/api/collab-docs/${encodeURIComponent(docId)}/history`,
+      {
+        headers: authHeaders(),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async revertToVersion(docId: string, versionId: string) {
+    const res = await fetch(
+      `${BASE}/api/collab-docs/${encodeURIComponent(docId)}/revert`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ version_id: versionId }),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async deleteDoc(docId: string) {
+    const res = await fetch(
+      `${BASE}/api/collab-docs/${encodeURIComponent(docId)}`,
+      {
+        method: "DELETE",
+        headers: authHeaders(),
+      },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+};
 
 // ── Models & Config ─────────────────────────────────────────────
 
@@ -188,6 +308,31 @@ export const api = {
   deleteSkill: (id: string) =>
     fetcher(`/api/skills/${id}`, { method: "DELETE" }),
 
+  /** Detect repeating execution patterns (3+ same tool sequence). */
+  getSelfSkillPatterns: (minOccurrences = 3) =>
+    fetcher<{ patterns: { signature: string; count: number; tools_used: string[]; examples: unknown[] }[] }>(
+      `/api/self-skills/patterns?min_occurrences=${minOccurrences}`,
+    ),
+  /** Generate auto-learned skill from a detected pattern. */
+  generateSelfSkillFromPattern: (signature: string) =>
+    fetcher<{ ok: boolean; skill?: unknown; error?: string }>(
+      `/api/self-skills/generate?signature=${encodeURIComponent(signature)}`,
+      { method: "POST" },
+    ),
+
+  /** Run skill hygiene (validate/clean junk skills). dryRun: only report, no changes. */
+  runSkillHygiene: (dryRun: boolean = false) =>
+    fetcher<{
+      checked: number;
+      healthy: number;
+      deactivated: Array<{ id: string; name: string; issues: string[]; action: string }>;
+      deleted: Array<{ id: string; name: string; issues: string[]; action: string }>;
+      migrated_to_memory: string[];
+      skipped_builtin: number;
+      dry_run: boolean;
+      timestamp?: string;
+    }>(`/api/skills/hygiene?dry_run=${dryRun}`.toLowerCase(), { method: "POST" }),
+
   // MCP
   mcpServers: () => fetcher("/api/mcp/servers"),
   addMcpServer: (server_id: string, url: string, name = "") =>
@@ -265,6 +410,10 @@ export const api = {
   // Thread Analytics
   getThreadAnalytics: (threadId: string) =>
     fetcher<ThreadAnalytics>(`/api/threads/${threadId}/analytics`),
+
+  /** Agent role → list of allowed tool names (for UI). */
+  getAgentTools: () =>
+    fetcher<Record<string, string[]>>("/api/agents/tools"),
 
   // Memory Advanced
   correlateMemories: (
@@ -363,6 +512,70 @@ export const api = {
   getMeetings: (limit = 20) =>
     fetcher<{ total: number; meetings: PostTaskMeeting[]; timestamp: string }>(
       `/api/agents/autonomous-chat/meetings?limit=${limit}`,
+    ),
+
+  // Agent Social (peer learning, swarm)
+  getSocialCommunities: () =>
+    fetcher<{ communities: { id: string; name: string; type: string; description: string; members: string[] }[] }>(
+      "/api/social/communities",
+    ),
+  getSocialDiscussions: (communityId?: string, limit = 20) =>
+    fetcher<{ discussions: { id: string; community_id: string; topic: string; started_by: string; message_count: number; created_at: string }[] }>(
+      `/api/social/discussions?limit=${limit}${communityId ? `&community_id=${encodeURIComponent(communityId)}` : ""}`,
+    ),
+  createSocialProposal: (proposer: string, title: string, description: string) =>
+    fetcher<{ id: string; proposer: string; title: string; description: string; votes: Record<string, string>; status: string }>(
+      "/api/social/proposals",
+      { method: "POST", body: JSON.stringify({ proposer, title, description }) },
+    ),
+  getSocialProposals: (status?: string, limit = 30) =>
+    fetcher<{ proposals: { id: string; proposer: string; title: string; description: string; votes: Record<string, string>; status: string; resolution_reason?: string | null; created_at: string }[] }>(
+      `/api/social/proposals?limit=${limit}${status ? `&status=${encodeURIComponent(status)}` : ""}`,
+    ),
+  voteSocialProposal: (proposalId: string, voter: string, vote: "agree" | "disagree" | "abstain") =>
+    fetcher<{ proposal_id: string; status: string; votes: Record<string, string>; resolution_reason?: string | null }>(
+      `/api/social/proposals/${encodeURIComponent(proposalId)}/vote?voter=${encodeURIComponent(voter)}&vote=${encodeURIComponent(vote)}`,
+      { method: "POST" },
+    ),
+  getCollectivePolicy: () =>
+    fetcher<{ policy: { quorum_min_votes: number; majority_ratio: number; tie_breaker: string; allow_human_escalation: boolean; escalation_threshold_ratio?: number } }>(
+      "/api/social/collective-policy",
+    ),
+  updateCollectivePolicy: (updates: { quorum_min_votes?: number; majority_ratio?: number; tie_breaker?: string; allow_human_escalation?: boolean; escalation_threshold_ratio?: number }) =>
+    fetcher<{ policy: Record<string, unknown> }>("/api/social/collective-policy", {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }),
+  resolveSocialProposal: (proposalId: string, resolution: "passed" | "rejected", reason?: string) =>
+    fetcher<{ proposal_id: string; status: string; votes: Record<string, string>; resolution_reason: string | null }>(
+      `/api/social/proposals/${encodeURIComponent(proposalId)}/resolve`,
+      { method: "POST", body: JSON.stringify({ resolution, reason }) },
+    ),
+  shareSocialLearning: (teacher: string, pattern: string, communityId = "general") =>
+    fetcher<{ id: string; teacher: string; pattern: string; community_id: string; adopted_by: string[]; rejected_by: string[]; created_at: string }>(
+      "/api/social/learnings",
+      { method: "POST", body: JSON.stringify({ teacher, pattern, community_id: communityId }) },
+    ),
+  getSocialLearnings: (teacher?: string, limit = 30) =>
+    fetcher<{ learnings: { id: string; teacher: string; pattern: string; community_id: string; adopted_by: string[]; rejected_by: string[]; created_at: string }[] }>(
+      `/api/social/learnings?limit=${limit}${teacher ? `&teacher=${encodeURIComponent(teacher)}` : ""}`,
+    ),
+
+  // Heartbeat (Faz 11.2)
+  getHeartbeatTasks: () =>
+    fetcher<{ tasks: { name: string; frequency: string; enabled: boolean; last_run: string | null; run_count: number; error_count: number }[] }>(
+      "/api/heartbeat/tasks",
+    ),
+  triggerHeartbeatTask: (name: string) =>
+    fetcher<{ task: string; result: unknown }>(`/api/heartbeat/tasks/${encodeURIComponent(name)}/trigger`, { method: "POST" }),
+  toggleHeartbeatTask: (name: string, enabled: boolean) =>
+    fetcher<{ name: string; enabled: boolean }>(
+      `/api/heartbeat/tasks/${encodeURIComponent(name)}?enabled=${enabled}`,
+      { method: "PATCH" },
+    ),
+  getHeartbeatEvents: (limit = 30) =>
+    fetcher<{ events: { type: string; task: string; timestamp: string; result?: unknown; error?: string }[] }>(
+      `/api/heartbeat/events?limit=${limit}`,
     ),
 
   // Agent Identity (SOUL.md Pattern)
@@ -469,6 +682,56 @@ export const api = {
       method: "DELETE",
       headers: authHeaders(),
     }),
+};
+
+// ── Image Studio API (generate + improve prompt) ─────────────────
+export const IMAGE_MODELS = ["zimage", "flux", "imagen-4", "grok-imagine"] as const;
+
+export type ImageModel = (typeof IMAGE_MODELS)[number];
+
+export interface ImageListItem {
+  filename: string;
+  size_kb: number;
+  created_at: number;
+}
+
+export const imageStudioApi = {
+  generate: (prompt: string, model: string, width = 1024, height = 1024) =>
+    fetcher<{
+      filename: string;
+      download_url: string;
+      image_url: string;
+      image_base64: string;
+      model: string;
+      prompt: string;
+    }>("/api/images/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ prompt, model, width, height }),
+    }),
+
+  improvePrompt: (prompt: string) =>
+    fetcher<{ improved_prompt: string }>("/api/images/improve-prompt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ prompt }),
+    }),
+
+  list: () => fetcher<ImageListItem[]>("/api/images"),
+
+  delete: (filename: string) =>
+    fetcher<{ deleted: boolean; filename: string }>(`/api/images/${encodeURIComponent(filename)}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    }),
+
+  /** Fetch image as blob for download (uses auth). */
+  async downloadBlob(filename: string): Promise<Blob> {
+    const url = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/api/images/${encodeURIComponent(filename)}/download`;
+    const res = await fetch(url, { headers: authHeaders() });
+    if (!res.ok) throw new Error(`İndirme hatası: ${res.status}`);
+    return res.blob();
+  },
 };
 
 // ── Memory API (uses fetcher for consistent auth + 401 handling) ─
@@ -798,22 +1061,28 @@ export const workflowOptimizerApi = {
   },
 
   async getWorkflowStats(workflowId: string) {
-    const res = await fetch(`${BASE}/api/workflow-optimizer/workflow/${encodeURIComponent(workflowId)}`, {
-      headers: authHeaders(),
-    });
+    const res = await fetch(
+      `${BASE}/api/workflow-optimizer/workflow/${encodeURIComponent(workflowId)}`,
+      {
+        headers: authHeaders(),
+      },
+    );
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
 
-  async optimizeTemplate(
-    templateName: string,
-    autoApply = false,
-  ) {
-    const res = await fetch(`${BASE}/api/workflow-optimizer/optimize-template`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ template_name: templateName, auto_apply: autoApply }),
-    });
+  async optimizeTemplate(templateName: string, autoApply = false) {
+    const res = await fetch(
+      `${BASE}/api/workflow-optimizer/optimize-template`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          template_name: templateName,
+          auto_apply: autoApply,
+        }),
+      },
+    );
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   },
@@ -1139,7 +1408,31 @@ export const domainApi = {
   },
 };
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Fetch that returns a Blob (for PDF/HTML/binary exports). Handles auth + 401. */
+export async function fetchBlob(
+  path: string,
+  init?: RequestInit,
+): Promise<Blob> {
+  const token = getAuthToken();
+  const res = await fetch(`${BASE}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...init,
+  });
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearAuthOn401();
+      throw new Error(
+        "Oturum süresi doldu veya geçersiz. Lütfen tekrar giriş yapın.",
+      );
+    }
+    throw new Error(`API ${res.status}: ${res.statusText}`);
+  }
+  return res.blob();
 }

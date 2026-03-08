@@ -1,0 +1,7 @@
+{
+  "quorum_min_votes": 4,
+  "majority_ratio": 0.6,
+  "tie_breaker": "proposer_wins",
+  "allow_human_escalation": true,
+  "escalation_threshold_ratio": 0.55
+}

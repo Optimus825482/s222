@@ -663,6 +663,9 @@ class CostTracker:
             """
             SELECT
                 COUNT(*)                        AS total_events,
+                COUNT(DISTINCT agent_role)      AS unique_agents,
+                COUNT(DISTINCT model)           AS unique_models,
+                COUNT(DISTINCT task_type)       AS unique_task_types,
                 COALESCE(SUM(input_tokens), 0)  AS total_input_tokens,
                 COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
                 COALESCE(SUM(total_tokens), 0)  AS total_tokens,
@@ -684,21 +687,6 @@ class CostTracker:
             stats["avg_input_tokens"] = 0.0
             stats["avg_output_tokens"] = 0.0
             stats["avg_cost_per_event"] = 0.0
-
-        # Unique counts
-        agents = conn.execute(
-            "SELECT COUNT(DISTINCT agent_role) AS n FROM usage_events"
-        ).fetchone()
-        models = conn.execute(
-            "SELECT COUNT(DISTINCT model) AS n FROM usage_events"
-        ).fetchone()
-        tasks = conn.execute(
-            "SELECT COUNT(DISTINCT task_type) AS n FROM usage_events"
-        ).fetchone()
-
-        stats["unique_agents"] = agents["n"]
-        stats["unique_models"] = models["n"]
-        stats["unique_task_types"] = tasks["n"]
 
         return stats
 

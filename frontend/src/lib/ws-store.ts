@@ -11,6 +11,8 @@ import type { WSLiveEvent } from "./types";
 type Status = "idle" | "connecting" | "running" | "complete" | "error";
 type Listener = () => void;
 
+const MAX_LIVE_EVENTS = 500;
+
 interface WSStore {
   status: Status;
   liveEvents: WSLiveEvent[];
@@ -50,12 +52,15 @@ export function setWSStatus(s: Status) {
 }
 
 export function setWSLiveEvents(events: WSLiveEvent[]) {
-  store.liveEvents = events;
+  store.liveEvents = events.slice(-MAX_LIVE_EVENTS);
   notify();
 }
 
 export function pushWSLiveEvent(event: WSLiveEvent) {
-  store.liveEvents = [...store.liveEvents, event];
+  store.liveEvents.push(event);
+  if (store.liveEvents.length > MAX_LIVE_EVENTS) {
+    store.liveEvents = store.liveEvents.slice(-MAX_LIVE_EVENTS);
+  }
   notify();
 }
 

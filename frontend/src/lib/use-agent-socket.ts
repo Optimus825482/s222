@@ -8,6 +8,16 @@ import { setWSStatus, pushWSLiveEvent, clearWSLiveEvents } from "./ws-store";
 const INITIAL_RECONNECT_MS = 1_000;
 const MAX_RECONNECT_MS = 30_000;
 const MAX_RECONNECT_ATTEMPTS = 10;
+const MAX_LIVE_EVENTS = 500;
+
+function toLiveEventWithKey(event: WSLiveEvent): WSLiveEvent {
+  if (event.logKey) return event;
+
+  return {
+    ...event,
+    logKey: `${event.timestamp}:${event.agent}:${event.event_type}`,
+  };
+}
 
 interface UseAgentSocketOptions {
   /** When false, does not connect (avoids "closed before connection" on redirect). */
@@ -35,6 +45,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentWsUrlRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimer.current !== null) {
@@ -88,21 +99,30 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      // Reset backoff on successful connection
+      if (!mountedRef.current) return;
       reconnectAttempts.current = 0;
       setStatus("idle");
       setWSStatus("idle");
     };
 
     ws.onmessage = (ev) => {
+      if (!mountedRef.current) return;
       try {
         const msg: WSMessage = JSON.parse(ev.data);
 
         switch (msg.type) {
           case "live_event":
-            setLiveEvents((prev) => [...prev, msg]);
-            pushWSLiveEvent(msg);
-            optsRef.current.onLiveEvent?.(msg);
+            {
+              const nextEvent = toLiveEventWithKey(msg);
+              setLiveEvents((prev) => {
+                const next = prev.concat(nextEvent);
+                return next.length > MAX_LIVE_EVENTS
+                  ? next.slice(next.length - MAX_LIVE_EVENTS)
+                  : next;
+              });
+              pushWSLiveEvent(nextEvent);
+              optsRef.current.onLiveEvent?.(nextEvent);
+            }
             break;
           case "monitor_start":
             setStatus("running");
@@ -146,6 +166,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     };
 
     ws.onclose = (ev) => {
+      if (!mountedRef.current) return;
       setStatus("idle");
       setWSStatus("idle");
 
@@ -181,6 +202,7 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     };
 
     ws.onerror = () => {
+      if (!mountedRef.current) return;
       setStatus("error");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,19 +218,44 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
   }, [clearReconnectTimer, connect]);
 
   useEffect(() => {
+    mountedRef.current = true;
     if (enabled) {
       connect();
     } else {
       clearReconnectTimer();
       if (wsRef.current) {
-        wsRef.current.close();
+        if (
+          wsRef.current.readyState === WebSocket.OPEN ||
+          wsRef.current.readyState === WebSocket.CLOSING
+        ) {
+          wsRef.current.close();
+        } else {
+          wsRef.current.onopen = null;
+          wsRef.current.onclose = null;
+          wsRef.current.onmessage = null;
+          wsRef.current.onerror = null;
+        }
         wsRef.current = null;
       }
     }
     return () => {
+      mountedRef.current = false;
       clearReconnectTimer();
-      wsRef.current?.close();
-      wsRef.current = null;
+      const ws = wsRef.current;
+      if (ws) {
+        if (
+          ws.readyState === WebSocket.OPEN ||
+          ws.readyState === WebSocket.CLOSING
+        ) {
+          ws.close();
+        } else {
+          ws.onopen = null;
+          ws.onclose = null;
+          ws.onmessage = null;
+          ws.onerror = null;
+        }
+        wsRef.current = null;
+      }
     };
   }, [connect, clearReconnectTimer, enabled]);
 

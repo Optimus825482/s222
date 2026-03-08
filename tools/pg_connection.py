@@ -342,3 +342,8 @@ def migrate_from_sqlite() -> dict[str, int]:
         logger.info(f"Migrated {counts['skills']} skills from SQLite")
 
     return counts
+
+
+# ── Backward-compatible alias ────────────────────────────────────
+# Several modules (monitoring, analytics, main) import this name.
+get_pg_connection = get_conn

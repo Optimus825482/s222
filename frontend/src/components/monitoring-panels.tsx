@@ -1,14 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useSyncExternalStore } from "react";
 import { api } from "@/lib/api";
 import type {
-  AgentHealth,
-  AgentLeaderboardEntry,
-  SystemStats,
-  AnomalyReport,
+  AgentRole,
 } from "@/lib/types";
-import { ROLE_ICON, ROLE_COLOR, STATUS_DOT, STATUS_LABEL } from "@/lib/constants";
+import {
+  ROLE_ICON,
+  ROLE_COLOR,
+  STATUS_DOT,
+  STATUS_LABEL,
+} from "@/lib/constants";
+import { getWSSnapshot, subscribeWS } from "@/lib/ws-store";
+import { LiveEventLog } from "@/components/live-event-log";
+import { useMonitoringData } from "@/hooks/use-monitoring-data";
 
 function Skeleton({ className = "" }: { className?: string }) {
   return (
@@ -37,27 +43,8 @@ function formatUptime(seconds: number): string {
 // ── Component 1: AgentHealthPanel ───────────────────────────────
 
 export function AgentHealthPanel() {
-  const [agents, setAgents] = useState<AgentHealth[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchHealth = useCallback(async () => {
-    try {
-      const data = await api.getAgentsHealth();
-      setAgents(data);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Veri alınamadı");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchHealth]);
+  const { agentHealth: agents, sharedLoading: loading, sharedError: error } =
+    useMonitoringData();
 
   if (loading) {
     return (
@@ -169,130 +156,11 @@ export function AgentHealthPanel() {
   );
 }
 
-// ── Component 2: LeaderboardPanel ───────────────────────────────
-
-export function LeaderboardPanel() {
-  const [entries, setEntries] = useState<AgentLeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchLeaderboard = useCallback(async () => {
-    try {
-      const data = await api.getAgentLeaderboard();
-      setEntries(data.sort((a, b) => a.rank - b.rank));
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Veri alınamadı");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLeaderboard();
-  }, [fetchLeaderboard]);
-
-  if (loading) {
-    return (
-      <section aria-label="Liderlik tablosu yükleniyor" className="space-y-2">
-        <h3 className="text-xs font-semibold text-slate-200 mb-2">
-          Liderlik Tablosu
-        </h3>
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-8 rounded" />
-        ))}
-      </section>
-    );
-  }
-
-  return (
-    <section aria-label="Agent liderlik tablosu" className="space-y-2">
-      <h3 className="text-xs font-semibold text-slate-200 mb-2">
-        Liderlik Tablosu
-      </h3>
-      {error && <InlineError message={error} />}
-
-      {/* Header row */}
-      <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3.5rem_3.5rem] gap-1 text-[10px] text-slate-500 px-2">
-        <span>#</span>
-        <span>Agent</span>
-        <span className="text-right">Skor</span>
-        <span className="text-right">Başarı</span>
-        <span className="text-right">Gecikme</span>
-        <span className="text-right">Verim</span>
-      </div>
-
-      <div className="space-y-1 max-h-[300px] overflow-y-auto">
-        {entries.map((entry) => {
-          const isTop = entry.rank === 1;
-          return (
-            <div
-              key={entry.role}
-              className={`grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3.5rem_3.5rem] gap-1 items-center px-2 py-1.5 rounded-md text-xs ${
-                isTop
-                  ? "bg-yellow-500/10 border border-yellow-500/30"
-                  : "bg-[#1a1f2e] border border-border"
-              }`}
-              aria-label={`Sıra ${entry.rank}: ${entry.name}`}
-            >
-              <span className="text-slate-400 font-medium">
-                {isTop ? "👑" : `#${entry.rank}`}
-              </span>
-              <span className="flex items-center gap-1 min-w-0">
-                <span className="text-sm" aria-hidden="true">
-                  {ROLE_ICON[entry.role]}
-                </span>
-                <span
-                  className="truncate font-medium"
-                  style={{ color: ROLE_COLOR[entry.role] }}
-                >
-                  {entry.name}
-                </span>
-              </span>
-              <span className="text-right font-bold text-slate-200">
-                {(entry.score ?? 0).toFixed(0)}
-              </span>
-              <span className="text-right text-slate-300">
-                {(entry.success_rate ?? 0).toFixed(0)}%
-              </span>
-              <span className="text-right text-slate-400">
-                {(entry.avg_latency_ms ?? 0).toFixed(0)}ms
-              </span>
-              <span className="text-right text-slate-400">
-                {(entry.efficiency ?? 0).toFixed(1)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 // ── Component 3: SystemStatsPanel ───────────────────────────────
 
 export function SystemStatsPanel() {
-  const [stats, setStats] = useState<SystemStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const data = await api.getSystemStats();
-      setStats(data);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Veri alınamadı");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 15_000);
-    return () => clearInterval(interval);
-  }, [fetchStats]);
+  const { systemStats: stats, sharedLoading: loading, sharedError: error } =
+    useMonitoringData();
 
   if (loading) {
     return (
@@ -427,27 +295,8 @@ const HEALTH_CONFIG: Record<string, { label: string; className: string }> = {
 };
 
 export function AnomalyPanel() {
-  const [report, setReport] = useState<AnomalyReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchAnomalies = useCallback(async () => {
-    try {
-      const data = await api.getAnomalies();
-      setReport(data);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Veri alınamadı");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAnomalies();
-    const interval = setInterval(fetchAnomalies, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchAnomalies]);
+  const { anomalies: report, sharedLoading: loading, sharedError: error } =
+    useMonitoringData();
 
   if (loading) {
     return (
@@ -537,6 +386,256 @@ export function AnomalyPanel() {
             </div>
           ))
         )}
+      </div>
+    </section>
+  );
+}
+
+// ── Component 5: HeartbeatPanel (Faz 11.2) ─────────────────────────────
+
+const FREQ_LABEL: Record<string, string> = {
+  minutely: "Her dakika",
+  hourly: "Saatlik",
+  daily: "Günlük",
+  weekly: "Haftalık",
+};
+
+export function HeartbeatPanel() {
+  const {
+    heartbeatTasks: tasks,
+    heartbeatEvents: events,
+    heartbeatLoading: loading,
+    refreshHeartbeatData,
+  } = useMonitoringData();
+  const [triggering, setTriggering] = useState<string | null>(null);
+
+  const onTrigger = async (name: string) => {
+    setTriggering(name);
+    try {
+      await api.triggerHeartbeatTask(name);
+      await refreshHeartbeatData();
+    } finally {
+      setTriggering(null);
+    }
+  };
+
+  const onToggle = async (name: string, enabled: boolean) => {
+    try {
+      await api.toggleHeartbeatTask(name, enabled);
+      await refreshHeartbeatData();
+    } catch { }
+  };
+
+  const ago = (ts: string) => {
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    return m < 1 ? "az önce" : m < 60 ? `${m}dk` : m < 1440 ? `${Math.floor(m / 60)}sa` : `${Math.floor(m / 1440)}g`;
+  };
+
+  if (loading) {
+    return (
+      <section aria-label="Heartbeat yükleniyor" className="space-y-2">
+        <h3 className="text-xs font-semibold text-slate-200 mb-2">Heartbeat</h3>
+        <Skeleton className="h-24 rounded-lg" />
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Heartbeat görevleri" className="space-y-2">
+      <h3 className="text-xs font-semibold text-slate-200 mb-2">
+        Proaktif Görevler (Heartbeat)
+      </h3>
+      <div className="space-y-1.5">
+        {tasks.map((t) => (
+          <div
+            key={t.name}
+            className="bg-[#1a1f2e] border border-border rounded-lg p-2.5 flex items-center justify-between gap-2"
+          >
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-slate-200">{t.name}</div>
+              <div className="text-[10px] text-slate-500">
+                {FREQ_LABEL[t.frequency] ?? t.frequency} · {t.run_count} çalıştı
+                {t.last_run ? ` · ${ago(t.last_run)}` : ""}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                type="button"
+                aria-label={t.enabled ? "Devre dışı bırak" : "Etkinleştir"}
+                onClick={() => onToggle(t.name, !t.enabled)}
+                className={`text-[10px] px-2 py-1 rounded ${t.enabled ? "bg-green-500/20 text-green-400" : "bg-slate-600/40 text-slate-500"}`}
+              >
+                {t.enabled ? "Açık" : "Kapalı"}
+              </button>
+              <button
+                type="button"
+                disabled={triggering === t.name}
+                onClick={() => onTrigger(t.name)}
+                className="text-[10px] px-2 py-1 rounded bg-cyan-500/20 text-cyan-400 disabled:opacity-50"
+              >
+                {triggering === t.name ? "…" : "Şimdi"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {events.length > 0 && (
+        <details className="mt-2">
+          <summary className="text-[10px] text-slate-500 cursor-pointer">Son olaylar</summary>
+          <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto text-[10px] text-slate-400">
+            {events.slice(0, 8).map((ev, i) => (
+              <li key={i}>
+                {ev.task} — {ago(ev.timestamp)}
+                {ev.error ? ` — ${ev.error}` : ""}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+// ── Component 6: Autonomous Oversight Panel (Faz 12.7 — İnsan gözetimi) ─
+
+/** Otonom davranış ve konuşmaları tek ekranda izleme: canlı akış + otonom sohbetler + heartbeat. */
+export function AutonomousOversightPanel() {
+  const snapshot = useSyncExternalStore(
+    subscribeWS,
+    getWSSnapshot,
+    getWSSnapshot,
+  );
+  const { status, liveEvents } = snapshot;
+
+  const {
+    autonomousConversations: convs,
+    autonomousLoading: loading,
+    heartbeatEvents,
+  } = useMonitoringData();
+
+  const ago = (ts: string) => {
+    const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+    if (s < 60) return "az önce";
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}dk`;
+    const h = Math.floor(m / 60);
+    return `${h}sa`;
+  };
+
+  return (
+    <section
+      aria-label="Otonom izleme — canlı aktivite, otonom sohbetler, heartbeat"
+      className="space-y-4"
+    >
+      <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+        <span aria-hidden>👁</span>
+        Otonom İzleme — İnsan Gözetimi
+      </h2>
+      <p className="text-[11px] text-slate-500">
+        Agent&apos;ların otonom davranışları ve konuşmaları tek ekrandan takip
+        edilir. Detay: İletişim (Otonom Sohbet), Sistem Durumu (Heartbeat).
+      </p>
+
+      {/* 1. Canlı aktivite akışı (WebSocket) */}
+      <div className="bg-[#1a1f2e] border border-border rounded-lg overflow-hidden">
+        <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+          <span className="text-xs font-medium text-slate-300">
+            Canlı Aktivite Akışı
+          </span>
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded ${status === "running"
+              ? "bg-amber-500/20 text-amber-400"
+              : status === "complete"
+                ? "bg-green-500/20 text-green-400"
+                : "bg-slate-600/40 text-slate-400"
+              }`}
+          >
+            {status === "running"
+              ? "Aktif"
+              : status === "complete"
+                ? "Tamamlandı"
+                : "Beklemede"}
+          </span>
+        </div>
+        <div className="max-h-48 overflow-y-auto p-2">
+          {liveEvents.length > 0 ? (
+            <LiveEventLog events={liveEvents} status={status} />
+          ) : (
+            <p className="text-[11px] text-slate-500 py-2 text-center">
+              Sohbetten görev gönderildiğinde olaylar burada görünür.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Son otonom sohbetler */}
+      <div className="bg-[#1a1f2e] border border-border rounded-lg overflow-hidden">
+        <div className="px-3 py-2 border-b border-border">
+          <span className="text-xs font-medium text-slate-300">
+            Son Otonom Sohbetler
+          </span>
+        </div>
+        <div className="max-h-40 overflow-y-auto p-2">
+          {loading ? (
+            <div className="animate-pulse h-12 rounded bg-slate-700/50" />
+          ) : convs.length === 0 ? (
+            <p className="text-[11px] text-slate-500 py-2 text-center">
+              Henüz otonom sohbet yok. İletişim → Otonom Sohbet ile başlatın.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {convs.slice(0, 6).map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center gap-2 text-[11px] text-slate-400"
+                >
+                  <span style={{ color: ROLE_COLOR[c.initiator as AgentRole] ?? "#94a3b8" }}>
+                    {ROLE_ICON[c.initiator as AgentRole] ?? "⚙"}
+                  </span>
+                  <span className="text-slate-500">⇄</span>
+                  <span style={{ color: ROLE_COLOR[c.responder as AgentRole] ?? "#94a3b8" }}>
+                    {ROLE_ICON[c.responder as AgentRole] ?? "⚙"}
+                  </span>
+                  <span className="truncate flex-1 text-slate-300">
+                    {c.topic || "Konuşma"}
+                  </span>
+                  <span className="text-slate-600 tabular-nums">
+                    {c.message_count} mesaj · {ago(c.started_at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* 3. Son heartbeat olayları */}
+      <div className="bg-[#1a1f2e] border border-border rounded-lg overflow-hidden">
+        <div className="px-3 py-2 border-b border-border">
+          <span className="text-xs font-medium text-slate-300">
+            Son Heartbeat Olayları
+          </span>
+        </div>
+        <div className="max-h-32 overflow-y-auto p-2">
+          {loading ? (
+            <div className="animate-pulse h-10 rounded bg-slate-700/50" />
+          ) : heartbeatEvents.length === 0 ? (
+            <p className="text-[11px] text-slate-500 py-2 text-center">
+              Henüz heartbeat olayı yok.
+            </p>
+          ) : (
+            <ul className="space-y-0.5 text-[11px] text-slate-400">
+              {heartbeatEvents.slice(0, 8).map((ev, i) => (
+                <li key={i}>
+                  {ev.task} — {ago(ev.timestamp)}
+                  {ev.error ? (
+                    <span className="text-red-400/80"> — {ev.error}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </section>
   );

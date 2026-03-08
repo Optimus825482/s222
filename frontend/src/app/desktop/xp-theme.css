@@ -4,16 +4,6 @@
 
 /* ── Wallpaper ── */
 .xp-wallpaper {
-  background: linear-gradient(
-    135deg,
-    #245edb 0%,
-    #3a7bd5 20%,
-    #00a2e8 40%,
-    #87ceeb 55%,
-    #5dade2 70%,
-    #245edb 100%
-  );
-  background-size: 200% 200%;
   position: relative;
 }
 
@@ -21,6 +11,7 @@
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   background:
     radial-gradient(
       ellipse 120% 80% at 50% 100%,
@@ -232,8 +223,21 @@
 
 /* ── Desktop Root ── */
 .xp-desktop-root {
-  font-family: "Tahoma", "Segoe UI", sans-serif;
+  font-family: "Roboto", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Override dark body background when XP desktop is active */
+body:has(.xp-desktop-root) {
+  background: #0a246a !important;
+}
+
+/* Override global dark scrollbar on XP desktop */
+body:has(.xp-desktop-root) ::-webkit-scrollbar-thumb {
+  background: #c0bca8;
+}
+body:has(.xp-desktop-root) ::-webkit-scrollbar-track {
+  background: #ece9d8;
 }
 
 /* ── XP-style scrollbar inside windows ── */

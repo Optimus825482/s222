@@ -135,7 +135,9 @@ class BaseAgent(ABC):
         """Override to provide function-calling tools."""
         return None
 
-    def build_context(self, thread: Thread, task_input: str) -> list[dict[str, Any]]:
+    async def build_context(
+        self, thread: Thread, task_input: str
+    ) -> list[dict[str, Any]]:
         """
         12-Factor #3: Build context window.
         Default: system prompt + serialized thread + current task.
@@ -166,18 +168,19 @@ class BaseAgent(ABC):
         # Auto-inject activated skills from sub-task assignments
         skill_injection = self._build_skill_injection(task_input, thread)
 
-        # Image generation capability — injected into ALL agents
+        # Visual capabilities — grafik çizme + Pollinations ile görsel üretme (injected into ALL agents)
         image_capability = (
-            "\n\n## IMAGE GENERATION CAPABILITY:\n"
-            "You have a `generate_image` tool — USE IT ACTIVELY.\n"
-            "- ALWAYS use it when the user asks for a visual, image, illustration, diagram, or infographic.\n"
-            "- In reports: add 1-3 relevant images using generate_image to make the report visually rich.\n"
-            "- If the user's request involves any visual content, you MUST call generate_image.\n"
-            "- Prompt must be in ENGLISH, descriptive, and specific.\n"
-            "- The tool returns a markdown image embed and a downloadable link.\n"
-            "- Embed images inline using ![description](url) markdown syntax.\n"
-            "- Example prompt: 'Professional diagram showing microservices architecture with API gateway'\n"
-            "- DO NOT skip image generation — if a visual would help, generate it.\n"
+            "\n\n## VISUAL CAPABILITIES (use when tasks need visuals):\n"
+            "**1. generate_image** (Pollinations API — AI image generation):\n"
+            "- Use for: illustrations, diagrams, infographics, concept art, photos.\n"
+            "- Prompt in ENGLISH, descriptive and specific. Returns markdown image + download URL.\n"
+            "- Example: 'Professional diagram showing microservices architecture with API gateway'.\n"
+            "**2. generate_chart** (matplotlib — data visualization):\n"
+            "- Use for: bar/line/pie/scatter/histogram/area/heatmap from structured data.\n"
+            "- Pass chart_type, data (e.g. {labels, values} or {x, y}), title, optional width/height.\n"
+            "- Use when the user asks for a chart, graph, or when analysis results should be shown visually.\n"
+            "- In reports: add 1–3 relevant images (generate_image) and/or charts (generate_chart) when they add value.\n"
+            "- DO NOT skip these tools when the task would benefit from a visual.\n"
         )
 
         # Faz 11.6 — SOUL.md identity injection
@@ -230,16 +233,22 @@ class BaseAgent(ABC):
         return ""
 
     async def call_llm(self, messages: list[dict], tools: list[dict] | None = None) -> dict[str, Any]:
-        """Single LLM call with metrics tracking."""
+        """Single LLM call with metrics tracking. Uses effective config (Faz 12.1 overrides)."""
+        try:
+            from tools.agent_param_overrides import get_effective_config
+
+            effective = get_effective_config(self.model_key)
+        except Exception:
+            effective = self.cfg
         kwargs: dict[str, Any] = {
-            "model": self.cfg["id"],
+            "model": effective["id"],
             "messages": messages,
-            "max_tokens": self.cfg["max_tokens"],
-            "temperature": self.cfg["temperature"],
-            "top_p": self.cfg["top_p"],
+            "max_tokens": effective["max_tokens"],
+            "temperature": effective["temperature"],
+            "top_p": effective["top_p"],
         }
-        if self.cfg.get("extra_body"):
-            kwargs["extra_body"] = self.cfg["extra_body"]
+        if effective.get("extra_body"):
+            kwargs["extra_body"] = effective["extra_body"]
         if tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
@@ -336,6 +345,16 @@ class BaseAgent(ABC):
             except Exception:
                 args["height"] = 450
 
+        if fn_name == "generate_chart":
+            try:
+                args["width"] = max(400, min(1600, int(args.get("width", 800))))
+            except Exception:
+                args["width"] = 800
+            try:
+                args["height"] = max(300, min(1200, int(args.get("height", 450))))
+            except Exception:
+                args["height"] = 450
+
         return args
 
     async def execute(self, task_input: str, thread: Thread) -> str:
@@ -348,16 +367,59 @@ class BaseAgent(ABC):
             f"Agent {self.role.value} starting: {task_input[:100]}",
             agent_role=self.role,
         )
+
+        # Progress tracking başlat (Faz 10.5)
+        from tools.agent_progress_tracker import get_tracker, AgentStatus
+
+        tracker = get_tracker()
+        agent_id = f"{self.role.value}_{uuid.uuid4().hex[:8]}"
+        tracker.start_task(agent_id, self.role.value, thread.id)
+        tracker.update_step(
+            agent_id,
+            "init",
+            "Görev başlatıldı",
+            AgentStatus.THINKING,
+            progress_percent=10,
+        )
         self._emit("agent_start", f"Görev alındı: {task_input[:80]}")
 
-        messages = self.build_context(thread, task_input)
+        messages = await self.build_context(thread, task_input)
         tools = self.get_tools()
 
-        for step in range(self.max_steps):
+        # Agentic Loop (Faz 11.1): token/cost guards + context compression
+        from agents.agentic_loop import (
+            get_loop_config,
+            check_guards,
+            compress_messages_if_needed,
+            cost_per_1k_for_model,
+        )
+
+        loop_config = get_loop_config()
+        max_steps_loop = min(self.max_steps, loop_config.max_iterations)
+        cumulative_tokens = 0
+        cumulative_cost_usd = 0.0
+        cost_per_1k = cost_per_1k_for_model(self.cfg.get("id", ""))
+
+        for step in range(max_steps_loop):
+            # Guard: iteration, token budget, cost
+            guard = check_guards(
+                step, cumulative_tokens, cumulative_cost_usd, loop_config
+            )
+            if not guard.ok:
+                thread.add_event(
+                    EventType.ERROR,
+                    f"Agentic loop guard: {guard.reason}",
+                    agent_role=self.role,
+                )
+                return f"[Guard] {guard.reason} — partial result (tokens={cumulative_tokens}, cost=${cumulative_cost_usd:.4f})."
+
             # Check stop request
             if self._live_monitor and self._live_monitor.should_stop():
                 thread.add_event(EventType.ERROR, "User requested stop", agent_role=self.role)
                 return "[Stopped] Kullanıcı tarafından durduruldu."
+
+            # Context Window Guard: compress if too many messages
+            messages = compress_messages_if_needed(messages, loop_config)
 
             try:
                 result = await self.call_llm(messages, tools)
@@ -474,10 +536,19 @@ class BaseAgent(ABC):
                         "tool_call_id": tc.id,
                         "content": str(tool_result),
                     })
+                # Track tokens and cost for this LLM call (result from last call_llm)
+                tok = result.get("tokens_total", 0) or 0
+                cumulative_tokens += tok
+                cumulative_cost_usd += (tok / 1000.0) * cost_per_1k
                 continue  # Back to LLM with tool results
 
             # Final response — break the loop
             content = result["content"]
+            # Track final turn tokens/cost
+            cumulative_tokens += result.get("tokens_total", 0) or 0
+            cumulative_cost_usd += (
+                (result.get("tokens_total", 0) or 0) / 1000.0
+            ) * cost_per_1k
             thread.add_event(
                 EventType.AGENT_RESPONSE,
                 content,
@@ -495,7 +566,12 @@ class BaseAgent(ABC):
             self._emit("response", content[:200])
             return content
 
-        # Max steps reached
+        # Max steps reached (agentic loop iteration limit)
+        thread.add_event(
+            EventType.ERROR,
+            f"Max steps reached ({max_steps_loop}). Tokens={cumulative_tokens}, cost=${cumulative_cost_usd:.4f}",
+            agent_role=self.role,
+        )
         thread.update_metrics(self.role, 0, 0, success=False)
         return "[Warning] Max steps reached — partial result."
 
@@ -543,7 +619,8 @@ class BaseAgent(ABC):
 
         if fn_name == "recall_memory":
             from tools.memory import recall_memory, format_recall_results
-            results = recall_memory(
+
+            results = await recall_memory(
                 query=fn_args["query"],
                 category=fn_args.get("category"),
                 max_results=fn_args.get("max_results", 5),
@@ -636,7 +713,8 @@ class BaseAgent(ABC):
 
         if fn_name == "rag_ingest":
             from tools.rag import ingest_document
-            result = ingest_document(
+
+            result = await ingest_document(
                 content=fn_args["content"],
                 title=fn_args["title"],
                 source=fn_args.get("source", "agent_input"),
@@ -647,7 +725,8 @@ class BaseAgent(ABC):
 
         if fn_name == "rag_query":
             from tools.rag import query_documents, format_rag_results
-            results = query_documents(
+
+            results = await query_documents(
                 query=fn_args["query"],
                 max_results=fn_args.get("max_results", 5),
             )
@@ -808,6 +887,46 @@ class BaseAgent(ABC):
                 f"![{prompt}]({image_url})\n\n"
                 f"Direct URL: {image_url}"
             )
+
+        if fn_name == "generate_chart":
+            from tools.chart_generator import generate_chart as run_generate_chart
+
+            chart_type = (fn_args.get("chart_type") or "bar").lower().strip()
+            data = fn_args.get("data")
+            if not isinstance(data, dict):
+                data = {}
+            title = fn_args.get("title") or f"{chart_type} chart"
+            width = fn_args.get("width", 800)
+            height = fn_args.get("height", 450)
+            try:
+                out = run_generate_chart(
+                    chart_type=chart_type,
+                    data=data,
+                    title=title,
+                    width=width,
+                    height=height,
+                )
+                if out.get("error"):
+                    return self._tool_error(
+                        "chart_generation_failed",
+                        out["error"],
+                        "Fix data shape and retry.",
+                    )
+                cid = out.get("chart_id", "")
+                b64 = out.get("image_base64", "")
+                return (
+                    f"Chart generated successfully.\n"
+                    f"- **chart_id:** {cid}\n"
+                    f"- **title:** {out.get('title', title)}\n"
+                    f"- **type:** {out.get('chart_type', chart_type)}\n"
+                    f"- View/download: dashboard Grafik panel or API GET /api/charts/{cid}.\n"
+                )
+            except Exception as e:
+                return self._tool_error(
+                    "chart_generation_failed",
+                    str(e),
+                    "Check chart_type and data format, then retry.",
+                )
 
         if fn_name == "create_skill":
             from tools.dynamic_skills import create_skill_package

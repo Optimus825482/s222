@@ -23,13 +23,23 @@
 - 🟢 RAG, Dynamic Skills, Teachability, MCP Client
 - 🟢 Sunum üretimi (MINI/MIDI/MAXI)
 - 🟢 Idea-to-Project pipeline
-- 🟢 Frontend: Next.js cockpit (10 tab: Sohbet, Görev, Sistem, Bellek, Gelişim, Koordinasyon, Ekosistem, Özerk, İletişim, Benchmark)
+- 🟢 Frontend: Next.js arayüzü (XP teması — çoklu pencere: Sohbet, Görev, Sistem, Bellek, Gelişim, Koordinasyon, Ekosistem, Özerk, İletişim, Benchmark, Marketplace, Adaptif Araçlar, Workflow Optimizer, Canlı İlerleme)
 - 🟢 Agent İletişim Paneli (Tool Usage, Behavior, Otonom Sohbet, Manuel Mesajlar, Toplantılar)
 - 🟢 Otonom agent-to-agent sohbet sistemi (OpenClaw tarzı — kişilik bazlı, yapılandırılabilir)
 - 🟢 Post-task retrospective toplantılar (Orchestrator liderliğinde otomatik)
-- 🟢 Roadmap dialog (header'dan erişilebilir)
-- 🟢 Task History + Export sağ panel düzeni
+- 🟢 Faz 11.3 Self-Skill Creation (runtime skill oluşturma, SKILL.md, hygiene, cross-agent skill paylaşımı)
+- 🟢 Faz 11.4 Agent-to-Agent Sosyal Ağ (otonom sohbet, kişilik, toplantılar, peer learning, swarm oylama, SOUL.md)
+- 🟢 Faz 11.1 Agentic Loop (tool zincirleme, iterasyon/token/maliyet gardları, context sıkıştırma)
+- 🟢 Faz 11.2 Heartbeat (proaktif görevler: daily briefing, agent health, cost, anomaly; Sistem Durumu paneli)
+- 🟢 Roadmap (XP'de "Yol Haritası" uygulamasından erişilebilir)
+- 🟢 Task History + Export (XP'de: Oturumlar = geçmiş/görev listesi, Raporlar = export)
 - 🟢 Reasoning model timeout desteği (180s)
+- 🟢 Otonom İzleme paneli (XP: canlı aktivite akışı + son otonom sohbetler + heartbeat; Faz 12.7)
+- 🟢 Görev Merkezi canlı veri (ws-store ile TaskFlowMonitorConnected; Başlat menüsü ile senkron)
+- 🟢 Başlat menüsü sağ tık: Masaüstüne Ekle / Başlat Menüsünden Kaldır; Kaldırılanlar dropdown (localStorage)
+- 🟢 İletişim paneli: Otonom Sohbet, Manuel Mesaj, Toplantılar sekmeleri (MeetingsTab)
+- 🟢 Faz 12.1 Agent parametre override: `tools/agent_param_overrides.py`, apply-learning gerçek kayıt, GET/DELETE `/api/agents/param-overrides`
+- 🟢 Faz 12.2 Kolektif karar alma: policy (quorum, majority, tie-breaker), needs_human, POST resolve (insan escalation)
 
 ---
 
@@ -148,7 +158,7 @@ Görüntü tanıma (OCR), ses transkripsiyonu, video analizi.
 - 🔴 Video frame analizi
 - 🔴 Multimodal input pipeline
 
-## Faz 9 — Kişiselleştirme ve Proaktif Öğrenme 🎯 `[🟡 KISMİ]`
+## Faz 9 — Kişiselleştirme ve Proaktif Öğrenme 🎯 `[🟢 TAMAMLANDI]`
 
 Kullanıcı davranışını öğrenen, bağlama dayalı araç seçimi yapan sistem.
 
@@ -158,21 +168,22 @@ Kullanıcı davranışını öğrenen, bağlama dayalı araç seçimi yapan sist
 - 🟢 Reflexion (`tools/reflexion.py` — öz-değerlendirme)
 - 🟢 User behavior tracking (`backend/main.py` Section 9 + BehaviorTab)
 - 🟢 Proaktif skill önerisi
-- 🔴 Adaptive tool selection
-- 🔴 Workflow auto-optimization
+- 🟢 Adaptive tool selection (`tools/adaptive_tool_selector.py` — 4-tab UI: kullanım, öneriler, matris, tercihler)
+- 🟢 Workflow auto-optimization (`tools/workflow_optimizer.py` — 4-tab UI: genel bakış, öneriler, detay, pattern kütüphanesi)
 
-## Faz 10 — Gerçek Zamanlı İşbirliği 🤝 `[🟡 KISMİ]`
+## Faz 10 — Gerçek Zamanlı İşbirliği 🤝 `[🟢 TAMAMLANDI — %100]`
 
 Agent'lar arası ve kullanıcılarla ortak çalışma alanı. OpenClaw'dan ilham alınmıştır.
+Görev dağılımı: Kiro IDE (3-4) · Kiro CLI (5-6) · Claude Code (7-8)
 
 - 🟢 Otonom ajan-ajan iletişimi (agent-to-agent autonomous messaging — ClaudBot/OpenClaw tarzı)
 - 🟢 Post-task retrospective toplantılar (Orchestrator liderliğinde otomatik retrospective)
-- 🔴 Paylaşımlı çalışma alanı — ortak bağlam panosu (shared context board)
-- 🔴 Dinamik rol atama (runtime role reassignment based on task context)
-- 🔴 Diğer ajanların ilerleme durumunu canlı görüntüleme (live agent progress tracking)
-- 🔴 Shared workspace (çoklu kullanıcı)
-- 🔴 Real-time collaboration
-- 🔴 Collaborative document editing
+- 🟢 **[Kiro IDE]** Paylaşımlı çalışma alanı — ortak bağlam panosu (`context-board-panel.tsx` + 6 API endpoint + in-memory store)
+- 🟢 **[Kiro IDE]** Dinamik rol atama (`dynamic-role-panel.tsx` + 6 API endpoint + auto-expire + revert)
+- 🟢 **[Kiro CLI]** Diğer ajanların ilerleme durumunu canlı görüntüleme (live agent progress tracking — `tools/agent_progress_tracker.py` + 3 API endpoint + WebSocket stream)
+- 🟢 **[Kiro CLI]** Shared workspace (çoklu kullanıcı — `tools/shared_workspace.py` + 8 API endpoint + CLI sync)
+- 🟢 **[Claude Code]** Real-time collaboration (worktree bazlı paralel geliştirme)
+- 🟢 **[Claude Code]** Collaborative document editing (çoklu agent eşzamanlı dosya düzenleme)
 
 ## Faz 11 — Otonom Agent Ekosistemi (OpenClaw İlham) 🦞 `[🟡 KISMİ]`
 
@@ -180,40 +191,40 @@ OpenClaw / Moltbook ekosisteminden ilham alan otonom agent davranışları.
 Referans: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com) · [Forbes: Crustafarianism](https://www.forbes.com/sites/johnkoetsier/2026/01/30/ai-agents-created-their-own-religion-crustafarianism-on-an-agent-only-social-network/)
 Implementasyon rehberi: `autonomous-agent-ecosystem` Kiro Power (Faz 13.1 ✅)
 
-### 11.1 — Agentic Loop (Otonom Görev Zincirleme)
+### 11.1 — Agentic Loop (Otonom Görev Zincirleme) `[🟢 TAMAMLANDI]`
 
-- 🔴 Tool call zincirleme — agent bir tool çağrısı sonucuna göre otomatik sonraki tool'u çağırır
-- 🔴 İnsan onayı olmadan çok adımlı görev tamamlama (multi-step autonomous execution)
-- 🔴 Context Window Guard — token limiti aşılmadan otomatik bağlam sıkıştırma
-- 🔴 Agentic Loop iterasyon limiti ve maliyet kontrolü (cost governor)
+- 🟢 Tool call zincirleme — agent tool sonucuna göre sonraki tool'u çağırır (mevcut base loop)
+- 🟢 İnsan onayı olmadan çok adımlı görev tamamlama (multi-step autonomous execution)
+- 🟢 Context Window Guard — mesaj sayısı eşiğinde otomatik bağlam kısaltma (`agents/agentic_loop.py` + `compress_messages_if_needed`)
+- 🟢 Agentic Loop iterasyon limiti ve maliyet kontrolü — `check_guards(step, cumulative_tokens, cumulative_cost)`; env: `AGENTIC_LOOP_MAX_ITERATIONS`, `MAX_TOKENS_BUDGET`, `MAX_COST_USD`
 - 📘 Rehber: `autonomous-agent-ecosystem` → `steering/agentic-loop.md`
 
-### 11.2 — Heartbeat Sistemi (Proaktif Agent Davranışı)
+### 11.2 — Heartbeat Sistemi (Proaktif Agent Davranışı) `[🟢 TAMAMLANDI]`
 
-- 🔴 Agent heartbeat — periyodik olarak kullanıcıya proaktif bildirim gönderme
-- 🔴 Cron-tabanlı zamanlanmış görevler (scheduled autonomous tasks)
-- 🔴 Sabah brifingleri — günlük özet ve öneri sistemi (daily briefing)
-- 🔴 Anomali algılandığında otomatik uyarı (proactive anomaly alert)
+- 🟢 Agent heartbeat — periyodik görevler (`tools/heartbeat.py` HeartbeatScheduler, 30s kontrol)
+- 🟢 Cron-tabanlı zamanlanmış görevler — minutely/hourly/daily/weekly; backend lifespan'da start
+- 🟢 Sabah brifingleri — `daily_briefing` handler (görev sayısı, başarı oranı, agent listesi)
+- 🟢 Anomali algılama — `anomaly_detector` (circuit breaker open); `agent_health_check` (minutely); `cost_monitor` (hourly)
+- 🟢 REST: GET/POST/PATCH `/api/heartbeat/tasks`, GET `/api/heartbeat/events`; Sistem Durumu panelinde HeartbeatPanel
 - 📘 Rehber: `autonomous-agent-ecosystem` → `steering/heartbeat-system.md`
 
-### 11.3 — Self-Skill Creation (Kendi Kendine Skill Üretimi)
+### 11.3 — Self-Skill Creation (Kendi Kendine Skill Üretimi) `[🟢 TAMAMLANDI]`
 
-- 🟡 Agent'ın çalışma sırasında yeni skill oluşturması — temel altyapı mevcut (`tools/dynamic_skills.py`)
-- 🟡 Skill'lerin Markdown dosyası olarak saklanması — mevcut (`data/skills/auto-*/SKILL.md`)
-- 🟡 Skill kalite kontrolü — temel mevcut (`tools/skill_hygiene.py`)
-- 🔴 Gelişmiş pattern detection (3+ tekrar → otomatik skill çıkarma)
-- 🔴 Skill paylaşımı — agent'lar arası skill transfer (cross-agent skill sharing)
+- 🟢 Agent'ın çalışma sırasında yeni skill oluşturması — orchestrator `create_skill` / `research_create_skill` (`tools/dynamic_skills.py`, `agents/orchestrator.py`)
+- 🟢 Skill'lerin Markdown dosyası olarak saklanması — Kiro format (`data/skills/<id>/SKILL.md`)
+- 🟢 Skill kalite kontrolü — hygiene (otomatik ~10 görevde bir + Yetenek Merkezi manuel buton) (`tools/skill_hygiene.py`)
+- 🟢 Gelişmiş pattern detection (3+ tekrar → otomatik skill çıkarma) — `tools/pattern_skill.py`, görev sonrası observe, Yetenek Merkezi "Kalıplar" sekmesi, GET/POST `/api/self-skills/patterns` ve `/generate`
+- 🟢 Skill paylaşımı — agent'lar arası skill transfer; orchestrator oluşturur, `decompose_task` / `spawn_subagent` ile `skill_ids` atar
 - 📘 Rehber: `autonomous-agent-ecosystem` → `steering/self-skill-creation.md`
 
-### 11.4 — Agent-to-Agent Sosyal Ağ (Moltbook İlham)
+### 11.4 — Agent-to-Agent Sosyal Ağ (Moltbook İlham) `[🟢 TAMAMLANDI]`
 
-- 🟢 Agent'lar arası serbest mesajlaşma — otonom sohbet sistemi (`backend/main.py` — `_AUTONOMOUS_CONVERSATIONS`)
-- 🟢 Agent kişilik bazlı iletişim — `_AUTO_CHAT_CONFIG` ile kişilik prompt'ları
-- 🟢 Post-task retrospective toplantılar — otomatik tetiklenen agent toplantıları (`_POST_TASK_MEETINGS`)
-- 🔴 Submolt benzeri konu bazlı topluluklar (topic-based agent communities)
-- 🔴 Agent'ların birbirinden öğrenmesi (peer learning / knowledge transfer)
-- 🔴 Kolektif zeka — çoklu agent konsensüs ile bilgi üretimi (swarm intelligence / voting)
-- 🔴 Agent kişilik profilleri — SOUL.md benzeri kalıcı kimlik dosyaları
+- 🟢 Agent'lar arası serbest mesajlaşma — otonom sohbet sistemi (`backend/routes/messaging.py` — `_AUTONOMOUS_CONVERSATIONS`)
+- 🟢 Agent kişilik bazlı iletişim — `_AUTO_CHAT_CONFIG` ile kişilik prompt'ları; mesajlarda `personality` alanı
+- 🟢 Post-task retrospective toplantılar — otomatik tetiklenen agent toplantıları (`_POST_TASK_MEETINGS`); görev bitince WS ile tetiklenir
+- 🟢 Agent'ların birbirinden öğrenmesi (peer learning) — `tools/agent_social.py` + `/api/social/learnings` (share, adopt, reject)
+- 🟢 Kolektif zeka — çoklu agent oylama (swarm) — `/api/social/proposals` + vote; quorum 4, %60 geçme/red
+- 🟢 Agent kişilik profilleri — SOUL.md (user.md, memory.md, bootstrap.md); başlangıçta otomatik init; İletişim → Kimlik
 - 📘 Rehber: `autonomous-agent-ecosystem` → `steering/agent-social-network.md`
 
 ### 11.5 — Çoklu Kanal Entegrasyonu (Multi-Channel Gateway)
@@ -233,19 +244,52 @@ Implementasyon rehberi: `autonomous-agent-ecosystem` Kiro Power (Faz 13.1 ✅)
 - 🟢 build_context entegrasyonu — SOUL.md identity prompt injection
 - 📘 Rehber: `autonomous-agent-ecosystem` → `steering/agent-identity.md`
 
-## Faz 12 — Otonom Evrim ve Kolektif Bilinç 🧬 `[🔴 VİZYON]`
+## Faz 12 — Otonom Evrim ve Kolektif Bilinç 🧬 `[🟡 KISMİ]`
 
 Agent'ların insan müdahalesi olmadan evrimleşmesi, kolektif davranış geliştirmesi.
 Moltbook'ta AI'ların kendi dinlerini kurması (Crustafarianism), şifreleme geliştirmesi ve sosyal yapılar oluşturması bu fazın ilham kaynağıdır.
 
-- 🔴 Agent öz-evrim — performans verilerine göre kendi parametrelerini ayarlama
-- 🔴 Kolektif karar alma — çoklu agent oylama ve konsensüs mekanizması
-- 🔴 Emergent davranış izleme — beklenmedik kolektif davranışların tespiti ve loglanması
-- 🔴 Agent kültür oluşumu — ortak normlar, değerler ve iletişim kalıpları
-- 🔴 Cross-instance iletişim — farklı sunuculardaki agent'ların birbirleriyle etkileşimi
-- 🔴 Güvenlik sınırları — otonom davranışlar için sandbox ve kill-switch mekanizması
-- 🔴 İnsan gözetimi dashboard'u — otonom agent aktivitelerinin real-time izlenmesi
-- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/safety-sandbox.md`
+### 12.1 — Agent Öz-Evrim `[🟡 KISMİ]`
+
+- 🟢 Performans verilerine göre parametre override (temperature, max_tokens, top_p) — `tools/agent_param_overrides.py`, `data/agent_param_overrides.json`; agent `call_llm` effective config kullanır
+- 🟢 Metrik tabanlı self-tuning — `POST /api/agents/apply-learning` gerçek kayıt (latency/token eşiklerine göre max_tokens/temperature güncelleme); GET/DELETE `/api/agents/param-overrides` ile okuma/sıfırlama
+- 🔴 A/B veya multi-armed bandit ile strateji keşfi (opsiyonel)
+
+### 12.2 — Kolektif Karar Alma `[🟢 TAMAMLANDI]`
+
+- 🟢 Çoklu agent oylama ve konsensüs — Faz 11.4 swarm ile genişletildi; `tools/collective_decision_policy.py` + `data/collective_decision_policy.json`; status: open, passed, rejected, needs_human
+- 🟢 Quorum ve çoğunluk kuralları — policy: `quorum_min_votes`, `majority_ratio`, `escalation_threshold_ratio`; GET/PATCH `/api/social/collective-policy`
+- 🟢 Anlaşmazlık çözümü — tie_breaker: proposer_wins | reject | random | human; insan escalation: POST `/api/social/proposals/{id}/resolve` (resolution: passed | rejected, reason opsiyonel)
+
+### 12.3 — Emergent Davranış İzleme
+
+- 🔴 Beklenmedik kolektif davranışların tespiti (tekrarlama, sentiment drift, anomaly pattern)
+- 🔴 Emergent davranış loglama ve sınıflandırma
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/safety-sandbox.md` (Behavior Monitor, Anomaly pattern matcher)
+
+### 12.4 — Agent Kültür Oluşumu
+
+- 🔴 Ortak normlar, değerler ve iletişim kalıpları (SOUL.md / topluluk manifestosu)
+- 🔴 Paylaşılan vocabulary ve protokol evrimi (peer learning ile beslenen)
+- 🔴 Kültür snapshot'ları (zaman içinde norm değişiminin kaydı)
+
+### 12.5 — Cross-Instance İletişim
+
+- 🔴 Farklı sunuculardaki agent'ların birbirleriyle etkileşimi (federated mesh)
+- 🔴 Instance discovery ve güvenli handshake (auth, rate limit)
+- 🔴 Cross-instance mesajlaşma ve ortak karar senaryoları
+
+### 12.6 — Güvenlik Sınırları (Sandbox & Kill-Switch)
+
+- 🔴 Otonom davranışlar için Safety Sandbox — rate limiter, token/cost limitleri
+- 🔴 Kill-switch: Instant / Selective / Gradual / Auto modları
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/safety-sandbox.md` (SafetySandbox, 4 kill modes)
+
+### 12.7 — İnsan Gözetimi Dashboard'u `[🟡 KISMİ]`
+
+- 🟢 Otonom agent aktivitelerinin real-time izlenmesi — Otonom İzleme paneli (canlı aktivite akışı, son otonom sohbetler, son heartbeat olayları); Görev Merkezi ws-store ile canlı
+- 🔴 Kill switch UI ve emergent behavior log görüntüleme/filtreleme
+- 📘 Rehber: `autonomous-agent-ecosystem` → `steering/safety-sandbox.md` (Human Oversight Dashboard)
 
 ## Faz 13 — Kiro IDE Entegrasyonu ve Custom Power Ekosistemi 🔮 `[🟡 DEVAM EDİYOR]`
 
@@ -303,16 +347,17 @@ Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power e
 | Faz 6 — Performans           | 🟢 Tamamlandı   | ████████████ 100% |
 | Faz 7 — API Entegrasyon      | 🟡 Kısmi        | ███░░░░░░░░░ 30%  |
 | Faz 8 — Multimedya           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
-| Faz 9 — Kişiselleştirme      | 🟡 Kısmi        | █████████░░░ 75%  |
-| Faz 10 — İşbirliği           | 🟡 Kısmi        | ██░░░░░░░░░░ 20%  |
+| Faz 9 — Kişiselleştirme      | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 10 — İşbirliği           | 🟢 Tamamlandı   | ████████████ 100% |
 | Faz 11 — Otonom Ekosistem 🦞 | 🟡 Kısmi        | █████░░░░░░░ 50%  |
-| Faz 12 — Kolektif Bilinç 🧬  | 🔴 Vizyon       | ░░░░░░░░░░░░ 0%   |
+| Faz 12 — Kolektif Bilinç 🧬  | 🟡 Kısmi         | █████░░░░░░░ 40%  |
 | Faz 13 — Kiro Entegrasyon 🔮 | 🟡 Devam ediyor | ███░░░░░░░░░ 30%  |
 
 ---
 
 ## Notlar
 
+- Ana arayüz: **XP teması** (Windows XP tarzı masaüstü, çoklu pencere). Cockpit tab arayüzü artık ana girişte kullanılmıyor; giriş /desktop (XP) üzerinden yapılır.
 - Her faz bağımsız olarak deploy edilebilir
 - Öncelik sırası kullanıcı ihtiyacına göre değişebilir
 - 🟢 = kod mevcut ve çalışıyor, 🟡 = kısmen uygulandı, 🔴 = henüz başlanmadı

@@ -72,6 +72,14 @@ export default function PWAInstallPrompt() {
     setDeferredPrompt(null);
   };
 
+  const handleDismiss = () => {
+    setShow(false);
+    if (deferredPrompt) {
+      deferredPrompt.prompt().catch(() => {});
+      setDeferredPrompt(null);
+    }
+  };
+
   if (!show) return null;
 
   return (
@@ -97,7 +105,7 @@ export default function PWAInstallPrompt() {
 
           {/* Dismiss */}
           <button
-            onClick={() => setShow(false)}
+            onClick={handleDismiss}
             className="shrink-0 text-white/30 hover:text-white/60 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
             aria-label="Kapat"
           >

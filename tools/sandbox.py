@@ -49,7 +49,7 @@ ROLE_ALLOWLIST: dict[str, set[str]] = {
         "rag_query", "rag_ingest", "rag_list_documents",
         "list_teachings", "request_approval", "spawn_subagent",
         "get_agent_baseline", "get_best_agent", "self_evaluate",
-        "mcp_call", "mcp_list_tools", "generate_image",
+        "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
         "create_skill", "code_execute",
         # Orchestrator-specific tools
         "decompose_task", "direct_response", "research_create_skill",
@@ -58,27 +58,27 @@ ROLE_ALLOWLIST: dict[str, set[str]] = {
     "thinker": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
-        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
+        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
     },
     "speed": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
-        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
+        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
     },
     "researcher": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "rag_ingest",
-        "code_execute", "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
+        "code_execute", "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
     },
     "reasoner": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
-        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
+        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
     },
     "critic": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
-        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image",
+        "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
     },
 }
 

@@ -145,17 +145,21 @@ class OrchestratorAgent(BaseAgent):
             "- self_evaluate: Rate your own response quality\n"
             "- get_agent_baseline / get_best_agent: Read performance metrics; use when improving the team or choosing which agent to assign\n"
             "- mcp_call / mcp_list_tools: Call external services via MCP protocol\n"
+            "- generate_image: Create images via Pollinations API (diagrams, illustrations) — use when synthesis or report needs visuals\n"
+            "- generate_chart: Create bar/line/pie/scatter/histogram/heatmap from data — use when task needs data visualization\n"
             "- create_skill / research_create_skill: Create new reusable skills when the team needs a capability it doesn't have yet\n\n"
             "LONG-TERM MEMORY & SELF-IMPROVEMENT:\n"
             "- At the START of non-trivial tasks: call recall_memory with a query related to the task (e.g. similar past solutions, user preferences). Use what you recall to avoid repeating mistakes and to match user style.\n"
             "- After completing important work: call save_memory to store key learnings, solutions, or decisions (category: solution, pattern, or preference) so future runs benefit.\n"
             "- When you need expertise that no existing skill covers: use research_create_skill to create it, then use_skill or inject that skill into spawn_subagent/decompose_task so the team gains the capability.\n"
             "- When improving agent performance: use get_agent_baseline to see metrics, then create or refine skills and assign them via decompose_task or spawn_subagent.\n\n"
-            "SKILL CREATION RULES (IMPORTANT):\n"
+            "SKILL CREATION & SHARING (IMPORTANT):\n"
+            "- ONLY the orchestrator can create skills (create_skill / research_create_skill). Other agents do NOT have these tools; they receive skills you assign.\n"
             "- Skills are SPECIAL CAPABILITIES (yetenekler) — NOT domain knowledge dumps.\n"
             "- A skill teaches HOW to do something: which libraries, APIs, algorithms, formulas, patterns to use.\n"
             "- Before ANY complex task: call find_skill to check if a relevant capability already exists.\n"
             "- If no skill exists: RESEARCH the topic (web_search), then call create_skill with structured knowledge.\n"
+            "- Cross-agent skill sharing: when you decompose_task or spawn_subagent, pass skill_ids so that agent gets the skill context automatically.\n"
             "- Skill knowledge MUST include: step-by-step instructions, recommended tools/libraries, code patterns, edge cases.\n"
             "- When decomposing tasks: add skill IDs to sub_tasks so specialist agents automatically receive the capability.\n"
             "- Skill IDs: kebab-case, descriptive (e.g., 'astrolojik-hesaplama', 'sentiment-analysis', 'pdf-table-extraction').\n"
@@ -191,7 +195,9 @@ class OrchestratorAgent(BaseAgent):
     def get_tools(self) -> list[dict]:
         return ORCHESTRATOR_TOOLS
 
-    def build_context(self, thread: Thread, task_input: str) -> list[dict[str, str]]:
+    async def build_context(
+        self, thread: Thread, task_input: str
+    ) -> list[dict[str, str]]:
         """Orchestrator sees full context + relevant memories + current date."""
         from datetime import datetime, timezone
 
@@ -208,7 +214,8 @@ class OrchestratorAgent(BaseAgent):
         memory_context = ""
         try:
             from tools.memory import recall_memory, format_recall_results
-            memories = recall_memory(query=task_input, max_results=3)
+
+            memories = await recall_memory(query=task_input, max_results=3)
             if memories:
                 memory_context = (
                     "\n\n--- RELEVANT MEMORIES ---\n"

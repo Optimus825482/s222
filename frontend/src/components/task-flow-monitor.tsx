@@ -606,14 +606,18 @@ function GanttChart({ task }: { task: Task }) {
                     <g
                       key={bar.sub.id}
                       onMouseEnter={(e) => {
-                        const rect = svgRef.current?.getBoundingClientRect();
-                        if (rect) {
-                          setTooltip({
-                            x: e.clientX - rect.left,
-                            y: e.clientY - rect.top - 40,
-                            sub: bar.sub,
-                          });
-                        }
+                        const cx = e.clientX;
+                        const cy = e.clientY;
+                        requestAnimationFrame(() => {
+                          const rect = svgRef.current?.getBoundingClientRect();
+                          if (rect) {
+                            setTooltip({
+                              x: cx - rect.left,
+                              y: cy - rect.top - 40,
+                              sub: bar.sub,
+                            });
+                          }
+                        });
                       }}
                       onMouseLeave={() => setTooltip(null)}
                       className="cursor-pointer"
@@ -1293,6 +1297,7 @@ function LogDetailDialog({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function LogStream({ logs }: { logs: LogItem[] }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -1497,9 +1502,9 @@ function LogStream({ logs }: { logs: LogItem[] }) {
                 </span>
               </div>
 
-              <div className="mt-1">
+              <div className="mt-1 min-w-0">
                 <p
-                  className={`text-[11px] leading-snug ${isError ? "text-rose-300" : "text-slate-400"} ${!isExpanded && isLong ? "line-clamp-2" : ""}`}
+                  className={`text-[11px] leading-snug break-words ${isError ? "text-rose-300" : "text-slate-400"} ${!isExpanded && isLong ? "line-clamp-2" : ""}`}
                 >
                   {log.content}
                 </p>
@@ -1797,6 +1802,7 @@ function Section({
    ═══════════════════════════════════════════════════════════════ */
 
 export function TaskFlowMonitor({ thread, liveEvents }: Props) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const logs = useMemo(
     () => toLogItems(thread, liveEvents),
     [thread, liveEvents],
@@ -1925,11 +1931,6 @@ export function TaskFlowMonitor({ thread, liveEvents }: Props) {
               <DependencyGraph subTasks={allSubTasks} />
             </Section>
           )}
-      </div>
-
-      {/* 6. Log Stream - always visible at bottom, takes remaining space */}
-      <div className="flex-1 min-h-[180px] max-h-[40vh] flex flex-col border-t border-slate-800/60">
-        <LogStream logs={logs} />
       </div>
     </section>
   );

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
-import { XpDesktop } from "@/components/xp-desktop";
+import { XpDesktop } from "@/components/xp/xp-desktop";
 import "./xp-theme.css";
 
 export default function DesktopPage() {

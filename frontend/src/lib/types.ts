@@ -143,6 +143,7 @@ export interface WSLiveEvent {
   content: string;
   extra: Record<string, unknown>;
   timestamp: number;
+  logKey?: string;
 }
 
 export interface WSResult {
@@ -469,6 +470,8 @@ export interface AutonomousChatMessage {
   timestamp: string;
   is_autonomous: boolean;
   topic: string;
+  /** Kişilik açıklaması (örn. "Sen MiniMax, derin düşünür ajansın...") */
+  personality?: string;
 }
 
 export interface AutonomousConversation {
@@ -486,6 +489,8 @@ export interface AutoChatConfig {
   max_exchanges: number;
   enabled_agents: string[];
   topics: string[];
+  /** role → kişilik prompt'u (agent kişilik bazlı iletişim) */
+  personality_prompts?: Record<string, string>;
 }
 
 // ── Post-Task Meeting Types ─────────────────────────────────────

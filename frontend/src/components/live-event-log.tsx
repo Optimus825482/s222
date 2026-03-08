@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { WSLiveEvent } from "@/lib/types";
 import { getAgentInfo } from "@/lib/agents";
 import {
@@ -50,6 +50,25 @@ export function LiveEventLog({ events, status }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
+  const keyedEvents = useMemo(
+    () =>
+      events.map((event) => ({
+        event,
+        key:
+          event.logKey ??
+          `${event.timestamp}:${event.agent}:${event.event_type}:${event.content.slice(0, 32)}`,
+      })),
+    [events],
+  );
+
+  const agentInfoByKey = useMemo(
+    () =>
+      new Map(
+        keyedEvents.map(({ event, key }) => [key, getAgentInfo(event.agent)]),
+      ),
+    [keyedEvents],
+  );
+
   const statusCfg = STATUS_ICONS[status];
   const showEmptyStatus =
     events.length === 0 &&
@@ -76,12 +95,12 @@ export function LiveEventLog({ events, status }: Props) {
   }
 
   const statusLabel = statusCfg
-    ? `${statusCfg.label} (${events.length} adım)`
-    : `Son çalışma (${events.length} adım)`;
+    ? `${statusCfg.label} (${keyedEvents.length} adım)`
+    : `Son çalışma (${keyedEvents.length} adım)`;
   const StatusIcon = statusCfg?.Icon ?? BarChart3;
 
   // For modal: get selected event (tracks live updates)
-  const selectedEvent = selectedIdx !== null ? events[selectedIdx] : null;
+  const selectedEvent = selectedIdx !== null ? keyedEvents[selectedIdx]?.event ?? null : null;
 
   return (
     <div
@@ -114,23 +133,28 @@ export function LiveEventLog({ events, status }: Props) {
           role="log"
           aria-live="polite"
         >
-          {events.map((ev, i) => {
-            const info = getAgentInfo(ev.agent);
+          {keyedEvents.map(({ event: ev, key }, i) => {
+            const info = agentInfoByKey.get(key) ?? getAgentInfo(ev.agent);
             const EvIcon = TYPE_ICONS[ev.event_type] ?? Pin;
             return (
               <button
-                key={i}
+                key={key}
                 onClick={() => setSelectedIdx(i)}
-                className="w-full flex items-center gap-1.5 text-[11px] text-slate-500 py-0.5 border-b border-border/50 hover:bg-white/5 transition-colors cursor-pointer text-left"
+                className="w-full flex items-start gap-1.5 text-[11px] text-slate-500 py-1.5 px-0.5 border-b border-border/50 hover:bg-white/5 transition-colors cursor-pointer text-left"
               >
-                <EvIcon className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-                <span
-                  className="text-[10px] font-medium flex-shrink-0"
-                  style={{ color: info.color }}
-                >
-                  {ev.agent}
-                </span>
-                <span className="truncate">{ev.content.slice(0, 100)}</span>
+                <EvIcon className="w-3 h-3 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <span
+                    className="text-[10px] font-medium flex-shrink-0"
+                    style={{ color: info.color }}
+                  >
+                    {ev.agent}
+                  </span>
+                  <span className="block text-slate-400 break-words mt-0.5">
+                    {ev.content.slice(0, 200)}
+                    {ev.content.length > 200 ? "…" : ""}
+                  </span>
+                </div>
               </button>
             );
           })}

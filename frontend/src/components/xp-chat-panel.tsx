@@ -59,6 +59,12 @@ export default function ChatDesktopPanel() {
 
   const handleSend = (message: string) => {
     sendMessage(message, thread?.id, pipeline);
+    // Görev başladığında Canlı İlerleme penceresini otomatik aç
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("open-app", { detail: "agent-progress" })
+      );
+    }
   };
 
   return (

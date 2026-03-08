@@ -5,6 +5,7 @@ Same public API as SQLite version.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import re
@@ -37,10 +38,25 @@ def _as_row_dict(row: Any) -> dict[str, Any]:
 
 # ── Embedding ────────────────────────────────────────────────────
 
-def _get_embedding(text: str) -> list[float] | None:
+async def _get_embedding_async(text: str) -> list[float] | None:
     try:
-        from tools.memory import _get_embedding as mem_embed
-        return mem_embed(text)
+        from tools.memory import _get_embedding_async as mem_embed_async
+
+        return await mem_embed_async(text)
+    except Exception as e:
+        logger.warning(f"RAG embedding failed: {e}")
+        return None
+
+
+def _get_embedding(text: str) -> list[float] | None:
+    """Sync wrapper for async embedding function using thread executor."""
+    import asyncio
+    try:
+        # Use the async version through thread executor to avoid blocking
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, _get_embedding_async(text))
+            return future.result(timeout=30.0)
     except Exception as e:
         logger.warning(f"RAG embedding failed: {e}")
         return None
@@ -111,7 +127,7 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
 
 # ── Public API ───────────────────────────────────────────────────
 
-def ingest_document(
+async def ingest_document(
     content: str,
     title: str,
     source: str = "direct_input",
@@ -150,19 +166,22 @@ def ingest_document(
             if doc_id is None:
                 return {"success": False, "error": "Failed to create document record"}
 
-            embedded_count = 0
+            # Batch insert chunks for better performance
+            chunk_data = []
             for i, chunk in enumerate(chunks):
-                embedding = _get_embedding(chunk)
+                embedding = await _get_embedding_async(chunk)
                 emb_str = str(embedding) if embedding else None
-                if embedding:
-                    embedded_count += 1
-                cur.execute(
-                    """INSERT INTO chunks (doc_id, chunk_index, content, embedding)
-                       VALUES (%s, %s, %s, %s::vector)""",
-                    (doc_id, i, chunk, emb_str),
-                )
+                chunk_data.append((doc_id, i, chunk, emb_str))
+
+            # Bulk insert all chunks at once
+            cur.executemany(
+                """INSERT INTO chunks (doc_id, chunk_index, content, embedding)
+                   VALUES (%s, %s, %s, %s::vector)""",
+                chunk_data
+            )
 
         conn.commit()
+        embedded_count = sum(1 for _, _, _, emb in chunk_data if emb is not None)
         logger.info(f"RAG: Ingested '{title}' — {len(chunks)} chunks, {embedded_count} embedded")
         return {
             "success": True,
@@ -186,23 +205,31 @@ def ingest_file(filepath: str, title: str | None = None, user_id: str | None = N
     if not content:
         return {"success": False, "error": f"Could not extract text from {filepath}"}
 
-    return ingest_document(
-        content=content,
-        title=title or path.name,
-        source=str(path),
-        source_type=source_type,
-        user_id=user_id,
-    )
+    try:
+        return asyncio.run(
+            ingest_document(
+                content=content,
+                title=title or path.name,
+                source=str(path),
+                source_type=source_type,
+                user_id=user_id,
+            )
+        )
+    except RuntimeError:
+        return {
+            "success": False,
+            "error": "ingest_file cannot be called from an active event loop; use ingest_document instead",
+        }
 
 
-def query_documents(
+async def query_documents(
     query: str,
     max_results: int = 5,
     min_similarity: float = 0.3,
     user_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Semantic search across all ingested documents via pgvector."""
-    embedding = _get_embedding(query)
+    embedding = await _get_embedding_async(query)
     if not embedding:
         return _keyword_search(query, max_results, user_id=user_id)
 

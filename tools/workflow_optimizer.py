@@ -357,7 +357,7 @@ class SuggestionEngine:
             from tools.workflow_engine import WORKFLOW_TEMPLATES
             if template_name in WORKFLOW_TEMPLATES:
                 wf = WORKFLOW_TEMPLATES[template_name]
-               WorkflowStats = self.pattern_optimizer.analyzer.get_workflow_stats(
+                workflow_stats = self.pattern_optimizer.analyzer.get_workflow_stats(
                     workflow_id=wf.workflow_id, limit=50
                 )
                 template_suggestions = self.pattern_optimizer.analyze_workflow(

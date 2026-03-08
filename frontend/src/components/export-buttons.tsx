@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, fetchBlob } from "@/lib/api";
 import type { Task } from "@/lib/types";
 import {
   FileText,
@@ -13,24 +13,6 @@ import {
 } from "lucide-react";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-
-function getAuthHeaders(contentType = false): HeadersInit {
-  let token = "";
-  try {
-    const stored = localStorage.getItem("ops-center-auth");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      token = parsed?.state?.user?.token || "";
-    }
-  } catch {
-    /* ignore */
-  }
-
-  return {
-    ...(contentType ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
 
 interface Props {
   result: string;
@@ -104,12 +86,9 @@ export function ExportButtons({ result, task }: Props) {
   const exportProjectPdf = useCallback(async (projectName: string) => {
     setExporting("project-pdf");
     try {
-      const res = await fetch(
-        `${BASE}/api/projects/${encodeURIComponent(projectName)}/export/pdf`,
-        { headers: getAuthHeaders() },
+      const blob = await fetchBlob(
+        `/api/projects/${encodeURIComponent(projectName)}/export/pdf`,
       );
-      if (!res.ok) throw new Error(`PDF export failed: ${res.status}`);
-      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -133,10 +112,10 @@ export function ExportButtons({ result, task }: Props) {
         presentations.length > 0
       ) {
         const p = presentations[0];
-        const url = `${BASE}/api/presentations/${encodeURIComponent(p.filename)}/pdf`;
-        const res = await fetch(url, { headers: getAuthHeaders() });
-        if (res.ok) {
-          const blob = await res.blob();
+        try {
+          const blob = await fetchBlob(
+            `/api/presentations/${encodeURIComponent(p.filename)}/pdf`,
+          );
           const blobUrl = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = blobUrl;
@@ -145,17 +124,17 @@ export function ExportButtons({ result, task }: Props) {
           URL.revokeObjectURL(blobUrl);
           setExporting(null);
           return;
+        } catch {
+          /* fall through to generic PDF export */
         }
       }
 
       const title = task?.user_input?.slice(0, 60) || "Rapor";
-      const res = await fetch(`${BASE}/api/export/pdf`, {
+      const blob = await fetchBlob(`/api/export/pdf`, {
         method: "POST",
-        headers: getAuthHeaders(true),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markdown: result, title }),
       });
-      if (!res.ok) throw new Error(`PDF export failed: ${res.status}`);
-      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -192,13 +171,11 @@ export function ExportButtons({ result, task }: Props) {
     setExporting("html");
     try {
       const title = task?.user_input?.slice(0, 60) || "Rapor";
-      const res = await fetch(`${BASE}/api/export/html`, {
+      const blob = await fetchBlob(`/api/export/html`, {
         method: "POST",
-        headers: getAuthHeaders(true),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markdown: result, title }),
       });
-      if (!res.ok) throw new Error(`HTML export failed: ${res.status}`);
-      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

@@ -2,7 +2,7 @@
    Windows XP Theme — Authentic Recreation
    ═══════════════════════════════════════════════════════════════ */
 
-@import url("https://fonts.googleapis.com/css2?family=Tahoma:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Tahoma:wght@500;900&family=Roboto:wght@400;500;700&display=swap");
 
 :root {
   /* ── XP Title Bar ── */
@@ -100,6 +100,28 @@
     2px 2px 10px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.2);
   --xp-window-shadow-active:
     3px 3px 14px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.3);
+
+  /* ── XP.css Authentic Border Patterns ── */
+  --xp-button-highlight: #ffffff;
+  --xp-button-face: #ece9d8;
+  --xp-button-shadow: #808080;
+  --xp-window-frame: #0a0a0a;
+  --xp-border-raised-outer:
+    inset -1px -1px var(--xp-window-frame),
+    inset 1px 1px var(--xp-button-highlight);
+  --xp-border-raised-inner:
+    inset -2px -2px var(--xp-button-shadow), inset 2px 2px var(--xp-button-face);
+  --xp-border-sunken-outer:
+    inset -1px -1px var(--xp-button-highlight),
+    inset 1px 1px var(--xp-window-frame);
+  --xp-border-sunken-inner:
+    inset -2px -2px var(--xp-button-face), inset 2px 2px var(--xp-button-shadow);
+  --xp-border-field:
+    inset -1px -1px var(--xp-button-highlight),
+    inset 1px 1px var(--xp-button-shadow),
+    inset -2px -2px var(--xp-button-face), inset 2px 2px var(--xp-window-frame);
+  --xp-border-status-bar:
+    inset -1px -1px var(--xp-button-face), inset 1px 1px var(--xp-button-shadow);
 }
 
 /* ── Desktop Surface ── */
@@ -107,12 +129,30 @@
   position: relative;
   width: 100%;
   height: 100%;
-  background: var(--xp-desktop-bg);
+  background: linear-gradient(
+    135deg,
+    #245edb 0%,
+    #3a7bd5 20%,
+    #00a2e8 40%,
+    #87ceeb 55%,
+    #5dade2 70%,
+    #245edb 100%
+  );
   overflow: hidden;
-  font-family: "Tahoma", "Segoe UI", sans-serif;
+  font-family: "Roboto", "Segoe UI", sans-serif;
+  font-size: 13px;
   user-select: none;
   cursor: default;
 }
+
+.xp-desktop-root {
+  font-family: "Roboto", "Segoe UI", sans-serif;
+  font-size: 13px;
+  user-select: none;
+  cursor: default;
+}
+
+/* wallpaper bg is set via inline style from xp-desktop.tsx */
 
 /* ── Desktop Icons ── */
 .xp-desktop-icon {
@@ -197,8 +237,8 @@
 }
 .xp-titlebar-text {
   flex: 1;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 800;
   color: var(--xp-title-text);
   text-shadow: var(--xp-title-text-shadow);
   white-space: nowrap;
@@ -223,8 +263,8 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   color: #fff;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
   transition: filter 0.1s;
@@ -269,6 +309,481 @@
   background: var(--xp-body-inner-bg);
   margin: 2px;
   border: 1px solid #aca899;
+  font-family: "Tahoma", "Segoe UI", "Verdana", sans-serif;
+  font-size: 13px;
+  color: #000;
+  line-height: 1.55;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ── XP Content Theme Override ──
+   NUCLEAR OVERRIDE: Forces ALL content inside XP windows
+   to use light XP theme regardless of dark Tailwind classes */
+
+/* Master font override — Tahoma (authentic XP) everywhere */
+.xp-window-content,
+.xp-window-content *,
+.xp-window-content *::before,
+.xp-window-content *::after {
+  font-family: "Tahoma", "Segoe UI", "Verdana", sans-serif !important;
+}
+
+/* Master background override — catch ALL dark backgrounds */
+.xp-window-content,
+.xp-window-content div,
+.xp-window-content section,
+.xp-window-content article,
+.xp-window-content aside,
+.xp-window-content main,
+.xp-window-content header,
+.xp-window-content footer,
+.xp-window-content nav,
+.xp-window-content form,
+.xp-window-content fieldset,
+.xp-window-content details,
+.xp-window-content summary {
+  color: #000;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Nuke ALL dark bg classes with wildcard selectors */
+.xp-window-content [class*="bg-slate-"],
+.xp-window-content [class*="bg-gray-"],
+.xp-window-content [class*="bg-zinc-"],
+.xp-window-content [class*="bg-neutral-"],
+.xp-window-content [class*="bg-stone-"],
+.xp-window-content [class*="bg-\[#0"],
+.xp-window-content [class*="bg-\[#1"],
+.xp-window-content [class*="bg-\[#2"],
+.xp-window-content [class*="bg-\[#3"],
+.xp-window-content .bg-black,
+.xp-window-content .bg-background,
+.xp-window-content .bg-card,
+.xp-window-content .bg-popover,
+.xp-window-content .bg-muted,
+.xp-window-content .bg-accent,
+.xp-window-content .bg-secondary,
+.xp-window-content .bg-destructive,
+.xp-window-content .bg-surface,
+.xp-window-content .bg-surface-raised,
+.xp-window-content [class*="bg-surface"],
+.xp-window-content [class*="bg-\[#1a"],
+.xp-window-content [class*="bg-\[#0d"],
+.xp-window-content [class*="bg-\[#12"] {
+  background: #fff !important;
+  color: #000 !important;
+  font-weight: 500 !important;
+}
+
+/* Slightly tinted backgrounds for cards/sections */
+.xp-window-content [class*="bg-white\\/"],
+.xp-window-content [class*="bg-white/"] {
+  background: #f8f6ee !important;
+}
+
+/* Headings */
+.xp-window-content h1,
+.xp-window-content h2,
+.xp-window-content h3,
+.xp-window-content h4,
+.xp-window-content h5,
+.xp-window-content h6 {
+  color: #003399 !important;
+  font-weight: 800;
+}
+
+/* Links */
+.xp-window-content a {
+  color: #0066cc !important;
+  text-decoration: underline;
+}
+.xp-window-content a:hover {
+  color: #003399 !important;
+}
+
+/* ALL text color overrides — BOLD dark text on light bg */
+.xp-window-content [class*="text-slate-"],
+.xp-window-content [class*="text-gray-"],
+.xp-window-content [class*="text-zinc-"],
+.xp-window-content [class*="text-neutral-"],
+.xp-window-content [class*="text-stone-"],
+.xp-window-content .text-white,
+.xp-window-content .text-foreground,
+.xp-window-content .text-card-foreground,
+.xp-window-content .text-popover-foreground,
+.xp-window-content .text-muted-foreground,
+.xp-window-content .text-accent-foreground,
+.xp-window-content .text-secondary-foreground {
+  color: #000 !important;
+  font-weight: 500 !important;
+}
+
+/* Muted/secondary text — still readable, not washed out */
+.xp-window-content .text-muted-foreground,
+.xp-window-content [class*="text-slate-5"],
+.xp-window-content [class*="text-slate-6"],
+.xp-window-content [class*="text-gray-5"],
+.xp-window-content [class*="text-gray-6"] {
+  color: #333 !important;
+}
+
+/* Colored text (agent names, status) — keep but ensure readable */
+.xp-window-content [class*="text-blue-"],
+.xp-window-content [class*="text-emerald-"],
+.xp-window-content [class*="text-green-"],
+.xp-window-content [class*="text-red-"],
+.xp-window-content [class*="text-amber-"],
+.xp-window-content [class*="text-orange-"],
+.xp-window-content [class*="text-purple-"],
+.xp-window-content [class*="text-pink-"],
+.xp-window-content [class*="text-cyan-"],
+.xp-window-content [class*="text-teal-"],
+.xp-window-content [class*="text-indigo-"],
+.xp-window-content [class*="text-violet-"],
+.xp-window-content [class*="text-rose-"],
+.xp-window-content [class*="text-yellow-"],
+.xp-window-content [class*="text-lime-"],
+.xp-window-content [class*="text-fuchsia-"] {
+  /* Keep original colors — they're readable on white */
+  color: inherit;
+}
+
+/* ALL border overrides */
+.xp-window-content [class*="border-slate-"],
+.xp-window-content [class*="border-gray-"],
+.xp-window-content [class*="border-zinc-"],
+.xp-window-content [class*="border-neutral-"],
+.xp-window-content [class*="border-white"],
+.xp-window-content .border-border,
+.xp-window-content [class*="border-border"] {
+  border-color: #d6d2c2 !important;
+}
+
+/* Hover states */
+.xp-window-content [class*="hover\\:bg-"]:hover,
+.xp-window-content [class*="hover:bg-"]:hover {
+  background: #e8e4d4 !important;
+}
+
+/* XP-style input fields — Authentic XP.css sunken border */
+.xp-window-content input,
+.xp-window-content textarea,
+.xp-window-content select {
+  background: #fff !important;
+  color: #000 !important;
+  border: none !important;
+  box-shadow: var(--xp-border-field) !important;
+  border-radius: 0 !important;
+  font-family: "Tahoma", "Verdana", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  padding: 3px 6px !important;
+  caret-color: #000 !important;
+  box-sizing: border-box !important;
+}
+.xp-window-content input::placeholder,
+.xp-window-content textarea::placeholder {
+  color: #888 !important;
+}
+.xp-window-content input:focus,
+.xp-window-content textarea:focus,
+.xp-window-content select:focus {
+  outline: none !important;
+  box-shadow:
+    var(--xp-border-field),
+    0 0 0 1px #0054e3 !important;
+}
+
+/* XP-style buttons inside panels — Authentic XP.css 3D raised look */
+.xp-window-content
+  button:not(.xp-btn-minimize):not(.xp-btn-maximize):not(.xp-btn-close) {
+  font-family: "Tahoma", "Verdana", sans-serif !important;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--xp-button-face) !important;
+  color: #000 !important;
+  border: none !important;
+  box-shadow:
+    var(--xp-border-raised-outer), var(--xp-border-raised-inner) !important;
+  border-radius: 0 !important;
+  min-height: 23px;
+  padding: 2px 12px !important;
+  cursor: pointer;
+}
+.xp-window-content
+  button:not(.xp-btn-minimize):not(.xp-btn-maximize):not(.xp-btn-close):hover {
+  background: #f0ede0 !important;
+}
+.xp-window-content
+  button:not(.xp-btn-minimize):not(.xp-btn-maximize):not(.xp-btn-close):active {
+  box-shadow:
+    var(--xp-border-sunken-outer), var(--xp-border-sunken-inner) !important;
+  padding: 3px 11px 1px 13px !important;
+}
+.xp-window-content
+  button:not(.xp-btn-minimize):not(.xp-btn-maximize):not(
+    .xp-btn-close
+  ):focus-visible {
+  outline: 1px dotted #000 !important;
+  outline-offset: -4px !important;
+}
+/* Primary/colored buttons — keep color but add XP border */
+.xp-window-content button[class*="bg-blue-"],
+.xp-window-content button[class*="bg-emerald-"],
+.xp-window-content button[class*="bg-green-"],
+.xp-window-content button[class*="bg-red-"],
+.xp-window-content button[class*="bg-primary"] {
+  color: #fff !important;
+  box-shadow:
+    var(--xp-border-raised-outer), var(--xp-border-raised-inner) !important;
+}
+.xp-window-content button[class*="bg-blue-"]:active,
+.xp-window-content button[class*="bg-emerald-"]:active,
+.xp-window-content button[class*="bg-green-"]:active,
+.xp-window-content button[class*="bg-red-"]:active,
+.xp-window-content button[class*="bg-primary"]:active {
+  box-shadow:
+    var(--xp-border-sunken-outer), var(--xp-border-sunken-inner) !important;
+}
+
+/* XP-style tabs — Authentic XP.css tab pattern */
+.xp-window-content [role="tablist"] {
+  background: transparent !important;
+  border-bottom: none !important;
+  display: flex !important;
+  padding-left: 3px !important;
+  margin-bottom: -2px !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+.xp-window-content [role="tab"] {
+  background: var(--xp-button-face) !important;
+  color: #222 !important;
+  border: 1px solid #888 !important;
+  border-bottom: none !important;
+  border-top-left-radius: 3px !important;
+  border-top-right-radius: 3px !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  font-family: "Tahoma", "Verdana", sans-serif !important;
+  font-size: 13px !important;
+  padding: 4px 12px !important;
+  position: relative !important;
+  z-index: 1 !important;
+  cursor: pointer !important;
+}
+.xp-window-content [role="tab"][data-state="active"],
+.xp-window-content [role="tab"][aria-selected="true"] {
+  background: #fff !important;
+  font-weight: 700 !important;
+  color: #000 !important;
+  z-index: 8 !important;
+  margin-bottom: -1px !important;
+  padding-bottom: 5px !important;
+  border-bottom: 1px solid #fff !important;
+}
+.xp-window-content [role="tab"]:focus-visible {
+  outline: 1px dotted #222 !important;
+  outline-offset: -4px !important;
+}
+.xp-window-content [role="tabpanel"] {
+  background: #fff !important;
+  border: 1px solid #888 !important;
+  padding: 8px !important;
+  position: relative !important;
+  z-index: 2 !important;
+  color: #1a1a1a !important;
+}
+
+/* XP-style badges/pills */
+.xp-window-content .rounded-full {
+  border-radius: 3px !important;
+}
+
+/* Fix gradient backgrounds used in dark panels */
+.xp-window-content [class*="from-slate"],
+.xp-window-content [class*="from-gray"],
+.xp-window-content [class*="from-zinc"] {
+  --tw-gradient-from: #f5f3e8 !important;
+  --tw-gradient-to: #ece9d8 !important;
+}
+
+/* Labels — force dark text on XP light bg */
+.xp-window-content label {
+  color: #000 !important;
+  font-weight: 600 !important;
+}
+
+/* Force minimum font size — no tiny unreadable text */
+.xp-window-content .text-xs,
+.xp-window-content [class*="text-\\[9px\\]"],
+.xp-window-content [class*="text-\\[10px\\]"],
+.xp-window-content [class*="text-\[9px\]"],
+.xp-window-content [class*="text-\[10px\]"] {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+.xp-window-content [class*="text-\\[11px\\]"],
+.xp-window-content [class*="text-\[11px\]"],
+.xp-window-content .text-sm {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+/* SVG icons inside windows — ensure visible */
+.xp-window-content svg {
+  color: inherit;
+}
+
+/* Canvas/chart containers — ensure white bg */
+.xp-window-content canvas {
+  background: #fff !important;
+}
+
+/* Recharts / chart library overrides */
+.xp-window-content .recharts-wrapper,
+.xp-window-content .recharts-surface {
+  background: #fff !important;
+}
+.xp-window-content .recharts-text {
+  fill: #333 !important;
+}
+.xp-window-content .recharts-cartesian-axis-tick-value {
+  fill: #555 !important;
+}
+.xp-window-content .recharts-cartesian-grid line {
+  stroke: #d6d2c2 !important;
+}
+
+/* Inline style background overrides for dark panels */
+.xp-window-content [style*="background"] {
+  /* Can't override inline styles with CSS, but we can target common patterns */
+}
+
+/* Ensure all span/p/div text is dark */
+.xp-window-content span,
+.xp-window-content p {
+  color: inherit;
+}
+
+/* ── MCP Panel Overrides ── */
+.xp-window-content .bg-surface,
+.xp-window-content [class*="bg-surface"] {
+  background: #f5f3e8 !important;
+  color: #1a1a1a !important;
+}
+.xp-window-content .bg-surface-raised,
+.xp-window-content [class*="bg-surface-raised"] {
+  background: #fff !important;
+  color: #1a1a1a !important;
+}
+/* MCP server status dot — keep green */
+.xp-window-content .fill-green-400 {
+  fill: #22c55e;
+}
+/* MCP tool count badge — keep readable */
+.xp-window-content [class*="bg-blue-400\\/10"],
+.xp-window-content [class*="bg-blue-400/10"] {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+/* MCP accordion body text */
+.xp-window-content [class*="text-slate-4"],
+.xp-window-content [class*="text-slate-5"] {
+  color: #555 !important;
+}
+/* MCP mono command text */
+.xp-window-content .font-mono {
+  color: #333 !important;
+}
+
+/* Table styling */
+.xp-window-content table {
+  color: #1a1a1a !important;
+}
+.xp-window-content th {
+  color: #003399 !important;
+  font-weight: 800;
+  border-bottom: 2px solid #aca899 !important;
+}
+.xp-window-content td {
+  border-bottom: 1px solid #d6d2c2 !important;
+}
+.xp-window-content tr:hover {
+  background: #f0ede0 !important;
+}
+
+/* Progress bars — keep colored */
+.xp-window-content [role="progressbar"] {
+  background: #ece9d8 !important;
+}
+
+/* Accordion / collapsible items */
+.xp-window-content [data-state="open"],
+.xp-window-content [data-state="closed"] {
+  background: #fff !important;
+  color: #1a1a1a !important;
+  border-color: #d6d2c2 !important;
+}
+
+/* XP panel wrapper */
+.xp-panel {
+  background: #fff;
+  color: #000;
+  padding: 8px;
+  height: 100%;
+  overflow: auto;
+  font-family: "Roboto", sans-serif;
+}
+
+/* ── XP.css Authentic Fieldset / GroupBox ── */
+.xp-window-content fieldset {
+  border: 1px solid #d6d2c2 !important;
+  border-radius: 0 !important;
+  padding: 8px !important;
+  margin: 0 0 9px 0 !important;
+  background: transparent !important;
+}
+.xp-window-content legend {
+  background: var(--xp-button-face) !important;
+  color: #003399 !important;
+  font-size: 13px !important;
+  padding: 0 4px !important;
+}
+
+/* ── XP.css Authentic Status Bar ── */
+.xp-window-content .xp-status-bar {
+  display: flex;
+  gap: 1px;
+  margin: 0 1px;
+}
+.xp-window-content .xp-status-bar-field {
+  box-shadow: var(--xp-border-status-bar);
+  flex-grow: 1;
+  padding: 2px 3px;
+  font-size: 11px;
+  color: #222;
+}
+
+/* ── XP.css Authentic Disabled State ── */
+.xp-window-content button:disabled,
+.xp-window-content input:disabled,
+.xp-window-content select:disabled,
+.xp-window-content textarea:disabled {
+  color: var(--xp-button-shadow) !important;
+  text-shadow: 1px 1px 0 var(--xp-button-highlight) !important;
+  cursor: default !important;
+}
+
+/* ── XP.css Authentic Vertical Separator ── */
+.xp-window-content hr {
+  border: none !important;
+  border-top: 1px solid var(--xp-button-shadow) !important;
+  border-bottom: 1px solid var(--xp-button-highlight) !important;
+  margin: 4px 0 !important;
 }
 
 /* ── Resize Handles ── */
@@ -357,9 +872,9 @@
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 0 8px 8px 0;
   color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: "Tahoma", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: "Roboto", sans-serif;
   cursor: pointer;
   text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.4);
   transition: filter 0.1s;
@@ -396,7 +911,7 @@
   border-radius: 2px;
   color: #fff;
   font-size: 11px;
-  font-family: "Tahoma", sans-serif;
+  font-family: "Roboto", sans-serif;
   cursor: pointer;
   white-space: nowrap;
   max-width: 160px;
@@ -431,7 +946,7 @@
 .xp-tray-clock {
   font-size: 11px;
   color: #fff;
-  font-family: "Tahoma", sans-serif;
+  font-family: "Roboto", sans-serif;
   text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
 }
 
@@ -447,7 +962,7 @@
   box-shadow: 4px 4px 16px rgba(0, 0, 0, 0.4);
   z-index: 10000;
   overflow: hidden;
-  font-family: "Tahoma", sans-serif;
+  font-family: "Roboto", sans-serif;
 }
 .xp-start-header {
   display: flex;
@@ -456,8 +971,8 @@
   padding: 8px 12px;
   background: linear-gradient(180deg, #1f5dbe 0%, #3478d7 100%);
   color: #fff;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 900;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
 }
 .xp-start-body {
@@ -541,19 +1056,111 @@
   animation: xp-restore 0.2s ease-out forwards;
 }
 
-/* ── Scrollbar XP Style ── */
+/* ── Scrollbar XP Style — Authentic XP.css pattern ── */
 .xp-window-content::-webkit-scrollbar {
   width: 16px;
 }
+.xp-window-content::-webkit-scrollbar-corner {
+  background: var(--xp-button-face);
+}
 .xp-window-content::-webkit-scrollbar-track {
-  background: #f1efe2;
-  border-left: 1px solid #aca899;
+  background-color: #f1efe2;
+  background-image: repeating-conic-gradient(#d6d2c2 0% 25%, transparent 0% 50%)
+    50% / 2px 2px;
 }
 .xp-window-content::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, #ece9d8 0%, #d6d2c2 50%, #ece9d8 100%);
-  border: 1px solid #aca899;
-  border-radius: 0;
+  background-color: var(--xp-button-face);
+  box-shadow: var(--xp-border-raised-outer), var(--xp-border-raised-inner);
 }
 .xp-window-content::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(90deg, #d6d2c2 0%, #c0bcac 50%, #d6d2c2 100%);
+  background-color: #d6d2c2;
+}
+.xp-window-content::-webkit-scrollbar-button:vertical:start {
+  height: 17px;
+  background: var(--xp-button-face);
+  box-shadow: var(--xp-border-raised-outer), var(--xp-border-raised-inner);
+  display: block;
+}
+.xp-window-content::-webkit-scrollbar-button:vertical:end {
+  height: 17px;
+  background: var(--xp-button-face);
+  box-shadow: var(--xp-border-raised-outer), var(--xp-border-raised-inner);
+  display: block;
+}
+.xp-window-content::-webkit-scrollbar-button:horizontal:start {
+  width: 16px;
+  background: var(--xp-button-face);
+  box-shadow: var(--xp-border-raised-outer), var(--xp-border-raised-inner);
+  display: block;
+}
+.xp-window-content::-webkit-scrollbar-button:horizontal:end {
+  width: 16px;
+  background: var(--xp-button-face);
+  box-shadow: var(--xp-border-raised-outer), var(--xp-border-raised-inner);
+  display: block;
+}
+
+/* ── Skill Creator Panel — XP Theme Overrides ──────────────────── */
+.xp-window-content [class*="bg-surface-raised"],
+.xp-window-content [class*="bg-surface"] {
+  background: #fffff0 !important;
+}
+
+.xp-window-content [class*="text-slate-2"],
+.xp-window-content [class*="text-slate-3"] {
+  color: #000 !important;
+}
+
+.xp-window-content [class*="text-slate-4"],
+.xp-window-content [class*="text-slate-5"],
+.xp-window-content [class*="text-slate-6"] {
+  color: #444 !important;
+}
+
+.xp-window-content [class*="placeholder:text-slate"] ::placeholder,
+.xp-window-content input::placeholder,
+.xp-window-content textarea::placeholder {
+  color: #888 !important;
+}
+
+.xp-window-content [class*="border-border"] {
+  border-color: #d6d2c2 !important;
+}
+
+.xp-window-content [class*="bg-amber-500\\/"] {
+  background: #fff3cd !important;
+}
+
+.xp-window-content [class*="text-amber-4"] {
+  color: #856404 !important;
+}
+
+.xp-window-content [class*="bg-emerald-500\\/"],
+.xp-window-content [class*="bg-green-"] {
+  background: #d4edda !important;
+}
+
+.xp-window-content [class*="text-emerald-4"],
+.xp-window-content [class*="text-green-4"] {
+  color: #155724 !important;
+}
+
+.xp-window-content [class*="bg-red-500\\/"] {
+  background: #f8d7da !important;
+}
+
+.xp-window-content [class*="text-red-4"] {
+  color: #721c24 !important;
+}
+
+.xp-window-content [class*="bg-blue-500\\/"] {
+  background: #cce5ff !important;
+}
+
+.xp-window-content [class*="text-blue-4"] {
+  color: #004085 !important;
+}
+
+.xp-window-content [class*="font-mono"] {
+  font-family: "Lucida Console", "Courier New", monospace !important;
 }

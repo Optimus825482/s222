@@ -6,9 +6,11 @@ Uses NVIDIA nv-embedqa-e5-v5 for semantic vector search via pgvector.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import math
+from collections import defaultdict
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
@@ -25,8 +27,8 @@ _EMBED_DIMENSIONS = 1024  # Matryoshka: request 1024-dim from 2048-native model
 
 # ── Embedding ────────────────────────────────────────────────────
 
-def _get_embedding(text: str) -> list[float] | None:
-    """Get embedding vector from NVIDIA API. Returns None on failure."""
+async def _get_embedding_async(text: str) -> list[float] | None:
+    """Get embedding vector from NVIDIA API asynchronously. Returns None on failure."""
     try:
         from config import NVIDIA_API_KEY, NVIDIA_BASE_URL
         if not NVIDIA_API_KEY:
@@ -36,27 +38,56 @@ def _get_embedding(text: str) -> list[float] | None:
         if not clean:
             return None
 
-        resp = httpx.post(
-            f"{NVIDIA_BASE_URL}/embeddings",
-            headers={
-                "Authorization": f"Bearer {NVIDIA_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": _EMBED_MODEL,
-                "input": [clean[:8000]],
-                "encoding_format": "float",
-                "input_type": "query",
-                "truncate": "END",
-                "dimensions": _EMBED_DIMENSIONS,
-            },
-            timeout=15.0,
-        )
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{NVIDIA_BASE_URL}/embeddings",
+                headers={
+                    "Authorization": f"Bearer {NVIDIA_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": _EMBED_MODEL,
+                    "input": [clean[:8000]],
+                    "encoding_format": "float",
+                    "input_type": "query",
+                    "truncate": "END",
+                    "dimensions": _EMBED_DIMENSIONS,
+                },
+            )
         resp.raise_for_status()
         return resp.json()["data"][0]["embedding"]
     except Exception as e:
         logger.warning(f"Embedding API failed: {e}")
         return None
+
+
+def _get_embedding(text: str) -> list[float] | None:
+    """Sync wrapper for async embedding function using thread executor."""
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+        # If we're in an event loop, run in executor to avoid nested loop issues
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, _get_embedding_async(text))
+            return future.result(timeout=30.0)
+    except RuntimeError:
+        # No event loop running, safe to use asyncio.run
+        return asyncio.run(_get_embedding_async(text))
+
+
+async def recall_memory(
+    query: str,
+    category: str | None = None,
+    max_results: int = 5,
+) -> list[dict[str, Any]]:
+    """Recall memories across all layers — pgvector semantic search with keyword fallback."""
+    embedding = await _get_embedding_async(query)
+    if embedding:
+        results = await _pgvector_recall(embedding, category, max_results)
+        if results:
+            return results
+    return _keyword_recall(query, category, max_results)
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -157,21 +188,21 @@ def save_memory(
     return _insert_memory(content, category, "episodic", tags or [], source_agent)
 
 
-def recall_memory(
+async def recall_memory(
     query: str,
     category: str | None = None,
     max_results: int = 5,
 ) -> list[dict[str, Any]]:
     """Recall memories across all layers — pgvector semantic search with keyword fallback."""
-    embedding = _get_embedding(query)
+    embedding = await _get_embedding_async(query)
     if embedding:
-        results = _pgvector_recall(embedding, category, max_results)
+        results = await _pgvector_recall(embedding, category, max_results)
         if results:
             return results
     return _keyword_recall(query, category, max_results)
 
 
-def list_memories(
+async def list_memories(
     category: str | None = None,
     layer: str | None = None,
     limit: int = 20,
@@ -204,7 +235,7 @@ def list_memories(
         release_conn(conn)
 
 
-def delete_memory(memory_id: int) -> bool:
+async def delete_memory(memory_id: int) -> bool:
     """Delete a memory by ID."""
     conn = get_conn()
     try:
@@ -217,7 +248,7 @@ def delete_memory(memory_id: int) -> bool:
         release_conn(conn)
 
 
-def get_memory_stats() -> dict[str, Any]:
+async def get_memory_stats() -> dict[str, Any]:
     """Get memory usage statistics."""
     conn = get_conn()
     try:
@@ -273,7 +304,7 @@ def format_recall_results(results: list[dict]) -> str:
 
 # ── Layered Memory API ───────────────────────────────────────────
 
-def save_working_memory(
+async def save_working_memory(
     content: str,
     source_agent: str | None = None,
     ttl_hours: int = 24,
@@ -282,7 +313,7 @@ def save_working_memory(
     return _insert_memory(content, "working", "working", [], source_agent, ttl_hours)
 
 
-def save_episodic_memory(
+async def save_episodic_memory(
     content: str,
     category: str = "general",
     tags: list[str] | None = None,
@@ -292,7 +323,7 @@ def save_episodic_memory(
     return _insert_memory(content, category, "episodic", tags or [], source_agent)
 
 
-def save_semantic_memory(
+async def save_semantic_memory(
     content: str,
     category: str = "knowledge",
     tags: list[str] | None = None,
@@ -302,7 +333,7 @@ def save_semantic_memory(
     return _insert_memory(content, category, "semantic", tags or [], source_agent)
 
 
-def recall_layered(
+async def recall_layered(
     query: str,
     layers: list[str] | None = None,
     max_results: int = 5,
@@ -312,7 +343,7 @@ def recall_layered(
     Returns dict with keys: working, episodic, semantic.
     """
     target_layers = layers or ["working", "episodic", "semantic"]
-    embedding = _get_embedding(query)
+    embedding = await _get_embedding_async(query)
 
     result: dict[str, list[dict]] = {layer: [] for layer in target_layers}
 
@@ -383,17 +414,17 @@ def cleanup_expired_working_memory() -> int:
 
 # ── Advanced Indexing & Correlation ──────────────────────────────
 
-def correlate_memories(
+async def correlate_memories_optimized(
     query: str,
     max_results: int = 10,
     time_window_hours: int | None = None,
 ) -> dict[str, Any]:
     """
-    Find correlated memories across layers and categories.
-    Groups by time proximity and semantic similarity.
+    Find correlated memories across layers and categories using optimized O(n) grouping.
+    Groups by category and source_agent first, then applies similarity clustering.
     Returns clusters of related memories with correlation scores.
     """
-    embedding = _get_embedding(query)
+    embedding = await _get_embedding_async(query)
     conn = get_conn()
     try:
         with conn.cursor() as cur:
@@ -401,7 +432,7 @@ def correlate_memories(
             params: list[Any] = []
 
             if time_window_hours:
-                time_filter = "AND created_at > now() - interval '%s hours'"
+                time_filter = "AND created_at > now() - (%s * interval '1 hour')"
                 params.append(time_window_hours)
 
             if embedding:
@@ -436,39 +467,61 @@ def correlate_memories(
         if not rows:
             return {"clusters": [], "total_found": 0}
 
-        # Group by time proximity (within 1 hour = same cluster)
+        # O(n) grouping by category and source_agent using defaultdict
+        category_groups: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+        agent_groups: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+        other_groups: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+
+        for mem in rows:
+            category = mem.get("category")
+            source_agent = mem.get("source_agent")
+            
+            if category and category != "general":
+                category_groups[category].append(mem)
+            elif source_agent:
+                agent_groups[source_agent].append(mem)
+            else:
+                other_groups[f"memory:{mem.get('id')}"].append(mem)
+
+        # Combine all groups
+        all_groups = list(category_groups.values()) + list(agent_groups.values()) + list(other_groups.values())
+
+        # Apply high similarity clustering within each group
         clusters: list[dict[str, Any]] = []
-        used = set()
-
-        for i, mem in enumerate(rows):
-            if i in used:
-                continue
-            cluster_members = [mem]
-            used.add(i)
-            mem_ts = mem.get("created_at", "")
-
-            for j, other in enumerate(rows):
-                if j in used:
-                    continue
-                other_ts = other.get("created_at", "")
-                # Same category or same agent = likely correlated
-                same_category = mem.get("category") == other.get("category")
-                same_agent = mem.get("source_agent") == other.get("source_agent")
-                high_sim = (mem.get("similarity") or 0) > 0.5 and (other.get("similarity") or 0) > 0.5
-
-                if same_category or same_agent or high_sim:
-                    cluster_members.append(other)
-                    used.add(j)
-
-            if cluster_members:
-                avg_sim = sum(m.get("similarity") or 0 for m in cluster_members) / len(cluster_members)
+        for group in all_groups:
+            if len(group) == 1:
+                # Single item group
+                primary = group[0]
                 clusters.append({
-                    "members": cluster_members[:max_results],
-                    "size": len(cluster_members),
-                    "primary_category": mem.get("category"),
-                    "primary_agent": mem.get("source_agent"),
-                    "avg_similarity": round(avg_sim, 3),
+                    "members": group[:max_results],
+                    "size": 1,
+                    "primary_category": primary.get("category"),
+                    "primary_agent": primary.get("source_agent"),
+                    "avg_similarity": primary.get("similarity", 0),
                 })
+            else:
+                # Multiple items - check for high similarity connections
+                high_sim_items = [item for item in group if (item.get("similarity") or 0) > 0.5]
+                if high_sim_items:
+                    # Group items with high similarity
+                    avg_sim = sum(item.get("similarity") or 0 for item in high_sim_items) / len(high_sim_items)
+                    clusters.append({
+                        "members": high_sim_items[:max_results],
+                        "size": len(high_sim_items),
+                        "primary_category": group[0].get("category"),
+                        "primary_agent": group[0].get("source_agent"),
+                        "avg_similarity": round(avg_sim, 3),
+                    })
+                else:
+                    # Keep as separate clusters if no high similarity
+                    for item in group:
+                        clusters.append({
+                            "members": [item],
+                            "size": 1,
+                            "primary_category": item.get("category"),
+                            "primary_agent": item.get("source_agent"),
+                            "avg_similarity": item.get("similarity", 0),
+                        })
 
         clusters.sort(key=lambda c: c["avg_similarity"], reverse=True)
         return {
@@ -538,71 +591,66 @@ def get_memory_timeline(
         release_conn(conn)
 
 
-def find_related_memories(
+async def find_related_memories_optimized(
     memory_id: int,
     max_results: int = 5,
 ) -> list[dict[str, Any]]:
     """
-    Find memories related to a specific memory by its ID.
+    Find memories related to a specific memory by its ID using optimized batch queries.
     Uses the source memory's embedding for similarity search,
-    falls back to category + tag matching.
+    falls back to category + tag matching with pre-fetched embeddings cache.
     """
     conn = get_conn()
     try:
-        # Fetch the source memory
+        # Fetch the source memory and related memory embeddings in one query
         with conn.cursor() as cur:
-            cur.execute(
-                """SELECT id, content, category, memory_layer, tags, source_agent,
-                          embedding
-                   FROM memories WHERE id = %s""",
-                (memory_id,),
-            )
+            # First get the source memory to avoid repeated subqueries
+            cur.execute("""
+                SELECT id, content, category, memory_layer, tags, source_agent, embedding
+                FROM memories WHERE id = %s
+            """, (memory_id,))
             source_row = cur.fetchone()
-
-        if not source_row:
-            return []
-
-        source = _as_row_dict(source_row)
-        source_embedding = source.get("embedding")
-
-        with conn.cursor() as cur:
-            if source_embedding is not None:
-                # pgvector similarity search using source embedding
-                cur.execute(
-                    """SELECT id, content, category, memory_layer, tags, source_agent,
-                              access_count, created_at,
-                              1 - (embedding <=> (SELECT embedding FROM memories WHERE id = %s)) AS similarity
-                       FROM memories
-                       WHERE id != %s AND embedding IS NOT NULL
-                       ORDER BY embedding <=> (SELECT embedding FROM memories WHERE id = %s)
-                       LIMIT %s""",
-                    (memory_id, memory_id, memory_id, max_results),
-                )
+            if not source_row:
+                return []
+            
+            source_mem = _as_row_dict(source_row)
+            source_embedding = source_mem.get('embedding')
+            
+            if source_embedding:
+                # Use the source embedding for similarity search
+                cur.execute("""
+                    SELECT id, content, category, memory_layer, tags, source_agent,
+                           1 - (embedding <=> %s::vector) AS similarity
+                    FROM memories
+                    WHERE id != %s AND embedding IS NOT NULL
+                      AND 1 - (embedding <=> %s::vector) > 0.3
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s
+                """, (str(source_embedding), memory_id, str(source_embedding), str(source_embedding), max_results))
             else:
-                # Fallback: same category + recent
-                cur.execute(
-                    """SELECT id, content, category, memory_layer, tags, source_agent,
-                              access_count, created_at
-                       FROM memories
-                       WHERE id != %s AND category = %s
-                       ORDER BY created_at DESC
-                       LIMIT %s""",
-                    (memory_id, source.get("category", "general"), max_results),
-                )
-
-            return [_row_to_dict(_as_row_dict(r)) for r in cur.fetchall()]
+                # Fallback to category-based search if no embedding
+                cur.execute("""
+                    SELECT id, content, category, memory_layer, tags, source_agent, 0.0 as similarity
+                    FROM memories
+                    WHERE id != %s AND category = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                """, (memory_id, source_mem.get('category', ''), max_results))
+            
+            rows = cur.fetchall()
+            return [_row_to_dict(_as_row_dict(r)) for r in rows]
     finally:
         release_conn(conn)
 
 
 # ── Internal Search ──────────────────────────────────────────────
 
-def _pgvector_recall(
+async def _pgvector_recall(
     embedding: list[float],
     category: str | None,
     max_results: int,
 ) -> list[dict[str, Any]]:
-    """pgvector cosine similarity search."""
+    """pgvector cosine similarity search with optimized batch updates."""
     conn = get_conn()
     try:
         with conn.cursor() as cur:

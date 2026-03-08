@@ -11,31 +11,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-
-function getToken(): string {
-  try {
-    const s = localStorage.getItem("ops-center-auth");
-    if (s) return JSON.parse(s)?.state?.user?.token || "";
-  } catch {}
-  return "";
-}
-
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken();
-  const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    ...init,
-  });
-  if (!res.ok) {
-    const err = await res.text().catch(() => res.statusText);
-    throw new Error(`API ${res.status}: ${err}`);
-  }
-  return res.json();
-}
+import { fetcher } from "@/lib/api";
 
 // ── Types ──
 
@@ -105,7 +81,7 @@ function ValidateTab() {
     setError("");
     setResult(null);
     try {
-      const r = await apiFetch<ValidateResult>("/api/skill-creator/validate", {
+      const r = await fetcher<ValidateResult>("/api/skill-creator/validate", {
         method: "POST",
         body: JSON.stringify({ skill_path: path.trim() }),
       });
@@ -242,7 +218,7 @@ function GradeTab() {
     setError("");
     setResult(null);
     try {
-      const r = await apiFetch<GradeResult>("/api/skill-creator/grade", {
+      const r = await fetcher<GradeResult>("/api/skill-creator/grade", {
         method: "POST",
         body: JSON.stringify({
           output_text: output.trim(),
@@ -374,7 +350,7 @@ function SearchTab() {
     setError("");
     setSearched(true);
     try {
-      const r = await apiFetch<SkillSearchResult[]>(
+      const r = await fetcher<SkillSearchResult[]>(
         `/api/skill-creator/search?query=${encodeURIComponent(query.trim())}`,
       );
       setResults(r);

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { X, Maximize2, Minimize2 } from "lucide-react";
 
 interface DetailModalProps {
   title: string;
@@ -23,6 +23,9 @@ export function DetailModal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const prevLen = useRef(content.length);
   const prevActiveElement = useRef<HTMLElement | null>(null);
+  const [fullScreen, setFullScreen] = useState(false);
+  const fullScreenRef = useRef(fullScreen);
+  fullScreenRef.current = fullScreen;
 
   const handleClose = useCallback(() => {
     onClose();
@@ -62,7 +65,11 @@ export function DetailModal({
 
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        handleClose();
+        if (fullScreenRef.current) {
+          setFullScreen(false);
+        } else {
+          handleClose();
+        }
         return;
       }
       if (e.key !== "Tab") return;
@@ -99,7 +106,13 @@ export function DetailModal({
         onClick={handleClose}
         aria-hidden="true"
       />
-      <div className="relative z-10 w-full max-w-2xl max-h-[85vh] flex flex-col min-h-0 rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden">
+      <div
+        className={`relative z-10 flex flex-col min-h-0 rounded-xl bg-[#1a1f2e] border border-border shadow-2xl overflow-hidden transition-all ${
+          fullScreen
+            ? "fixed inset-4 w-[calc(100vw-2rem)] h-[calc(100vh-2rem)] max-w-none"
+            : "w-full max-w-2xl max-h-[85vh]"
+        }`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -118,20 +131,34 @@ export function DetailModal({
               </span>
             )}
           </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={handleClose}
-            aria-label="Kapat"
-            className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer rounded hover:bg-white/5 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setFullScreen(!fullScreen)}
+              aria-label={fullScreen ? "Küçült" : "Tam ekran"}
+              className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 rounded hover:bg-white/5 transition-colors"
+            >
+              {fullScreen ? (
+                <Minimize2 className="w-4 h-4" />
+              ) : (
+                <Maximize2 className="w-4 h-4" />
+              )}
+            </button>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={handleClose}
+              aria-label="Kapat"
+              className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer rounded hover:bg-white/5 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        {/* Content: bounded height so scrollbars appear; break-all so long lines wrap */}
+        {/* Content: flex-1 + min-h-0 so it scrolls; full height in both normal and fullscreen */}
         <div
           ref={contentRef}
-          className="flex-1 min-h-0 max-h-[70vh] overflow-y-auto overflow-x-auto px-5 py-4 text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap break-all font-mono"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-5 py-4 text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap break-words font-mono"
         >
           {content || "İçerik yok"}
         </div>

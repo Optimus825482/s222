@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AGENT_CONFIG } from "@/lib/agents";
 import type { AgentRole } from "@/lib/types";
+import { fetcher } from "@/lib/api";
 
 /* ── Constants ─────────────────────────────────────────────────── */
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 const allRoles = Object.keys(AGENT_CONFIG) as AgentRole[];
 const crd = "bg-slate-800/50 border border-slate-700/50 rounded-lg p-4";
 const sCls =
@@ -25,37 +25,6 @@ const BENCH_TABS: { key: BenchTab; label: string; icon: string }[] = [
   { key: "results", label: "Sonuçlar", icon: "📊" },
   { key: "compare", label: "Karşılaştır", icon: "⚔️" },
 ];
-
-/* ── API helpers ───────────────────────────────────────────────── */
-async function bApi<T>(path: string): Promise<T> {
-  const raw = localStorage.getItem("ops-center-auth");
-  const parsed = raw ? JSON.parse(raw) : null;
-  const token = parsed?.state?.user?.token;
-  const res = await fetch(`${BASE}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
-async function bPost<T>(
-  path: string,
-  body: Record<string, unknown>,
-): Promise<T> {
-  const raw = localStorage.getItem("ops-center-auth");
-  const parsed = raw ? JSON.parse(raw) : null;
-  const token = parsed?.state?.user?.token;
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 function ai(r: string) {
@@ -87,7 +56,7 @@ function LeaderboardTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    bApi<{ leaderboard: AnyData[] }>("/api/benchmarks/leaderboard")
+    fetcher<{ leaderboard: AnyData[] }>("/api/benchmarks/leaderboard")
       .then((r) => setData(r.leaderboard ?? []))
       .catch(() => setData([]))
       .finally(() => setLoading(false));
@@ -171,7 +140,7 @@ function RunTab() {
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    bApi<{ scenarios: AnyData[] }>("/api/benchmarks/scenarios")
+    fetcher<{ scenarios: AnyData[] }>("/api/benchmarks/scenarios")
       .then((r) => setScenarios(r.scenarios ?? []))
       .catch(() => {});
   }, []);
@@ -203,7 +172,10 @@ function RunTab() {
       if (agent) body.agent_role = agent;
       if (scenario) body.scenario_id = scenario;
       if (category) body.category = category;
-      const r = await bPost<AnyData>("/api/benchmarks/run", body);
+      const r = await fetcher<AnyData>("/api/benchmarks/run", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
       setResult(r.summary ?? r.result ?? r);
       if (progressRef.current) clearInterval(progressRef.current);
       progressRef.current = null;
@@ -382,7 +354,7 @@ function ResultsTab() {
   const load = useCallback(() => {
     setLoading(true);
     const q = agent ? `?agent_role=${agent}&limit=50` : "?limit=50";
-    bApi<{ results: AnyData[] }>(`/api/benchmarks/results${q}`)
+    fetcher<{ results: AnyData[] }>(`/api/benchmarks/results${q}`)
       .then((r) => setResults(r.results ?? []))
       .catch(() => setResults([]))
       .finally(() => setLoading(false));
@@ -491,7 +463,7 @@ function CompareTab() {
     setError("");
     setData(null);
     try {
-      const r = await bApi<{ comparison: AnyData }>(
+      const r = await fetcher<{ comparison: AnyData }>(
         `/api/benchmarks/compare?role_a=${roleA}&role_b=${roleB}`,
       );
       setData(r.comparison ?? r);

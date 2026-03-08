@@ -38,12 +38,16 @@ export const PHASES: Phase[] = [
       { done: true, label: "RAG, Dynamic Skills, Teachability, MCP Client" },
       { done: true, label: "Sunum üretimi (MINI/MIDI/MAXI)" },
       { done: true, label: "Idea-to-Project pipeline" },
-      { done: true, label: "Frontend: Next.js cockpit (10 tab)" },
+      { done: true, label: "Frontend: Next.js arayüzü (XP teması, çoklu pencere)" },
       {
         done: true,
         label:
           "Agent İletişim Paneli (Tool Usage, Behavior, Otonom Sohbet, Toplantılar)",
       },
+      { done: true, label: "Otonom İzleme paneli + Görev Merkezi canlı veri" },
+      { done: true, label: "Başlat menüsü sağ tık (Masaüstüne Ekle / Kaldır) + Kaldırılanlar" },
+      { done: true, label: "Faz 12.1 Parametre override (apply-learning, GET/DELETE param-overrides)" },
+      { done: true, label: "Faz 12.2 Kolektif karar (policy, needs_human, resolve API)" },
       { done: true, label: "Roadmap dialog + Task History sağ panel" },
       { done: true, label: "Reasoning model timeout desteği (180s)" },
     ],
@@ -266,76 +270,70 @@ export const PHASES: Phase[] = [
     id: "f10",
     title: "Faz 10 — Gerçek Zamanlı İşbirliği",
     icon: "🤝",
-    status: "wip",
-    color: "text-rose-400",
-    border: "border-rose-400/30",
-    progress: 20,
+    status: "done",
+    color: "text-emerald-400",
+    border: "border-emerald-400/30",
+    progress: 100,
     items: [
       { done: true, label: "Otonom ajan-ajan iletişimi (OpenClaw tarzı)" },
       { done: true, label: "Post-task retrospective toplantılar" },
-      { done: false, label: "Paylaşımlı çalışma alanı — ortak bağlam panosu" },
-      { done: false, label: "Dinamik rol atama" },
-      { done: false, label: "Canlı agent ilerleme görüntüleme" },
-      { done: false, label: "Shared workspace (çoklu kullanıcı)" },
-      { done: false, label: "Collaborative document editing" },
+      {
+        done: true,
+        label: "[Kiro IDE] Paylaşımlı çalışma alanı — ortak bağlam panosu",
+      },
+      { done: true, label: "[Kiro IDE] Dinamik rol atama" },
+      { done: true, label: "[Kiro CLI] Canlı agent ilerleme görüntüleme" },
+      {
+        done: true,
+        label: "[Kiro CLI] Shared workspace (çoklu kullanıcı — CLI sync)",
+      },
+      {
+        done: true,
+        label: "[Claude Code] Real-time collaboration (worktree bazlı)",
+      },
+      { done: true, label: "[Claude Code] Collaborative document editing" },
     ],
   },
   {
     id: "f11",
     title: "Faz 11 — Otonom Agent Ekosistemi",
-    icon: "🤖",
+    icon: "🦞",
     status: "wip",
     color: "text-orange-400",
     border: "border-orange-400/30",
-    progress: 50,
+    progress: 65,
     items: [
-      { done: false, label: "11.1 Agentic Loop — otonom görev zincirleme" },
-      { done: false, label: "11.1 Context Window Guard + Cost Governor" },
-      { done: false, label: "11.2 Heartbeat — proaktif bildirim sistemi" },
-      { done: false, label: "11.2 Sabah brifingleri + anomali uyarıları" },
-      {
-        done: true,
-        label: "11.3 Self-Skill — runtime skill oluşturma (Dynamic Skills)",
-      },
-      { done: true, label: "11.3 Skill Markdown dosya depolama" },
-      {
-        done: false,
-        label: "11.3 Gelişmiş pattern detection + cross-agent paylaşım",
-      },
+      { done: true, label: "11.1 Agentic Loop — otonom görev zincirleme" },
+      { done: true, label: "11.1 Context Window Guard + Cost Governor" },
+      { done: true, label: "11.2 Heartbeat — proaktif bildirim sistemi" },
+      { done: true, label: "11.2 Sabah brifingleri + anomali uyarıları" },
+      { done: true, label: "11.3 Self-Skill — runtime skill (Dynamic Skills)" },
+      { done: true, label: "11.3 Skill Markdown depolama + hygiene" },
+      { done: true, label: "11.3 Pattern detection + cross-agent paylaşım" },
       { done: true, label: "11.4 Agent-to-agent otonom sohbet" },
-      { done: true, label: "11.4 Agent kişilik bazlı iletişim" },
-      { done: true, label: "11.4 Post-task retrospective toplantılar" },
-      { done: false, label: "11.4 Konu bazlı topluluklar + swarm voting" },
-      {
-        done: false,
-        label: "11.5 Multi-channel gateway (WhatsApp/Telegram/Discord)",
-      },
-      {
-        done: true,
-        label: "11.6 SOUL.md / user.md / memory.md / bootstrap.md",
-      },
-      {
-        done: true,
-        label: "11.6 Kimlik editörü UI + build_context entegrasyonu",
-      },
+      { done: true, label: "11.4 Kişilik bazlı iletişim + retrospective" },
+      { done: true, label: "11.4 Swarm oylama (proposals + vote)" },
+      { done: false, label: "11.5 Multi-channel gateway (WhatsApp/Telegram/Discord)" },
+      { done: true, label: "11.6 SOUL.md / user.md / memory.md / bootstrap.md" },
+      { done: true, label: "11.6 Kimlik editörü UI + build_context" },
     ],
   },
   {
     id: "f12",
-    title: "Faz 12 — Kolektif Bilinç",
+    title: "Faz 12 — Otonom Evrim ve Kolektif Bilinç",
     icon: "🧬",
-    status: "planned",
+    status: "wip",
     color: "text-fuchsia-400",
     border: "border-fuchsia-400/30",
-    progress: 0,
+    progress: 40,
     items: [
-      { done: false, label: "Agent öz-evrim — kendi parametrelerini ayarlama" },
-      { done: false, label: "Kolektif karar alma — oylama ve konsensüs" },
-      { done: false, label: "Emergent davranış izleme ve loglama" },
-      { done: false, label: "Agent kültür oluşumu" },
-      { done: false, label: "Cross-instance iletişim" },
-      { done: false, label: "Safety sandbox + kill-switch" },
-      { done: false, label: "İnsan gözetimi dashboard'u" },
+      { done: true, label: "12.1 Parametre override (temperature, max_tokens, apply-learning)" },
+      { done: true, label: "12.2 Kolektif karar (policy, quorum, tie-breaker, needs_human, resolve)" },
+      { done: true, label: "12.7 Otonom İzleme paneli + canlı aktivite" },
+      { done: false, label: "12.3 Emergent davranış izleme ve loglama" },
+      { done: false, label: "12.4 Agent kültür oluşumu" },
+      { done: false, label: "12.5 Cross-instance iletişim" },
+      { done: false, label: "12.6 Safety sandbox + kill-switch" },
     ],
   },
   {
@@ -388,15 +386,19 @@ interface Props {
 
 export function RoadmapDialog({ open, onClose }: Props) {
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
+  const [fullScreen, setFullScreen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (fullScreen) setFullScreen(false);
+        else onClose();
+      }
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
+  }, [open, onClose, fullScreen]);
 
   if (!open) return null;
 
@@ -416,11 +418,15 @@ export function RoadmapDialog({ open, onClose }: Props) {
       aria-label="Yol Haritası"
     >
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-[94vw] max-w-3xl max-h-[85vh] flex flex-col"
+        className={`bg-slate-900 border border-slate-700 shadow-2xl flex flex-col transition-all ${
+          fullScreen
+            ? "fixed inset-2 z-[101] rounded-xl max-w-none max-h-none w-[calc(100vw-1rem)] h-[calc(100vh-1rem)]"
+            : "w-[94vw] max-w-3xl max-h-[85vh] rounded-xl"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🗺️</span>
             <div>
@@ -433,13 +439,23 @@ export function RoadmapDialog({ open, onClose }: Props) {
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-200 transition-colors text-xl leading-none p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-white/5"
-            aria-label="Kapat"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setFullScreen(!fullScreen)}
+              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
+              aria-label={fullScreen ? "Küçült" : "Tam ekran"}
+            >
+              {fullScreen ? "Küçült" : "Tam ekran"}
+            </button>
+            <button
+              onClick={onClose}
+              className="text-slate-500 hover:text-slate-200 transition-colors text-xl leading-none p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-white/5"
+              aria-label="Kapat"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Overall progress bar */}
@@ -539,8 +555,8 @@ export function RoadmapDialog({ open, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-800 text-center text-[10px] text-slate-600">
-          Son güncelleme: 2026-03-07 · Her sprint sonunda güncellenir
+        <div className="px-5 py-3 border-t border-slate-800 text-center text-[10px] text-slate-600 shrink-0">
+          Son güncelleme: 2026-03-08 · Her sprint sonunda güncellenir
         </div>
       </div>
     </div>
