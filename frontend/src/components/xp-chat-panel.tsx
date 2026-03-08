@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAgentSocket } from "@/lib/use-agent-socket";
 import { useAuth } from "@/lib/auth";
 import type { Thread, PipelineType } from "@/lib/types";
@@ -11,11 +11,12 @@ import type { AttachedFile } from "@/components/chat-input";
 import { LiveEventLog } from "@/components/live-event-log";
 import { ThinkingPanel } from "@/components/thinking-panel";
 import { ToolExecutionDisplay } from "@/components/tool-execution-display";
-import { api } from "@/lib/api";
+import { api, domainApi } from "@/lib/api";
 import { consumePendingThread, setActiveThread } from "@/lib/ws-store";
 import { trackBehavior } from "@/lib/behavior-tracker";
 import { useSessionPersistence } from "@/lib/use-session-persistence";
 import { useToast } from "@/components/toast";
+import { Plus } from "lucide-react";
 
 export default function ChatDesktopPanel() {
   const { user } = useAuth();
@@ -224,6 +225,27 @@ export default function ChatDesktopPanel() {
 
   const isProcessing = status === "running" || status === "connecting";
 
+  const handleNewSession = useCallback(() => {
+    if (isProcessing) return;
+    setThread(null);
+    setLastError(null);
+    setStreamThinking("");
+    setStreamText("");
+    setStreamToolCalls([]);
+    setStreamAgent("");
+    // Clear persisted session so refresh doesn't reload old one
+    try {
+      localStorage.removeItem("lastActiveSessionId");
+    } catch {}
+  }, [isProcessing]);
+
+  // Listen for "new-session" custom events from other panels
+  useEffect(() => {
+    const handler = () => handleNewSession();
+    window.addEventListener("new-session", handler);
+    return () => window.removeEventListener("new-session", handler);
+  }, [handleNewSession]);
+
   const handleSend = async (message: string, attachments?: AttachedFile[]) => {
     // Attachment'ları yükle ve extracted text'i mesaja ekle
     let fullMessage = message;
@@ -231,7 +253,7 @@ export default function ChatDesktopPanel() {
       const extracts: string[] = [];
       for (const att of attachments) {
         try {
-          const result = await api.uploadDocument(att.file);
+          const result = await domainApi.uploadDocument(att.file);
           if (
             result.extracted_text &&
             !result.extracted_text.startsWith("[Image")
@@ -276,6 +298,16 @@ export default function ChatDesktopPanel() {
             }}
           />
         </div>
+        <button
+          onClick={handleNewSession}
+          disabled={isProcessing}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title="Yeni oturum başlat"
+          aria-label="Yeni oturum başlat"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Yeni</span>
+        </button>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <ChatArea thread={thread} isProcessing={isProcessing} status={status} />

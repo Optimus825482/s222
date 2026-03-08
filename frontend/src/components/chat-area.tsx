@@ -1,10 +1,18 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
 import type { Thread, AgentEvent } from "@/lib/types";
 import { getAgentInfo } from "@/lib/agents";
-import { Brain, CheckCircle, Clock, Coins } from "lucide-react";
+import { Brain, CheckCircle, Clock, Coins, ShieldCheck } from "lucide-react";
 import { detectArtifacts, ArtifactCard } from "@/components/artifacts-panel";
+import { getWSSnapshot, subscribeWS } from "@/lib/ws-store";
+import { DetailModal } from "./detail-modal";
 
 interface Props {
   thread: Thread | null;
@@ -407,6 +415,24 @@ function WelcomeScreen({
 }
 
 function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
+  const [showConfModal, setShowConfModal] = useState(false);
+  const wsSnap = useSyncExternalStore(
+    subscribeWS,
+    getWSSnapshot,
+    getWSSnapshot,
+  );
+
+  // Find the latest confidence_analysis from live events
+  const confidenceText = useMemo(() => {
+    for (let i = wsSnap.liveEvents.length - 1; i >= 0; i--) {
+      const ev = wsSnap.liveEvents[i];
+      if (ev.event_type === "confidence_analysis") {
+        return ev.content;
+      }
+    }
+    return undefined;
+  }, [wsSnap.liveEvents]);
+
   if (event.event_type === "user_message") {
     return (
       <div className="flex justify-end animate-fade-in">
@@ -487,7 +513,7 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
 
         {/* Mobile-friendly metadata footer for final results */}
         {isFinal && lastTask && (
-          <div className="mt-3 pt-2 border-t border-border/50 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+          <div className="mt-3 pt-2 border-t border-border/50 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
             {lastTask.total_tokens > 0 && (
               <span className="inline-flex items-center gap-0.5">
                 <Coins className="w-3 h-3" aria-hidden="true" />
@@ -506,7 +532,29 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
                 {lastTask.sub_tasks.length} agent
               </span>
             )}
+            {confidenceText && (
+              <button
+                type="button"
+                onClick={() => setShowConfModal(true)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-400 hover:bg-amber-900/50 transition-colors cursor-pointer border border-amber-800/30"
+                title="Güven Analizi"
+              >
+                <ShieldCheck className="w-3 h-3" aria-hidden="true" />
+                Güven Analizi
+              </button>
+            )}
           </div>
+        )}
+
+        {/* Confidence Analysis Modal */}
+        {showConfModal && confidenceText && (
+          <DetailModal
+            title="Güven Analizi"
+            content={confidenceText}
+            color="#f59e0b"
+            badge="CONFIDENCE"
+            onClose={() => setShowConfModal(false)}
+          />
         )}
       </div>
     </div>

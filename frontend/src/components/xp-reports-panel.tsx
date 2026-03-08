@@ -24,7 +24,9 @@ import {
   BarChart3,
   User,
   Wrench,
+  ShieldCheck,
 } from "lucide-react";
+import { DetailModal } from "./detail-modal";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -291,6 +293,7 @@ function EventBlock({ event }: { event: AgentEvent }) {
 
 function TaskCard({ task, index }: { task: Task; index: number }) {
   const [expanded, setExpanded] = useState(false);
+  const [showConfidence, setShowConfidence] = useState(false);
   const statusStyle = STATUS_COLORS[task.status] ?? {
     bg: "#f3f4f6",
     text: "#374151",
@@ -413,11 +416,31 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
                 border: "1px solid #a7f3d0",
               }}
             >
-              <div
-                className="text-[11px] font-semibold mb-1"
-                style={{ color: "#065f46" }}
-              >
-                Sonuç
+              <div className="flex items-center justify-between mb-1">
+                <div
+                  className="text-[11px] font-semibold"
+                  style={{ color: "#065f46" }}
+                >
+                  Sonuç
+                </div>
+                {task.confidence_footer && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowConfidence(true);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
+                    style={{
+                      backgroundColor: "#eff6ff",
+                      color: "#1e40af",
+                      border: "1px solid #bfdbfe",
+                    }}
+                    title="Güven Analizi"
+                  >
+                    <ShieldCheck className="w-3 h-3" />
+                    Güven Analizi
+                  </button>
+                )}
               </div>
               <div
                 className="text-[12px] leading-relaxed whitespace-pre-wrap"
@@ -426,6 +449,17 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
                 {task.final_result}
               </div>
             </div>
+          )}
+
+          {/* Confidence analysis modal */}
+          {showConfidence && task.confidence_footer && (
+            <DetailModal
+              title="Güven Analizi"
+              content={task.confidence_footer}
+              color="#3b82f6"
+              badge="Confidence"
+              onClose={() => setShowConfidence(false)}
+            />
           )}
         </div>
       )}
@@ -444,11 +478,21 @@ function ThreadDetailView({
 }) {
   const [activeTab, setActiveTab] = useState<"tasks" | "events">("tasks");
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [showThreadConfidence, setShowThreadConfidence] = useState(false);
   const totalTokens = thread.tasks.reduce((s, t) => s + t.total_tokens, 0);
   const totalLatency = thread.tasks.reduce((s, t) => s + t.total_latency_ms, 0);
   const lastStatus = thread.tasks.length
     ? thread.tasks[thread.tasks.length - 1].status
     : "boş";
+
+  // Combine all confidence footers from tasks
+  const allConfidenceFooters = thread.tasks
+    .filter((t) => t.confidence_footer)
+    .map(
+      (t, i) => `## Görev ${i + 1}: ${t.user_input}\n\n${t.confidence_footer}`,
+    )
+    .join("\n\n---\n\n");
+  const hasConfidence = allConfidenceFooters.length > 0;
 
   return (
     <div
@@ -478,6 +522,18 @@ function ThreadDetailView({
             Thread: {thread.id.slice(0, 8)}...
           </span>
           <div className="ml-auto flex items-center gap-1">
+            {hasConfidence && (
+              <button
+                onClick={() => setShowThreadConfidence(true)}
+                className="p-1.5 rounded text-[10px] flex items-center gap-1"
+                title="Güven Analizi"
+                aria-label="Güven analizini görüntüle"
+                style={{ color: "#1e40af", backgroundColor: "#eff6ff" }}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Güven</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 const md = buildCleanReportMarkdown(thread);
@@ -699,6 +755,17 @@ function ThreadDetailView({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Thread-level confidence analysis modal */}
+      {showThreadConfidence && hasConfidence && (
+        <DetailModal
+          title="Güven Analizi — Tüm Görevler"
+          content={allConfidenceFooters}
+          color="#3b82f6"
+          badge="Confidence"
+          onClose={() => setShowThreadConfidence(false)}
+        />
       )}
     </div>
   );

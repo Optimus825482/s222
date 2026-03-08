@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import { X, Maximize2, Minimize2, Camera, Copy, Check } from "lucide-react";
+import {
+  X,
+  Maximize2,
+  Minimize2,
+  Camera,
+  Copy,
+  Check,
+  ShieldCheck,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 /** Close unclosed markdown fences so ReactMarkdown renders streaming content properly */
@@ -16,6 +24,7 @@ interface DetailModalProps {
   content: string;
   color?: string;
   badge?: string;
+  confidenceAnalysis?: string;
   onClose: () => void;
 }
 
@@ -24,6 +33,7 @@ export function DetailModal({
   content,
   color,
   badge,
+  confidenceAnalysis,
   onClose,
 }: DetailModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -34,6 +44,7 @@ export function DetailModal({
   const prevActiveElement = useRef<HTMLElement | null>(null);
   const [fullScreen, setFullScreen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showConfidence, setShowConfidence] = useState(false);
   const fullScreenRef = useRef(fullScreen);
   fullScreenRef.current = fullScreen;
 
@@ -232,8 +243,19 @@ export function DetailModal({
           )}
         </div>
 
-        {/* FAB buttons — bottom right: Copy + Screenshot + Fullscreen */}
+        {/* FAB buttons — bottom right: Confidence + Copy + Screenshot + Fullscreen */}
         <div className="absolute bottom-4 right-4 flex items-center gap-2 z-20">
+          {confidenceAnalysis && (
+            <button
+              type="button"
+              onClick={() => setShowConfidence(true)}
+              aria-label="Güven Analizi"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-amber-600 hover:bg-amber-500 text-white shadow-lg transition-colors"
+              title="Güven Analizi"
+            >
+              <ShieldCheck className="w-5 h-5" />
+            </button>
+          )}
           <button
             type="button"
             onClick={handleCopy}
@@ -271,6 +293,45 @@ export function DetailModal({
           </button>
         </div>
       </div>
+
+      {/* Confidence Analysis Overlay */}
+      {showConfidence && confidenceAnalysis && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Güven Analizi"
+        >
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowConfidence(false)}
+            aria-hidden="true"
+          />
+          <div className="relative z-10 w-full max-w-lg max-h-[70vh] flex flex-col rounded-xl bg-[#1a1f2e] border border-amber-500/30 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-amber-500/20 bg-amber-950/20 shrink-0">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span className="text-sm font-semibold text-amber-200">
+                  Güven Analizi
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfidence(false)}
+                aria-label="Güven analizini kapat"
+                className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer rounded hover:bg-white/5 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 text-sm text-slate-300 leading-relaxed">
+              <div className="prose prose-invert prose-sm max-w-none prose-headings:text-amber-200 prose-strong:text-amber-200 prose-code:text-cyan-300">
+                <ReactMarkdown>{confidenceAnalysis}</ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

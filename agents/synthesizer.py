@@ -35,17 +35,15 @@ class SynthesizerAgent(BaseAgent):
             "3. Cite which agent provided which insight using [Agent: role] notation.\n"
             "4. Remove redundancy — don't repeat the same point from multiple agents.\n"
             "5. Produce a structured, actionable conclusion.\n"
-            "6. Add a 'Güven Analizi' (Confidence Analysis) section at the end summarizing "
-            "overall reliability of the synthesized answer.\n"
-            "7. Respond in the SAME LANGUAGE as the user's original question.\n"
-            "8. If one agent clearly has higher expertise for the topic, weight it accordingly.\n"
-            "9. Preserve important nuances and caveats from individual agents.\n"
-            "10. Keep the response focused — synthesis should be shorter than the sum of inputs.\n\n"
+            "6. Respond in the SAME LANGUAGE as the user's original question.\n"
+            "7. If one agent clearly has higher expertise for the topic, weight it accordingly.\n"
+            "8. Preserve important nuances and caveats from individual agents.\n"
+            "9. Keep the response focused — synthesis should be shorter than the sum of inputs.\n"
+            "10. Do NOT add a confidence analysis section — it will be provided separately.\n\n"
             "OUTPUT FORMAT:\n"
             "- Start with a direct answer / executive summary\n"
             "- Organize by topic, not by agent\n"
-            "- Use clear headings and structure\n"
-            "- End with 'Güven Analizi' section\n\n"
+            "- Use clear headings and structure\n\n"
             "CRITICAL: NEVER fabricate information. Only synthesize what the agents provided. "
             "If all agents lack information on a point, say so honestly."
         )
@@ -56,7 +54,7 @@ class SynthesizerAgent(BaseAgent):
         user_input: str,
         thread: Thread,
         confidence_data: dict | None = None,
-    ) -> str:
+    ) -> tuple[str, str]:
         """
         Synthesize multiple agent outputs into a unified response.
 
@@ -68,7 +66,7 @@ class SynthesizerAgent(BaseAgent):
                              If None, computed here.
 
         Returns:
-            Synthesized response string with confidence footer.
+            Tuple of (synthesized_response, confidence_footer).
         """
         # Step 1: Score confidence for each agent result
         conf_scores: dict[str, dict] = {}
@@ -108,9 +106,28 @@ class SynthesizerAgent(BaseAgent):
         # Step 6: Execute LLM synthesis
         result = await self.execute(synthesis_prompt, thread)
 
-        # Step 7: Append confidence footer
+        # Step 7: Build confidence footer separately
         footer = _build_confidence_footer(conf_scores, contradictions, weights)
-        return f"{result}\n\n{footer}"
+
+        # Step 8: Emit confidence analysis as separate extra field via live monitor
+        if self._live_monitor:
+            self._live_monitor.emit(
+                "confidence_analysis",
+                self.role.value,
+                footer,
+                confidence_data={
+                    role: {
+                        "score": s.get("confidence_score", 0),
+                        "level": s.get("confidence_level", "unknown"),
+                        "weight": weights.get(role, 0),
+                    }
+                    for role, s in conf_scores.items()
+                },
+                contradictions_count=len(contradictions),
+            )
+
+        # Return main text and confidence footer as separate values
+        return result, footer
 
 
 # ── Private helpers ──────────────────────────────────────────────
@@ -169,7 +186,7 @@ def _build_synthesis_prompt(
         "Synthesize the above agent outputs into a single, coherent response. "
         "Weight higher-confidence agents more heavily. "
         "Resolve any contradictions explicitly. "
-        "End with a 'Güven Analizi' section."
+        "Do NOT add a confidence analysis section at the end."
     )
 
     return "\n".join(parts)

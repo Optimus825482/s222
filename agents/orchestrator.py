@@ -1388,7 +1388,7 @@ class OrchestratorAgent(BaseAgent):
                     if st.result:
                         agent_results[st.assigned_agent.value] = st.result
                 
-                final = await synthesizer.synthesize(agent_results, user_input, thread)
+                final, conf_footer = await synthesizer.synthesize(agent_results, user_input, thread)
             except Exception:
                 # Fallback to old synthesis
                 synth_input = (
@@ -1402,7 +1402,9 @@ class OrchestratorAgent(BaseAgent):
                     f"Respond in the same language as the user's request."
                 )
                 final = await self.execute(synth_input, thread)
+                conf_footer = None
             task.final_result = final
+            task.confidence_footer = conf_footer
             try:
                 from tools.confidence import score_confidence
                 avg_conf = sum(
@@ -1476,7 +1478,7 @@ class OrchestratorAgent(BaseAgent):
                     if st.result:
                         agent_results[st.assigned_agent.value] = st.result
                 
-                final = await synthesizer.synthesize(agent_results, user_input, thread)
+                final, conf_footer = await synthesizer.synthesize(agent_results, user_input, thread)
             except Exception:
                 # Fallback to old synthesis
                 synth_input = (
@@ -1491,7 +1493,9 @@ class OrchestratorAgent(BaseAgent):
                     f"Respond in the same language as the user's request."
                 )
                 final = await self.execute(synth_input, thread)
+                conf_footer = None
             task.final_result = final
+            task.confidence_footer = conf_footer
             try:
                 from tools.confidence import score_confidence
                 avg_conf = sum(
@@ -1607,7 +1611,7 @@ class OrchestratorAgent(BaseAgent):
                         if st.result:
                             agent_results[st.assigned_agent.value] = st.result
                     
-                    final = await synthesizer.synthesize(agent_results, user_input, thread)
+                    final, conf_footer = await synthesizer.synthesize(agent_results, user_input, thread)
                 except Exception:
                     # Fallback to old synthesis
                     synth_input = (
@@ -1617,7 +1621,9 @@ class OrchestratorAgent(BaseAgent):
                         f"Synthesize a clear, comprehensive final response in the user's language."
                     )
                     final = await self.execute(synth_input, thread)
+                    conf_footer = None
                 current_task.final_result = final
+                current_task.confidence_footer = conf_footer
                 try:
                     from tools.confidence import score_confidence
                     avg_conf = sum(

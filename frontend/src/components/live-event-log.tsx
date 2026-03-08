@@ -71,8 +71,7 @@ export function LiveEventLog({ events, status }: Props) {
 
   const statusCfg = STATUS_ICONS[status];
   const showEmptyStatus =
-    events.length === 0 &&
-    (status === "connecting" || status === "running");
+    events.length === 0 && (status === "connecting" || status === "running");
 
   if (events.length === 0 && !showEmptyStatus) return null;
 
@@ -100,7 +99,20 @@ export function LiveEventLog({ events, status }: Props) {
   const StatusIcon = statusCfg?.Icon ?? BarChart3;
 
   // For modal: get selected event (tracks live updates)
-  const selectedEvent = selectedIdx !== null ? keyedEvents[selectedIdx]?.event ?? null : null;
+  const selectedEvent =
+    selectedIdx !== null ? (keyedEvents[selectedIdx]?.event ?? null) : null;
+
+  // Find the latest confidence_analysis event for the selected event's agent
+  const confidenceForSelected = useMemo(() => {
+    if (!selectedEvent) return undefined;
+    for (let i = keyedEvents.length - 1; i >= 0; i--) {
+      const ev = keyedEvents[i].event;
+      if (ev.event_type === "confidence_analysis") {
+        return ev.content;
+      }
+    }
+    return undefined;
+  }, [selectedEvent, keyedEvents]);
 
   return (
     <div
@@ -142,7 +154,10 @@ export function LiveEventLog({ events, status }: Props) {
                 onClick={() => setSelectedIdx(i)}
                 className="w-full flex items-start gap-1.5 text-[11px] text-slate-500 py-1.5 px-0.5 border-b border-border/50 hover:bg-white/5 transition-colors cursor-pointer text-left"
               >
-                <EvIcon className="w-3 h-3 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <EvIcon
+                  className="w-3 h-3 flex-shrink-0 mt-0.5"
+                  aria-hidden="true"
+                />
                 <div className="flex-1 min-w-0">
                   <span
                     className="text-[10px] font-medium flex-shrink-0"
@@ -167,6 +182,7 @@ export function LiveEventLog({ events, status }: Props) {
           content={selectedEvent.content}
           color={getAgentInfo(selectedEvent.agent).color}
           badge={status === "running" ? "LIVE" : undefined}
+          confidenceAnalysis={confidenceForSelected}
           onClose={() => setSelectedIdx(null)}
         />
       )}

@@ -90,6 +90,7 @@ export interface Task {
   sub_tasks: SubTask[];
   status: TaskStatus;
   final_result: string | null;
+  confidence_footer: string | null;
   total_tokens: number;
   total_latency_ms: number;
   created_at: string;

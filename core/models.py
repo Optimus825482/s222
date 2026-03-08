@@ -113,6 +113,7 @@ class Task(BaseModel):
     sub_tasks: list[SubTask] = Field(default_factory=list)
     status: TaskStatus = TaskStatus.PENDING
     final_result: str | None = None
+    confidence_footer: str | None = None
     total_tokens: int = 0
     total_latency_ms: float = 0.0
     created_at: datetime = Field(default_factory=_now)
