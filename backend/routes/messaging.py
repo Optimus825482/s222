@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 from typing import Any
+import asyncio
 import uuid
 import sys
 from pathlib import Path
@@ -27,6 +28,8 @@ _POST_TASK_MEETINGS: list[dict] = []
 
 _AUTO_CHAT_CONFIG: dict = {
     "enabled": True,
+    "auto_start": True,
+    "interval_minutes": 5,
     "max_exchanges": 4,
     "enabled_agents": ["orchestrator", "thinker", "speed", "researcher", "reasoner", "critic"],
     "topics": [
@@ -48,9 +51,100 @@ _AUTO_CHAT_CONFIG: dict = {
 
 class AutoChatConfigRequest(BaseModel):
     enabled: bool | None = None
+    auto_start: bool | None = None
+    interval_minutes: int | None = None
     max_exchanges: int | None = None
     enabled_agents: list[str] | None = None
     topics: list[str] | None = None
+
+
+# ═════════════════════════════════════════════════════════════════
+# Autonomous Chat Background Scheduler
+# ═════════════════════════════════════════════════════════════════
+
+_auto_chat_task: asyncio.Task | None = None
+_auto_chat_running = False
+
+
+async def _auto_chat_loop():
+    """Background loop: runs autonomous chat rounds at configured interval."""
+    global _auto_chat_running
+    _auto_chat_running = True
+    print("[AutoChat] Background scheduler started")
+    # Initial delay — let the system warm up before first auto-chat
+    await asyncio.sleep(30)
+    try:
+        while _auto_chat_running:
+            cfg = _AUTO_CHAT_CONFIG
+            interval = max(cfg.get("interval_minutes", 5), 1) * 60
+            if cfg.get("enabled") and cfg.get("auto_start"):
+                try:
+                    conv = _run_autonomous_chat_round()
+                    if conv:
+                        print(f"[AutoChat] Auto-triggered: {conv['initiator']} ⇄ {conv['responder']} — {conv['topic']}")
+                except Exception as e:
+                    print(f"[AutoChat] Round failed: {e}")
+            await asyncio.sleep(interval)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        _auto_chat_running = False
+        print("[AutoChat] Background scheduler stopped")
+
+
+async def start_auto_chat_scheduler():
+    """Start the background autonomous chat scheduler."""
+    global _auto_chat_task
+    if _auto_chat_task and not _auto_chat_task.done():
+        return
+    _auto_chat_task = asyncio.create_task(_auto_chat_loop())
+
+
+async def stop_auto_chat_scheduler():
+    """Stop the background autonomous chat scheduler."""
+    global _auto_chat_task, _auto_chat_running
+    _auto_chat_running = False
+    if _auto_chat_task and not _auto_chat_task.done():
+        _auto_chat_task.cancel()
+        try:
+            await _auto_chat_task
+        except asyncio.CancelledError:
+            pass
+    _auto_chat_task = None
+
+
+def trigger_post_task_auto_chat(
+    task_summary: str,
+    participating_agents: list[str] | None = None,
+) -> dict | None:
+    """Trigger autonomous chat + post-task meeting after task completion.
+    Called internally from orchestrator — no auth needed."""
+    cfg = _AUTO_CHAT_CONFIG
+    if not cfg.get("enabled"):
+        return None
+
+    meeting = None
+    try:
+        agents = participating_agents or cfg["enabled_agents"][:3]
+        meeting = _generate_post_task_meeting(
+            task_summary=task_summary,
+            participating_agents=agents,
+            task_status="completed",
+        )
+    except Exception:
+        pass
+
+    conv = None
+    try:
+        original_topics = list(cfg["topics"])
+        task_topic = f"az önce tamamlanan görev: {task_summary[:80]}"
+        cfg["topics"] = [task_topic] + original_topics[:2]
+        conv = _run_autonomous_chat_round()
+        cfg["topics"] = original_topics
+    except Exception:
+        pass
+
+    return {"meeting": meeting, "conversation": conv}
 
 
 # ═════════════════════════════════════════════════════════════════
@@ -124,20 +218,20 @@ async def get_agent_messages(
 # ═════════════════════════════════════════════════════════════════
 
 
-@router.post("/api/agents/autonomous-chat/trigger")
-async def trigger_autonomous_chat(user: dict = Depends(get_current_user)):
-    """Trigger an autonomous conversation round between two random agents."""
-    _audit("autonomous_chat_trigger", user["user_id"])
+def _run_autonomous_chat_round() -> dict | None:
+    """Core logic for one autonomous conversation round (no auth required).
+    Returns the conversation dict, or None if disabled / not enough agents.
+    """
+    import random as _rnd
 
     cfg = _AUTO_CHAT_CONFIG
     if not cfg["enabled"]:
-        raise HTTPException(status_code=400, detail="Autonomous chat is disabled")
+        return None
 
     enabled = [r for r in cfg["enabled_agents"] if r in _AGENT_ROLES]
     if len(enabled) < 2:
-        raise HTTPException(status_code=400, detail="Need at least 2 enabled agents")
+        return None
 
-    import random as _rnd
     agents = _rnd.sample(enabled, 2)
     initiator, responder = agents[0], agents[1]
     topic = _rnd.choice(cfg["topics"])
@@ -216,8 +310,20 @@ async def trigger_autonomous_chat(user: dict = Depends(get_current_user)):
     if len(_AUTONOMOUS_CONVERSATIONS) > 50:
         _AUTONOMOUS_CONVERSATIONS[:] = _AUTONOMOUS_CONVERSATIONS[-50:]
 
+    return conversation
+
+
+@router.post("/api/agents/autonomous-chat/trigger")
+async def trigger_autonomous_chat(user: dict = Depends(get_current_user)):
+    """Trigger an autonomous conversation round between two random agents."""
+    _audit("autonomous_chat_trigger", user["user_id"])
+
+    conv = _run_autonomous_chat_round()
+    if conv is None:
+        raise HTTPException(status_code=400, detail="Autonomous chat is disabled or not enough agents")
+
     return {
-        "conversation": conversation,
+        "conversation": conv,
         "total_conversations": len(_AUTONOMOUS_CONVERSATIONS),
     }
 
@@ -252,10 +358,13 @@ async def get_auto_chat_config(user: dict = Depends(get_current_user)):
     return {
         "config": {
             "enabled": _AUTO_CHAT_CONFIG["enabled"],
+            "auto_start": _AUTO_CHAT_CONFIG.get("auto_start", True),
+            "interval_minutes": _AUTO_CHAT_CONFIG.get("interval_minutes", 5),
             "max_exchanges": _AUTO_CHAT_CONFIG["max_exchanges"],
             "enabled_agents": _AUTO_CHAT_CONFIG["enabled_agents"],
             "topics": _AUTO_CHAT_CONFIG["topics"],
             "personality_prompts": _AUTO_CHAT_CONFIG.get("personality_prompts", {}),
+            "scheduler_running": _auto_chat_running,
         }
     }
 
@@ -270,6 +379,10 @@ async def update_auto_chat_config(
 
     if req.enabled is not None:
         _AUTO_CHAT_CONFIG["enabled"] = req.enabled
+    if req.auto_start is not None:
+        _AUTO_CHAT_CONFIG["auto_start"] = req.auto_start
+    if req.interval_minutes is not None:
+        _AUTO_CHAT_CONFIG["interval_minutes"] = max(1, min(req.interval_minutes, 60))
     if req.max_exchanges is not None:
         _AUTO_CHAT_CONFIG["max_exchanges"] = max(2, min(req.max_exchanges, 6))
     if req.enabled_agents is not None:
@@ -279,12 +392,22 @@ async def update_auto_chat_config(
     if req.topics is not None and len(req.topics) > 0:
         _AUTO_CHAT_CONFIG["topics"] = req.topics[:20]
 
+    # Restart scheduler if auto_start changed
+    if req.auto_start is not None or req.enabled is not None:
+        if _AUTO_CHAT_CONFIG.get("enabled") and _AUTO_CHAT_CONFIG.get("auto_start"):
+            asyncio.ensure_future(start_auto_chat_scheduler())
+        else:
+            asyncio.ensure_future(stop_auto_chat_scheduler())
+
     return {"config": {
         "enabled": _AUTO_CHAT_CONFIG["enabled"],
+        "auto_start": _AUTO_CHAT_CONFIG.get("auto_start", True),
+        "interval_minutes": _AUTO_CHAT_CONFIG.get("interval_minutes", 5),
         "max_exchanges": _AUTO_CHAT_CONFIG["max_exchanges"],
         "enabled_agents": _AUTO_CHAT_CONFIG["enabled_agents"],
         "topics": _AUTO_CHAT_CONFIG["topics"],
         "personality_prompts": _AUTO_CHAT_CONFIG.get("personality_prompts", {}),
+        "scheduler_running": _auto_chat_running,
     }}
 
 

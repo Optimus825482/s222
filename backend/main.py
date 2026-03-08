@@ -8,6 +8,7 @@ All endpoints live in backend/routes/*.py modules.
 import os
 import sys
 import time
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -113,7 +114,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Heartbeat scheduler failed (non-critical): {e}")
 
+    # Autonomous chat background scheduler (messaging module)
+    try:
+        from routes.messaging import start_auto_chat_scheduler
+        await start_auto_chat_scheduler()
+        print("[Backend] Autonomous chat auto-start enabled")
+    except Exception as e:
+        print(f"[Backend] Autonomous chat auto-start failed (non-critical): {e}")
+
     yield
+
+    # Shutdown: stop autonomous chat scheduler
+    try:
+        from routes.messaging import stop_auto_chat_scheduler
+        await stop_auto_chat_scheduler()
+    except Exception:
+        pass
 
     # Shutdown: stop heartbeat
     try:

@@ -386,6 +386,13 @@ class BaseAgent(ABC):
         messages = await self.build_context(thread, task_input)
         tools = self.get_tools()
 
+        # Adaptive Tool Selector — record tool usage for learning (Faz 12)
+        try:
+            from tools.adaptive_tool_selector import get_adaptive_tool_selector
+            _ats = get_adaptive_tool_selector()
+        except Exception:
+            _ats = None
+
         # Agentic Loop (Faz 11.1): token/cost guards + context compression
         from agents.agentic_loop import (
             get_loop_config,
@@ -526,6 +533,17 @@ class BaseAgent(ABC):
                     )
                     self._emit("tool_result", str(tool_result)[:150])
 
+                    # Adaptive Tool Selector: record tool usage
+                    if _ats:
+                        try:
+                            _is_err = isinstance(tool_result, dict) and tool_result.get("error")
+                            if _is_err:
+                                _ats.record_failure(self.role.value, fn_name, task_input, str(tool_result.get("error", ""))[:200])
+                            else:
+                                _ats.record_success(self.role.value, fn_name, task_input)
+                        except Exception:
+                            pass
+
                     # Append to messages for next LLM turn
                     messages.append(
                         {
@@ -586,6 +604,13 @@ class BaseAgent(ABC):
             )
             self._emit("response", content[:200])
 
+            # Adaptive Tool Selector: record agent-level success
+            if _ats:
+                try:
+                    _ats.record_success(self.role.value, f"agent:{self.role.value}", task_input)
+                except Exception:
+                    pass
+
             # Canlı ilerleme: görev tamamlandı
             tracker.complete_task(agent_id)
 
@@ -600,6 +625,35 @@ class BaseAgent(ABC):
                 )
             except Exception:
                 pass  # non-critical
+
+            # Record task completion to user_behavior table for agent self-improvement
+            try:
+                from tools.pg_connection import get_conn, release_conn
+                _bconn = get_conn()
+                try:
+                    with _bconn.cursor() as _bcur:
+                        _bcur.execute(
+                            """INSERT INTO user_behavior (action, context, metadata, user_id, timestamp)
+                               VALUES (%s, %s, %s, %s, %s)""",
+                            (
+                                "agent_task_complete",
+                                task_input[:200],
+                                json.dumps({
+                                    "agent": self.role.value,
+                                    "model": self.cfg.get("id", ""),
+                                    "tokens": cumulative_tokens,
+                                    "cost_usd": round(cumulative_cost_usd, 6),
+                                    "steps": step + 1,
+                                }),
+                                thread.user_id if hasattr(thread, "user_id") else "system",
+                                time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                            ),
+                        )
+                    _bconn.commit()
+                finally:
+                    release_conn(_bconn)
+            except Exception:
+                pass  # non-critical — never break agent flow
 
             return content
 

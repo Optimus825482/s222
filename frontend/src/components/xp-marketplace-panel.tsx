@@ -119,9 +119,10 @@ export function XpMarketplacePanel() {
     }
   };
 
-  const renderStars = (rating: number) => {
-    const full = Math.floor(rating);
-    const half = rating - full >= 0.5;
+  const renderStars = (rating: number | undefined) => {
+    const r = Number(rating ?? 0);
+    const full = Math.floor(r);
+    const half = r - full >= 0.5;
     return (
       <span className="flex items-center gap-0.5">
         {Array.from({ length: 5 }, (_, i) => (
@@ -131,7 +132,7 @@ export function XpMarketplacePanel() {
           />
         ))}
         <span className="text-[10px] text-slate-500 ml-1">
-          {rating.toFixed(1)}
+          {r.toFixed(1)}
         </span>
       </span>
     );

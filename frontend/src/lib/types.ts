@@ -486,11 +486,15 @@ export interface AutonomousConversation {
 
 export interface AutoChatConfig {
   enabled: boolean;
+  auto_start: boolean;
+  interval_minutes: number;
   max_exchanges: number;
   enabled_agents: string[];
   topics: string[];
   /** role → kişilik prompt'u (agent kişilik bazlı iletişim) */
   personality_prompts?: Record<string, string>;
+  /** Background scheduler durumu */
+  scheduler_running?: boolean;
 }
 
 // ── Post-Task Meeting Types ─────────────────────────────────────

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { api, fetchBlob } from "@/lib/api";
+import { trackBehavior } from "@/lib/behavior-tracker";
 import type { ThreadSummary, Thread, Task, AgentEvent } from "@/lib/types";
 import {
   ArrowLeft,
@@ -52,6 +53,22 @@ function buildThreadMarkdown(thread: Thread): string {
   md += `## Olaylar (${thread.events.length})\n\n`;
   for (const e of thread.events) {
     md += `- [${e.event_type}] ${e.agent_role ?? "system"}: ${e.content.slice(0, 200)}\n`;
+  }
+  return md;
+}
+
+function buildCleanReportMarkdown(thread: Thread): string {
+  const completedTasks = thread.tasks.filter(
+    (t) => t.status === "completed" && t.final_result,
+  );
+  if (completedTasks.length === 0)
+    return "# Sonuç Raporu\n\nTamamlanmış görev bulunamadı.\n";
+
+  const date = formatDate(thread.created_at);
+  let md = `# Sonuç Raporu\n\nTarih: ${date}\n\n---\n\n`;
+
+  for (const t of completedTasks) {
+    md += `## ${t.user_input}\n\n${t.final_result}\n\n---\n\n`;
   }
   return md;
 }
@@ -320,7 +337,7 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
               {task.total_tokens.toLocaleString()} token
             </span>
             <span className="text-[10px]" style={{ color: "#666" }}>
-              {(task.total_latency_ms / 1000).toFixed(1)}s
+              {((task.total_latency_ms ?? 0) / 1000).toFixed(1)}s
             </span>
           </div>
         </div>
@@ -426,6 +443,7 @@ function ThreadDetailView({
   onBack: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"tasks" | "events">("tasks");
+  const [exportingPdf, setExportingPdf] = useState(false);
   const totalTokens = thread.tasks.reduce((s, t) => s + t.total_tokens, 0);
   const totalLatency = thread.tasks.reduce((s, t) => s + t.total_latency_ms, 0);
   const lastStatus = thread.tasks.length
@@ -459,20 +477,79 @@ function ThreadDetailView({
           >
             Thread: {thread.id.slice(0, 8)}...
           </span>
-          <button
-            onClick={() =>
-              downloadMarkdown(
-                `thread-${thread.id.slice(0, 8)}.md`,
-                buildThreadMarkdown(thread),
-              )
-            }
-            className="ml-auto p-1.5 rounded"
-            title="İndir (.md)"
-            aria-label="Markdown olarak indir"
-            style={{ color: "#666" }}
-          >
-            <Download className="w-4 h-4" />
-          </button>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={() => {
+                const md = buildCleanReportMarkdown(thread);
+                downloadMarkdown(
+                  `sonuc-raporu-${thread.id.slice(0, 8)}.md`,
+                  md,
+                );
+                trackBehavior("report_download", thread.id, { format: "md" });
+              }}
+              className="p-1.5 rounded text-[10px] flex items-center gap-1"
+              title="Sonuç Raporu (MD)"
+              aria-label="Sonuç raporunu Markdown olarak indir"
+              style={{ color: "#065f46", backgroundColor: "#ecfdf5" }}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>MD</span>
+            </button>
+            <button
+              onClick={async () => {
+                setExportingPdf(true);
+                try {
+                  const md = buildCleanReportMarkdown(thread);
+                  const title =
+                    thread.tasks[0]?.user_input?.slice(0, 60) || "Sonuç Raporu";
+                  const blob = await fetchBlob("/api/export/pdf", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ markdown: md, title }),
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `sonuc-raporu-${thread.id.slice(0, 8)}.pdf`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  trackBehavior("report_download", thread.id, {
+                    format: "pdf",
+                  });
+                } catch (err) {
+                  console.error("[XpReports] PDF export error:", err);
+                } finally {
+                  setExportingPdf(false);
+                }
+              }}
+              disabled={exportingPdf}
+              className="p-1.5 rounded text-[10px] flex items-center gap-1"
+              title="Sonuç Raporu (PDF)"
+              aria-label="Sonuç raporunu PDF olarak indir"
+              style={{ color: "#1e40af", backgroundColor: "#dbeafe" }}
+            >
+              {exportingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span>PDF</span>
+            </button>
+            <button
+              onClick={() =>
+                downloadMarkdown(
+                  `thread-${thread.id.slice(0, 8)}.md`,
+                  buildThreadMarkdown(thread),
+                )
+              }
+              className="p-1.5 rounded"
+              title="Tüm detayları indir (.md)"
+              aria-label="Tüm detayları Markdown olarak indir"
+              style={{ color: "#666" }}
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Stats bar */}
@@ -493,7 +570,7 @@ function ThreadDetailView({
             {totalTokens.toLocaleString()} token
           </span>
           <span style={{ color: "#555" }}>
-            {(totalLatency / 1000).toFixed(1)}s
+            {((totalLatency ?? 0) / 1000).toFixed(1)}s
           </span>
           <span
             className="px-1.5 py-0.5 rounded text-[10px] font-medium"
@@ -821,6 +898,7 @@ export function XpReportsPanel() {
       if (ctxMenu.type === "threads") {
         await api.deleteThread(ctxMenu.id);
         setThreads((prev) => prev.filter((t) => t.id !== ctxMenu.id));
+        trackBehavior("thread_delete", ctxMenu.id, { label: ctxMenu.label });
       }
     } catch (err) {
       console.error("[XpReports] delete error:", err);

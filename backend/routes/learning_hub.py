@@ -1,5 +1,6 @@
 """Learning Hub — Unified API for all adaptive learning mechanisms."""
 
+import json
 import logging
 import sys
 from datetime import datetime, timezone, timedelta
@@ -200,6 +201,139 @@ async def learning_hub_dashboard(user: dict = Depends(get_current_user)):
 
     health_avg = optimizer_stats.get("health_score", optimizer_stats.get("avg_health", 0))
 
+    # User behavior stats from PostgreSQL
+    behavior_stats: dict[str, Any] = {
+        "total_events": 0,
+        "by_action": [],
+        "recent_actions": [],
+        "insights": [],
+    }
+    try:
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                # Total events
+                cur.execute(
+                    "SELECT COUNT(*) FROM user_behavior WHERE user_id = %s",
+                    (user["user_id"],),
+                )
+                row = cur.fetchone()
+                behavior_stats["total_events"] = row[0] if row else 0
+
+                # By action breakdown
+                cur.execute(
+                    """SELECT action, COUNT(*) as cnt
+                       FROM user_behavior WHERE user_id = %s
+                       GROUP BY action ORDER BY cnt DESC""",
+                    (user["user_id"],),
+                )
+                behavior_stats["by_action"] = [
+                    {"action": r[0], "count": r[1]} for r in cur.fetchall()
+                ]
+
+                # Recent 10 actions
+                cur.execute(
+                    """SELECT action, context, metadata, timestamp
+                       FROM user_behavior WHERE user_id = %s
+                       ORDER BY timestamp DESC LIMIT 10""",
+                    (user["user_id"],),
+                )
+                behavior_stats["recent_actions"] = [
+                    {
+                        "action": r[0],
+                        "context": (r[1] or "")[:100],
+                        "metadata": json.loads(r[2]) if r[2] and isinstance(r[2], str) else (r[2] or {}),
+                        "timestamp": r[3] if isinstance(r[3], str) else str(r[3]),
+                    }
+                    for r in cur.fetchall()
+                ]
+
+                # Insights: pipeline preference
+                cur.execute(
+                    """SELECT metadata::text FROM user_behavior
+                       WHERE user_id = %s AND action = 'task_submit'
+                       ORDER BY timestamp DESC LIMIT 50""",
+                    (user["user_id"],),
+                )
+                pipeline_counts: dict[str, int] = {}
+                for (raw_meta,) in cur.fetchall():
+                    try:
+                        meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
+                        p = meta.get("pipeline", "unknown")
+                        pipeline_counts[p] = pipeline_counts.get(p, 0) + 1
+                    except Exception:
+                        pass
+                if pipeline_counts:
+                    fav = max(pipeline_counts, key=pipeline_counts.get)  # type: ignore[arg-type]
+                    behavior_stats["insights"].append({
+                        "type": "pipeline_preference",
+                        "label": f"En çok kullanılan pipeline: {fav}",
+                        "data": pipeline_counts,
+                    })
+
+                # Insights: avg tokens per completed task (from agent side)
+                cur.execute(
+                    """SELECT metadata::text FROM user_behavior
+                       WHERE user_id = %s AND action = 'agent_task_complete'
+                       ORDER BY timestamp DESC LIMIT 50""",
+                    (user["user_id"],),
+                )
+                token_vals: list[int] = []
+                cost_vals: list[float] = []
+                agent_counts: dict[str, int] = {}
+                for (raw_meta,) in cur.fetchall():
+                    try:
+                        meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
+                        if meta.get("tokens"):
+                            token_vals.append(int(meta["tokens"]))
+                        if meta.get("cost_usd"):
+                            cost_vals.append(float(meta["cost_usd"]))
+                        ag = meta.get("agent", "unknown")
+                        agent_counts[ag] = agent_counts.get(ag, 0) + 1
+                    except Exception:
+                        pass
+                if token_vals:
+                    avg_tok = sum(token_vals) // len(token_vals)
+                    behavior_stats["insights"].append({
+                        "type": "avg_tokens",
+                        "label": f"Ortalama token/görev: {avg_tok:,}",
+                        "data": {"avg": avg_tok, "min": min(token_vals), "max": max(token_vals)},
+                    })
+                if cost_vals:
+                    total_cost = sum(cost_vals)
+                    behavior_stats["insights"].append({
+                        "type": "total_cost",
+                        "label": f"Toplam maliyet: ${total_cost:.4f}",
+                        "data": {"total": round(total_cost, 6), "avg": round(total_cost / len(cost_vals), 6)},
+                    })
+                if agent_counts:
+                    behavior_stats["insights"].append({
+                        "type": "agent_usage",
+                        "label": "Agent kullanım dağılımı",
+                        "data": agent_counts,
+                    })
+
+                # Insights: hourly activity pattern
+                cur.execute(
+                    """SELECT EXTRACT(HOUR FROM timestamp::timestamp) as hr, COUNT(*)
+                       FROM user_behavior WHERE user_id = %s
+                       GROUP BY hr ORDER BY hr""",
+                    (user["user_id"],),
+                )
+                hourly = {int(r[0]): r[1] for r in cur.fetchall()}
+                if hourly:
+                    peak_hr = max(hourly, key=hourly.get)  # type: ignore[arg-type]
+                    behavior_stats["insights"].append({
+                        "type": "peak_hours",
+                        "label": f"En aktif saat: {peak_hr:02d}:00",
+                        "data": hourly,
+                    })
+        finally:
+            release_conn(conn)
+    except Exception as e:
+        logger.warning("Dashboard: user_behavior failed: %s", e)
+
     return {
         "teachings": {
             "total": len(teachings),
@@ -228,6 +362,7 @@ async def learning_hub_dashboard(user: dict = Depends(get_current_user)):
             "total_executions": workflow_stats.get("total_executions", workflow_stats.get("total_workflows", 0)),
         },
         "benchmark": {"leaderboard": leaderboard},
+        "user_behavior": behavior_stats,
     }
 
 
@@ -572,3 +707,194 @@ async def learning_timeline(hours: int = 24, user: dict = Depends(get_current_us
 
     events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
     return events
+
+
+# ── 11. User Behavior Insights for Learning ─────────────────────
+
+
+@router.get("/api/learning-hub/behavior-insights")
+async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_user)):
+    """Deep behavior insights for agent self-improvement learning."""
+    _audit("learning_hub_behavior_insights", user["user_id"])
+    uid = user["user_id"]
+
+    result: dict[str, Any] = {
+        "action_flow": [],
+        "pipeline_effectiveness": [],
+        "agent_performance": [],
+        "time_patterns": [],
+        "learning_signals": [],
+    }
+
+    try:
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+
+                # Action flow: what users do in sequence
+                cur.execute(
+                    """SELECT action, context, metadata::text, timestamp
+                       FROM user_behavior WHERE user_id = %s AND timestamp >= %s
+                       ORDER BY timestamp DESC LIMIT 200""",
+                    (uid, cutoff),
+                )
+                rows = cur.fetchall()
+                result["action_flow"] = [
+                    {
+                        "action": r[0],
+                        "context": (r[1] or "")[:120],
+                        "metadata": json.loads(r[2]) if r[2] and isinstance(r[2], str) else (r[2] or {}),
+                        "timestamp": r[3] if isinstance(r[3], str) else str(r[3]),
+                    }
+                    for r in rows
+                ]
+
+                # Pipeline effectiveness: completion rate + avg tokens per pipeline
+                cur.execute(
+                    """SELECT metadata::text FROM user_behavior
+                       WHERE user_id = %s AND action IN ('task_submit', 'task_complete', 'agent_task_complete')
+                       AND timestamp >= %s""",
+                    (uid, cutoff),
+                )
+                pipe_submit: dict[str, int] = {}
+                pipe_complete: dict[str, int] = {}
+                pipe_tokens: dict[str, list[int]] = {}
+                pipe_latency: dict[str, list[float]] = {}
+                for (raw_meta,) in cur.fetchall():
+                    try:
+                        meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
+                        p = meta.get("pipeline", "unknown")
+                        if meta.get("tokens"):
+                            pipe_complete[p] = pipe_complete.get(p, 0) + 1
+                            pipe_tokens.setdefault(p, []).append(int(meta["tokens"]))
+                        if meta.get("latency_ms"):
+                            pipe_latency.setdefault(p, []).append(float(meta["latency_ms"]))
+                        if not meta.get("tokens") and not meta.get("cost_usd"):
+                            pipe_submit[p] = pipe_submit.get(p, 0) + 1
+                    except Exception:
+                        pass
+
+                all_pipes = set(list(pipe_submit.keys()) + list(pipe_complete.keys()))
+                for p in all_pipes:
+                    sub = pipe_submit.get(p, 0)
+                    comp = pipe_complete.get(p, 0)
+                    toks = pipe_tokens.get(p, [])
+                    lats = pipe_latency.get(p, [])
+                    result["pipeline_effectiveness"].append({
+                        "pipeline": p,
+                        "submitted": sub,
+                        "completed": comp,
+                        "completion_rate": round(100 * comp / max(sub, 1), 1),
+                        "avg_tokens": sum(toks) // max(len(toks), 1) if toks else 0,
+                        "avg_latency_ms": round(sum(lats) / max(len(lats), 1), 1) if lats else 0,
+                    })
+
+                # Agent performance from behavior data
+                cur.execute(
+                    """SELECT metadata::text FROM user_behavior
+                       WHERE user_id = %s AND action = 'agent_task_complete'
+                       AND timestamp >= %s""",
+                    (uid, cutoff),
+                )
+                agent_data: dict[str, dict[str, Any]] = {}
+                for (raw_meta,) in cur.fetchall():
+                    try:
+                        meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
+                        ag = meta.get("agent", "unknown")
+                        if ag not in agent_data:
+                            agent_data[ag] = {"tasks": 0, "tokens": [], "costs": [], "steps": []}
+                        agent_data[ag]["tasks"] += 1
+                        if meta.get("tokens"):
+                            agent_data[ag]["tokens"].append(int(meta["tokens"]))
+                        if meta.get("cost_usd"):
+                            agent_data[ag]["costs"].append(float(meta["cost_usd"]))
+                        if meta.get("steps"):
+                            agent_data[ag]["steps"].append(int(meta["steps"]))
+                    except Exception:
+                        pass
+
+                for ag, d in agent_data.items():
+                    result["agent_performance"].append({
+                        "agent": ag,
+                        "tasks": d["tasks"],
+                        "avg_tokens": sum(d["tokens"]) // max(len(d["tokens"]), 1) if d["tokens"] else 0,
+                        "total_cost": round(sum(d["costs"]), 6),
+                        "avg_steps": round(sum(d["steps"]) / max(len(d["steps"]), 1), 1) if d["steps"] else 0,
+                    })
+
+                # Time patterns: daily activity
+                cur.execute(
+                    """SELECT DATE(timestamp::timestamp) as day, COUNT(*)
+                       FROM user_behavior WHERE user_id = %s AND timestamp >= %s
+                       GROUP BY day ORDER BY day""",
+                    (uid, cutoff),
+                )
+                result["time_patterns"] = [
+                    {"date": str(r[0]), "count": r[1]} for r in cur.fetchall()
+                ]
+
+                # Learning signals: patterns that agents should learn from
+                # e.g. user frequently changes pipeline → auto pipeline not working well
+                cur.execute(
+                    """SELECT COUNT(*) FROM user_behavior
+                       WHERE user_id = %s AND action = 'pipeline_change'
+                       AND timestamp >= %s""",
+                    (uid, cutoff),
+                )
+                pipe_changes = cur.fetchone()[0] or 0
+                cur.execute(
+                    """SELECT COUNT(*) FROM user_behavior
+                       WHERE user_id = %s AND action = 'task_submit'
+                       AND timestamp >= %s""",
+                    (uid, cutoff),
+                )
+                task_submits = cur.fetchone()[0] or 0
+
+                if task_submits > 0 and pipe_changes > task_submits * 0.3:
+                    result["learning_signals"].append({
+                        "signal": "high_pipeline_change_rate",
+                        "severity": "medium",
+                        "message": f"Kullanıcı görevlerin %{round(100*pipe_changes/task_submits)}inde pipeline değiştiriyor — auto routing iyileştirilmeli",
+                        "data": {"changes": pipe_changes, "submits": task_submits},
+                    })
+
+                # Signal: report downloads → user values exportable results
+                cur.execute(
+                    """SELECT COUNT(*) FROM user_behavior
+                       WHERE user_id = %s AND action = 'report_download'
+                       AND timestamp >= %s""",
+                    (uid, cutoff),
+                )
+                downloads = cur.fetchone()[0] or 0
+                if downloads > 3:
+                    result["learning_signals"].append({
+                        "signal": "frequent_report_downloads",
+                        "severity": "info",
+                        "message": f"Kullanıcı {downloads} rapor indirdi — sonuç kalitesi önemli",
+                        "data": {"downloads": downloads},
+                    })
+
+                # Signal: thread deletions → user not satisfied
+                cur.execute(
+                    """SELECT COUNT(*) FROM user_behavior
+                       WHERE user_id = %s AND action = 'thread_delete'
+                       AND timestamp >= %s""",
+                    (uid, cutoff),
+                )
+                deletions = cur.fetchone()[0] or 0
+                if task_submits > 0 and deletions > task_submits * 0.2:
+                    result["learning_signals"].append({
+                        "signal": "high_deletion_rate",
+                        "severity": "high",
+                        "message": f"Kullanıcı görevlerin %{round(100*deletions/task_submits)}ini siliyor — sonuç kalitesi düşük olabilir",
+                        "data": {"deletions": deletions, "submits": task_submits},
+                    })
+
+        finally:
+            release_conn(conn)
+    except Exception as e:
+        logger.warning("Behavior insights failed: %s", e)
+
+    return result

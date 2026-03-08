@@ -154,6 +154,7 @@ def list_skills(
     category: str | None = None,
     source: str | None = None,
     active_only: bool = True,
+    limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """List skills with optional filters."""
     conditions = ["1=1"]
@@ -168,13 +169,15 @@ def list_skills(
         conditions.append("source = %s")
         params.append(source)
 
+    sql = f"SELECT * FROM skills WHERE {' AND '.join(conditions)} ORDER BY use_count DESC, name ASC"
+    if limit is not None and limit > 0:
+        sql += " LIMIT %s"
+        params.append(limit)
+
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                f"SELECT * FROM skills WHERE {' AND '.join(conditions)} ORDER BY use_count DESC, name ASC",
-                params,
-            )
+            cur.execute(sql, params)
             return [_row_to_dict(dict(r)) for r in cur.fetchall()]
     finally:
         release_conn(conn)

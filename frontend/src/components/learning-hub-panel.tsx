@@ -18,6 +18,21 @@ interface LearningDashboard {
   tool_stats: { total_analyses: number };
   workflow_stats: { total_executions: number };
   benchmark: { leaderboard: BenchmarkEntry[] };
+  user_behavior: {
+    total_events: number;
+    by_action: { action: string; count: number }[];
+    recent_actions: {
+      action: string;
+      context: string;
+      metadata: Record<string, unknown>;
+      timestamp: string;
+    }[];
+    insights: {
+      type: string;
+      label: string;
+      data: Record<string, unknown>;
+    }[];
+  };
 }
 interface Teaching {
   id: number;
@@ -74,14 +89,46 @@ interface AnalysisResult {
   new_suggestions: number;
   details: Record<string, unknown>;
 }
+interface BehaviorInsights {
+  action_flow: {
+    action: string;
+    context: string;
+    metadata: Record<string, unknown>;
+    timestamp: string;
+  }[];
+  pipeline_effectiveness: {
+    pipeline: string;
+    submitted: number;
+    completed: number;
+    completion_rate: number;
+    avg_tokens: number;
+    avg_latency_ms: number;
+  }[];
+  agent_performance: {
+    agent: string;
+    tasks: number;
+    avg_tokens: number;
+    total_cost: number;
+    avg_steps: number;
+  }[];
+  time_patterns: { date: string; count: number }[];
+  learning_signals: {
+    signal: string;
+    severity: string;
+    message: string;
+    data: Record<string, unknown>;
+  }[];
+}
 type HubTab =
   | "overview"
   | "recommendations"
   | "teachings"
   | "agents"
-  | "errors";
+  | "errors"
+  | "behavior";
 const TABS: { key: HubTab; label: string; icon: string }[] = [
   { key: "overview", label: "Genel Bakış", icon: "📊" },
+  { key: "behavior", label: "Davranış", icon: "👤" },
   { key: "recommendations", label: "Öneriler", icon: "💡" },
   { key: "teachings", label: "Öğrenmeler", icon: "🧠" },
   { key: "agents", label: "Agent Profilleri", icon: "🤖" },
@@ -255,6 +302,7 @@ function OverviewTab() {
   if (e) return <Er m={e} r={load} />;
   if (!d) return null;
   const hp = Math.round(d.optimizer_stats.health_avg ?? 0);
+  const bev = d.user_behavior;
   const stats = [
     { l: "Toplam Öğrenme", v: d.teachings.total, c: "text-cyan-400" },
     {
@@ -264,10 +312,16 @@ function OverviewTab() {
     },
     { l: "Hata Örüntüleri", v: d.error_patterns.active, c: "text-red-400" },
     { l: "Sistem Sağlığı", v: `%${hp}`, c: hc(hp) },
+    { l: "Davranış Olayları", v: bev.total_events, c: "text-purple-400" },
+    {
+      l: "Öğrenme Sinyalleri",
+      v: bev.insights.length,
+      c: bev.insights.length > 0 ? "text-orange-400" : "text-slate-500",
+    },
   ];
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {stats.map((s) => (
           <div key={s.l} className={cd + " text-center"}>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">
@@ -290,6 +344,44 @@ function OverviewTab() {
         )}
         {az ? "Analiz Ediliyor…" : "Tam Analiz Çalıştır"}
       </button>
+      {bev.insights.length > 0 && (
+        <div className={cd}>
+          <h4 className="text-xs font-medium text-purple-300 mb-2">
+            🎯 Davranış Sinyalleri
+          </h4>
+          <div className="space-y-1.5">
+            {bev.insights.map((ins, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2 py-1.5 px-2 rounded"
+                style={{
+                  backgroundColor:
+                    ins.type === "peak_hours"
+                      ? "rgba(139,92,246,0.08)"
+                      : ins.type === "pipeline_preference"
+                        ? "rgba(59,130,246,0.08)"
+                        : ins.type === "total_cost"
+                          ? "rgba(245,158,11,0.08)"
+                          : "rgba(16,185,129,0.08)",
+                }}
+              >
+                <span className="text-sm flex-shrink-0">
+                  {ins.type === "peak_hours"
+                    ? "🕐"
+                    : ins.type === "pipeline_preference"
+                      ? "🔀"
+                      : ins.type === "total_cost"
+                        ? "💰"
+                        : ins.type === "agent_usage"
+                          ? "🤖"
+                          : "📈"}
+                </span>
+                <span className="text-[11px] text-slate-300">{ins.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className={cd}>
         <h4 className="text-xs font-medium text-slate-200 mb-2">Son Olaylar</h4>
         {tl.length === 0 ? (
@@ -765,7 +857,205 @@ function ErrorPatternsTab() {
     </div>
   );
 }
-export function LearningHubPanel() {
+export function BehaviorTab() {
+  const [d, setD] = useState<BehaviorInsights | null>(null);
+  const [ld, setLd] = useState(true);
+  const [e, setE] = useState("");
+  const load = useCallback(async () => {
+    try {
+      setE("");
+      setLd(true);
+      setD(
+        await fetcher<BehaviorInsights>("/api/learning-hub/behavior-insights"),
+      );
+    } catch (x) {
+      setE(x instanceof Error ? x.message : "Veri yüklenemedi");
+    } finally {
+      setLd(false);
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  if (ld) return <Sk n={4} />;
+  if (e) return <Er m={e} r={load} />;
+  if (!d) return null;
+  const hasData =
+    d.pipeline_effectiveness.length > 0 ||
+    d.agent_performance.length > 0 ||
+    d.learning_signals.length > 0;
+  if (!hasData && d.action_flow.length === 0)
+    return <Mt icon="👤" text="Henüz davranış verisi yok — görev çalıştırın" />;
+  return (
+    <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+      {d.learning_signals.length > 0 && (
+        <div className={cd}>
+          <h4 className="text-xs font-medium text-orange-300 mb-2">
+            ⚠️ Öğrenme Sinyalleri
+          </h4>
+          <div className="space-y-1.5">
+            {d.learning_signals.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2 py-1.5 px-2 rounded"
+                style={{
+                  backgroundColor:
+                    s.severity === "high"
+                      ? "rgba(239,68,68,0.1)"
+                      : s.severity === "medium"
+                        ? "rgba(245,158,11,0.1)"
+                        : "rgba(59,130,246,0.08)",
+                }}
+              >
+                <span className="text-sm flex-shrink-0">
+                  {s.severity === "high"
+                    ? "🔴"
+                    : s.severity === "medium"
+                      ? "🟡"
+                      : "🔵"}
+                </span>
+                <span className="text-[11px] text-slate-300 leading-snug">
+                  {s.message}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.pipeline_effectiveness.length > 0 && (
+        <div className={cd}>
+          <h4 className="text-xs font-medium text-blue-300 mb-2">
+            🔀 Pipeline Etkinliği
+          </h4>
+          <div className="space-y-1">
+            {d.pipeline_effectiveness.map((p) => (
+              <div
+                key={p.pipeline}
+                className="flex items-center gap-2 py-1.5 border-b border-slate-700/20 last:border-0"
+              >
+                <span className="text-[11px] text-slate-200 font-medium w-16 truncate">
+                  {p.pipeline}
+                </span>
+                <div className="flex-1 h-1.5 bg-slate-700/40 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(p.completion_rate, 100)}%`,
+                      backgroundColor:
+                        p.completion_rate >= 80
+                          ? "#10b981"
+                          : p.completion_rate >= 50
+                            ? "#f59e0b"
+                            : "#ef4444",
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 tabular-nums w-10 text-right">
+                  %{p.completion_rate}
+                </span>
+                <span className="text-[9px] text-slate-500 tabular-nums w-16 text-right">
+                  {p.avg_tokens.toLocaleString()} tok
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.agent_performance.length > 0 && (
+        <div className={cd}>
+          <h4 className="text-xs font-medium text-emerald-300 mb-2">
+            🤖 Agent Performansı (Davranış Verisi)
+          </h4>
+          <div className="space-y-1">
+            {d.agent_performance.map((a) => (
+              <div
+                key={a.agent}
+                className="flex items-center gap-3 py-1.5 border-b border-slate-700/20 last:border-0 text-[10px]"
+              >
+                <span className="text-slate-200 font-medium w-20 truncate">
+                  {a.agent}
+                </span>
+                <span className="text-slate-400 tabular-nums">
+                  {a.tasks} görev
+                </span>
+                <span className="text-slate-400 tabular-nums">
+                  ~{a.avg_tokens.toLocaleString()} tok
+                </span>
+                <span className="text-slate-400 tabular-nums">
+                  ~{a.avg_steps} adım
+                </span>
+                <span className="text-amber-400 tabular-nums ml-auto">
+                  ${(a.total_cost ?? 0).toFixed(4)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.time_patterns.length > 0 && (
+        <div className={cd}>
+          <h4 className="text-xs font-medium text-purple-300 mb-2">
+            📅 Günlük Aktivite
+          </h4>
+          <div className="flex items-end gap-0.5 h-12">
+            {d.time_patterns.slice(-14).map((tp) => {
+              const maxC = Math.max(...d.time_patterns.map((x) => x.count), 1);
+              const pct = (tp.count / maxC) * 100;
+              return (
+                <div
+                  key={tp.date}
+                  className="flex-1 rounded-t transition-all"
+                  style={{
+                    height: `${Math.max(pct, 4)}%`,
+                    backgroundColor: "rgba(139,92,246,0.5)",
+                  }}
+                  title={`${tp.date}: ${tp.count} olay`}
+                />
+              );
+            })}
+          </div>
+          <div className="flex justify-between text-[8px] text-slate-600 mt-1">
+            <span>
+              {d.time_patterns[
+                Math.max(0, d.time_patterns.length - 14)
+              ]?.date?.slice(5)}
+            </span>
+            <span>
+              {d.time_patterns[d.time_patterns.length - 1]?.date?.slice(5)}
+            </span>
+          </div>
+        </div>
+      )}
+      {d.action_flow.length > 0 && (
+        <div className={cd}>
+          <h4 className="text-xs font-medium text-slate-300 mb-2">
+            📋 Son Aksiyonlar
+          </h4>
+          <div className="space-y-1 max-h-[160px] overflow-y-auto">
+            {d.action_flow.slice(0, 20).map((a, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 py-1 border-b border-slate-700/20 last:border-0"
+              >
+                <span className="text-[10px] font-medium text-cyan-400 w-28 truncate">
+                  {a.action}
+                </span>
+                <span className="text-[10px] text-slate-400 flex-1 truncate">
+                  {a.context || "—"}
+                </span>
+                <span className="text-[8px] text-slate-600 tabular-nums flex-shrink-0">
+                  {fmt(a.timestamp)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LearningHubPanel() {
   const [tab, setTab] = useState<HubTab>("overview");
   return (
     <div className="space-y-3">
@@ -788,6 +1078,7 @@ export function LearningHubPanel() {
       </nav>
       <div role="tabpanel">
         {tab === "overview" && <OverviewTab />}
+        {tab === "behavior" && <BehaviorTab />}
         {tab === "recommendations" && <RecommendationsTab />}
         {tab === "teachings" && <TeachingsTab />}
         {tab === "agents" && <AgentProfilesTab />}

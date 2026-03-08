@@ -1710,3 +1710,20 @@ class OrchestratorAgent(BaseAgent):
                 run_hygiene_check(dry_run=False)
         except Exception:
             pass
+
+        # Post-task autonomous chat: agents discuss the completed task
+        try:
+            from backend.routes.messaging import trigger_post_task_auto_chat
+            trigger_post_task_auto_chat(
+                task_summary=user_input[:120],
+                participating_agents=None,
+            )
+        except Exception:
+            try:
+                from routes.messaging import trigger_post_task_auto_chat
+                trigger_post_task_auto_chat(
+                    task_summary=user_input[:120],
+                    participating_agents=None,
+                )
+            except Exception:
+                pass

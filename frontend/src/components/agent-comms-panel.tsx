@@ -294,8 +294,25 @@ function AutonomousChatTab() {
     } catch {}
   };
 
+  const toggleAutoStart = async () => {
+    if (!cfg) return;
+    try {
+      const r = await api.updateAutoChatConfig({ auto_start: !cfg.auto_start });
+      setCfg(r.config);
+    } catch {}
+  };
+
   return (
     <div className="flex flex-col gap-3">
+      {/* Scheduler status banner */}
+      {cfg?.scheduler_running && (
+        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-emerald-900/20 border border-emerald-500/15 rounded text-[10px] text-emerald-400">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          Otonom zamanlayıcı çalışıyor — her {cfg.interval_minutes}dk&apos;da
+          bir sohbet
+        </div>
+      )}
+
       {/* Controls */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
@@ -315,6 +332,18 @@ function AutonomousChatTab() {
           className={`px-2.5 py-1.5 text-[10px] font-medium rounded border transition-colors ${cfg?.enabled ? "bg-green-600/15 text-green-400 border-green-500/20 hover:bg-green-600/25" : "bg-red-600/15 text-red-400 border-red-500/20 hover:bg-red-600/25"}`}
         >
           {cfg?.enabled ? "● Aktif" : "○ Pasif"}
+        </button>
+        <button
+          onClick={toggleAutoStart}
+          disabled={!cfg?.enabled}
+          className={`px-2.5 py-1.5 text-[10px] font-medium rounded border transition-colors disabled:opacity-40 ${cfg?.auto_start ? "bg-cyan-600/15 text-cyan-400 border-cyan-500/20 hover:bg-cyan-600/25" : "bg-slate-600/15 text-slate-400 border-slate-500/20 hover:bg-slate-600/25"}`}
+          title={
+            cfg?.auto_start
+              ? "Otomatik başlatma açık"
+              : "Otomatik başlatma kapalı"
+          }
+        >
+          {cfg?.auto_start ? "🔄 Oto" : "⏸ Manuel"}
         </button>
         <button
           onClick={() => setShowCfg(!showCfg)}
@@ -346,8 +375,9 @@ function AutonomousChatTab() {
           <div className="text-3xl mb-2">🤖</div>
           <p className="text-xs text-slate-500">Henüz otonom sohbet yok</p>
           <p className="text-[10px] text-slate-600 mt-1">
-            &quot;Sohbet Başlat&quot; ile ajanların kendi aralarında konuşmasını
-            başlatın
+            {cfg?.auto_start
+              ? "Otomatik sohbet aktif — ajanlar kısa süre içinde konuşmaya başlayacak"
+              : '"Sohbet Başlat" ile ajanların kendi aralarında konuşmasını başlatın'}
           </p>
         </div>
       ) : (
@@ -421,14 +451,17 @@ function AutonomousChatTab() {
                                 {ago(m.timestamp)}
                               </span>
                             </div>
-                            {"personality" in m && (m as { personality?: string }).personality && (
-                              <p
-                                className="text-[8px] text-slate-500 italic mb-1 line-clamp-2"
-                                title={(m as { personality?: string }).personality}
-                              >
-                                {(m as { personality?: string }).personality}
-                              </p>
-                            )}
+                            {"personality" in m &&
+                              (m as { personality?: string }).personality && (
+                                <p
+                                  className="text-[8px] text-slate-500 italic mb-1 line-clamp-2"
+                                  title={
+                                    (m as { personality?: string }).personality
+                                  }
+                                >
+                                  {(m as { personality?: string }).personality}
+                                </p>
+                              )}
                             <p className="text-[11px] text-slate-300 leading-relaxed break-words">
                               {m.content}
                             </p>
@@ -457,12 +490,16 @@ function CfgPanel({
 }) {
   const [maxEx, setMaxEx] = useState(cfg.max_exchanges);
   const [agents, setAgents] = useState<string[]>(cfg.enabled_agents);
+  const [autoStart, setAutoStart] = useState(cfg.auto_start ?? true);
+  const [interval, setInterval_] = useState(cfg.interval_minutes ?? 5);
 
   const save = async () => {
     try {
       const r = await api.updateAutoChatConfig({
         max_exchanges: maxEx,
         enabled_agents: agents,
+        auto_start: autoStart,
+        interval_minutes: interval,
       });
       onUpdate(r.config);
     } catch {}
@@ -477,6 +514,28 @@ function CfgPanel({
   return (
     <div className="bg-slate-800/60 border border-slate-700/40 rounded-lg p-3 space-y-2">
       <div className="text-[10px] text-slate-400 font-medium">Ayarlar</div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setAutoStart(!autoStart)}
+          className={`text-[9px] px-2 py-1 rounded border transition-colors ${autoStart ? "border-emerald-500/30 bg-emerald-600/15 text-emerald-400" : "border-slate-700/40 text-slate-600 hover:text-slate-400"}`}
+        >
+          {autoStart
+            ? "🔄 Otomatik Başlatma: Açık"
+            : "⏸ Otomatik Başlatma: Kapalı"}
+        </button>
+        <span className="text-[10px] text-slate-500">Aralık:</span>
+        <input
+          type="range"
+          min={1}
+          max={30}
+          value={interval}
+          onChange={(x) => setInterval_(Number(x.target.value))}
+          className="w-20 h-1 accent-cyan-500"
+        />
+        <span className="text-[10px] text-cyan-400 tabular-nums">
+          {interval} dk
+        </span>
+      </div>
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-slate-500">Maks. mesaj:</span>
         <input
@@ -889,12 +948,16 @@ type SocialProposal = {
 
 /* ── Social summary (learnings + proposals + policy + resolve) ── */
 function SocialSummaryBlock() {
-  const [learnings, setLearnings] = useState<{ id: string; teacher: string; pattern: string; adopted_by: string[] }[]>([]);
+  const [learnings, setLearnings] = useState<
+    { id: string; teacher: string; pattern: string; adopted_by: string[] }[]
+  >([]);
   const [proposals, setProposals] = useState<SocialProposal[]>([]);
   const [policy, setPolicy] = useState<CollectivePolicy | null>(null);
   const [loading, setLoading] = useState(true);
   const [policySaving, setPolicySaving] = useState(false);
-  const [resolveProposalId, setResolveProposalId] = useState<string | null>(null);
+  const [resolveProposalId, setResolveProposalId] = useState<string | null>(
+    null,
+  );
   const [resolveReason, setResolveReason] = useState("");
   const [resolving, setResolving] = useState(false);
 
@@ -942,7 +1005,11 @@ function SocialSummaryBlock() {
     if (!resolveProposalId) return;
     setResolving(true);
     try {
-      await api.resolveSocialProposal(resolveProposalId, resolution, resolveReason || undefined);
+      await api.resolveSocialProposal(
+        resolveProposalId,
+        resolution,
+        resolveReason || undefined,
+      );
       setResolveProposalId(null);
       setResolveReason("");
       await load();
@@ -969,7 +1036,16 @@ function SocialSummaryBlock() {
                   min={1}
                   max={20}
                   value={policy.quorum_min_votes}
-                  onChange={(e) => setPolicy((p) => p ? { ...p, quorum_min_votes: Number(e.target.value) || 1 } : null)}
+                  onChange={(e) =>
+                    setPolicy((p) =>
+                      p
+                        ? {
+                            ...p,
+                            quorum_min_votes: Number(e.target.value) || 1,
+                          }
+                        : null,
+                    )
+                  }
                   className={sCls}
                 />
               </label>
@@ -981,7 +1057,16 @@ function SocialSummaryBlock() {
                   max={1}
                   step={0.05}
                   value={policy.majority_ratio}
-                  onChange={(e) => setPolicy((p) => p ? { ...p, majority_ratio: Number(e.target.value) || 0.6 } : null)}
+                  onChange={(e) =>
+                    setPolicy((p) =>
+                      p
+                        ? {
+                            ...p,
+                            majority_ratio: Number(e.target.value) || 0.6,
+                          }
+                        : null,
+                    )
+                  }
                   className={sCls}
                 />
               </label>
@@ -990,7 +1075,11 @@ function SocialSummaryBlock() {
               <span className="text-slate-500">Tie-breaker</span>
               <select
                 value={policy.tie_breaker}
-                onChange={(e) => setPolicy((p) => p ? { ...p, tie_breaker: e.target.value } : null)}
+                onChange={(e) =>
+                  setPolicy((p) =>
+                    p ? { ...p, tie_breaker: e.target.value } : null,
+                  )
+                }
                 className={sCls}
               >
                 <option value="proposer_wins">Proposer kazanır</option>
@@ -1003,10 +1092,18 @@ function SocialSummaryBlock() {
               <input
                 type="checkbox"
                 checked={policy.allow_human_escalation}
-                onChange={(e) => setPolicy((p) => p ? { ...p, allow_human_escalation: e.target.checked } : null)}
+                onChange={(e) =>
+                  setPolicy((p) =>
+                    p
+                      ? { ...p, allow_human_escalation: e.target.checked }
+                      : null,
+                  )
+                }
                 className="accent-cyan-500"
               />
-              <span className="text-slate-400">İnsan escalation (needs_human)</span>
+              <span className="text-slate-400">
+                İnsan escalation (needs_human)
+              </span>
             </label>
             <button
               type="button"
@@ -1024,11 +1121,15 @@ function SocialSummaryBlock() {
         Öğrenmeler: {learnings.length} · Oylamalar: {proposals.length}
       </p>
       {learnings.length === 0 && proposals.length === 0 && (
-        <p className="text-slate-600">Henüz peer öğrenme veya oylama yok. API: POST /api/social/learnings, /api/social/proposals</p>
+        <p className="text-slate-600">
+          Henüz peer öğrenme veya oylama yok. API: POST /api/social/learnings,
+          /api/social/proposals
+        </p>
       )}
       {learnings.slice(0, 4).map((l) => (
         <div key={l.id} className="truncate text-slate-400">
-          {ai(l.teacher).icon} {l.teacher}: {l.pattern.slice(0, 60)}… · {l.adopted_by?.length ?? 0} benimsedi
+          {ai(l.teacher).icon} {l.teacher}: {l.pattern.slice(0, 60)}… ·{" "}
+          {l.adopted_by?.length ?? 0} benimsedi
         </div>
       ))}
 
@@ -1056,7 +1157,8 @@ function SocialSummaryBlock() {
               </span>
             </div>
             <div className="text-slate-500 text-[9px]">
-              {ai(p.proposer).icon} {p.proposer} · {Object.keys(p.votes).length} oy
+              {ai(p.proposer).icon} {p.proposer} · {Object.keys(p.votes).length}{" "}
+              oy
               {p.resolution_reason && ` · ${p.resolution_reason}`}
             </div>
             {p.status === "needs_human" && (
@@ -1086,7 +1188,10 @@ function SocialSummaryBlock() {
                         Red
                       </button>
                       <button
-                        onClick={() => { setResolveProposalId(null); setResolveReason(""); }}
+                        onClick={() => {
+                          setResolveProposalId(null);
+                          setResolveReason("");
+                        }}
                         className="px-2 py-1 text-slate-500 rounded text-[10px]"
                       >
                         İptal
@@ -1180,7 +1285,8 @@ function MeetingsSection() {
                 {meet.task_summary}
               </div>
               <div className="text-[9px] text-slate-600 mt-0.5">
-                {meet.participants?.length ?? 0} katılımcı · {meet.message_count} mesaj · {ago(meet.started_at)}
+                {meet.participants?.length ?? 0} katılımcı ·{" "}
+                {meet.message_count} mesaj · {ago(meet.started_at)}
               </div>
             </div>
           ))

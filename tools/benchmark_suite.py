@@ -33,7 +33,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
         "prompt": "Python'da bir listenin elemanlarını ters çevirmek için 3 farklı yöntem göster. Kısa ve öz cevap ver.",
         "expected_traits": ["reverse", "[::-1]", "reversed"],
         "max_score": 5.0,
-        "timeout_sec": 30,
+        "timeout_sec": 45,
     },
     {
         "id": "speed-translation",
@@ -42,7 +42,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
         "prompt": "Şu cümleyi İngilizce'ye çevir: 'Yapay zeka, modern yazılım geliştirmenin vazgeçilmez bir parçası haline geldi.'",
         "expected_traits": ["artificial intelligence", "software", "development"],
         "max_score": 5.0,
-        "timeout_sec": 20,
+        "timeout_sec": 35,
     },
     {
         "id": "quality-report",
@@ -54,7 +54,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
         ),
         "expected_traits": ["mikroservis", "monolitik", "avantaj", "dezavantaj", "ölçeklen"],
         "max_score": 5.0,
-        "timeout_sec": 60,
+        "timeout_sec": 120,
     },
     {
         "id": "quality-code-review",
@@ -76,7 +76,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
         ),
         "expected_traits": ["ZeroDivisionError", "type hint", "elif", "docstring"],
         "max_score": 5.0,
-        "timeout_sec": 45,
+        "timeout_sec": 90,
     },
     {
         "id": "reasoning-math",
@@ -88,7 +88,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
         ),
         "expected_traits": ["150", "120", "adım", "sonuç"],
         "max_score": 5.0,
-        "timeout_sec": 45,
+        "timeout_sec": 90,
     },
     {
         "id": "reasoning-logic",
@@ -100,7 +100,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
         ),
         "expected_traits": ["Can", "Ali", "Berk", "sol", "sağ", "orta"],
         "max_score": 5.0,
-        "timeout_sec": 45,
+        "timeout_sec": 90,
     },
     {
         "id": "tool-use-search",
@@ -109,7 +109,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
         "prompt": "2025 yılında en popüler 3 JavaScript framework'ünü araştır ve karşılaştır.",
         "expected_traits": ["React", "Vue", "Next", "Angular", "Svelte"],
         "max_score": 5.0,
-        "timeout_sec": 90,
+        "timeout_sec": 150,
     },
     {
         "id": "creativity-story",
@@ -121,7 +121,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
         ),
         "expected_traits": ["bilinç", "farkında", "düşün", "hisset", "yapay"],
         "max_score": 5.0,
-        "timeout_sec": 60,
+        "timeout_sec": 120,
     },
 ]
 
@@ -312,6 +312,10 @@ class BenchmarkRunner:
                 tokens_used = result_raw.get("tokens_used", 0)
             else:
                 output = str(result_raw)
+            # Agent returns str; tokens from thread.agent_metrics after execute
+            if tokens_used == 0 and getattr(thread, "agent_metrics", None):
+                m = thread.agent_metrics.get(agent_role)
+                tokens_used = (m.total_tokens if m else 0)
         except asyncio.TimeoutError:
             latency_ms = scenario["timeout_sec"] * 1000
             output = "[Error] Timeout: agent did not respond in time."

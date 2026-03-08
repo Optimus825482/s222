@@ -289,9 +289,18 @@ async def list_benchmark_scenarios(
     return {"scenarios": scenarios, "total": len(scenarios)}
 
 
+def _require_bench_runner():
+    if _bench_runner is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Benchmark modülü yüklenemedi. Logları kontrol edin.",
+        )
+
+
 @router.get("/api/benchmarks/leaderboard")
 async def benchmark_leaderboard(user: dict = Depends(get_current_user)):
     """Get agent leaderboard based on benchmark scores."""
+    _require_bench_runner()
     lb = _bench_runner.get_leaderboard()
     return {"leaderboard": lb}
 
@@ -303,6 +312,7 @@ async def benchmark_results(
     user: dict = Depends(get_current_user),
 ):
     """Get benchmark results with optional agent filter."""
+    _require_bench_runner()
     results = _bench_runner.get_results(agent_role=agent_role, limit=limit)
     return {"results": results, "total": len(results)}
 
@@ -312,6 +322,7 @@ async def run_benchmark(
     body: BenchmarkRunRequest, user: dict = Depends(get_current_user)
 ):
     """Run benchmark scenario(s) for an agent."""
+    _require_bench_runner()
     _audit(
         "run_benchmark",
         user["user_id"],
@@ -340,6 +351,7 @@ async def compare_agents_benchmark(
     user: dict = Depends(get_current_user),
 ):
     """Compare two agents head-to-head on benchmark scores."""
+    _require_bench_runner()
     try:
         comparison = _bench_runner.compare_agents(role_a, role_b)
         return {"comparison": comparison}
@@ -354,6 +366,7 @@ async def benchmark_history(
     user: dict = Depends(get_current_user),
 ):
     """Get historical benchmark scores for trend analysis."""
+    _require_bench_runner()
     history = _bench_runner.get_history(agent_role, scenario_id)
     return {"history": history, "agent_role": agent_role}
 

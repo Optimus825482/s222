@@ -196,13 +196,13 @@ export function WorkflowOptimizerPanel() {
               <div className="p-4 rounded-lg bg-surface-raised border border-border">
                 <div className="text-xs text-slate-500 mb-1">Ort. Süre</div>
                 <div className="text-2xl font-bold text-cyan-400">
-                  {stats.avg_execution_time.toFixed(1)}s
+                  {(stats.avg_execution_time ?? 0).toFixed(1)}s
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-surface-raised border border-border">
                 <div className="text-xs text-slate-500 mb-1">Başarı Oranı</div>
                 <div className="text-2xl font-bold text-emerald-400">
-                  {(stats.success_rate * 100).toFixed(1)}%
+                  {((stats.success_rate ?? 0) * 100).toFixed(1)}%
                 </div>
               </div>
               <div className="p-4 rounded-lg bg-surface-raised border border-border">
@@ -210,7 +210,7 @@ export function WorkflowOptimizerPanel() {
                   Optimizasyon Potansiyeli
                 </div>
                 <div className="text-2xl font-bold text-orange-400">
-                  {(stats.optimization_potential * 100).toFixed(1)}%
+                  {((stats.optimization_potential ?? 0) * 100).toFixed(1)}%
                 </div>
               </div>
             </div>
@@ -271,13 +271,13 @@ export function WorkflowOptimizerPanel() {
                     <div>
                       <span className="text-slate-500">Ort. Süre: </span>
                       <span className="text-cyan-400">
-                        {d.avg_time.toFixed(1)}s
+                        {(d.avg_time ?? 0).toFixed(1)}s
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500">Başarı: </span>
                       <span className="text-emerald-400">
-                        {(d.success_rate * 100).toFixed(1)}%
+                        {((d.success_rate ?? 0) * 100).toFixed(1)}%
                       </span>
                     </div>
                     <div>

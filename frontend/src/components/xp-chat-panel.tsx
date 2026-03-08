@@ -10,6 +10,7 @@ import { ChatInput } from "@/components/chat-input";
 import { LiveEventLog } from "@/components/live-event-log";
 import { api } from "@/lib/api";
 import { consumePendingThread } from "@/lib/ws-store";
+import { trackBehavior } from "@/lib/behavior-tracker";
 
 export default function ChatDesktopPanel() {
   const { user } = useAuth();
@@ -22,6 +23,18 @@ export default function ChatDesktopPanel() {
     onResult: (_tid, _result, updatedThread) => {
       setThread(updatedThread);
       setLastError(null);
+      const lastTask = updatedThread?.tasks?.[updatedThread.tasks.length - 1];
+      if (lastTask?.status === "completed") {
+        trackBehavior(
+          "task_complete",
+          lastTask.user_input?.slice(0, 200) || "",
+          {
+            pipeline: lastTask.pipeline_type,
+            tokens: lastTask.total_tokens,
+            latency_ms: lastTask.total_latency_ms,
+          },
+        );
+      }
     },
     onError: (msg) => setLastError(msg),
   });
@@ -59,10 +72,11 @@ export default function ChatDesktopPanel() {
 
   const handleSend = (message: string) => {
     sendMessage(message, thread?.id, pipeline);
+    trackBehavior("task_submit", message.slice(0, 200), { pipeline });
     // Görev başladığında Canlı İlerleme penceresini otomatik aç
     if (typeof window !== "undefined") {
       window.dispatchEvent(
-        new CustomEvent("open-app", { detail: "agent-progress" })
+        new CustomEvent("open-app", { detail: "agent-progress" }),
       );
     }
   };
@@ -71,7 +85,13 @@ export default function ChatDesktopPanel() {
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center gap-2 shrink-0 px-2 py-1 border-b border-slate-700/50">
         <div className="flex-1 min-w-0">
-          <PipelineSelector selected={pipeline} onSelect={setPipeline} />
+          <PipelineSelector
+            selected={pipeline}
+            onSelect={(p) => {
+              setPipeline(p);
+              trackBehavior("pipeline_change", p, { from: pipeline, to: p });
+            }}
+          />
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">

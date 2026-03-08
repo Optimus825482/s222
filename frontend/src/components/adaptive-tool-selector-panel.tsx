@@ -168,13 +168,13 @@ export function AdaptiveToolSelectorPanel() {
                     <div>
                       <span className="text-slate-500">Başarı: </span>
                       <span className="text-emerald-400">
-                        {(u.success_rate * 100).toFixed(1)}%
+                        {((u.success_rate ?? 0) * 100).toFixed(1)}%
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500">Gecikme: </span>
                       <span className="text-cyan-400">
-                        {u.avg_latency_ms.toFixed(0)}ms
+                        {(u.avg_latency_ms ?? 0).toFixed(0)}ms
                       </span>
                     </div>
                     <div>
@@ -205,7 +205,7 @@ export function AdaptiveToolSelectorPanel() {
                       {r.tool_name}
                     </span>
                     <span className="text-xs px-2 py-1 rounded bg-cyan-400/10 text-cyan-400">
-                      Skor: {r.score.toFixed(2)}
+                      Skor: {(r.score ?? 0).toFixed(2)}
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mb-1">{r.reason}</p>
@@ -235,7 +235,7 @@ export function AdaptiveToolSelectorPanel() {
                       {p.tool_name}
                     </span>
                     <span className="text-xs text-slate-400">
-                      Tercih: {p.preference_score.toFixed(2)}
+                      Tercih: {(p.preference_score ?? 0).toFixed(2)}
                     </span>
                   </div>
                 </div>

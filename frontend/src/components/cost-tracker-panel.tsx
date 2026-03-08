@@ -162,16 +162,17 @@ function Bar({ v, mx, c, l }: { v: number; mx: number; c: string; l: string }) {
         />
       </div>
       <span className="text-[10px] text-slate-500 w-16 text-right tabular-nums">
-        ${v.toFixed(4)}
+        ${(Number(v) || 0).toFixed(4)}
       </span>
     </div>
   );
 }
 
-function fmtCost(v: number): string {
-  if (v >= 1) return `$${v.toFixed(2)}`;
-  if (v >= 0.01) return `$${v.toFixed(3)}`;
-  return `$${v.toFixed(4)}`;
+function fmtCost(v: number | undefined | null): string {
+  const n = Number(v) || 0;
+  if (n >= 1) return `$${n.toFixed(2)}`;
+  if (n >= 0.01) return `$${n.toFixed(3)}`;
+  return `$${n.toFixed(4)}`;
 }
 
 function fmtTokens(v: number): string {

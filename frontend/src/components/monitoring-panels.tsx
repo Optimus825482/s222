@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useSyncExternalStore } from "react";
 import { api } from "@/lib/api";
-import type {
-  AgentRole,
-} from "@/lib/types";
+import type { AgentRole } from "@/lib/types";
 import {
   ROLE_ICON,
   ROLE_COLOR,
@@ -43,8 +41,11 @@ function formatUptime(seconds: number): string {
 // ── Component 1: AgentHealthPanel ───────────────────────────────
 
 export function AgentHealthPanel() {
-  const { agentHealth: agents, sharedLoading: loading, sharedError: error } =
-    useMonitoringData();
+  const {
+    agentHealth: agents,
+    sharedLoading: loading,
+    sharedError: error,
+  } = useMonitoringData();
 
   if (loading) {
     return (
@@ -159,8 +160,11 @@ export function AgentHealthPanel() {
 // ── Component 3: SystemStatsPanel ───────────────────────────────
 
 export function SystemStatsPanel() {
-  const { systemStats: stats, sharedLoading: loading, sharedError: error } =
-    useMonitoringData();
+  const {
+    systemStats: stats,
+    sharedLoading: loading,
+    sharedError: error,
+  } = useMonitoringData();
 
   if (loading) {
     return (
@@ -295,8 +299,11 @@ const HEALTH_CONFIG: Record<string, { label: string; className: string }> = {
 };
 
 export function AnomalyPanel() {
-  const { anomalies: report, sharedLoading: loading, sharedError: error } =
-    useMonitoringData();
+  const {
+    anomalies: report,
+    sharedLoading: loading,
+    sharedError: error,
+  } = useMonitoringData();
 
   if (loading) {
     return (
@@ -423,12 +430,18 @@ export function HeartbeatPanel() {
     try {
       await api.toggleHeartbeatTask(name, enabled);
       await refreshHeartbeatData();
-    } catch { }
+    } catch {}
   };
 
   const ago = (ts: string) => {
     const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    return m < 1 ? "az önce" : m < 60 ? `${m}dk` : m < 1440 ? `${Math.floor(m / 60)}sa` : `${Math.floor(m / 1440)}g`;
+    return m < 1
+      ? "az önce"
+      : m < 60
+        ? `${m}dk`
+        : m < 1440
+          ? `${Math.floor(m / 60)}sa`
+          : `${Math.floor(m / 1440)}g`;
   };
 
   if (loading) {
@@ -481,7 +494,9 @@ export function HeartbeatPanel() {
       </div>
       {events.length > 0 && (
         <details className="mt-2">
-          <summary className="text-[10px] text-slate-500 cursor-pointer">Son olaylar</summary>
+          <summary className="text-[10px] text-slate-500 cursor-pointer">
+            Son olaylar
+          </summary>
           <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto text-[10px] text-slate-400">
             {events.slice(0, 8).map((ev, i) => (
               <li key={i}>
@@ -543,12 +558,13 @@ export function AutonomousOversightPanel() {
             Canlı Aktivite Akışı
           </span>
           <span
-            className={`text-[10px] px-1.5 py-0.5 rounded ${status === "running"
-              ? "bg-amber-500/20 text-amber-400"
-              : status === "complete"
-                ? "bg-green-500/20 text-green-400"
-                : "bg-slate-600/40 text-slate-400"
-              }`}
+            className={`text-[10px] px-1.5 py-0.5 rounded ${
+              status === "running"
+                ? "bg-amber-500/20 text-amber-400"
+                : status === "complete"
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-slate-600/40 text-slate-400"
+            }`}
           >
             {status === "running"
               ? "Aktif"
@@ -580,7 +596,8 @@ export function AutonomousOversightPanel() {
             <div className="animate-pulse h-12 rounded bg-slate-700/50" />
           ) : convs.length === 0 ? (
             <p className="text-[11px] text-slate-500 py-2 text-center">
-              Henüz otonom sohbet yok. İletişim → Otonom Sohbet ile başlatın.
+              Otonom sohbet zamanlayıcısı aktif — kısa süre içinde sohbetler
+              başlayacak.
             </p>
           ) : (
             <ul className="space-y-1.5">
@@ -589,11 +606,19 @@ export function AutonomousOversightPanel() {
                   key={c.id}
                   className="flex items-center gap-2 text-[11px] text-slate-400"
                 >
-                  <span style={{ color: ROLE_COLOR[c.initiator as AgentRole] ?? "#94a3b8" }}>
+                  <span
+                    style={{
+                      color: ROLE_COLOR[c.initiator as AgentRole] ?? "#94a3b8",
+                    }}
+                  >
                     {ROLE_ICON[c.initiator as AgentRole] ?? "⚙"}
                   </span>
                   <span className="text-slate-500">⇄</span>
-                  <span style={{ color: ROLE_COLOR[c.responder as AgentRole] ?? "#94a3b8" }}>
+                  <span
+                    style={{
+                      color: ROLE_COLOR[c.responder as AgentRole] ?? "#94a3b8",
+                    }}
+                  >
                     {ROLE_ICON[c.responder as AgentRole] ?? "⚙"}
                   </span>
                   <span className="truncate flex-1 text-slate-300">
