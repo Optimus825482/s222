@@ -409,8 +409,9 @@ function SkillRecommendations() {
           ))}
         </div>
       ) : skills.length === 0 ? (
-        <div className="text-xs text-slate-500 text-center py-4">
-          Öneri bulunamadı
+        <div className="text-xs text-slate-500 text-center py-4 space-y-1">
+          <p>Öneri bulunamadı</p>
+          <p className="text-[10px]">Yukarıdaki arama kutusuna konu yazıp Ara ile mevcut yeteneklerden öneri alabilirsiniz.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[280px] overflow-y-auto pr-1">
@@ -493,6 +494,9 @@ function AutoDiscovery() {
 
   return (
     <div className="space-y-3">
+      <p className="text-[11px] text-slate-500 leading-snug">
+        Son 7 gündeki tamamlanmış görevlerinizden kalıp çıkarılır; her kalıp <strong className="text-slate-400">data/skills</strong> altında yeni bir yetenek olarak kaydedilir. Agent&apos;lar bu yetenekleri <strong className="text-slate-400">find_skill</strong> ile bulup kullanır.
+      </p>
       <div className="flex items-center gap-3">
         <button
           onClick={handleDiscover}

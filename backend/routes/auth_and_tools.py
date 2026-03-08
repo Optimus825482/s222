@@ -641,8 +641,9 @@ async def auto_discover_skills(user: dict = Depends(get_current_user)):
     """Analyze recent tasks and auto-create skills from successful patterns."""
     _audit("skill_auto_discover", user["user_id"])
     try:
+        import hashlib
         from datetime import timedelta
-        from tools.dynamic_skills import auto_create_skill_from_pattern
+        from tools.dynamic_skills import auto_create_skill_from_pattern, get_skill
 
         discovered: list[dict] = []
         seen_descriptions: set[str] = set()
@@ -681,6 +682,11 @@ async def auto_discover_skills(user: dict = Depends(get_current_user)):
                 knowledge = "\n".join(knowledge_parts[:5])
                 keywords = list(set(tool_sequence))[:6] or ["auto-discovered"]
 
+                # Duplikasyon: aynı görev açıklaması → aynı skill_id; zaten varsa atla
+                skill_id = "auto-" + hashlib.md5(desc.encode()).hexdigest()[:8]
+                if get_skill(skill_id):
+                    continue
+
                 try:
                     skill = auto_create_skill_from_pattern(
                         pattern_description=desc,
@@ -693,6 +699,7 @@ async def auto_discover_skills(user: dict = Depends(get_current_user)):
                             "skill_id": skill.get("id", ""),
                             "name": skill.get("name", ""),
                             "description": desc,
+                            "pattern": desc,
                         }
                     )
                 except Exception:
@@ -702,6 +709,7 @@ async def auto_discover_skills(user: dict = Depends(get_current_user)):
                 break
 
         return {
+            "discovered": len(discovered),
             "discovered_count": len(discovered),
             "skills": discovered,
             "scanned_threads": len(user_threads),
