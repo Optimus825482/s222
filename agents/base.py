@@ -564,6 +564,19 @@ class BaseAgent(ABC):
                 success=True,
             )
             self._emit("response", content[:200])
+
+            # Faz 11.6: memory.md auto-update on task completion
+            try:
+                from tools.agent_identity import IdentityManager
+                _role_str = self.role.value if hasattr(self.role, "value") else str(self.role)
+                _summary = task_input[:120].replace("\n", " ")
+                IdentityManager().update_memory(
+                    _role_str,
+                    f"Task completed: {_summary} → {content[:80].replace(chr(10), ' ')}",
+                )
+            except Exception:
+                pass  # non-critical
+
             return content
 
         # Max steps reached (agentic loop iteration limit)

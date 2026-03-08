@@ -16,6 +16,7 @@ import json
 import logging
 import re
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -500,9 +501,4 @@ def get_workflow_optimizer() -> WorkflowOptimizer:
     return _optimizer
 
 
-# ─── Import fix for dataclasses ───────────────────────────────────
-
-from dataclasses import dataclass
-
-# Re-import after definition
 import sqlite3
