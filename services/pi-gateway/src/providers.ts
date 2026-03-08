@@ -1,14 +1,19 @@
 import type { KnownProvider } from "@mariozechner/pi-ai";
 import { getModels, getEnvApiKey } from "@mariozechner/pi-ai";
 
+/** Provider entry — KnownProvider for native ones, string for custom/OpenAI-compatible */
+interface TrackedProvider {
+  provider: string;
+  envVar: string;
+}
+
 /** Providers we actively track with env var mapping */
-const TRACKED_PROVIDERS: { provider: KnownProvider; envVar: string }[] = [
-  { provider: "openai", envVar: "OPENAI_API_KEY" },
-  { provider: "anthropic", envVar: "ANTHROPIC_API_KEY" },
+const TRACKED_PROVIDERS: TrackedProvider[] = [
   { provider: "google", envVar: "GEMINI_API_KEY" },
   { provider: "groq", envVar: "GROQ_API_KEY" },
   { provider: "mistral", envVar: "MISTRAL_API_KEY" },
-  { provider: "xai", envVar: "XAI_API_KEY" },
+  { provider: "deepseek", envVar: "DEEPSEEK_API_KEY" },
+  { provider: "nvidia", envVar: "NVIDIA_API_KEY" },
   { provider: "openrouter", envVar: "OPENROUTER_API_KEY" },
 ];
 
@@ -19,16 +24,26 @@ export interface ProviderStatus {
   modelCount: number;
 }
 
+/** Check if a provider API key is set (native or env-based) */
+function hasApiKey(provider: string, envVar: string): boolean {
+  try {
+    return !!getEnvApiKey(provider as KnownProvider);
+  } catch {
+    // Not a KnownProvider — check env directly
+    return !!process.env[envVar];
+  }
+}
+
 /** Check which providers have API keys set */
 export function getConfiguredProviders(): ProviderStatus[] {
   return TRACKED_PROVIDERS.map(({ provider, envVar }) => {
-    const hasKey = !!getEnvApiKey(provider);
+    const hasKey = hasApiKey(provider, envVar);
     let modelCount = 0;
     if (hasKey) {
       try {
-        modelCount = getModels(provider).length;
+        modelCount = getModels(provider as KnownProvider).length;
       } catch {
-        /* skip */
+        /* not a native provider or no models */
       }
     }
     return { provider, configured: hasKey, envVar, modelCount };
@@ -46,10 +61,10 @@ export function getAllAvailableModels() {
     supportsImages: boolean;
   }> = [];
 
-  for (const { provider } of TRACKED_PROVIDERS) {
-    if (!getEnvApiKey(provider)) continue;
+  for (const { provider, envVar } of TRACKED_PROVIDERS) {
+    if (!hasApiKey(provider, envVar)) continue;
     try {
-      const models = getModels(provider);
+      const models = getModels(provider as KnownProvider);
       for (const m of models) {
         results.push({
           id: `${provider}/${m.id}`,
@@ -61,7 +76,7 @@ export function getAllAvailableModels() {
         });
       }
     } catch {
-      // Provider not available, skip
+      // Provider not natively supported or unavailable, skip
     }
   }
   return results;

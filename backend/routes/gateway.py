@@ -71,20 +71,25 @@ def _build_mapping() -> dict[str, Any]:
     result = {}
     for role, cfg in GATEWAY_MODELS.items():
         primary = cfg.get("primary", {})
-        alternatives = cfg.get("alternatives", [])
+        raw_alts = cfg.get("alternatives", [])
+        # Flatten alternatives to string list of model IDs
+        alt_ids = [
+            a["id"] if isinstance(a, dict) else str(a)
+            for a in raw_alts
+        ]
         if role in overrides:
             ov = overrides[role]
             result[role] = {
                 "current_model": ov.get("model_id", primary.get("id")),
                 "provider": ov.get("provider", primary.get("provider")),
-                "alternatives": alternatives,
+                "alternatives": alt_ids,
                 "is_override": True,
             }
         else:
             result[role] = {
                 "current_model": primary.get("id"),
                 "provider": primary.get("provider"),
-                "alternatives": alternatives,
+                "alternatives": alt_ids,
                 "is_override": False,
             }
     return result
@@ -247,11 +252,13 @@ async def reset_model_mapping(role: str, user: dict = Depends(get_current_user))
     _save_overrides(overrides)
     # Return the default mapping for this role
     primary = GATEWAY_MODELS[role].get("primary", {})
+    raw_alts = GATEWAY_MODELS[role].get("alternatives", [])
+    alt_ids = [a["id"] if isinstance(a, dict) else str(a) for a in raw_alts]
     return {
         "role": role,
         "current_model": primary.get("id"),
         "provider": primary.get("provider"),
-        "alternatives": GATEWAY_MODELS[role].get("alternatives", []),
+        "alternatives": alt_ids,
         "is_override": False,
     }
 

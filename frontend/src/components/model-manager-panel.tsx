@@ -48,6 +48,7 @@ const PROVIDER_ICONS: Record<string, string> = {
   xai: "✖️",
   nvidia: "💚",
   deepseek: "🐋",
+  openrouter: "⚙️",
 };
 
 const ROLES: AgentRole[] = [
@@ -316,8 +317,13 @@ function MappingTab() {
               >
                 <option value={m.current_model}>{m.current_model}</option>
                 {m.alternatives
-                  .filter((a) => a !== m.current_model)
-                  .map((alt) => (
+                  .map((a: any) =>
+                    typeof a === "object" && a !== null
+                      ? (a.id ?? String(a))
+                      : String(a),
+                  )
+                  .filter((a: string) => a !== m.current_model)
+                  .map((alt: string) => (
                     <option key={alt} value={alt}>
                       {alt}
                     </option>
