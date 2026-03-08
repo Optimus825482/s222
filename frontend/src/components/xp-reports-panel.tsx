@@ -787,7 +787,12 @@ export function XpReportsPanel() {
   useEffect(() => {
     if (!ctxMenu) return;
     const handler = (e: MouseEvent) => {
-      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        ctxRef.current &&
+        document.contains(target) &&
+        !ctxRef.current.contains(target)
+      ) {
         setCtxMenu(null);
       }
     };
