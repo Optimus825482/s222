@@ -1,7 +1,7 @@
 """
 Presentation Service — Professional PPTX generation with AI-generated visuals.
 Uses python-pptx for slides, Pollinations.ai for image generation,
-and SearXNG deep research for content enrichment.
+and Whoogle deep research for content enrichment.
 
 Enhanced with MINI/MIDI/MAXI mode analysis, multi-theme support,
 and advanced slide types (quote, data highlight, two-column).
@@ -127,7 +127,7 @@ async def deep_research_for_presentation(
     mode: PresentationMode = "midi",
 ) -> dict[str, Any]:
     """
-    Perform multi-query deep research on a topic using SearXNG.
+    Perform multi-query deep research on a topic using Whoogle.
     Research depth scales with mode: MINI=light, MIDI=standard, MAXI=deep.
     Returns structured research data: key_facts, statistics, sources, subtopics.
     """

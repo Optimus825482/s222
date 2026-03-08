@@ -1,6 +1,6 @@
 """
 GLM 4.7 — Research Agent.
-Web search via SearXNG, web fetch, data gathering, summarization.
+Web search via Whoogle (Google proxy), web fetch, data gathering, summarization.
 """
 
 from __future__ import annotations

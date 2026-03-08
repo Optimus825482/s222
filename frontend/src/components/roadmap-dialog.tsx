@@ -243,7 +243,7 @@ export const PHASES: Phase[] = [
     border: "border-cyan-400/30",
     progress: 30,
     items: [
-      { done: true, label: "MCP Client + Web fetch + SearXNG" },
+      { done: true, label: "MCP Client + Web fetch + Whoogle" },
       { done: false, label: "Webhook receiver/sender" },
       { done: false, label: "Generic REST API connector" },
       { done: false, label: "Email gönderimi (SMTP)" },

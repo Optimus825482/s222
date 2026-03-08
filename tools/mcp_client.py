@@ -446,7 +446,7 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-brave-search"],
         "env": {"BRAVE_API_KEY": ""},
-        "description": "Brave Search API — SearXNG'e ek olarak ikinci web arama motoru",
+        "description": "Brave Search API — Whoogle'a ek olarak ikinci web arama motoru",
     },
     {
         "id": "fetch",

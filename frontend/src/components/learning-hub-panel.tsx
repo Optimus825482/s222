@@ -1055,7 +1055,7 @@ export function BehaviorTab() {
   );
 }
 
-function LearningHubPanel() {
+export function LearningHubPanel() {
   const [tab, setTab] = useState<HubTab>("overview");
   return (
     <div className="space-y-3">

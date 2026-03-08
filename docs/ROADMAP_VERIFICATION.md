@@ -5,9 +5,9 @@
 
 ## Özet
 
-| Durum | Açıklama |
-|-------|-----------|
-| ✅ Doğrulandı | Tüm 🟢 maddeler uygulamada mevcut |
+| Durum          | Açıklama                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| ✅ Doğrulandı  | Tüm 🟢 maddeler uygulamada mevcut                                                         |
 | 📝 XP eşlemesi | Task History → **Oturumlar**, Export → **Raporlar** (ROADMAP metni buna göre güncellendi) |
 
 ---
@@ -20,12 +20,12 @@
 - **Faz 3:** chart_generator.py, chart-panel, 5 chart API.
 - **Faz 5:** pii_masker.py.
 - **Faz 6:** agent_eval, confidence, circuit_breaker, benchmark_suite, benchmark-panel, error_patterns (8 endpoint), auto_optimizer, cost_tracker, cost-tracker-panel.
-- **Faz 7:** mcp_client, web_fetch, search (SearXNG).
+- **Faz 7:** mcp_client, web_fetch, search (Whoogle).
 - **Faz 8:** presentation_service MINI/MIDI/MAXI.
 - **Faz 9:** teachability, dynamic_skills, skill_hygiene, reflexion, adaptive_tool_selector, workflow_optimizer, proaktif skill önerisi (auth_and_tools).
 - **Faz 10:** context-board (6 API), dynamic-role (6 API), agent_progress_tracker (3 API + WebSocket), **shared_workspace** (tools/shared_workspace.py + 10 API: create, list, get, add/remove member, add/get/delete items, stats, **sync/cli**), **worktree** (tools/worktree_manager.py + 7 API: list, create, remove, commit, merge, sync, diff + worktree-panel.tsx), **collaborative-editor** (CRDT + 9 API + **/ws/collab-docs** real-time broadcast).
-- **Faz 11.4 / 11.6:** _AUTONOMOUS_CONVERSATIONS, _AUTO_CHAT_CONFIG, _POST_TASK_MEETINGS, SOUL.md/user.md/memory.md/bootstrap.md, agent_identity, build_context SOUL injection, Kimlik editörü.
-- **Faz 13.1:** POWER.md ve steering/*.md (powers/autonomous-agent-ecosystem).
+- **Faz 11.4 / 11.6:** \_AUTONOMOUS_CONVERSATIONS, \_AUTO_CHAT_CONFIG, \_POST_TASK_MEETINGS, SOUL.md/user.md/memory.md/bootstrap.md, agent_identity, build_context SOUL injection, Kimlik editörü.
+- **Faz 13.1:** POWER.md ve steering/\*.md (powers/autonomous-agent-ecosystem).
 
 ---
 
@@ -34,8 +34,8 @@
 ### 1. Task History + Export (Mevcut v2.0)
 
 - **ROADMAP:** «🟢 Task History + Export sağ panel düzeni»
-- **XP’deki karşılık:**  
-  - **Task History** → **Oturumlar** (Sessions) penceresi — geçmiş oturumlar, görev sayısı, olay sayısı, tarih; tek tek veya tümünü silme.  
+- **XP’deki karşılık:**
+  - **Task History** → **Oturumlar** (Sessions) penceresi — geçmiş oturumlar, görev sayısı, olay sayısı, tarih; tek tek veya tümünü silme.
   - **Export** → **Raporlar** uygulaması — rapor/export işlemleri.
 - **Sonuç:** Özellik XP’de farklı isimlerle mevcut; ROADMAP maddesi 🟢 kalabilir, açıklama güncellendi.
 
@@ -50,19 +50,19 @@
 
 ### Real-time collaboration (worktree bazlı paralel geliştirme)
 
-| Bileşen | Durum |
-|---------|--------|
-| **tools/worktree_manager.py** | Var — create_worktree, remove_worktree, commit, merge, sync, get_diff |
-| **Backend API** | 7 endpoint: GET/POST /api/worktrees, DELETE /api/worktrees/{agent_id}, POST commit, merge, sync, GET diff |
-| **Frontend** | worktree-panel.tsx — listele, oluştur, sil, commit, merge, sync, diff görüntüleme |
+| Bileşen                       | Durum                                                                                                     |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **tools/worktree_manager.py** | Var — create_worktree, remove_worktree, commit, merge, sync, get_diff                                     |
+| **Backend API**               | 7 endpoint: GET/POST /api/worktrees, DELETE /api/worktrees/{agent_id}, POST commit, merge, sync, GET diff |
+| **Frontend**                  | worktree-panel.tsx — listele, oluştur, sil, commit, merge, sync, diff görüntüleme                         |
 
 ### Shared workspace (çoklu kullanıcı + CLI sync)
 
-| Bileşen | Durum |
-|---------|--------|
-| **tools/shared_workspace.py** | Var — Qdrant tabanlı workspace, members, items, search |
-| **Backend API** | 10 endpoint: POST/GET workspaces, GET workspaces/{id}, POST/DELETE members, POST/GET/DELETE items, GET stats, **POST sync/cli** |
-| **CLI sync** | POST /api/workspaces/{workspace_id}/sync/cli mevcut |
+| Bileşen                       | Durum                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **tools/shared_workspace.py** | Var — Qdrant tabanlı workspace, members, items, search                                                                          |
+| **Backend API**               | 10 endpoint: POST/GET workspaces, GET workspaces/{id}, POST/DELETE members, POST/GET/DELETE items, GET stats, **POST sync/cli** |
+| **CLI sync**                  | POST /api/workspaces/{workspace_id}/sync/cli mevcut                                                                             |
 
 ### Collaborative document editing (real-time tamamlandı)
 

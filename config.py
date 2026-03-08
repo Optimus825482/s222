@@ -34,12 +34,12 @@ PI_GATEWAY_FALLBACK_MAX_RETRIES = int(os.getenv("PI_GATEWAY_FALLBACK_MAX_RETRIES
 # Streaming configuration (Faz 14.2)
 PI_GATEWAY_STREAMING_ENABLED = os.getenv("PI_GATEWAY_STREAMING_ENABLED", "true").lower() == "true"
 
-# Base URL without trailing slash (app appends /search)
-_SEARXNG_RAW = os.getenv(
-    "SEARXNG_URL",
-    "http://searxng-pwcsc8ow08oks0ggokwoo8ww.77.42.68.4.sslip.io",
+# Whoogle — self-hosted Google proxy (format=json API, needs session cookie)
+_WHOOGLE_RAW = os.getenv(
+    "WHOOGLE_URL",
+    "http://whoogle-e4s8oc4kkc8sokcsco808ccw.77.42.68.4.sslip.io",
 )
-SEARXNG_URL = _SEARXNG_RAW.rstrip("/") if _SEARXNG_RAW else ""
+WHOOGLE_URL = _WHOOGLE_RAW.rstrip("/") if _WHOOGLE_RAW else ""
 
 # ── Model Definitions ────────────────────────────────────────────
 

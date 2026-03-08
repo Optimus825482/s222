@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { fetcher } from "@/lib/api";
+import { fetcher, authHeaders } from "@/lib/api";
 import { type AnyData, crd, sCls, CATEGORIES, allRoles, ai } from "./shared";
 import { SuiteResultView } from "./suite-result";
 import { SingleResultView } from "./single-result";
@@ -50,7 +50,7 @@ export function RunTab() {
 
       const resp = await fetch(`${API_BASE}/api/benchmarks/run-stream`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });

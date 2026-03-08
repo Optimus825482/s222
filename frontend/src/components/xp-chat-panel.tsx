@@ -86,6 +86,10 @@ export default function ChatDesktopPanel() {
               icon: "/icon-192x192.png",
             });
           }
+          // Auto-open reports panel on task completion
+          window.dispatchEvent(
+            new CustomEvent("open-app", { detail: "reports" }),
+          );
           // Completion sound
           try {
             const ctx = new AudioContext();

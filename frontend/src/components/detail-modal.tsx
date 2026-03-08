@@ -114,14 +114,18 @@ export function DetailModal({
   }, [content]);
 
   const handleScreenshot = useCallback(async () => {
-    const el = panelRef.current;
+    // Tam ekran: tüm sayfayı yakala; normal mod: sadece paneli yakala
+    const el = fullScreenRef.current ? document.body : panelRef.current;
     if (!el) return;
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { default: html2canvas } = await import("html2canvas" as any);
       const canvas = await html2canvas(el, {
-        backgroundColor: "#1a1f2e",
+        backgroundColor: fullScreenRef.current ? null : "#1a1f2e",
         scale: 2,
+        useCORS: true,
+        windowWidth: document.documentElement.scrollWidth,
+        windowHeight: document.documentElement.scrollHeight,
       });
       canvas.toBlob((blob: Blob | null) => {
         if (!blob) return;
@@ -191,19 +195,6 @@ export function DetailModal({
                 <Copy className="w-4 h-4" />
               )}
             </button>
-            {/* Fullscreen toggle */}
-            <button
-              type="button"
-              onClick={() => setFullScreen(!fullScreen)}
-              aria-label={fullScreen ? "Küçült" : "Tam ekran"}
-              className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-slate-300 rounded hover:bg-white/5 transition-colors"
-            >
-              {fullScreen ? (
-                <Minimize2 className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
-            </button>
             {/* Close button */}
             <button
               ref={closeButtonRef}
@@ -217,13 +208,21 @@ export function DetailModal({
           </div>
         </div>
 
-        {/* Content — markdown rendered, selectable text */}
+        {/* Content — markdown rendered, selectable text (mouse ile seçilebilir) */}
         <div
           ref={contentRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-5 py-4 text-sm text-slate-300 leading-relaxed select-text cursor-text"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-auto px-5 py-4 pb-16 text-sm text-slate-300 leading-relaxed"
+          style={{
+            userSelect: "text",
+            WebkitUserSelect: "text",
+            cursor: "text",
+          }}
         >
           {content ? (
-            <div className="prose prose-invert prose-sm max-w-none prose-headings:text-slate-200 prose-p:text-slate-300 prose-strong:text-slate-200 prose-code:text-cyan-300 prose-code:bg-slate-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:border prose-pre:border-border prose-li:text-slate-300 prose-a:text-cyan-400">
+            <div
+              className="prose prose-invert prose-sm max-w-none prose-headings:text-slate-200 prose-p:text-slate-300 prose-strong:text-slate-200 prose-code:text-cyan-300 prose-code:bg-slate-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:border prose-pre:border-border prose-li:text-slate-300 prose-a:text-cyan-400 [&_*]:select-text"
+              style={{ userSelect: "text", WebkitUserSelect: "text" }}
+            >
               <ReactMarkdown>
                 {sanitizeStreamingMarkdown(content)}
               </ReactMarkdown>
@@ -233,15 +232,44 @@ export function DetailModal({
           )}
         </div>
 
-        {/* Screenshot FAB — bottom right */}
-        <button
-          type="button"
-          onClick={handleScreenshot}
-          aria-label="Ekran görüntüsü al"
-          className="absolute bottom-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg transition-colors z-20"
-        >
-          <Camera className="w-5 h-5" />
-        </button>
+        {/* FAB buttons — bottom right: Copy + Screenshot + Fullscreen */}
+        <div className="absolute bottom-4 right-4 flex items-center gap-2 z-20">
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Tümünü kopyala"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-white shadow-lg transition-colors"
+            title="Tümünü kopyala"
+          >
+            {copied ? (
+              <Check className="w-5 h-5 text-emerald-400" />
+            ) : (
+              <Copy className="w-5 h-5" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={handleScreenshot}
+            aria-label="Ekran görüntüsü al"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg transition-colors"
+            title="Ekran görüntüsü"
+          >
+            <Camera className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFullScreen(!fullScreen)}
+            aria-label={fullScreen ? "Küçült" : "Tam ekran"}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg transition-colors"
+            title={fullScreen ? "Küçült" : "Tam ekran"}
+          >
+            {fullScreen ? (
+              <Minimize2 className="w-5 h-5" />
+            ) : (
+              <Maximize2 className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

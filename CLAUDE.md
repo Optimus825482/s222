@@ -33,14 +33,14 @@ multi-agent-dashboard/
 
 6 specialist agents orchestrated by a central controller. Model configurations defined in `config.py` (MODELS dictionary):
 
-| Agent | Model | Role |
-|-------|-------|------|
-| Orchestrator | Qwen3 80B | Task analysis, decomposition, routing, synthesis |
-| Thinker | MiniMax M2.1 | Deep reasoning, analysis, planning |
-| Speed | Step 3.5 Flash | Quick responses, code generation, formatting |
-| Researcher | GLM 4.7 | Web search, data gathering, summarization |
-| Reasoner | Nemotron 3 Nano | Chain-of-thought, math, logic, verification |
-| Critic | DeepSeek Chat | Code review, fact-checking, quality gate |
+| Agent        | Model           | Role                                             |
+| ------------ | --------------- | ------------------------------------------------ |
+| Orchestrator | Qwen3 80B       | Task analysis, decomposition, routing, synthesis |
+| Thinker      | MiniMax M2.1    | Deep reasoning, analysis, planning               |
+| Speed        | Step 3.5 Flash  | Quick responses, code generation, formatting     |
+| Researcher   | GLM 4.7         | Web search, data gathering, summarization        |
+| Reasoner     | Nemotron 3 Nano | Chain-of-thought, math, logic, verification      |
+| Critic       | DeepSeek Chat   | Code review, fact-checking, quality gate         |
 
 **Key files:** `agents/base.py`, `agents/orchestrator.py`, `config.py`
 
@@ -70,6 +70,7 @@ Utilities organized by function in `tools/`:
 ### Backend API
 
 `backend/main.py` provides:
+
 - **WebSocket**: `/ws/chat` - Real-time event streaming
 - **Auth**: Bearer token with bcrypt passwords, HMAC-signed tokens
 - **REST**: `/api/*` endpoints for threads, agents, tools, workflows, benchmarks
@@ -84,6 +85,7 @@ Utilities organized by function in `tools/`:
 ### Data Models
 
 `core/models.py` defines:
+
 - `Thread` - Unified execution state
 - `Task` / `SubTask` - Task decomposition with agent assignment
 - `Event` - Serialized event log
@@ -93,7 +95,7 @@ Utilities organized by function in `tools/`:
 ### External Services
 
 - **PostgreSQL + pgvector** - Vector embeddings and persistent storage
-- **SearXNG** - Self-hosted web search
+- **Whoogle** - Self-hosted Google proxy for web search
 - **MCP** - Model Context Protocol for external tool integration
 - **NVIDIA API** - Primary LLM provider
 - **DeepSeek API** - Critic agent
@@ -101,6 +103,7 @@ Utilities organized by function in `tools/`:
 ## Configuration
 
 See `.env.example` for all environment variables. Key settings:
+
 - **Database**: `DATABASE_URL` (PostgreSQL with SQLite fallback)
 - **API Keys**: `NVIDIA_API_KEY`, `DEEPSEEK_API_KEY`
 - **Ports**: Configured in `package.json` (backend: 8001, frontend: 3015)

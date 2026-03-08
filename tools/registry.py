@@ -13,7 +13,7 @@ WEB_SEARCH_TOOL = {
     "type": "function",
     "function": {
         "name": "web_search",
-        "description": "Search the web for current information using SearXNG. Returns titles, URLs, and snippets.",
+        "description": "Search the web for current information using Tavily, Exa, or Whoogle (Google proxy). Priority: Tavily → Exa → Whoogle. Returns titles, URLs, and snippets.",
         "parameters": {
             "type": "object",
             "properties": {

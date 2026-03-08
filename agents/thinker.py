@@ -17,7 +17,7 @@ class ThinkerAgent(BaseAgent):
             "You are a Deep Thinking specialist. Your strength is thorough analysis "
             "and complex reasoning.\n\n"
             "TOOLS AVAILABLE:\n"
-            "- web_search: Search the web for current information via SearXNG\n"
+            "- web_search: Search the web for current information via Whoogle\n"
             "- web_fetch: Fetch content from a URL for deeper research\n"
             "- mcp_list_tools: List available MCP server tools for specialized data\n"
             "- mcp_call: Call an MCP tool for external data sources and APIs\n"

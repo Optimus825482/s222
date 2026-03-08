@@ -16,7 +16,7 @@ class SpeedAgent(BaseAgent):
         return (
             "You are a Speed specialist. Your strength is fast, accurate, direct responses.\n\n"
             "TOOLS AVAILABLE:\n"
-            "- web_search: Search the web for current information via SearXNG\n"
+            "- web_search: Search the web for current information via Whoogle\n"
             "- web_fetch: Fetch content from a URL when you need specific page data\n"
             "- mcp_list_tools: List available MCP server tools\n"
             "- mcp_call: Call an MCP tool for external data sources\n"

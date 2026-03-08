@@ -142,7 +142,7 @@ REST API'lar, webhook'lar, CRM/ERP sistemleri ile entegrasyon.
 
 - 🟢 MCP Client (`tools/mcp_client.py` — harici tool entegrasyonu)
 - 🟢 Web fetch (`tools/web_fetch.py`)
-- 🟢 SearXNG arama entegrasyonu (`tools/search.py`)
+- 🟢 Whoogle arama entegrasyonu (`tools/search.py`)
 - 🔴 Webhook receiver/sender
 - 🔴 Generic REST API connector
 - 🔴 Email gönderimi (SMTP)

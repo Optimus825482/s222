@@ -34,8 +34,9 @@ services:
       NVIDIA_API_KEY: ${NVIDIA_API_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
-      SEARXNG_URL: ${SEARXNG_URL:-http://searxng-pwcsc8ow08oks0ggokwoo8ww.77.42.68.4.sslip.io}
+      WHOOGLE_URL: ${WHOOGLE_URL:-http://whoogle-e4s8oc4kkc8sokcsco808ccw.77.42.68.4.sslip.io}
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      EXA_API_KEY: ${EXA_API_KEY:-}
       POLLINATIONS_API_KEY: ${POLLINATIONS_API_KEY:-}
       PI_GATEWAY_URL: ${PI_GATEWAY_URL:-http://pi-gateway:3100}
       PI_GATEWAY_ENABLED: ${PI_GATEWAY_ENABLED:-true}
