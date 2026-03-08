@@ -201,40 +201,72 @@ class WorkspaceItemRequest(BaseModel):
     metadata: dict = {}
 
 
+import logging as _ws_logging
+_ws_logger = _ws_logging.getLogger("workspace")
+
+
+def _safe_get_workspace():
+    """get_workspace() wrapper — Qdrant erişilemezse None döner."""
+    try:
+        return get_workspace()
+    except Exception as exc:
+        _ws_logger.warning("Workspace backend unavailable: %s", exc)
+        return None
+
+
 @router.post("/api/workspaces")
 async def api_create_workspace(req: WorkspaceCreateRequest, user: dict = Depends(get_current_user)):
     """Yeni workspace oluştur"""
-    workspace = get_workspace()
-    result = workspace.create_workspace(
-        workspace_id=req.workspace_id,
-        owner_id=user["user_id"],
-        name=req.name,
-        metadata=req.metadata
-    )
-    _audit("workspace_create", user["user_id"], f"workspace_id={req.workspace_id}")
-    return result
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"error": "workspace backend unavailable"}
+        result = workspace.create_workspace(
+            workspace_id=req.workspace_id,
+            owner_id=user["user_id"],
+            name=req.name,
+            metadata=req.metadata
+        )
+        _audit("workspace_create", user["user_id"], f"workspace_id={req.workspace_id}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_create_workspace error")
+        return {"error": str(exc)}
 
 
 @router.get("/api/workspaces")
 async def api_list_workspaces(user: dict = Depends(get_current_user)):
     """Kullanıcının workspace'lerini listele"""
-    workspace = get_workspace()
-    return {"workspaces": workspace.list_workspaces(user["user_id"])}
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"workspaces": []}
+        return {"workspaces": workspace.list_workspaces(user["user_id"])}
+    except Exception as exc:
+        _ws_logger.exception("api_list_workspaces error")
+        return {"workspaces": []}
 
 
 @router.get("/api/workspaces/{workspace_id}")
 async def api_get_workspace(workspace_id: str, user: dict = Depends(get_current_user)):
     """Workspace detaylarını al"""
-    workspace = get_workspace()
-    result = workspace.get_workspace(workspace_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    # Erişim kontrolü
-    if user["user_id"] not in result.get("members", []):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    return result
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"error": "workspace backend unavailable"}
+        result = workspace.get_workspace(workspace_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if user["user_id"] not in result.get("members", []):
+            raise HTTPException(status_code=403, detail="Access denied")
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_get_workspace error")
+        return {"error": str(exc)}
 
 
 @router.post("/api/workspaces/{workspace_id}/members")
@@ -244,22 +276,25 @@ async def api_add_workspace_member(
     user: dict = Depends(get_current_user)
 ):
     """Workspace'e üye ekle"""
-    workspace = get_workspace()
-    ws = workspace.get_workspace(workspace_id)
-
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    # Sadece owner ekleyebilir
-    if ws.get("owner_id") != user["user_id"]:
-        raise HTTPException(status_code=403, detail="Only owner can add members")
-
-    success = workspace.add_member(workspace_id, req.user_id, req.role)
-    if success:
-        _audit("workspace_add_member", user["user_id"], f"workspace={workspace_id} member={req.user_id}")
-        return {"status": "added", "user_id": req.user_id}
-
-    raise HTTPException(status_code=400, detail="Failed to add member")
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"error": "workspace backend unavailable"}
+        ws = workspace.get_workspace(workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if ws.get("owner_id") != user["user_id"]:
+            raise HTTPException(status_code=403, detail="Only owner can add members")
+        success = workspace.add_member(workspace_id, req.user_id, req.role)
+        if success:
+            _audit("workspace_add_member", user["user_id"], f"workspace={workspace_id} member={req.user_id}")
+            return {"status": "added", "user_id": req.user_id}
+        raise HTTPException(status_code=400, detail="Failed to add member")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_add_workspace_member error")
+        return {"error": str(exc)}
 
 
 @router.delete("/api/workspaces/{workspace_id}/members/{user_id}")
@@ -269,22 +304,25 @@ async def api_remove_workspace_member(
     user: dict = Depends(get_current_user)
 ):
     """Workspace'den üye çıkar"""
-    workspace = get_workspace()
-    ws = workspace.get_workspace(workspace_id)
-
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    # Sadece owner çıkarabilir
-    if ws.get("owner_id") != user["user_id"]:
-        raise HTTPException(status_code=403, detail="Only owner can remove members")
-
-    success = workspace.remove_member(workspace_id, user_id)
-    if success:
-        _audit("workspace_remove_member", user["user_id"], f"workspace={workspace_id} member={user_id}")
-        return {"status": "removed", "user_id": user_id}
-
-    raise HTTPException(status_code=400, detail="Failed to remove member")
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"error": "workspace backend unavailable"}
+        ws = workspace.get_workspace(workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if ws.get("owner_id") != user["user_id"]:
+            raise HTTPException(status_code=403, detail="Only owner can remove members")
+        success = workspace.remove_member(workspace_id, user_id)
+        if success:
+            _audit("workspace_remove_member", user["user_id"], f"workspace={workspace_id} member={user_id}")
+            return {"status": "removed", "user_id": user_id}
+        raise HTTPException(status_code=400, detail="Failed to remove member")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_remove_workspace_member error")
+        return {"error": str(exc)}
 
 
 @router.post("/api/workspaces/{workspace_id}/items")
@@ -294,29 +332,31 @@ async def api_add_workspace_item(
     user: dict = Depends(get_current_user)
 ):
     """Workspace'e item ekle"""
-    workspace = get_workspace()
-    ws = workspace.get_workspace(workspace_id)
-
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    if user["user_id"] not in ws.get("members", []):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    # Dummy vector (gerçek implementasyonda embedding gerekir)
-    vector = [0.0] * 1536
-
-    item_id = workspace.add_item(
-        workspace_id=workspace_id,
-        item_type=req.item_type,
-        content=req.content,
-        vector=vector,
-        author_id=user["user_id"],
-        metadata=req.metadata
-    )
-
-    _audit("workspace_add_item", user["user_id"], f"workspace={workspace_id} type={req.item_type}")
-    return {"status": "added", "item_id": item_id}
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"error": "workspace backend unavailable"}
+        ws = workspace.get_workspace(workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if user["user_id"] not in ws.get("members", []):
+            raise HTTPException(status_code=403, detail="Access denied")
+        vector = [0.0] * 1536
+        item_id = workspace.add_item(
+            workspace_id=workspace_id,
+            item_type=req.item_type,
+            content=req.content,
+            vector=vector,
+            author_id=user["user_id"],
+            metadata=req.metadata
+        )
+        _audit("workspace_add_item", user["user_id"], f"workspace={workspace_id} type={req.item_type}")
+        return {"status": "added", "item_id": item_id}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_add_workspace_item error")
+        return {"error": str(exc)}
 
 
 @router.get("/api/workspaces/{workspace_id}/items")
@@ -328,17 +368,22 @@ async def api_get_workspace_items(
     user: dict = Depends(get_current_user)
 ):
     """Workspace item'larını al"""
-    workspace = get_workspace()
-    ws = workspace.get_workspace(workspace_id)
-
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    if user["user_id"] not in ws.get("members", []):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    items = workspace.get_items(workspace_id, item_type, limit, offset)
-    return {"items": items, "count": len(items)}
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"items": [], "count": 0}
+        ws = workspace.get_workspace(workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if user["user_id"] not in ws.get("members", []):
+            raise HTTPException(status_code=403, detail="Access denied")
+        items = workspace.get_items(workspace_id, item_type, limit, offset)
+        return {"items": items, "count": len(items)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_get_workspace_items error")
+        return {"items": [], "count": 0}
 
 
 @router.delete("/api/workspaces/{workspace_id}/items/{item_id}")
@@ -348,36 +393,45 @@ async def api_delete_workspace_item(
     user: dict = Depends(get_current_user)
 ):
     """Workspace item'ı sil"""
-    workspace = get_workspace()
-    ws = workspace.get_workspace(workspace_id)
-
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    if user["user_id"] not in ws.get("members", []):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    success = workspace.delete_item(item_id)
-    if success:
-        _audit("workspace_delete_item", user["user_id"], f"workspace={workspace_id} item={item_id}")
-        return {"status": "deleted", "item_id": item_id}
-
-    raise HTTPException(status_code=400, detail="Failed to delete item")
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"error": "workspace backend unavailable"}
+        ws = workspace.get_workspace(workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if user["user_id"] not in ws.get("members", []):
+            raise HTTPException(status_code=403, detail="Access denied")
+        success = workspace.delete_item(item_id)
+        if success:
+            _audit("workspace_delete_item", user["user_id"], f"workspace={workspace_id} item={item_id}")
+            return {"status": "deleted", "item_id": item_id}
+        raise HTTPException(status_code=400, detail="Failed to delete item")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_delete_workspace_item error")
+        return {"error": str(exc)}
 
 
 @router.get("/api/workspaces/{workspace_id}/stats")
 async def api_get_workspace_stats(workspace_id: str, user: dict = Depends(get_current_user)):
     """Workspace istatistikleri"""
-    workspace = get_workspace()
-    ws = workspace.get_workspace(workspace_id)
-
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    if user["user_id"] not in ws.get("members", []):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    return workspace.get_workspace_stats(workspace_id)
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"error": "workspace backend unavailable"}
+        ws = workspace.get_workspace(workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if user["user_id"] not in ws.get("members", []):
+            raise HTTPException(status_code=403, detail="Access denied")
+        return workspace.get_workspace_stats(workspace_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_get_workspace_stats error")
+        return {"error": str(exc)}
 
 
 @router.post("/api/workspaces/{workspace_id}/sync/cli")
@@ -387,21 +441,25 @@ async def api_sync_workspace_to_cli(
     user: dict = Depends(get_current_user)
 ):
     """CLI hafızasına senkronize et"""
-    workspace = get_workspace()
-    ws = workspace.get_workspace(workspace_id)
-
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    if user["user_id"] not in ws.get("members", []):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    success = workspace.sync_to_cli(workspace_id, cli_memory_path)
-    if success:
-        _audit("workspace_sync_cli", user["user_id"], f"workspace={workspace_id}")
-        return {"status": "synced", "path": cli_memory_path}
-
-    raise HTTPException(status_code=400, detail="Sync failed")
+    try:
+        workspace = _safe_get_workspace()
+        if workspace is None:
+            return {"error": "workspace backend unavailable"}
+        ws = workspace.get_workspace(workspace_id)
+        if not ws:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        if user["user_id"] not in ws.get("members", []):
+            raise HTTPException(status_code=403, detail="Access denied")
+        success = workspace.sync_to_cli(workspace_id, cli_memory_path)
+        if success:
+            _audit("workspace_sync_cli", user["user_id"], f"workspace={workspace_id}")
+            return {"status": "synced", "path": cli_memory_path}
+        raise HTTPException(status_code=400, detail="Sync failed")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _ws_logger.exception("api_sync_workspace_to_cli error")
+        return {"error": str(exc)}
 
 
 # ══════════════════════════════════════════════════════════════════
