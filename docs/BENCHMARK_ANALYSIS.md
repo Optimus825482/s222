@@ -88,7 +88,7 @@ Bu dokümanda benchmark altyapısı, tespit edilen hatalar, iyileştirme öneril
 | Run sonucu özet UI              | ✅ Düzeltildi                     | —       |
 | Karşılaştır: aynı agent uyarısı | ✅ Düzeltildi                     | —       |
 | History trend grafiği           | ✅ Düzeltildi                     | —       |
-| Gerçek ilerleme (WS/polling)    | Açık — simüle progress bar var    | Düşük   |
+| Gerçek ilerleme (SSE streaming) | ✅ Düzeltildi                     | —       |
 
 ---
 
@@ -122,5 +122,12 @@ Bu dokümanda benchmark altyapısı, tespit edilen hatalar, iyileştirme öneril
    - **Sonuçlar (Results):** Agent filtresi + zaman filtresi, tarihli sonuç tablosu.
    - **Trend:** SVG çizgi grafik — senaryo bazlı çizgiler, ortalama çizgisi, değişim yüzdesi göstergesi.
    - **Karşılaştır (Compare):** İki agent seçici, aynı-agent uyarısı, kategori bazlı bar karşılaştırması, kazanan gösterimi.
+
+8. **frontend/src/components/benchmark/run-tab.tsx — SSE streaming**
+   - Eski polling-based (setInterval + /api/benchmarks/progress/{run_id}) mekanizması tamamen kaldırıldı.
+   - Yeni POST /api/benchmarks/run-stream SSE endpoint’ine etch + ReadableStream ile bağlanılıyor.
+   - started, progress, done, rror event’leri gerçek zamanlı parse ediliyor.
+   - İlerleme çubuğu gerçek completed/total değerlerini gösteriyor; tamamlandığında yeşil gradient’e geçiyor.
+   - AbortController ile çalışan benchmark iptal edilebiliyor (İptal butonu eklendi).
 
 Bu analiz, mevcut benchmark sisteminin durumunu ve sonraki adımlar için önerileri tek yerde toplar.

@@ -1,12 +1,15 @@
-"use client";
+import pathlib
+
+code = r'''"use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { fetcher } from "@/lib/api";
-import { type AnyData, crd, sCls, CATEGORIES, allRoles, ai } from "./shared";
+import { type AnyData, crd, sCls, allRoles, CATEGORIES, ai } from "./shared";
 import { SuiteResultView } from "./suite-result";
 import { SingleResultView } from "./single-result";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 export function RunTab() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
   const [scenarios, setScenarios] = useState<AnyData[]>([]);
   const [agent, setAgent] = useState("");
   const [category, setCategory] = useState("");
@@ -15,7 +18,6 @@ export function RunTab() {
   const [pct, setPct] = useState(0);
   const [total, setTotal] = useState(0);
   const [completed, setCompleted] = useState(0);
-  const [curAgent, setCurAgent] = useState("");
   const [curLabel, setCurLabel] = useState("");
   const [result, setResult] = useState<AnyData | null>(null);
   const [resultType, setResultType] = useState<"single" | "suite" | null>(null);
@@ -28,6 +30,12 @@ export function RunTab() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
   const run = useCallback(async () => {
     setRunning(true);
     setResult(null);
@@ -36,11 +44,9 @@ export function RunTab() {
     setPct(0);
     setTotal(0);
     setCompleted(0);
-    setCurAgent("");
     setCurLabel("");
-
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
+    const ac = new AbortController();
+    abortRef.current = ac;
 
     try {
       const body: Record<string, unknown> = {};
@@ -52,14 +58,17 @@ export function RunTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: ctrl.signal,
+        signal: ac.signal,
       });
 
-      if (!resp.ok || !resp.body) {
-        throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(txt || `HTTP ${resp.status}`);
       }
 
-      const reader = resp.body.getReader();
+      const reader = resp.body?.getReader();
+      if (!reader) throw new Error("No readable stream");
+
       const decoder = new TextDecoder();
       let buf = "";
 
@@ -67,74 +76,72 @@ export function RunTab() {
         const { done, value } = await reader.read();
         if (done) break;
         buf += decoder.decode(value, { stream: true });
-
         const lines = buf.split("\n");
         buf = lines.pop() ?? "";
 
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
-          const raw = line.slice(6).trim();
-          if (!raw) continue;
-          let ev: AnyData;
           try {
-            ev = JSON.parse(raw);
-          } catch {
-            continue;
-          }
-
-          if (ev.event === "started") {
-            setTotal(ev.total ?? 0);
-          } else if (ev.event === "progress") {
-            const c = ev.completed ?? 0;
-            const t = ev.total ?? 1;
-            setCompleted(c);
-            setTotal(t);
-            setCurAgent(ev.agent_role ?? "");
-            setCurLabel(ev.scenario_name ?? ev.scenario_id ?? "");
-            setPct(Math.round((c / t) * 100));
-          } else if (ev.event === "done") {
-            if (ev.type === "single") {
-              setResultType("single");
-              setResult(ev.result ?? ev);
-            } else {
-              setResultType("suite");
-              setResult(ev.summary ?? ev);
+            const evt = JSON.parse(line.slice(6));
+            if (evt.event === "started") {
+              setTotal(evt.total);
+            } else if (evt.event === "progress") {
+              setCompleted(evt.completed);
+              setTotal(evt.total);
+              setCurLabel(`${ai(evt.agent_role).icon} ${evt.scenario_name}`);
+              setPct(Math.round((evt.completed / evt.total) * 100));
+            } else if (evt.event === "done") {
+              setPct(100);
+              setCurLabel("");
+              if (evt.type === "single") {
+                setResultType("single");
+                setResult(evt.result);
+              } else {
+                setResultType("suite");
+                setResult(evt.summary);
+              }
+            } else if (evt.event === "error") {
+              throw new Error(evt.message);
             }
-            setPct(100);
-          } else if (ev.event === "error") {
-            setError(ev.message ?? "Bilinmeyen hata");
+          } catch {
+            /* skip malformed SSE */
           }
         }
       }
-    } catch (e: unknown) {
-      if (e instanceof DOMException && e.name === "AbortError") {
-        setError("İptal edildi");
-      } else {
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") {
         setError(e instanceof Error ? e.message : "Bilinmeyen hata");
+        setPct(0);
       }
     } finally {
       setRunning(false);
       abortRef.current = null;
     }
-  }, [agent, category, scenario, API_BASE]);
+  }, [agent, category, scenario]);
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();
+    setRunning(false);
+    setPct(0);
+    setCurLabel("");
   }, []);
+
+  const showBar = running || pct === 100;
+  const barBg =
+    pct === 100
+      ? "linear-gradient(180deg,#10b981 0%,#059669 40%,#047857 100%)"
+      : "linear-gradient(180deg,#3b82f6 0%,#1d4ed8 40%,#1e40af 100%)";
 
   return (
     <div className="space-y-4">
       <div className={`${crd} space-y-3`}>
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label
-              className="text-[10px] text-slate-500 block mb-1"
-              htmlFor="bench-agent"
-            >
+            <label className="text-[10px] text-slate-500 block mb-1" htmlFor="ba">
               Agent
             </label>
             <select
-              id="bench-agent"
+              id="ba"
               className={sCls + " w-full"}
               value={agent}
               onChange={(e) => setAgent(e.target.value)}
@@ -150,14 +157,11 @@ export function RunTab() {
             </select>
           </div>
           <div>
-            <label
-              className="text-[10px] text-slate-500 block mb-1"
-              htmlFor="bench-cat"
-            >
+            <label className="text-[10px] text-slate-500 block mb-1" htmlFor="bc">
               Kategori
             </label>
             <select
-              id="bench-cat"
+              id="bc"
               className={sCls + " w-full"}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -173,14 +177,11 @@ export function RunTab() {
             </select>
           </div>
           <div>
-            <label
-              className="text-[10px] text-slate-500 block mb-1"
-              htmlFor="bench-sc"
-            >
+            <label className="text-[10px] text-slate-500 block mb-1" htmlFor="bs">
               Senaryo
             </label>
             <select
-              id="bench-sc"
+              id="bs"
               className={sCls + " w-full"}
               value={scenario}
               onChange={(e) => setScenario(e.target.value)}
@@ -196,6 +197,7 @@ export function RunTab() {
             </select>
           </div>
         </div>
+
         <div className="flex gap-2">
           <button
             onClick={run}
@@ -215,41 +217,37 @@ export function RunTab() {
           {running && (
             <button
               onClick={cancel}
-              className="px-3 py-1.5 rounded text-xs font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
-              aria-label="İptal et"
+              className="px-3 py-1.5 rounded text-xs font-medium bg-red-600/80 hover:bg-red-500 text-white transition-colors"
+              aria-label="İptal"
             >
-              ⏹ İptal
+              ✕ İptal
             </button>
           )}
         </div>
-        {running && total > 0 && (
+
+        {showBar && (
           <div
             className="space-y-1.5"
             role="progressbar"
             aria-valuenow={pct}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label="Benchmark ilerleme durumu"
+            aria-label="Benchmark ilerleme"
           >
             <div className="flex justify-between text-[10px]">
               <span className="text-blue-400 font-medium">
-                {curLabel
-                  ? `${ai(curAgent).icon} ${curLabel}`
-                  : "Hazırlanıyor…"}
+                {pct === 100 ? "Tamamlandı!" : curLabel || "Başlatılıyor…"}
               </span>
               <span className="text-slate-400 font-mono">
-                {completed}/{total} — %{pct}
+                {total > 0 ? `${completed}/${total}` : ""} — %{pct}
               </span>
             </div>
             <div className="h-3 bg-gray-600 border border-gray-500 rounded-sm overflow-hidden shadow-inner">
               <div
                 className="h-full rounded-sm transition-all duration-300 ease-out"
                 style={{
-                  width: `${pct}%`,
-                  background:
-                    pct === 100
-                      ? "linear-gradient(180deg, #22c55e 0%, #16a34a 40%, #15803d 100%)"
-                      : "linear-gradient(180deg, #3b82f6 0%, #1d4ed8 40%, #1e40af 100%)",
+                  width: `${Math.min(pct, 100)}%`,
+                  background: barBg,
                   boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3)",
                 }}
               />
@@ -257,6 +255,7 @@ export function RunTab() {
           </div>
         )}
       </div>
+
       {error && (
         <div
           className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-xs text-red-400"
@@ -265,6 +264,7 @@ export function RunTab() {
           {error}
         </div>
       )}
+
       {result && (
         <div className={crd}>
           <div className="flex items-center gap-2 mb-3">
@@ -283,3 +283,8 @@ export function RunTab() {
     </div>
   );
 }
+'''
+
+p = pathlib.Path('frontend/src/components/benchmark/run-tab.tsx')
+p.write_text(code.strip() + '\n', encoding='utf-8')
+print(f'Written: {len(code.strip())} chars, {code.strip().count(chr(10))+1} lines')
