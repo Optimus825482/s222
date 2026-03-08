@@ -3,11 +3,12 @@
 import asyncio
 import json
 import logging
+import sys
 import time
 import traceback
 import uuid
-import sys
 from pathlib import Path
+from typing import Any, Coroutine, Union
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -43,7 +44,7 @@ class WSLiveMonitor:
     async def _send(self, data: dict):
         await self.ws.send_json(data)
 
-    def _track_task(self, coroutine: asyncio.Future | asyncio.coroutines) -> None:
+    def _track_task(self, coroutine: Union[asyncio.Future, Coroutine[Any, Any, Any]]) -> None:
         task = asyncio.create_task(coroutine, name="ws-send")
         self._pending_tasks.add(task)
 
