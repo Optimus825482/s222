@@ -959,32 +959,9 @@ class BaseAgent(ABC):
             # Canlı ilerleme: görev tamamlandı
             tracker.complete_task(agent_id)
 
-            # Faz 11.6: memory.md auto-update on task completion
-            try:
-                from tools.agent_identity import IdentityManager
-                _role_str = self.role.value if hasattr(self.role, "value") else str(self.role)
-                # Clean summary: strip tool_call artifacts, keep meaningful text
-                _raw_summary = task_input[:300].replace("\n", " ").strip()
-                # Remove injected skill/tool noise
-                for _noise in ["--- INJECTED SKILLS ---", "<tool_call>", "<skill "]:
-                    _idx = _raw_summary.find(_noise)
-                    if _idx > 0:
-                        _raw_summary = _raw_summary[:_idx].strip()
-                _summary = _raw_summary[:200]
-
-                _raw_content = content[:300].replace("\n", " ").strip()
-                for _noise in ["<tool_call>", "```json", "```"]:
-                    _idx = _raw_content.find(_noise)
-                    if _idx > 0:
-                        _raw_content = _raw_content[:_idx].strip()
-                _content_preview = _raw_content[:200]
-
-                IdentityManager().update_memory(
-                    _role_str,
-                    f"Task completed: {_summary} → {_content_preview}",
-                )
-            except Exception:
-                pass  # non-critical
+            # Faz 11.6: memory.md is for agent character development only.
+            # Task memory goes to Qdrant (continual-learning tag).
+            # No auto-dump of task completions to memory.md.
 
             # Record task completion to user_behavior table for agent self-improvement
             try:
