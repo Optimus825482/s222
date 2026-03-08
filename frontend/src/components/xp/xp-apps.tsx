@@ -102,7 +102,7 @@ const AgentIdentityEditor = dynamic(
 );
 const BenchmarkPanel = dynamic(
   () =>
-    import("@/components/benchmark-panel").then((m) => ({
+    import("@/components/benchmark").then((m) => ({
       default: m.BenchmarkPanel,
     })),
   { ssr: false },

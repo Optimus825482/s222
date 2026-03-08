@@ -6,13 +6,13 @@ Bu dokümanda benchmark altyapısı, tespit edilen hatalar, iyileştirme öneril
 
 ## 1. Mimari Özet
 
-| Katman | Dosya / Kaynak | Açıklama |
-|--------|----------------|----------|
-| **Senaryolar** | `tools/benchmark_suite.py` → `BENCHMARK_SCENARIOS` | 8 sabit senaryo: speed (2), quality (2), reasoning (2), tool_use (1), creativity (1) |
-| **Çalıştırıcı** | `BenchmarkRunner` (aynı dosya) | `run_single`, `run_suite`, skorlama, SQLite’a yazma |
-| **API** | `backend/routes/monitoring.py` | `/api/benchmarks/scenarios`, `/leaderboard`, `/results`, `/run`, `/compare`, `/history` |
-| **Frontend** | `frontend/src/components/benchmark-panel.tsx` | Sıralama, Test Çalıştır, Sonuçlar, Karşılaştır sekmeleri |
-| **Veri** | `data/benchmarks.db` (SQLite) | `benchmark_results` tablosu |
+| Katman          | Dosya / Kaynak                                     | Açıklama                                                                                |
+| --------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Senaryolar**  | `tools/benchmark_suite.py` → `BENCHMARK_SCENARIOS` | 8 sabit senaryo: speed (2), quality (2), reasoning (2), tool_use (1), creativity (1)    |
+| **Çalıştırıcı** | `BenchmarkRunner` (aynı dosya)                     | `run_single`, `run_suite`, skorlama, SQLite’a yazma                                     |
+| **API**         | `backend/routes/monitoring.py`                     | `/api/benchmarks/scenarios`, `/leaderboard`, `/results`, `/run`, `/compare`, `/history` |
+| **Frontend**    | `frontend/src/components/benchmark-panel.tsx`      | Sıralama, Test Çalıştır, Sonuçlar, Karşılaştır sekmeleri                                |
+| **Veri**        | `data/benchmarks.db` (SQLite)                      | `benchmark_results` tablosu                                                             |
 
 ---
 
@@ -77,28 +77,50 @@ Bu dokümanda benchmark altyapısı, tespit edilen hatalar, iyileştirme öneril
 
 ## 4. Özet Tablo
 
-| Konu | Durum | Öncelik |
-|------|--------|---------|
-| `_bench_runner` null → 503 | Düzeltildi | — |
-| `tokens_used` her zaman 0 | Düzeltildi (thread.agent_metrics) | — |
-| Suite hata detayı UI’da yok | Açık | Orta |
-| Skorlama: uzun cevap cezası | İyileştirme önerisi | Düşük |
-| Tarih/aralık filtreleri | Öneri | Orta |
-| Leaderboard zaman penceresi | Öneri | Orta |
-| Run sonucu özet UI | Öneri | Orta |
-| Karşılaştır: aynı agent uyarısı | Öneri | Düşük |
-| History trend grafiği | Öneri | Düşük |
-| Gerçek ilerleme (WS/polling) | Öneri | Düşük |
+| Konu                            | Durum                             | Öncelik |
+| ------------------------------- | --------------------------------- | ------- |
+| `_bench_runner` null → 503      | Düzeltildi                        | —       |
+| `tokens_used` her zaman 0       | Düzeltildi (thread.agent_metrics) | —       |
+| Suite hata detayı UI’da yok     | ✅ Düzeltildi                     | —       |
+| Skorlama: uzun cevap cezası     | ✅ Düzeltildi                     | —       |
+| Tarih/aralık filtreleri         | ✅ Düzeltildi                     | —       |
+| Leaderboard zaman penceresi     | ✅ Düzeltildi                     | —       |
+| Run sonucu özet UI              | ✅ Düzeltildi                     | —       |
+| Karşılaştır: aynı agent uyarısı | ✅ Düzeltildi                     | —       |
+| History trend grafiği           | ✅ Düzeltildi                     | —       |
+| Gerçek ilerleme (WS/polling)    | Açık — simüle progress bar var    | Düşük   |
 
 ---
 
 ## 5. Yapılan Kod Değişiklikleri (Özet)
 
-1. **backend/routes/monitoring.py**  
-   - `_require_bench_runner()` eklendi; `_bench_runner` null ise 503 dönüyor.  
+1. **backend/routes/monitoring.py**
+   - `_require_bench_runner()` eklendi; `_bench_runner` null ise 503 dönüyor.
    - Tüm benchmark endpoint’leri bu kontrolü kullanıyor.
 
-2. **tools/benchmark_suite.py**  
+2. **tools/benchmark_suite.py**
    - `run_single` içinde, `execute` bittikten sonra `tokens_used` hâlâ 0 ise `thread.agent_metrics.get(agent_role)` ile `total_tokens` alınıp sonuç kaydına yazılıyor.
+
+3. **tools/benchmark_suite.py — Skorlama iyileştirmesi**
+   - `_score_output` artık kategori-bazlı substance scoring yapıyor: `speed` kategorisi kısa cevabı ödüllendirirken, `quality`/`reasoning` kategorileri daha uzun ve detaylı cevapları ödüllendiriyor.
+   - Uzun cevap cezası (`>2000 char → max 3.5`) kaldırıldı; yerine kategori-uyumlu bant sistemi getirildi.
+
+4. **tools/benchmark_suite.py — Tarih filtreleri**
+   - `get_leaderboard(days)`, `get_results(days)`, `get_history(days)` metotlarına opsiyonel `days` parametresi eklendi.
+   - `days` verildiğinde SQL sorgularına `WHERE timestamp >= datetime('now', '-N days')` filtresi ekleniyor.
+
+5. **tools/benchmark_suite.py — Suite hata detayı**
+   - `run_suite` dönüş objesine `errors: [{ agent_role, scenario_id, error }]` dizisi eklendi; başarısız senaryolar artık ayrıca raporlanıyor.
+
+6. **backend/routes/monitoring.py — Tarih parametreleri**
+   - `benchmark_leaderboard`, `benchmark_results`, `benchmark_history` endpoint'leri `?days=N` query parametresi kabul ediyor.
+   - Parametre `get_leaderboard(days)` vb. metotlara aktarılıyor.
+
+7. **frontend/src/components/benchmark-panel.tsx — Tam yeniden yazım (5 sekme)**
+   - **Sıralama (Leaderboard):** 7/30/90 gün zaman filtresi, skor çubukları ile tablo.
+   - **Test Çalıştır (Run):** Agent/kategori/senaryo seçicileri, ilerleme çubuğu, suite ve tekli sonuç görünümleri (SuiteResultView / SingleResultView).
+   - **Sonuçlar (Results):** Agent filtresi + zaman filtresi, tarihli sonuç tablosu.
+   - **Trend:** SVG çizgi grafik — senaryo bazlı çizgiler, ortalama çizgisi, değişim yüzdesi göstergesi.
+   - **Karşılaştır (Compare):** İki agent seçici, aynı-agent uyarısı, kategori bazlı bar karşılaştırması, kazanan gösterimi.
 
 Bu analiz, mevcut benchmark sisteminin durumunu ve sonraki adımlar için önerileri tek yerde toplar.

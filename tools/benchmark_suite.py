@@ -14,7 +14,7 @@ import sqlite3
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -213,18 +213,35 @@ class BenchmarkRunner:
     ) -> dict:
         dimensions: dict[str, float] = {}
 
-        # 1. Substance (length quality)
+        # 1. Substance (length quality) — category-aware
         length = len(output)
-        if length < 50:
-            dimensions["substance"] = 1.0
-        elif length < 200:
-            dimensions["substance"] = 2.5
-        elif length < 1000:
-            dimensions["substance"] = 4.0
-        elif length < 3000:
-            dimensions["substance"] = 4.5
+        cat = scenario.get("category", "")
+        if cat == "speed":
+            # Speed: concise answers rewarded
+            if length < 50:
+                dimensions["substance"] = 1.5
+            elif length < 200:
+                dimensions["substance"] = 4.5
+            elif length < 500:
+                dimensions["substance"] = 4.0
+            elif length < 1000:
+                dimensions["substance"] = 3.5
+            else:
+                dimensions["substance"] = 3.0
         else:
-            dimensions["substance"] = 3.5
+            # Quality/reasoning/creativity: depth rewarded, no cap
+            if length < 50:
+                dimensions["substance"] = 1.0
+            elif length < 200:
+                dimensions["substance"] = 2.5
+            elif length < 500:
+                dimensions["substance"] = 3.5
+            elif length < 1500:
+                dimensions["substance"] = 4.0
+            elif length < 3000:
+                dimensions["substance"] = 4.5
+            else:
+                dimensions["substance"] = 5.0
 
         # 2. Structure
         s = 2.0
@@ -359,8 +376,16 @@ class BenchmarkRunner:
         self,
         agent_role: str | None = None,
         category: str | None = None,
+        progress_callback: Callable[[dict], Awaitable[None]] | None = None,
     ) -> dict:
-        """Run multiple scenarios and return an aggregated summary."""
+        """Run multiple scenarios and return an aggregated summary.
+
+        If *progress_callback* is provided it is awaited after every
+        individual scenario completes.  The callback receives a dict:
+        ``{"completed": int, "total": int, "agent_role": str,
+           "scenario_id": str, "scenario_name": str, "status": "ok"|"error",
+           "result": dict|None}``
+        """
         from agents import create_agent
 
         scenarios = get_scenarios(category)
@@ -376,25 +401,48 @@ class BenchmarkRunner:
             _ensure_registry()
             roles = list(_AGENT_REGISTRY.keys())
 
+        # Build flat task list for progress tracking
+        task_list = [(r, s) for r in roles for s in scenarios]
+        total = len(task_list)
+
         all_results: list[dict] = []
-        for role in roles:
-            for scenario in scenarios:
-                try:
-                    res = await self.run_single(role, scenario["id"])
-                    all_results.append(res)
-                except Exception as exc:
-                    logger.exception(
-                        "Suite error: role=%s scenario=%s", role, scenario["id"]
-                    )
-                    all_results.append(
-                        {
-                            "agent_role": role,
-                            "scenario_id": scenario["id"],
-                            "error": str(exc),
-                        }
-                    )
+        for idx, (role, scenario) in enumerate(task_list):
+            try:
+                res = await self.run_single(role, scenario["id"])
+                all_results.append(res)
+                if progress_callback:
+                    await progress_callback({
+                        "completed": idx + 1,
+                        "total": total,
+                        "agent_role": role,
+                        "scenario_id": scenario["id"],
+                        "scenario_name": scenario.get("name", scenario["id"]),
+                        "status": "ok",
+                        "result": res,
+                    })
+            except Exception as exc:
+                logger.exception(
+                    "Suite error: role=%s scenario=%s", role, scenario["id"]
+                )
+                err_entry = {
+                    "agent_role": role,
+                    "scenario_id": scenario["id"],
+                    "error": str(exc),
+                }
+                all_results.append(err_entry)
+                if progress_callback:
+                    await progress_callback({
+                        "completed": idx + 1,
+                        "total": total,
+                        "agent_role": role,
+                        "scenario_id": scenario["id"],
+                        "scenario_name": scenario.get("name", scenario["id"]),
+                        "status": "error",
+                        "result": err_entry,
+                    })
 
         scored = [r for r in all_results if "score" in r]
+        errors = [r for r in all_results if "error" in r]
         avg_score = (
             round(sum(r["score"] for r in scored) / len(scored), 2)
             if scored
@@ -413,39 +461,49 @@ class BenchmarkRunner:
             "avg_score": avg_score,
             "avg_latency_ms": avg_latency,
             "results": all_results,
+            "errors": errors,
         }
 
     # -- queries ------------------------------------------------------------
 
     def get_results(
-        self, agent_role: str | None = None, limit: int = 100
+        self, agent_role: str | None = None, limit: int = 100, days: int | None = None
     ) -> list[dict]:
-        """Fetch stored benchmark results."""
+        """Fetch stored benchmark results, optionally filtered by date range."""
         conn = sqlite3.connect(str(BENCH_DB_PATH))
         conn.row_factory = sqlite3.Row
         try:
+            conditions = []
+            params: list = []
             if agent_role:
-                rows = conn.execute(
-                    "SELECT * FROM benchmark_results WHERE agent_role = ? "
-                    "ORDER BY created_at DESC LIMIT ?",
-                    (agent_role, limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM benchmark_results ORDER BY created_at DESC LIMIT ?",
-                    (limit,),
-                ).fetchall()
+                conditions.append("agent_role = ?")
+                params.append(agent_role)
+            if days is not None:
+                conditions.append("created_at >= datetime('now', ?)")
+                params.append(f"-{days} days")
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            params.append(limit)
+            rows = conn.execute(
+                f"SELECT * FROM benchmark_results {where} "
+                f"ORDER BY created_at DESC LIMIT ?",
+                params,
+            ).fetchall()
             return [self._row_to_dict(r) for r in rows]
         finally:
             conn.close()
 
-    def get_leaderboard(self) -> list[dict]:
-        """Aggregated scores per agent, sorted descending."""
+    def get_leaderboard(self, days: int | None = None) -> list[dict]:
+        """Aggregated scores per agent, sorted descending. Optionally filtered by date range."""
         conn = sqlite3.connect(str(BENCH_DB_PATH))
         conn.row_factory = sqlite3.Row
         try:
+            date_filter = ""
+            params: list = []
+            if days is not None:
+                date_filter = "WHERE created_at >= datetime('now', ?)"
+                params.append(f"-{days} days")
             rows = conn.execute(
-                """
+                f"""
                 SELECT
                     agent_role,
                     COUNT(*)          AS total_runs,
@@ -454,34 +512,36 @@ class BenchmarkRunner:
                     ROUND(MIN(score), 2)      AS worst_score,
                     ROUND(AVG(latency_ms), 1) AS avg_latency_ms
                 FROM benchmark_results
+                {date_filter}
                 GROUP BY agent_role
                 ORDER BY avg_score DESC
-                """
+                """,
+                params,
             ).fetchall()
             return [dict(r) for r in rows]
         finally:
             conn.close()
 
     def get_history(
-        self, agent_role: str, scenario_id: str | None = None
+        self, agent_role: str, scenario_id: str | None = None, days: int | None = None
     ) -> list[dict]:
-        """Historical scores for trend analysis."""
+        """Historical scores for trend analysis, optionally filtered by date range."""
         conn = sqlite3.connect(str(BENCH_DB_PATH))
         conn.row_factory = sqlite3.Row
         try:
+            conditions = ["agent_role = ?"]
+            params: list = [agent_role]
             if scenario_id:
-                rows = conn.execute(
-                    "SELECT * FROM benchmark_results "
-                    "WHERE agent_role = ? AND scenario_id = ? "
-                    "ORDER BY created_at ASC",
-                    (agent_role, scenario_id),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM benchmark_results "
-                    "WHERE agent_role = ? ORDER BY created_at ASC",
-                    (agent_role,),
-                ).fetchall()
+                conditions.append("scenario_id = ?")
+                params.append(scenario_id)
+            if days is not None:
+                conditions.append("created_at >= datetime('now', ?)")
+                params.append(f"-{days} days")
+            where = "WHERE " + " AND ".join(conditions)
+            rows = conn.execute(
+                f"SELECT * FROM benchmark_results {where} ORDER BY created_at ASC",
+                params,
+            ).fetchall()
             return [self._row_to_dict(r) for r in rows]
         finally:
             conn.close()

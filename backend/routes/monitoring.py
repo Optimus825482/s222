@@ -1,12 +1,15 @@
 """Monitoring, benchmarking, error analysis, cost tracking, and optimizer endpoints."""
 
+import asyncio
 import json
 import sys
+import uuid
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 _parent = str(Path(__file__).parent.parent)
@@ -297,11 +300,18 @@ def _require_bench_runner():
         )
 
 
+# ── Benchmark progress tracking (in-memory) ─────────────────────
+_benchmark_runs: dict[str, dict] = {}
+
+
 @router.get("/api/benchmarks/leaderboard")
-async def benchmark_leaderboard(user: dict = Depends(get_current_user)):
+async def benchmark_leaderboard(
+    days: int | None = None,
+    user: dict = Depends(get_current_user),
+):
     """Get agent leaderboard based on benchmark scores."""
     _require_bench_runner()
-    lb = _bench_runner.get_leaderboard()
+    lb = _bench_runner.get_leaderboard(days=days)
     return {"leaderboard": lb}
 
 
@@ -309,11 +319,12 @@ async def benchmark_leaderboard(user: dict = Depends(get_current_user)):
 async def benchmark_results(
     agent_role: str | None = None,
     limit: int = 50,
+    days: int | None = None,
     user: dict = Depends(get_current_user),
 ):
-    """Get benchmark results with optional agent filter."""
+    """Get benchmark results with optional agent and date filter."""
     _require_bench_runner()
-    results = _bench_runner.get_results(agent_role=agent_role, limit=limit)
+    results = _bench_runner.get_results(agent_role=agent_role, limit=limit, days=days)
     return {"results": results, "total": len(results)}
 
 
@@ -329,19 +340,156 @@ async def run_benchmark(
         detail=f"role={body.agent_role}, scenario={body.scenario_id}, cat={body.category}",
     )
     try:
+        # Single scenario — run synchronously (fast)
         if body.scenario_id and body.agent_role:
             result = await _bench_runner.run_single(body.agent_role, body.scenario_id)
             return {"result": result, "type": "single"}
-        else:
-            summary = await _bench_runner.run_suite(
-                agent_role=body.agent_role,
-                category=body.category,
-            )
-            return {"summary": summary, "type": "suite"}
+
+        # Suite — run as background task with progress tracking
+        run_id = uuid.uuid4().hex[:12]
+        _benchmark_runs[run_id] = {
+            "status": "running",
+            "total": 0,
+            "completed": 0,
+            "current_agent": None,
+            "current_scenario": None,
+            "current_scenario_name": None,
+            "result": None,
+            "error": None,
+            "started_at": _utcnow(),
+        }
+
+        async def _progress_cb(info: dict):
+            _benchmark_runs[run_id].update({
+                "total": info["total"],
+                "completed": info["completed"],
+                "current_agent": info.get("agent_role"),
+                "current_scenario": info.get("scenario_id"),
+                "current_scenario_name": info.get("scenario_name"),
+            })
+
+        async def _run_suite_bg():
+            try:
+                summary = await _bench_runner.run_suite(
+                    agent_role=body.agent_role,
+                    category=body.category,
+                    progress_callback=_progress_cb,
+                )
+                _benchmark_runs[run_id].update({
+                    "status": "done",
+                    "result": summary,
+                    "completed": summary.get("total_runs", 0),
+                    "total": summary.get("total_runs", 0),
+                })
+            except Exception as exc:
+                _benchmark_runs[run_id].update({
+                    "status": "error",
+                    "error": str(exc),
+                })
+
+        asyncio.create_task(_run_suite_bg())
+        return {"run_id": run_id, "type": "suite_async"}
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Benchmark failed: {e}")
+
+
+@router.get("/api/benchmarks/progress/{run_id}")
+async def benchmark_progress(run_id: str, user: dict = Depends(get_current_user)):
+    """Poll real-time progress for a running benchmark suite."""
+    entry = _benchmark_runs.get(run_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Run not found")
+    resp: dict[str, Any] = {
+        "run_id": run_id,
+        "status": entry["status"],
+        "total": entry["total"],
+        "completed": entry["completed"],
+        "current_agent": entry.get("current_agent"),
+        "current_scenario": entry.get("current_scenario"),
+        "current_scenario_name": entry.get("current_scenario_name"),
+    }
+    if entry["status"] == "done":
+        resp["summary"] = entry["result"]
+    elif entry["status"] == "error":
+        resp["error"] = entry["error"]
+    return resp
+
+
+@router.post("/api/benchmarks/run-stream")
+async def run_benchmark_stream(
+    body: BenchmarkRunRequest, user: dict = Depends(get_current_user)
+):
+    """SSE stream for real-time benchmark progress."""
+    _require_bench_runner()
+    _audit(
+        "run_benchmark_stream",
+        user["user_id"],
+        detail=f"role={body.agent_role}, scenario={body.scenario_id}, cat={body.category}",
+    )
+
+    import asyncio
+
+    async def _generate():
+        try:
+            # Single scenario — no incremental progress needed
+            if body.scenario_id and body.agent_role:
+                yield f"data: {json.dumps({'event': 'started', 'total': 1, 'type': 'single'})}\n\n"
+                result = await _bench_runner.run_single(body.agent_role, body.scenario_id)
+                yield f"data: {json.dumps({'event': 'progress', 'completed': 1, 'total': 1, 'status': 'ok', 'agent_role': body.agent_role, 'scenario_id': body.scenario_id, 'scenario_name': result.get('scenario_name', body.scenario_id)})}\n\n"
+                yield f"data: {json.dumps({'event': 'done', 'type': 'single', 'result': result})}\n\n"
+            else:
+                # Suite — stream progress after each scenario
+                from tools.benchmark_suite import get_scenarios
+                from agents import _AGENT_REGISTRY, _ensure_registry
+
+                scenarios = get_scenarios(body.category)
+                if body.agent_role:
+                    roles = [body.agent_role]
+                else:
+                    _ensure_registry()
+                    roles = list(_AGENT_REGISTRY.keys())
+                total = len(roles) * len(scenarios)
+
+                yield f"data: {json.dumps({'event': 'started', 'total': total, 'type': 'suite'})}\n\n"
+
+                async def on_progress(info: dict):
+                    pass  # placeholder — we yield from the loop below
+
+                # We run suite with callback that pushes to a queue
+                progress_queue: asyncio.Queue = asyncio.Queue()
+
+                async def _cb(info: dict):
+                    await progress_queue.put(info)
+
+                async def _run():
+                    summary = await _bench_runner.run_suite(
+                        agent_role=body.agent_role,
+                        category=body.category,
+                        progress_callback=_cb,
+                    )
+                    await progress_queue.put({"event": "_done", "summary": summary})
+
+                task = asyncio.create_task(_run())
+
+                while True:
+                    item = await progress_queue.get()
+                    if item.get("event") == "_done":
+                        yield f"data: {json.dumps({'event': 'done', 'type': 'suite', 'summary': item['summary']})}\n\n"
+                        break
+                    yield f"data: {json.dumps({'event': 'progress', 'completed': item['completed'], 'total': item['total'], 'status': item['status'], 'agent_role': item['agent_role'], 'scenario_id': item['scenario_id'], 'scenario_name': item['scenario_name']})}\n\n"
+
+                await task  # ensure clean finish
+        except Exception as exc:
+            yield f"data: {json.dumps({'event': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/api/benchmarks/compare")
@@ -363,11 +511,12 @@ async def compare_agents_benchmark(
 async def benchmark_history(
     agent_role: str,
     scenario_id: str | None = None,
+    days: int | None = None,
     user: dict = Depends(get_current_user),
 ):
     """Get historical benchmark scores for trend analysis."""
     _require_bench_runner()
-    history = _bench_runner.get_history(agent_role, scenario_id)
+    history = _bench_runner.get_history(agent_role, scenario_id, days=days)
     return {"history": history, "agent_role": agent_role}
 
 
