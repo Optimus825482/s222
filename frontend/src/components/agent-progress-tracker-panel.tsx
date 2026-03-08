@@ -69,12 +69,16 @@ export function AgentProgressTrackerPanel() {
 
   useEffect(() => {
     loadProgress();
-    const interval = setInterval(loadProgress, 5000);
+    const interval = setInterval(loadProgress, 3000);
     return () => clearInterval(interval);
   }, [loadProgress]);
 
   useEffect(() => {
-    const ws = new WebSocket(`${WS_BASE}/ws/progress`);
+    const url = `${WS_BASE}/ws/progress`;
+    const ws = new WebSocket(url);
+    ws.onopen = () => {
+      loadProgress();
+    };
     ws.onmessage = (e) => {
       try {
         const p = JSON.parse(e.data) as Record<string, unknown>;
@@ -82,12 +86,16 @@ export function AgentProgressTrackerPanel() {
         setAgents((prev) => {
           const next = prev.filter((a) => a.agent_id !== live.agent_id);
           next.push(live);
+          next.sort((a, b) => (a.started_at > b.started_at ? -1 : 1));
           agentsRef.current = next;
           return next;
         });
       } catch {
         /* ignore */
       }
+    };
+    ws.onerror = () => {
+      /* connection error; poll will keep data fresh */
     };
     return () => {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {

@@ -19,6 +19,7 @@ import {
   Volume2,
   VolumeX,
   Mic,
+  Code2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useXpSounds } from "@/lib/use-xp-sounds";
@@ -433,6 +434,27 @@ export function XpTaskbar({
       {/* System Tray */}
       <VolumeControl />
       <div className="xp-tray flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 h-full shrink-0">
+        <button
+          onClick={() => {
+            try {
+              document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                  key: "F12",
+                  code: "F12",
+                  keyCode: 123,
+                  which: 123,
+                  bubbles: true,
+                }),
+              );
+            } catch {
+              // Fallback: some environments block programmatic F12
+            }
+          }}
+          className="p-0.5 hover:bg-white/10 rounded transition-colors flex items-center justify-center"
+          title="Geliştirici Seçenekleri (F12)"
+        >
+          <Code2 className="w-3.5 h-3.5 text-white/60" />
+        </button>
         <button
           className="p-0.5 hover:bg-white/10 rounded transition-colors hidden sm:block"
           title="WiFi — Bağlı"

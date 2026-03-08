@@ -183,6 +183,7 @@ from routes.identity import router as identity_router
 from routes.social import router as social_router
 from routes.heartbeat_routes import router as heartbeat_router
 from routes.chat_ws import router as chat_ws_router
+from routes.learning_hub import router as learning_hub_router
 
 app.include_router(auth_router)
 app.include_router(skills_router)
@@ -196,6 +197,7 @@ app.include_router(identity_router)
 app.include_router(social_router)
 app.include_router(heartbeat_router)
 app.include_router(chat_ws_router)
+app.include_router(learning_hub_router)
 
 print("[Backend] All route modules loaded successfully")
-print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws")
+print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub")

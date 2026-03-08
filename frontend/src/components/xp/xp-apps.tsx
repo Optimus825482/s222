@@ -238,6 +238,13 @@ const AgentProgressTrackerPanel = dynamic(
     ),
   },
 );
+const LearningHubPanel = dynamic(
+  () =>
+    import("@/components/learning-hub-panel").then((m) => ({
+      default: m.LearningHubPanel,
+    })),
+  { ssr: false },
+);
 
 // ── Panel imports from xp/panels ──
 import { XpAgentsPanel } from "./panels/xp-agents-panel";
@@ -650,7 +657,8 @@ export const APPS: DesktopApp[] = [
     icon: <FeatherIcon name="image" color="#a855f7" />,
     color: "#a855f7",
     group: "Analitik",
-    description: "Prompt ile görsel oluştur (zimage, flux, imagen-4, grok-imagine). İndir ve prompt iyileştir.",
+    description:
+      "Prompt ile görsel oluştur (zimage, flux, imagen-4, grok-imagine). İndir ve prompt iyileştir.",
     defaultW: 560,
     defaultH: 640,
     render: () => (
@@ -752,7 +760,8 @@ export const APPS: DesktopApp[] = [
     icon: <FeatherIcon name="shopping-bag" color="#a855f7" />,
     color: "#a855f7",
     group: "Araçlar",
-    description: "Alan uzmanlığı skill'leri — finans, hukuk, mühendislik, akademik.",
+    description:
+      "Alan uzmanlığı skill'leri — finans, hukuk, mühendislik, akademik.",
     defaultW: 700,
     defaultH: 550,
     render: () => (
@@ -803,6 +812,22 @@ export const APPS: DesktopApp[] = [
     render: () => (
       <div className="p-4 overflow-auto h-full">
         <AgentProgressTrackerPanel />
+      </div>
+    ),
+  },
+  {
+    id: "learning-hub",
+    title: "Öğrenme Merkezi",
+    icon: <FeatherIcon name="book-open" color="#22d3ee" />,
+    color: "#22d3ee",
+    group: "Analitik",
+    description:
+      "Adaptif öğrenme merkezi — tüm öğrenme mekanizmalarını tek panelde izleyin ve yönetin.",
+    defaultW: 700,
+    defaultH: 560,
+    render: () => (
+      <div className="p-4 overflow-auto h-full">
+        <LearningHubPanel />
       </div>
     ),
   },

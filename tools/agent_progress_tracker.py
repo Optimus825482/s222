@@ -149,22 +149,34 @@ class AgentProgressTracker:
         
         asyncio.create_task(self._notify_subscribers(agent_id))
     
+    def _step_to_dict(self, step: ProgressStep) -> dict:
+        """JSON-safe step dict (status as string)."""
+        return {
+            "step_id": step.step_id,
+            "description": step.description,
+            "status": step.status.value if hasattr(step.status, "value") else str(step.status),
+            "started_at": step.started_at.isoformat() if step.started_at else "",
+            "completed_at": step.completed_at.isoformat() if step.completed_at else None,
+            "progress_percent": step.progress_percent,
+            "metadata": step.metadata or {},
+        }
+
     def get_progress(self, agent_id: str) -> Optional[Dict]:
-        """Agent ilerlemesini al"""
+        """Agent ilerlemesini al (JSON-safe)."""
         if agent_id not in self._progress:
             return None
-        
+
         progress = self._progress[agent_id]
         return {
             "agent_id": progress.agent_id,
             "agent_name": progress.agent_name,
             "task_id": progress.task_id,
             "status": progress.status.value,
-            "current_step": asdict(progress.current_step) if progress.current_step else None,
-            "steps": [asdict(s) for s in progress.steps],
+            "current_step": self._step_to_dict(progress.current_step) if progress.current_step else None,
+            "steps": [self._step_to_dict(s) for s in progress.steps],
             "overall_progress": progress.overall_progress,
             "started_at": progress.started_at.isoformat(),
-            "updated_at": progress.updated_at.isoformat()
+            "updated_at": progress.updated_at.isoformat(),
         }
     
     def get_all_progress(self) -> List[Dict]:

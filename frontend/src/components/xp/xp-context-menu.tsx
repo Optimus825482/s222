@@ -112,6 +112,16 @@ export function DesktopContextMenu({
         <FeatherIcon name="search" color="currentColor" size={14} />
         Arama
       </button>
+      <button
+        onClick={() => {
+          onClose();
+          window.location.reload();
+        }}
+        className="w-full text-left px-4 py-1.5 hover:bg-[#2f71cd] hover:text-white flex items-center gap-2.5"
+      >
+        <FeatherIcon name="refresh-cw" color="currentColor" size={14} />
+        Yenile
+      </button>
       <div className="border-t border-gray-200 my-1" />
       <button
         onClick={() => {

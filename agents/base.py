@@ -411,11 +411,19 @@ class BaseAgent(ABC):
                     f"Agentic loop guard: {guard.reason}",
                     agent_role=self.role,
                 )
+                try:
+                    tracker.set_error(agent_id, guard.reason[:200])
+                except Exception:
+                    pass
                 return f"[Guard] {guard.reason} — partial result (tokens={cumulative_tokens}, cost=${cumulative_cost_usd:.4f})."
 
             # Check stop request
             if self._live_monitor and self._live_monitor.should_stop():
                 thread.add_event(EventType.ERROR, "User requested stop", agent_role=self.role)
+                try:
+                    tracker.set_error(agent_id, "Kullanıcı durdurdu")
+                except Exception:
+                    pass
                 return "[Stopped] Kullanıcı tarafından durduruldu."
 
             # Context Window Guard: compress if too many messages
@@ -429,6 +437,10 @@ class BaseAgent(ABC):
                 thread.add_event(EventType.ERROR, error_msg, agent_role=self.role)
                 thread.update_metrics(self.role, 0, 0, success=False)
                 self._emit("error", error_msg)
+                try:
+                    tracker.set_error(agent_id, error_msg[:200])
+                except Exception:
+                    pass
                 return f"[Error] {error_msg}"
 
             # Track thinking content
@@ -540,6 +552,15 @@ class BaseAgent(ABC):
                 tok = result.get("tokens_total", 0) or 0
                 cumulative_tokens += tok
                 cumulative_cost_usd += (tok / 1000.0) * cost_per_1k
+                # Canlı ilerleme: bu döngü adımı sonrası güncelle
+                progress_pct = min(90, 10 + (step + 1) * 25)
+                tracker.update_step(
+                    agent_id,
+                    f"step_{step}",
+                    f"Araç kullanımı (adım {step + 1})",
+                    AgentStatus.EXECUTING,
+                    progress_percent=progress_pct,
+                )
                 continue  # Back to LLM with tool results
 
             # Final response — break the loop
@@ -565,6 +586,9 @@ class BaseAgent(ABC):
             )
             self._emit("response", content[:200])
 
+            # Canlı ilerleme: görev tamamlandı
+            tracker.complete_task(agent_id)
+
             # Faz 11.6: memory.md auto-update on task completion
             try:
                 from tools.agent_identity import IdentityManager
@@ -586,6 +610,10 @@ class BaseAgent(ABC):
             agent_role=self.role,
         )
         thread.update_metrics(self.role, 0, 0, success=False)
+        try:
+            tracker.set_error(agent_id, "Max steps reached — partial result.")
+        except Exception:
+            pass
         return "[Warning] Max steps reached — partial result."
 
     async def handle_tool_call(self, fn_name: str, fn_args: dict, thread: Thread) -> str:
