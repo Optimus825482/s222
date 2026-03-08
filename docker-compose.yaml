@@ -32,7 +32,16 @@ services:
     environment:
       DATABASE_URL: postgresql://agent:${POSTGRES_PASSWORD:-agent_secret_2024}@postgres:5432/multiagent
       NVIDIA_API_KEY: ${NVIDIA_API_KEY}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng-pwcsc8ow08oks0ggokwoo8ww.77.42.68.4.sslip.io}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      POLLINATIONS_API_KEY: ${POLLINATIONS_API_KEY:-}
+      PI_GATEWAY_URL: ${PI_GATEWAY_URL:-http://pi-gateway:3100}
+      PI_GATEWAY_ENABLED: ${PI_GATEWAY_ENABLED:-true}
+      PI_GATEWAY_FALLBACK_ENABLED: ${PI_GATEWAY_FALLBACK_ENABLED:-true}
+      PI_GATEWAY_FALLBACK_MAX_RETRIES: ${PI_GATEWAY_FALLBACK_MAX_RETRIES:-2}
+      PI_GATEWAY_STREAMING_ENABLED: ${PI_GATEWAY_STREAMING_ENABLED:-true}
     volumes:
       - app-data:/app/data
     deploy:
@@ -45,6 +54,8 @@ services:
           memory: 512M
     depends_on:
       postgres:
+        condition: service_healthy
+      pi-gateway:
         condition: service_healthy
     healthcheck:
       test:
