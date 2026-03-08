@@ -127,6 +127,11 @@ class BaseAgent(ABC):
         self.max_steps = 30  # Allow longer agentic loops for complex tasks
         self._live_monitor = None  # LiveMonitor callback for realtime UI
 
+        # Agent Communication Protocol (Faz 15) — lazy init
+        self._bus = None
+        self._handoff_manager = None
+        self._task_delegation = None
+
     @abstractmethod
     def system_prompt(self) -> str:
         """Each agent owns its prompt — 12-Factor #2."""
@@ -601,6 +606,99 @@ class BaseAgent(ABC):
     def set_live_monitor(self, monitor):
         """Attach a LiveMonitor for realtime UI updates."""
         self._live_monitor = monitor
+
+    # ── Agent Communication Protocol (Faz 15) ───────────────────
+
+    @property
+    def bus(self):
+        """Lazy-init EventBus erişimi."""
+        if self._bus is None:
+            from core.event_bus import get_event_bus
+            self._bus = get_event_bus()
+        return self._bus
+
+    @property
+    def handoff_manager(self):
+        """Lazy-init HandoffManager erişimi."""
+        if self._handoff_manager is None:
+            from core.handoff import get_handoff_manager
+            self._handoff_manager = get_handoff_manager()
+        return self._handoff_manager
+
+    @property
+    def task_delegation(self):
+        """Lazy-init TaskDelegationManager erişimi."""
+        if self._task_delegation is None:
+            from core.task_delegation import get_task_delegation_manager
+            self._task_delegation = get_task_delegation_manager()
+        return self._task_delegation
+
+    async def send_to_agent(
+        self, target: str, msg_type, payload: dict, correlation_id: str | None = None,
+    ) -> bool:
+        """Başka bir agent'a doğrudan mesaj gönder."""
+        from core.protocols import MessageType as MT
+        return await self.bus.send_to_agent(
+            source=self.role.value,
+            target=target,
+            msg_type=msg_type if isinstance(msg_type, MT) else MT(msg_type),
+            payload=payload,
+            correlation_id=correlation_id,
+        )
+
+    async def broadcast_message(self, msg_type, payload: dict) -> bool:
+        """Tüm agent'lara broadcast mesaj gönder."""
+        from core.protocols import MessageType as MT
+        return await self.bus.broadcast(
+            source=self.role.value,
+            msg_type=msg_type if isinstance(msg_type, MT) else MT(msg_type),
+            payload=payload,
+        )
+
+    async def delegate_task(
+        self, target: str, description: str, input_data: dict | None = None, timeout: float = 120.0,
+    ) -> str | None:
+        """Başka bir agent'a görev delegasyonu — sonucu bekle."""
+        return await self.task_delegation.delegate_and_wait(
+            delegator=self.role.value,
+            delegate=target,
+            description=description,
+            input_data=input_data,
+            timeout=timeout,
+        )
+
+    async def handoff_to(
+        self,
+        target: str,
+        reason: str,
+        task_description: str,
+        work_completed: str = "",
+        work_remaining: str = "",
+        partial_result: str = "",
+        thread_id: str | None = None,
+    ):
+        """İşi başka bir agent'a devret."""
+        return await self.handoff_manager.initiate(
+            from_agent=self.role.value,
+            to_agent=target,
+            reason=reason,
+            task_description=task_description,
+            work_completed=work_completed,
+            work_remaining=work_remaining,
+            partial_result=partial_result,
+            thread_id=thread_id,
+        )
+
+    def subscribe_to_channel(self, channel: str, handler, filter_types=None):
+        """Bu agent'ı bir kanala abone et."""
+        return self.bus.subscribe(
+            agent_role=self.role.value,
+            channel=channel,
+            handler=handler,
+            filter_types=filter_types,
+        )
+
+    # ── End Agent Communication Protocol ─────────────────────────
 
     def _emit(self, event_type: str, content: str, **extra):
         """Emit event to live monitor if attached."""

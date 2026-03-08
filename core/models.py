@@ -71,6 +71,14 @@ class EventType(str, Enum):
     CODE_EXECUTION = "code_execution"
     RAG_QUERY = "rag_query"
     EVALUATION = "evaluation"
+    # Agent Communication Protocol (Faz 15)
+    HANDOFF_INITIATED = "handoff_initiated"
+    HANDOFF_ACCEPTED = "handoff_accepted"
+    HANDOFF_REJECTED = "handoff_rejected"
+    HANDOFF_COMPLETED = "handoff_completed"
+    TASK_DELEGATED = "task_delegated"
+    TASK_DELEGATION_RESULT = "task_delegation_result"
+    BUS_MESSAGE = "bus_message"
 
 
 # ── Event ────────────────────────────────────────────────────────

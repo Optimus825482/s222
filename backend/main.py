@@ -27,6 +27,13 @@ from deps import _validate_signed_token, rate_limiter as _rate_limiter
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Structured logging — must be first so all subsequent logs are JSON
+    try:
+        from tools.observability import setup_structured_logging
+        setup_structured_logging()
+    except Exception as e:
+        print(f"[Backend] Structured logging init failed: {e}")
+
     # Initialize PostgreSQL on startup
     try:
         from tools.pg_connection import init_database
@@ -34,6 +41,14 @@ async def lifespan(app: FastAPI):
         print("[Backend] PostgreSQL initialized successfully")
     except Exception as e:
         print(f"[Backend] PostgreSQL init failed (SQLite fallback): {e}")
+
+    # Create execution_traces table
+    try:
+        from tools.observability import init_traces_table
+        init_traces_table()
+        print("[Backend] execution_traces table initialized")
+    except Exception as e:
+        print(f"[Backend] execution_traces init failed (non-critical): {e}")
 
     # Create analytics tables
     try:
@@ -165,6 +180,16 @@ app.add_middleware(
 # ── Middleware ────────────────────────────────────────────────────
 
 @app.middleware("http")
+async def trace_id_middleware(request, call_next):
+    """Inject trace_id into every request for end-to-end tracing."""
+    from tools.observability import new_trace_id, get_trace_id
+    tid = new_trace_id()
+    response = await call_next(request)
+    response.headers["X-Trace-Id"] = tid
+    return response
+
+
+@app.middleware("http")
 async def security_and_rate_limit_middleware(request, call_next):
     """Per-IP + per-user rate limiting + security headers for all responses."""
     if request.url.path.startswith("/api/"):
@@ -211,6 +236,10 @@ from routes.chat_ws import router as chat_ws_router
 from routes.learning_hub import router as learning_hub_router
 from routes.gateway import router as gateway_router
 from routes.documents import router as documents_router
+from routes.mcp_management import router as mcp_router
+from routes.rag_pipeline import router as rag_pipeline_router
+from routes.traces import router as traces_router
+from routes.agent_comm import router as agent_comm_router
 
 app.include_router(auth_router)
 app.include_router(skills_router)
@@ -227,6 +256,10 @@ app.include_router(chat_ws_router)
 app.include_router(learning_hub_router)
 app.include_router(gateway_router)
 app.include_router(documents_router)
+app.include_router(mcp_router)
+app.include_router(rag_pipeline_router)
+app.include_router(traces_router)
+app.include_router(agent_comm_router)
 
 print("[Backend] All route modules loaded successfully")
-print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents")
+print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm")

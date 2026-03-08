@@ -48,17 +48,121 @@ class PipelineEngine:
         }
         self._live_monitor = None
 
+        # Agent Communication Protocol (Faz 15) — bus entegrasyonu
+        self._bus_initialized = False
+
     def set_live_monitor(self, monitor):
         """Attach live monitor and propagate to all agents."""
         self._live_monitor = monitor
         for agent in self._agents.values():
             agent.set_live_monitor(monitor)
 
+    def _init_bus_subscriptions(self) -> None:
+        """Agent'ları event bus'a kaydet — task delegation ve handoff için."""
+        try:
+            from core.event_bus import get_event_bus
+            from core.handoff import get_handoff_manager
+            from core.task_delegation import get_task_delegation_manager
+
+            bus = get_event_bus()
+            handoff_mgr = get_handoff_manager()
+            task_mgr = get_task_delegation_manager()
+
+            for role, agent in self._agents.items():
+                # Subscribe each agent to its own unicast channel
+                bus.subscribe(
+                    agent_role=role.value,
+                    channel=f"agent:{role.value}",
+                    handler=self._make_agent_message_handler(agent),
+                )
+
+                # Register handoff handler
+                handoff_mgr.register_handler(
+                    agent_role=role.value,
+                    handler=self._make_handoff_handler(agent),
+                )
+
+                # Register task delegation executor
+                task_mgr.register_executor(
+                    agent_role=role.value,
+                    executor=self._make_task_executor(agent),
+                )
+
+            self._bus_initialized = True
+        except Exception as e:
+            import logging
+            logging.getLogger("pipeline_engine").warning(f"Bus init failed (non-fatal): {e}")
+
+    def _make_agent_message_handler(self, agent: BaseAgent):
+        """Agent için generic bus message handler oluştur."""
+        async def handler(msg):
+            from core.protocols import MessageType as MT
+            if msg.message_type == MT.QUERY:
+                query = msg.payload.get("query", "")
+                if query:
+                    temp_thread = Thread()
+                    result = await agent.execute(query, temp_thread)
+                    await agent.send_to_agent(
+                        target=msg.source_agent,
+                        msg_type=MT.QUERY_RESPONSE,
+                        payload={"response": result, "query": query},
+                        correlation_id=msg.correlation_id,
+                    )
+        return handler
+
+    def _make_handoff_handler(self, agent: BaseAgent):
+        """Agent için handoff kabul handler'ı oluştur."""
+        async def handler(ctx):
+            temp_thread = Thread()
+            prompt = (
+                f"HANDOFF from {ctx.from_agent}: {ctx.reason}\n\n"
+                f"Original task: {ctx.task_description}\n"
+                f"Work completed: {ctx.work_completed}\n"
+                f"Work remaining: {ctx.work_remaining}\n"
+            )
+            if ctx.partial_result:
+                prompt += f"\nPartial result so far:\n{ctx.partial_result}\n"
+            prompt += "\nContinue from where the previous agent left off."
+            return await agent.execute(prompt, temp_thread)
+        return handler
+
+    def _make_task_executor(self, agent: BaseAgent):
+        """Agent için delegated task executor oluştur."""
+        async def executor(task):
+            temp_thread = Thread()
+            prompt = task.description
+            if task.input_data:
+                prompt += f"\n\nInput data: {task.input_data}"
+            return await agent.execute(prompt, temp_thread)
+        return executor
+
     def get_agent(self, role: AgentRole) -> BaseAgent:
         return self._agents[role]
 
     async def execute(self, task: Task, thread: Thread) -> str:
         """Route to appropriate pipeline strategy."""
+        # Initialize bus subscriptions once
+        if not self._bus_initialized:
+            self._init_bus_subscriptions()
+
+        # Publish pipeline start event to bus
+        try:
+            from core.event_bus import get_event_bus
+            from core.protocols import MessageType as MT
+            bus = get_event_bus()
+            await bus.broadcast(
+                source="pipeline_engine",
+                msg_type=MT.BROADCAST,
+                payload={
+                    "event": "pipeline_start",
+                    "pipeline_type": task.pipeline_type.value,
+                    "sub_task_count": len(task.sub_tasks),
+                    "agents": [st.assigned_agent.value for st in task.sub_tasks],
+                },
+            )
+        except Exception:
+            pass  # Bus errors never break pipeline
+
         # Check cache for identical queries
         try:
             cached = await get_cached_response(task.user_input, task.pipeline_type.value)
@@ -126,6 +230,26 @@ class PipelineEngine:
             f"Pipeline {task.pipeline_type.value} completed: {task.status.value}",
             latency_ms=task.total_latency_ms,
         )
+
+        # Publish pipeline complete event to bus
+        try:
+            from core.event_bus import get_event_bus
+            from core.protocols import MessageType as MT
+            bus = get_event_bus()
+            await bus.broadcast(
+                source="pipeline_engine",
+                msg_type=MT.BROADCAST,
+                payload={
+                    "event": "pipeline_complete",
+                    "pipeline_type": task.pipeline_type.value,
+                    "status": task.status.value,
+                    "latency_ms": task.total_latency_ms,
+                    "sub_task_count": len(task.sub_tasks),
+                },
+            )
+        except Exception:
+            pass
+
         return result
 
     async def _run_subtask(self, subtask: SubTask, context: str, thread: Thread) -> str:
