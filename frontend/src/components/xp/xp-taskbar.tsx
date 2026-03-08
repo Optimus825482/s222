@@ -128,18 +128,45 @@ export function XpTaskbar({
 
   const groupNames = Array.from(groups.keys());
 
+  const intentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleGroupEnter = (name: string) => {
-    if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
-    setHoveredGroup(name);
+    // Cancel any pending close
+    if (flyoutTimerRef.current) {
+      clearTimeout(flyoutTimerRef.current);
+      flyoutTimerRef.current = null;
+    }
+    // Debounce open: small delay to avoid flicker between categories
+    if (intentTimerRef.current) clearTimeout(intentTimerRef.current);
+    if (hoveredGroup === name) return;
+    intentTimerRef.current = setTimeout(() => {
+      setHoveredGroup(name);
+      intentTimerRef.current = null;
+    }, 100);
   };
   const handleGroupLeave = () => {
-    flyoutTimerRef.current = setTimeout(() => setHoveredGroup(null), 200);
+    // Cancel pending open
+    if (intentTimerRef.current) {
+      clearTimeout(intentTimerRef.current);
+      intentTimerRef.current = null;
+    }
+    // Delay close so user can reach flyout
+    if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+    flyoutTimerRef.current = setTimeout(() => setHoveredGroup(null), 400);
   };
   const handleFlyoutEnter = () => {
-    if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+    if (flyoutTimerRef.current) {
+      clearTimeout(flyoutTimerRef.current);
+      flyoutTimerRef.current = null;
+    }
+    if (intentTimerRef.current) {
+      clearTimeout(intentTimerRef.current);
+      intentTimerRef.current = null;
+    }
   };
   const handleFlyoutLeave = () => {
-    flyoutTimerRef.current = setTimeout(() => setHoveredGroup(null), 200);
+    if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+    flyoutTimerRef.current = setTimeout(() => setHoveredGroup(null), 400);
   };
 
   return (
@@ -163,7 +190,13 @@ export function XpTaskbar({
           {/* Body */}
           <div className="flex max-h-[calc(100dvh-140px)]">
             {/* Left: Category list (desktop flyout) / flat list (mobile) */}
-            <div className="flex-1 bg-white py-2 px-1 overflow-y-auto">
+            <div
+              className="flex-1 bg-white py-2 px-1 overflow-y-auto"
+              onMouseEnter={() => {
+                if (flyoutTimerRef.current)
+                  clearTimeout(flyoutTimerRef.current);
+              }}
+            >
               {isMobile ? (
                 /* Mobile: accordion-style flat list */
                 <>
