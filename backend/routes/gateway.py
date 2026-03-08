@@ -98,6 +98,11 @@ class ModelMappingUpdate(BaseModel):
     provider: str
 
 
+class BulkMappingUpdate(BaseModel):
+    """Bulk update: {mappings: {role: model_id, ...}}"""
+    mappings: dict[str, str]
+
+
 # ── Endpoints ────────────────────────────────────────────────────
 
 @router.get("/api/gateway/health")
@@ -111,18 +116,18 @@ async def gateway_health(user: dict = Depends(get_current_user)):
             resp.raise_for_status()
             data = resp.json()
             return {
-                "status": "connected",
+                "status": "healthy",
                 "url": PI_GATEWAY_URL,
-                "uptime": data.get("uptime", 0),
+                "uptime": data.get("uptime", "0s"),
                 "total_requests": data.get("total_requests", 0),
                 "avg_latency_ms": data.get("avg_latency_ms", 0),
             }
     except Exception as e:
         logger.warning(f"Gateway health check failed: {e}")
         return {
-            "status": "disconnected",
+            "status": "down",
             "url": PI_GATEWAY_URL,
-            "uptime": 0,
+            "uptime": "0s",
             "total_requests": 0,
             "avg_latency_ms": 0,
         }
@@ -137,10 +142,22 @@ async def gateway_providers(user: dict = Depends(get_current_user)):
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             resp = await client.get(f"{base}/api/providers")
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            # Transform gateway format to frontend-expected format
+            raw = data.get("providers", data) if isinstance(data, dict) else data
+            if not isinstance(raw, list):
+                raw = []
+            return [
+                {
+                    "name": p.get("provider", p.get("name", "unknown")),
+                    "status": "connected" if p.get("configured", False) else "disconnected",
+                    "model_count": p.get("modelCount", p.get("model_count", 0)),
+                }
+                for p in raw
+            ]
     except Exception as e:
         logger.warning(f"Gateway providers fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"Gateway unreachable: {e}")
+        return []
 
 
 @router.get("/api/gateway/models")
@@ -154,33 +171,65 @@ async def gateway_models(user: dict = Depends(get_current_user)):
             return resp.json()
     except Exception as e:
         logger.warning(f"Gateway models fetch failed: {e}")
-        raise HTTPException(status_code=502, detail=f"Gateway unreachable: {e}")
+        return {"object": "list", "data": [], "status": "disconnected", "error": str(e)}
 
 
 @router.get("/api/gateway/model-mapping")
 async def get_model_mapping(user: dict = Depends(get_current_user)):
-    """Get current agent-model mapping with overrides applied."""
+    """Get current agent-model mapping with overrides applied.
+    Returns array format: [{role, current_model, provider, alternatives}]
+    """
     _ensure_gateway()
-    return _build_mapping()
+    mapping = _build_mapping()
+    return [
+        {"role": role, **info}
+        for role, info in mapping.items()
+    ]
 
 
 @router.post("/api/gateway/model-mapping")
 async def update_model_mapping(
-    body: ModelMappingUpdate,
+    body: dict,
     user: dict = Depends(get_current_user),
 ):
-    """Update agent-model mapping for a specific role."""
+    """Update agent-model mapping. Accepts bulk {mappings: {role: model_id}} or single {role, model_id, provider}."""
     _ensure_gateway()
-    if body.role not in GATEWAY_MODELS:
+
+    # Bulk update from frontend: {mappings: {orchestrator: "gpt-4o", ...}}
+    if "mappings" in body:
+        overrides = _load_overrides()
+        current = _build_mapping()
+        for role, model_id in body["mappings"].items():
+            if role not in GATEWAY_MODELS:
+                continue
+            # Find provider from current mapping or alternatives
+            provider = current.get(role, {}).get("provider", "unknown")
+            for alt in GATEWAY_MODELS[role].get("alternatives", []):
+                if isinstance(alt, dict) and alt.get("id") == model_id:
+                    provider = alt.get("provider", provider)
+                    break
+            primary = GATEWAY_MODELS[role].get("primary", {})
+            if primary.get("id") == model_id:
+                provider = primary.get("provider", provider)
+            overrides[role] = {"model_id": model_id, "provider": provider}
+        _save_overrides(overrides)
+        _audit("gateway_model_mapping_bulk_update", user["user_id"], detail=str(list(body["mappings"].keys())))
+        mapping = _build_mapping()
+        return [{"role": role, **info} for role, info in mapping.items()]
+
+    # Single update: {role, model_id, provider}
+    parsed = ModelMappingUpdate(**body)
+    if parsed.role not in GATEWAY_MODELS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown role: {body.role}. Valid roles: {list(GATEWAY_MODELS.keys())}",
+            detail=f"Unknown role: {parsed.role}. Valid roles: {list(GATEWAY_MODELS.keys())}",
         )
-    _audit("gateway_model_mapping_update", user["user_id"], detail=f"{body.role} → {body.model_id}")
+    _audit("gateway_model_mapping_update", user["user_id"], detail=f"{parsed.role} → {parsed.model_id}")
     overrides = _load_overrides()
-    overrides[body.role] = {"model_id": body.model_id, "provider": body.provider}
+    overrides[parsed.role] = {"model_id": parsed.model_id, "provider": parsed.provider}
     _save_overrides(overrides)
-    return _build_mapping()
+    mapping = _build_mapping()
+    return [{"role": role, **info} for role, info in mapping.items()]
 
 
 @router.delete("/api/gateway/model-mapping/{role}")

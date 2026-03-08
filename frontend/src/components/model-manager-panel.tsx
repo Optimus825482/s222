@@ -125,8 +125,15 @@ function ProvidersTab() {
     try {
       setErr("");
       setLd(true);
-      const data = await fetcher<ProviderInfo[]>("/api/gateway/providers");
-      setProviders(data);
+      const data = await fetcher<
+        ProviderInfo[] | { providers: ProviderInfo[] }
+      >("/api/gateway/providers");
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.providers)
+          ? data.providers
+          : [];
+      setProviders(list);
     } catch (x) {
       setErr(x instanceof Error ? x.message : "Sağlayıcılar yüklenemedi");
     } finally {
@@ -217,7 +224,14 @@ function MappingTab() {
     try {
       setErr("");
       setLd(true);
-      const data = await fetcher<ModelMapping[]>("/api/gateway/model-mapping");
+      const raw = await fetcher<Record<string, any> | ModelMapping[]>(
+        "/api/gateway/model-mapping",
+      );
+      const data = Array.isArray(raw)
+        ? raw
+        : Object.entries(raw).map(
+            ([role, v]) => ({ role, ...v }) as ModelMapping,
+          );
       setMappings(data);
       const initial: Record<string, string> = {};
       data.forEach((m) => {
