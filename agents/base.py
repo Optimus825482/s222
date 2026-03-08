@@ -18,7 +18,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from config import NVIDIA_API_KEY, NVIDIA_BASE_URL, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, MODELS
+from config import NVIDIA_API_KEY, NVIDIA_BASE_URL, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, MODELS, PI_GATEWAY_URL, PI_GATEWAY_ENABLED, PI_GATEWAY_FALLBACK_ENABLED, PI_GATEWAY_STREAMING_ENABLED, GATEWAY_MODELS
 from core.models import AgentRole, EventType, Thread
 from core.events import serialize_thread_for_llm
 
@@ -114,6 +114,16 @@ class BaseAgent(ABC):
             api_key=_api_key,
             timeout=_timeout,
         )
+
+        # PI AI Gateway client (optional, for multi-provider routing)
+        self.gateway_client: AsyncOpenAI | None = None
+        if PI_GATEWAY_ENABLED:
+            self.gateway_client = AsyncOpenAI(
+                base_url=PI_GATEWAY_URL,
+                api_key="pi-gateway",  # gateway handles auth per provider
+                timeout=_timeout,
+            )
+
         self.max_steps = 10  # 12-Factor #10: small focused
         self._live_monitor = None  # LiveMonitor callback for realtime UI
 
@@ -232,29 +242,130 @@ class BaseAgent(ABC):
             pass
         return ""
 
+    def _get_client_for_model(self, effective: dict) -> tuple[AsyncOpenAI, str]:
+        """Return (client, model_id) based on gateway availability and config.
+
+        Routing logic:
+        - If gateway is enabled AND effective config has a 'gateway_model' override → gateway client
+        - Otherwise → existing NVIDIA/DeepSeek client (fully backward compatible)
+        """
+        gateway_model = effective.get("gateway_model")
+        if self.gateway_client and gateway_model:
+            return self.gateway_client, gateway_model
+        return self.client, effective["id"]
+
+    def _get_fallback_models(self) -> list[str]:
+        """Get fallback model IDs from GATEWAY_MODELS for this agent's role.
+        Returns list of 'provider/model_id' strings for gateway fallback.
+        """
+        if not PI_GATEWAY_FALLBACK_ENABLED or not self.gateway_client:
+            return []
+        role = self.role.value if hasattr(self.role, "value") else str(self.role)
+        role_config = GATEWAY_MODELS.get(self.model_key) or GATEWAY_MODELS.get(role)
+        if not role_config:
+            return []
+        alternatives = role_config.get("alternatives", [])
+        return [f"{alt['provider']}/{alt['id']}" for alt in alternatives if alt.get("provider") and alt.get("id")]
+
+    @staticmethod
+    def _is_retryable_error(exc: Exception) -> bool:
+        """Check if an LLM error is worth retrying on a different provider."""
+        msg = str(exc).lower()
+        # Rate limits, server errors, timeouts, connection issues
+        return any(kw in msg for kw in (
+            "429", "rate limit", "rate_limit",
+            "500", "502", "503", "504",
+            "timeout", "timed out",
+            "connection", "econnrefused", "econnreset",
+            "server error", "internal server error",
+            "all providers failed",
+        ))
+
     async def call_llm(self, messages: list[dict], tools: list[dict] | None = None) -> dict[str, Any]:
-        """Single LLM call with metrics tracking. Uses effective config (Faz 12.1 overrides)."""
+        """Single LLM call with metrics tracking and provider fallback.
+        Uses effective config (Faz 12.1 overrides).
+        When PI gateway is enabled, sends fallback_models in the request body
+        so the gateway can try alternatives if the primary provider fails.
+        If the gateway itself fails, retries with alternative models from GATEWAY_MODELS.
+        """
         try:
             from tools.agent_param_overrides import get_effective_config
 
             effective = get_effective_config(self.model_key)
         except Exception:
             effective = self.cfg
+
+        # Determine which client and model to use
+        client, model_id = self._get_client_for_model(effective)
+
+        # Build fallback model list for gateway-level fallback
+        fallback_models = self._get_fallback_models()
+
         kwargs: dict[str, Any] = {
-            "model": effective["id"],
+            "model": model_id,
             "messages": messages,
             "max_tokens": effective["max_tokens"],
             "temperature": effective["temperature"],
             "top_p": effective["top_p"],
         }
-        if effective.get("extra_body"):
-            kwargs["extra_body"] = effective["extra_body"]
+        extra_body = dict(effective.get("extra_body") or {})
+        # Inject fallback_models into extra_body for gateway
+        if fallback_models and self.gateway_client and client is self.gateway_client:
+            extra_body["fallback_models"] = fallback_models
+        if extra_body:
+            kwargs["extra_body"] = extra_body
         if tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
 
         t0 = time.monotonic()
-        response = await self.client.chat.completions.create(**kwargs)
+
+        # Attempt primary call
+        last_error: Exception | None = None
+        try:
+            response = await client.chat.completions.create(**kwargs)
+        except Exception as primary_err:
+            last_error = primary_err
+            response = None
+
+            # Python-level fallback: if primary failed and we have alternatives, try them
+            if self._is_retryable_error(primary_err) and fallback_models and self.gateway_client:
+                for fb_model in fallback_models:
+                    try:
+                        fb_kwargs = dict(kwargs)
+                        fb_kwargs["model"] = fb_model
+                        # Remove fallback_models from extra_body for fallback calls
+                        fb_extra = {k: v for k, v in extra_body.items() if k != "fallback_models"}
+                        if fb_extra:
+                            fb_kwargs["extra_body"] = fb_extra
+                        elif "extra_body" in fb_kwargs:
+                            del fb_kwargs["extra_body"]
+                        response = await self.gateway_client.chat.completions.create(**fb_kwargs)
+                        last_error = None
+                        break  # success
+                    except Exception as fb_err:
+                        last_error = fb_err
+                        if not self._is_retryable_error(fb_err):
+                            break  # non-retryable, stop trying
+
+            # If all gateway attempts failed, try direct client as last resort
+            if response is None and client is self.gateway_client:
+                try:
+                    direct_kwargs = dict(kwargs)
+                    direct_kwargs["model"] = effective["id"]
+                    direct_extra = {k: v for k, v in (effective.get("extra_body") or {}).items()}
+                    if direct_extra:
+                        direct_kwargs["extra_body"] = direct_extra
+                    elif "extra_body" in direct_kwargs:
+                        del direct_kwargs["extra_body"]
+                    response = await self.client.chat.completions.create(**direct_kwargs)
+                    last_error = None
+                except Exception:
+                    pass  # keep original error
+
+        if response is None:
+            raise last_error or RuntimeError("LLM call failed with no response")
+
         latency_ms = (time.monotonic() - t0) * 1000
 
         choice = response.choices[0]
@@ -297,6 +408,195 @@ class BaseAgent(ABC):
             "latency_ms": latency_ms,
             "thinking": thinking,
         }
+
+    async def call_llm_stream(self, messages: list[dict], tools: list[dict] | None = None):
+        """Streaming version of call_llm — yields granular events.
+
+        Yields dicts with types: text_delta, thinking_delta,
+        toolcall_start, toolcall_delta, done.
+        Falls back to non-streaming call_llm() if streaming is disabled
+        or if an error occurs mid-stream.
+        """
+        # Guard: streaming requires gateway
+        if not PI_GATEWAY_STREAMING_ENABLED or not self.gateway_client:
+            result = await self.call_llm(messages, tools)
+            if result.get("content"):
+                yield {"type": "text_delta", "delta": result["content"], "agent": self.role.value}
+            yield {
+                "type": "done",
+                "agent": self.role.value,
+                "content": result.get("content", ""),
+                "thinking": result.get("thinking", ""),
+                "tool_calls": result.get("tool_calls") or [],
+                "usage": {
+                    "prompt_tokens": result.get("tokens_prompt", 0),
+                    "completion_tokens": result.get("tokens_completion", 0),
+                    "total_tokens": result.get("tokens_total", 0),
+                },
+            }
+            return
+
+        try:
+            from tools.agent_param_overrides import get_effective_config
+            effective = get_effective_config(self.model_key)
+        except Exception:
+            effective = self.cfg
+
+        client, model_id = self._get_client_for_model(effective)
+        fallback_models = self._get_fallback_models()
+
+        kwargs: dict[str, Any] = {
+            "model": model_id,
+            "messages": messages,
+            "max_tokens": effective["max_tokens"],
+            "temperature": effective["temperature"],
+            "top_p": effective["top_p"],
+            "stream": True,
+        }
+        extra_body = dict(effective.get("extra_body") or {})
+        if fallback_models and client is self.gateway_client:
+            extra_body["fallback_models"] = fallback_models
+        if extra_body:
+            kwargs["extra_body"] = extra_body
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+
+        t0 = time.monotonic()
+        full_text = ""
+        full_thinking = ""
+        tool_calls_acc: dict[int, dict] = {}  # index → {id, name, arguments}
+
+        try:
+            stream = await client.chat.completions.create(**kwargs)
+
+            async for chunk in stream:
+                if not chunk.choices:
+                    continue
+
+                delta = chunk.choices[0].delta
+                finish_reason = chunk.choices[0].finish_reason
+
+                # --- Text content delta ---
+                if delta.content:
+                    full_text += delta.content
+                    yield {"type": "text_delta", "delta": delta.content, "agent": self.role.value}
+
+                # --- Thinking delta (custom gateway extension) ---
+                thinking_delta = getattr(delta, "thinking", None) or getattr(delta, "reasoning_content", None)
+                if thinking_delta:
+                    full_thinking += thinking_delta
+                    yield {"type": "thinking_delta", "delta": thinking_delta, "agent": self.role.value}
+
+                # --- Tool call deltas ---
+                if delta.tool_calls:
+                    for tc_delta in delta.tool_calls:
+                        idx = tc_delta.index
+                        if idx not in tool_calls_acc:
+                            # New tool call starting
+                            tc_id = tc_delta.id or f"stream_call_{uuid.uuid4().hex[:8]}"
+                            tc_name = tc_delta.function.name if tc_delta.function and tc_delta.function.name else ""
+                            tool_calls_acc[idx] = {
+                                "id": tc_id,
+                                "name": tc_name,
+                                "arguments": "",
+                            }
+                            if tc_name:
+                                yield {
+                                    "type": "toolcall_start",
+                                    "agent": self.role.value,
+                                    "tool_name": tc_name,
+                                    "tool_call_id": tc_id,
+                                }
+                        else:
+                            # Update name if it arrives in a later chunk
+                            if tc_delta.function and tc_delta.function.name:
+                                tool_calls_acc[idx]["name"] = tc_delta.function.name
+
+                        # Accumulate arguments
+                        if tc_delta.function and tc_delta.function.arguments:
+                            tool_calls_acc[idx]["arguments"] += tc_delta.function.arguments
+                            yield {
+                                "type": "toolcall_delta",
+                                "delta": tc_delta.function.arguments,
+                                "agent": self.role.value,
+                                "tool_call_id": tool_calls_acc[idx]["id"],
+                            }
+
+                # --- Stream finished ---
+                if finish_reason:
+                    break
+
+            latency_ms = (time.monotonic() - t0) * 1000
+
+            # Build final tool_calls list matching call_llm() format
+            final_tool_calls = []
+            if tool_calls_acc:
+                from types import SimpleNamespace
+                for idx in sorted(tool_calls_acc):
+                    tc = tool_calls_acc[idx]
+                    final_tool_calls.append(SimpleNamespace(
+                        id=tc["id"],
+                        type="function",
+                        function=SimpleNamespace(
+                            name=tc["name"],
+                            arguments=tc["arguments"],
+                        ),
+                    ))
+
+            # Clean content: strip <think> tags
+            clean_content = _strip_thinking_tags(full_text)
+
+            # Extract usage from the last chunk if available
+            usage_data = {}
+            if chunk and hasattr(chunk, "usage") and chunk.usage:
+                usage_data = {
+                    "prompt_tokens": chunk.usage.prompt_tokens or 0,
+                    "completion_tokens": chunk.usage.completion_tokens or 0,
+                    "total_tokens": chunk.usage.total_tokens or 0,
+                }
+
+            yield {
+                "type": "done",
+                "agent": self.role.value,
+                "content": clean_content,
+                "thinking": full_thinking,
+                "tool_calls": final_tool_calls,
+                "usage": usage_data,
+                "latency_ms": latency_ms,
+            }
+
+        except Exception as e:
+            # Fallback to non-streaming on any stream error
+            import logging
+            logging.getLogger(__name__).warning(
+                "call_llm_stream failed, falling back to call_llm: %s", e
+            )
+            try:
+                result = await self.call_llm(messages, tools)
+                if result.get("content"):
+                    yield {"type": "text_delta", "delta": result["content"], "agent": self.role.value}
+                yield {
+                    "type": "done",
+                    "agent": self.role.value,
+                    "content": result.get("content", ""),
+                    "thinking": result.get("thinking", ""),
+                    "tool_calls": result.get("tool_calls") or [],
+                    "usage": {
+                        "prompt_tokens": result.get("tokens_prompt", 0),
+                        "completion_tokens": result.get("tokens_completion", 0),
+                        "total_tokens": result.get("tokens_total", 0),
+                    },
+                }
+            except Exception as fallback_err:
+                yield {
+                    "type": "done",
+                    "agent": self.role.value,
+                    "content": f"[Error] Streaming and fallback both failed: {e} / {fallback_err}",
+                    "thinking": "",
+                    "tool_calls": [],
+                    "usage": {},
+                }
 
     def set_live_monitor(self, monitor):
         """Attach a LiveMonitor for realtime UI updates."""
@@ -393,19 +693,24 @@ class BaseAgent(ABC):
         except Exception:
             _ats = None
 
-        # Agentic Loop (Faz 11.1): token/cost guards + context compression
+        # Agentic Loop (Faz 11.1 + 14.6): token/cost guards + context compression + transforms + steering + follow-up
         from agents.agentic_loop import (
             get_loop_config,
             check_guards,
             compress_messages_if_needed,
             cost_per_1k_for_model,
+            get_default_transformer,
+            get_followup_config,
         )
 
         loop_config = get_loop_config()
+        context_transformer = get_default_transformer()
+        followup_config = get_followup_config()
         max_steps_loop = min(self.max_steps, loop_config.max_iterations)
         cumulative_tokens = 0
         cumulative_cost_usd = 0.0
         cost_per_1k = cost_per_1k_for_model(self.cfg.get("id", ""))
+        follow_up_count = 0
 
         for step in range(max_steps_loop):
             # Guard: iteration, token budget, cost
@@ -436,6 +741,24 @@ class BaseAgent(ABC):
             # Context Window Guard: compress if too many messages
             messages = compress_messages_if_needed(messages, loop_config)
 
+            # Faz 14.6: Context Transformer — apply pluggable transforms before LLM call
+            messages = context_transformer.apply(messages, loop_config)
+
+            # Faz 14.6: Steering Messages — inject user steering if available
+            if self._live_monitor and hasattr(self._live_monitor, '_steering_queue'):
+                steering_msg = self._live_monitor._steering_queue.pop()
+                if steering_msg:
+                    messages.append({
+                        "role": "user",
+                        "content": f"[STEERING — Kullanıcı talimatı] {steering_msg}",
+                    })
+                    thread.add_event(
+                        EventType.AGENT_THINKING,
+                        f"Steering message injected: {steering_msg[:100]}",
+                        agent_role=self.role,
+                    )
+                    self._emit("steering", f"Kullanıcı talimatı alındı: {steering_msg[:80]}")
+
             try:
                 result = await self.call_llm(messages, tools)
             except Exception as e:
@@ -461,8 +784,10 @@ class BaseAgent(ABC):
 
             # Handle tool calls
             if result["tool_calls"]:
+                _used_tools: list[str] = []
                 for tc in result["tool_calls"]:
                     fn_name = tc.function.name
+                    _used_tools.append(fn_name)
                     raw_args = getattr(tc.function, "arguments", "{}")
                     args_for_message = (
                         raw_args
@@ -491,6 +816,17 @@ class BaseAgent(ABC):
                     fn_args = self._normalize_tool_args(fn_name, fn_args)
                     args_preview = json.dumps(fn_args, ensure_ascii=False)
 
+                    # Faz 14.3: Validate tool arguments against JSON Schema
+                    validation_error_msg = None
+                    if not parse_error:
+                        try:
+                            from tools.tool_schema_registry import validate_tool_args
+                            vr = validate_tool_args(fn_name, fn_args)
+                            if not vr.get("valid"):
+                                validation_error_msg = vr.get("correction_prompt", "Invalid tool arguments.")
+                        except ImportError:
+                            pass  # jsonschema not available — skip validation
+
                     thread.add_event(
                         EventType.TOOL_CALL,
                         f"{fn_name}({args_preview[:200]})",
@@ -507,6 +843,12 @@ class BaseAgent(ABC):
                             "invalid_tool_arguments",
                             parse_error,
                             "Call the same tool again with valid JSON object arguments.",
+                        )
+                    elif validation_error_msg:
+                        tool_result = self._tool_error(
+                            "schema_validation_failed",
+                            validation_error_msg,
+                            None,
                         )
                     else:
                         try:
@@ -531,7 +873,13 @@ class BaseAgent(ABC):
                         str(tool_result)[:500],
                         agent_role=self.role,
                     )
-                    self._emit("tool_result", str(tool_result)[:150])
+                    _is_tool_error = isinstance(tool_result, dict) and tool_result.get("error")
+                    self._emit(
+                        "tool_result",
+                        str(tool_result)[:150],
+                        tool_name=fn_name,
+                        tool_success=not _is_tool_error,
+                    )
 
                     # Adaptive Tool Selector: record tool usage
                     if _ats:
@@ -572,10 +920,11 @@ class BaseAgent(ABC):
                 cumulative_cost_usd += (tok / 1000.0) * cost_per_1k
                 # Canlı ilerleme: bu döngü adımı sonrası güncelle
                 progress_pct = min(90, 10 + (step + 1) * 25)
+                _tools_label = ", ".join(_used_tools[-3:]) if _used_tools else "?"
                 tracker.update_step(
                     agent_id,
                     f"step_{step}",
-                    f"Araç kullanımı (adım {step + 1})",
+                    f"🔧 {_tools_label} (adım {step + 1})",
                     AgentStatus.EXECUTING,
                     progress_percent=progress_pct,
                 )
@@ -654,6 +1003,26 @@ class BaseAgent(ABC):
                     release_conn(_bconn)
             except Exception:
                 pass  # non-critical — never break agent flow
+
+            # Faz 14.6: Follow-up Messages — auto-continue if agent signals continuation
+            if (
+                followup_config.enabled
+                and follow_up_count < followup_config.max_follow_ups
+                and followup_config.should_follow_up(content)
+            ):
+                follow_up_count += 1
+                messages.append({"role": "assistant", "content": content})
+                messages.append({
+                    "role": "user",
+                    "content": followup_config.follow_up_message,
+                })
+                self._emit("follow_up", f"Otomatik devam #{follow_up_count}")
+                thread.add_event(
+                    EventType.AGENT_THINKING,
+                    f"Auto follow-up #{follow_up_count}: response indicated continuation",
+                    agent_role=self.role,
+                )
+                continue  # Back to LLM for continuation
 
             return content
 

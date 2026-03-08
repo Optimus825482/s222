@@ -119,7 +119,7 @@ export function XpTaskbar({
               <Bot className="w-5 h-5 text-white" />
             </div>
             <span className="text-white text-sm font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
-              Agent Ops Center
+              Nexus AI Team
             </span>
           </div>
 

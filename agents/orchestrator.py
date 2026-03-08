@@ -123,11 +123,14 @@ class OrchestratorAgent(BaseAgent):
             "- For deep/complex analysis: use decompose_task with parallel specialists.\n"
             "- For trivial greeting/acknowledgement: use direct_response.\n\n"
             "STANDARD DECOMPOSITION for research/analysis tasks:\n"
-            "- researcher: Search web, gather current data and sources\n"
-            "- thinker: Deep analysis, pros/cons, strategic evaluation\n"
-            "- reasoner: Verify facts, check logic, find inconsistencies\n"
-            "- speed: Format output, generate code/tables if needed\n"
-            "- critic: Review quality, find weaknesses, suggest improvements\n\n"
+            "- researcher: MUST use web_search + web_fetch + mcp tools to gather real data. Multiple searches required.\n"
+            "- thinker: MUST use web_search/mcp to verify claims. Deep analysis, pros/cons, strategic evaluation.\n"
+            "- reasoner: MUST use web_search/code_execute to verify facts. Check logic, find inconsistencies.\n"
+            "- speed: Use tools as needed. Format output, generate code/tables.\n"
+            "- critic: Review quality, cross-check with web_search if needed, find weaknesses.\n\n"
+            "IMPORTANT: When writing sub-task descriptions, EXPLICITLY instruct agents to USE THEIR TOOLS.\n"
+            "BAD: 'Analyze PI-MONO integration'\n"
+            "GOOD: 'Use web_search to find PI-MONO documentation and GitHub repos. Use web_fetch to read key pages. Use mcp_list_tools to check available data sources. Analyze integration feasibility with evidence.'\n\n"
             "YOUR TOOLS:\n"
             "- decompose_task: Break work into sub-tasks and assign to agents (ALWAYS prefer parallel)\n"
             "- spawn_subagent: Create and run a ONE-OFF specialist on ANY topic (custom role + optional skills). Use when the fixed 4 agents are not the right fit or you need a domain expert (crypto, legal, etc.). You can create a skill first with research_create_skill then pass skill_ids to spawn_subagent.\n"
@@ -300,7 +303,8 @@ class OrchestratorAgent(BaseAgent):
 
     def _build_deep_research_tasks(self, user_input: str) -> list[dict]:
         """Build parallel sub-tasks for deep research mode.
-        Short queries use 2 agents (researcher + speed) for faster response."""
+        Short queries use 2 agents (researcher + speed) for faster response.
+        Task descriptions explicitly instruct agents to USE their tools."""
         query_len = len(user_input.strip())
         quick_research = query_len < 180  # short query → fewer agents, faster
 
@@ -308,8 +312,11 @@ class OrchestratorAgent(BaseAgent):
             return [
                 {
                     "description": (
-                        f"Search the web for: {user_input}\n"
-                        "Find 2-4 good sources, current data or stats. Cite URLs. Be concise."
+                        f"Research this topic using your tools: {user_input}\n"
+                        "REQUIRED: Use web_search to find 2-4 good sources. "
+                        "Use web_fetch on the best URLs for details. "
+                        "Check mcp_list_tools for any relevant data sources. "
+                        "Cite all URLs. Be concise but evidence-based."
                     ),
                     "assigned_agent": "researcher",
                     "priority": 1,
@@ -317,19 +324,25 @@ class OrchestratorAgent(BaseAgent):
                 {
                     "description": (
                         f"Summarize and structure: {user_input}\n"
+                        "If you need current data, use web_search first. "
                         "Clear sections, bullets, key takeaways. Keep it readable and short."
                     ),
                     "assigned_agent": "speed",
                     "priority": 1,
                 },
             ]
-        # Full deep research: 4 agents
+        # Full deep research: 5 agents
         return [
             {
                 "description": (
-                    f"Search the web thoroughly for: {user_input}\n"
-                    "Find multiple sources, current data, statistics, and expert opinions. "
-                    "Provide URLs and cite sources."
+                    f"Research this topic thoroughly using ALL your tools: {user_input}\n"
+                    "REQUIRED STEPS:\n"
+                    "1. Use web_search with multiple different queries to find diverse sources\n"
+                    "2. Use web_fetch on the top 2-3 URLs to get full content\n"
+                    "3. Use mcp_list_tools to check for specialized data sources, then mcp_call if relevant\n"
+                    "4. Use rag_query to check internal knowledge base\n"
+                    "5. Synthesize findings with source URLs cited\n"
+                    "Do NOT skip tool usage — real data beats assumptions."
                 ),
                 "assigned_agent": "researcher",
                 "priority": 1,
@@ -337,8 +350,11 @@ class OrchestratorAgent(BaseAgent):
             {
                 "description": (
                     f"Provide deep analysis for: {user_input}\n"
+                    "REQUIRED: Use web_search to verify your claims and gather evidence. "
+                    "Use web_fetch for detailed reading of key sources. "
+                    "Check mcp_list_tools for specialized analysis tools. "
                     "Consider multiple perspectives, pros/cons, trade-offs, "
-                    "strategic implications, and long-term impact. Be thorough."
+                    "strategic implications, and long-term impact. Be thorough and evidence-based."
                 ),
                 "assigned_agent": "thinker",
                 "priority": 1,
@@ -346,8 +362,10 @@ class OrchestratorAgent(BaseAgent):
             {
                 "description": (
                     f"Verify and reason about: {user_input}\n"
+                    "REQUIRED: Use web_search to fact-check claims. "
+                    "Use code_execute for any calculations or data verification. "
                     "Check logical consistency, identify potential biases or errors, "
-                    "validate claims with chain-of-thought reasoning."
+                    "validate claims with chain-of-thought reasoning backed by evidence."
                 ),
                 "assigned_agent": "reasoner",
                 "priority": 1,
@@ -355,6 +373,7 @@ class OrchestratorAgent(BaseAgent):
             {
                 "description": (
                     f"Prepare a well-structured summary for: {user_input}\n"
+                    "Use web_search if you need current data to enrich the summary. "
                     "Create clear formatting with sections, bullet points, "
                     "and actionable takeaways. Focus on readability."
                 ),
@@ -364,6 +383,7 @@ class OrchestratorAgent(BaseAgent):
             {
                 "description": (
                     f"Critically evaluate all findings about: {user_input}\n"
+                    "Use web_search to cross-check claims from other agents. "
                     "Find weaknesses, missing perspectives, unsupported claims. "
                     "Suggest concrete improvements. Rate overall quality."
                 ),
@@ -371,6 +391,7 @@ class OrchestratorAgent(BaseAgent):
                 "priority": 2,
             },
         ]
+
 
     # ── Idea-to-Project Detection ───────────────────────────────────
 

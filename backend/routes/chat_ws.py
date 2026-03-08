@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Coroutine, Union
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import Request
+from fastapi.responses import StreamingResponse
 
 _parent = str(Path(__file__).parent.parent)
 if _parent not in sys.path:
@@ -34,6 +36,9 @@ class WSLiveMonitor:
         self._stop = False
         self._events_list = events_list or []
         self._pending_tasks: set[asyncio.Task] = set()
+        # Faz 14.6: Steering queue for injecting user messages into running agent
+        from agents.agentic_loop import SteeringQueue
+        self._steering_queue = SteeringQueue()
 
     def should_stop(self) -> bool:
         return self._stop
@@ -100,6 +105,19 @@ class WSLiveMonitor:
                 }
             )
         )
+
+    def emit_stream_event(self, event_type: str, agent: str, delta: str = "", **extra):
+        """Emit granular streaming events (thinking_delta, text_delta, toolcall_*)."""
+        payload = {
+            "type": "stream_event",
+            "event_type": event_type,
+            "agent": agent,
+            "delta": delta,
+            "extra": extra,
+            "timestamp": time.time(),
+        }
+        self._events_list.append(payload)
+        self._track_task(self._send(payload))
 
 
 # Import _generate_post_task_meeting from messaging module
@@ -283,6 +301,16 @@ async def ws_chat(ws: WebSocket):
                 run_task = getattr(ws.state, "run_task", None)
                 events = getattr(ws.state, "live_events", [])
                 if run_task and not run_task.done():
+                    # Faz 14.6: Steering — inject user message into running agent's queue
+                    monitor_obj = getattr(ws.state, "monitor", None)
+                    if user_msg and monitor_obj and hasattr(monitor_obj, '_steering_queue'):
+                        # Status queries don't get injected as steering
+                        is_status_query = user_msg.lower() in (
+                            "durum", "status", "nerede", "ne oldu", "?",
+                        )
+                        if not is_status_query:
+                            monitor_obj._steering_queue.push(user_msg)
+
                     step_count = len(events)
                     last_agents = list(
                         dict.fromkeys(
@@ -293,24 +321,21 @@ async def ws_chat(ws: WebSocket):
                         f"Görev devam ediyor. Toplam {step_count} adım.",
                         f"Son etkileşimler: {', '.join(last_agents[-5:]) or '—'}.",
                     ]
-                    if user_msg.lower() in (
-                        "durum",
-                        "status",
-                        "nerede",
-                        "ne oldu",
-                        "?",
-                    ):
+                    is_status_query = user_msg.lower() in (
+                        "durum", "status", "nerede", "ne oldu", "?",
+                    )
+                    if is_status_query:
                         reply = "\n".join(status_lines)
                     else:
                         reply = (
                             "\n".join(status_lines)
-                            + "\n\nEk talimatınız kaydedildi; mevcut görev bittikten sonra yeni bir mesaj olarak gönderebilirsiniz."
+                            + "\n\n✅ Talimatınız agent'a iletildi — bir sonraki adımda dikkate alınacak."
                         )
                     await _safe_ws_send(
                         {
                             "type": "orchestrator_chat_reply",
                             "content": reply,
-                            "is_status": True,
+                            "is_status": is_status_query,
                         }
                     )
                 else:
@@ -378,3 +403,103 @@ async def ws_chat(ws: WebSocket):
 async def ws_chat_api_alias(ws: WebSocket):
     """Alias route for deployments where only /api/* is routed to backend."""
     await ws_chat(ws)
+
+
+@router.post("/api/stream")
+async def stream_chat(request: Request):
+    """SSE endpoint for granular LLM streaming.
+
+    Accepts JSON body: {"message": str, "thread_id": str | None, "pipeline_type": str}
+    Requires Authorization: Bearer <token> header.
+    Returns text/event-stream with SSE events.
+    """
+    # Auth check
+    auth_header = request.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
+    if not token:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Missing authorization token"}, status_code=401)
+
+    user = _get_user_from_token(token)
+    if not user:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Invalid token"}, status_code=401)
+
+    user_id = user["user_id"]
+
+    # Rate limit
+    if not _rate_limiter.is_allowed(f"sse:{user_id}"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Rate limit exceeded"}, status_code=429)
+
+    body = await request.json()
+    message = (body.get("message") or "").strip()
+    thread_id = body.get("thread_id")
+    pipeline_str = body.get("pipeline_type", "auto")
+
+    if not message:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Empty message"}, status_code=400)
+
+    async def _sse_generator():
+        """Async generator that yields SSE-formatted events."""
+        try:
+            from agents.orchestrator import OrchestratorAgent
+
+            thread = load_thread(thread_id, user_id=user_id) if thread_id else None
+            if not thread:
+                thread = Thread()
+
+            orchestrator = OrchestratorAgent()
+            forced_pipe = None
+            if pipeline_str != "auto":
+                try:
+                    forced_pipe = PipelineType(pipeline_str)
+                except ValueError:
+                    pass
+
+            # Build context and stream from orchestrator's LLM
+            messages = await orchestrator.build_context(thread, message)
+            tools = orchestrator.get_tools()
+
+            async for event in orchestrator.call_llm_stream(messages, tools):
+                sse_data = json.dumps(event, ensure_ascii=False)
+                yield f"data: {sse_data}\n\n"
+
+                # On done event, save thread and send final result
+                if event.get("type") == "done":
+                    # Save the result to thread
+                    content = event.get("content", "")
+                    if content:
+                        from core.models import EventType
+                        thread.add_event(
+                            EventType.AGENT_RESPONSE,
+                            content,
+                            agent_role=orchestrator.role,
+                        )
+                    save_thread(thread, user_id=user_id)
+
+                    # Yield thread info as final SSE event
+                    final_event = json.dumps({
+                        "type": "stream_end",
+                        "thread_id": thread.id,
+                    }, ensure_ascii=False)
+                    yield f"data: {final_event}\n\n"
+
+        except Exception as e:
+            error_event = json.dumps({
+                "type": "error",
+                "message": f"{type(e).__name__}: {e}",
+                "agent": "orchestrator",
+            }, ensure_ascii=False)
+            yield f"data: {error_event}\n\n"
+
+    return StreamingResponse(
+        _sse_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

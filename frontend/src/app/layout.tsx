@@ -25,14 +25,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Multi-Agent Ops Center",
-  description:
-    "Qwen3 80B Orchestrator + 4 Specialist Agents — 12-Factor Architecture",
+  title: "Nexus AI Team",
+  description: "Nexus AI Team — Multi-Agent Intelligence Platform",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Agent Ops",
+    title: "Nexus",
   },
   icons: {
     icon: [

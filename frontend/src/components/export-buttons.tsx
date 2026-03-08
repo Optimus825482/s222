@@ -53,7 +53,7 @@ export function ExportButtons({ result, task }: Props) {
 
   // ── MD download (client-side) ──
   const exportMd = useCallback(() => {
-    const lines = ["# Multi-Agent Result\n"];
+    const lines = ["# Nexus AI Team Result\n"];
     if (task) {
       lines.push(`**Query:** ${task.user_input}\n`);
       lines.push(`**Pipeline:** ${task.pipeline_type}\n`);

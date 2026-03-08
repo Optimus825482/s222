@@ -309,16 +309,27 @@ export const api = {
     fetcher(`/api/skills/${id}`, { method: "DELETE" }),
   /** Improve skill with DeepSeek; returns updated skill. */
   improveSkill: (id: string) =>
-    fetcher<{ id: string; name: string; description?: string; knowledge?: string; keywords?: string[]; category: string; source: string; use_count?: number }>(
-      `/api/skills/${encodeURIComponent(id)}/improve`,
-      { method: "POST" },
-    ),
+    fetcher<{
+      id: string;
+      name: string;
+      description?: string;
+      knowledge?: string;
+      keywords?: string[];
+      category: string;
+      source: string;
+      use_count?: number;
+    }>(`/api/skills/${encodeURIComponent(id)}/improve`, { method: "POST" }),
 
   /** Detect repeating execution patterns (3+ same tool sequence). */
   getSelfSkillPatterns: (minOccurrences = 3) =>
-    fetcher<{ patterns: { signature: string; count: number; tools_used: string[]; examples: unknown[] }[] }>(
-      `/api/self-skills/patterns?min_occurrences=${minOccurrences}`,
-    ),
+    fetcher<{
+      patterns: {
+        signature: string;
+        count: number;
+        tools_used: string[];
+        examples: unknown[];
+      }[];
+    }>(`/api/self-skills/patterns?min_occurrences=${minOccurrences}`),
   /** Generate auto-learned skill from a detected pattern. */
   generateSelfSkillFromPattern: (signature: string) =>
     fetcher<{ ok: boolean; skill?: unknown; error?: string }>(
@@ -331,13 +342,25 @@ export const api = {
     fetcher<{
       checked: number;
       healthy: number;
-      deactivated: Array<{ id: string; name: string; issues: string[]; action: string }>;
-      deleted: Array<{ id: string; name: string; issues: string[]; action: string }>;
+      deactivated: Array<{
+        id: string;
+        name: string;
+        issues: string[];
+        action: string;
+      }>;
+      deleted: Array<{
+        id: string;
+        name: string;
+        issues: string[];
+        action: string;
+      }>;
       migrated_to_memory: string[];
       skipped_builtin: number;
       dry_run: boolean;
       timestamp?: string;
-    }>(`/api/skills/hygiene?dry_run=${String(dryRun).toLowerCase()}`, { method: "POST" }),
+    }>(`/api/skills/hygiene?dry_run=${String(dryRun).toLowerCase()}`, {
+      method: "POST",
+    }),
 
   // MCP
   mcpServers: () => fetcher("/api/mcp/servers"),
@@ -418,8 +441,7 @@ export const api = {
     fetcher<ThreadAnalytics>(`/api/threads/${threadId}/analytics`),
 
   /** Agent role → list of allowed tool names (for UI). */
-  getAgentTools: () =>
-    fetcher<Record<string, string[]>>("/api/agents/tools"),
+  getAgentTools: () => fetcher<Record<string, string[]>>("/api/agents/tools"),
 
   // Memory Advanced
   correlateMemories: (
@@ -522,67 +544,175 @@ export const api = {
 
   // Agent Social (peer learning, swarm)
   getSocialCommunities: () =>
-    fetcher<{ communities: { id: string; name: string; type: string; description: string; members: string[] }[] }>(
-      "/api/social/communities",
-    ),
+    fetcher<{
+      communities: {
+        id: string;
+        name: string;
+        type: string;
+        description: string;
+        members: string[];
+      }[];
+    }>("/api/social/communities"),
   getSocialDiscussions: (communityId?: string, limit = 20) =>
-    fetcher<{ discussions: { id: string; community_id: string; topic: string; started_by: string; message_count: number; created_at: string }[] }>(
+    fetcher<{
+      discussions: {
+        id: string;
+        community_id: string;
+        topic: string;
+        started_by: string;
+        message_count: number;
+        created_at: string;
+      }[];
+    }>(
       `/api/social/discussions?limit=${limit}${communityId ? `&community_id=${encodeURIComponent(communityId)}` : ""}`,
     ),
-  createSocialProposal: (proposer: string, title: string, description: string) =>
-    fetcher<{ id: string; proposer: string; title: string; description: string; votes: Record<string, string>; status: string }>(
-      "/api/social/proposals",
-      { method: "POST", body: JSON.stringify({ proposer, title, description }) },
-    ),
+  createSocialProposal: (
+    proposer: string,
+    title: string,
+    description: string,
+  ) =>
+    fetcher<{
+      id: string;
+      proposer: string;
+      title: string;
+      description: string;
+      votes: Record<string, string>;
+      status: string;
+    }>("/api/social/proposals", {
+      method: "POST",
+      body: JSON.stringify({ proposer, title, description }),
+    }),
   getSocialProposals: (status?: string, limit = 30) =>
-    fetcher<{ proposals: { id: string; proposer: string; title: string; description: string; votes: Record<string, string>; status: string; resolution_reason?: string | null; created_at: string }[] }>(
+    fetcher<{
+      proposals: {
+        id: string;
+        proposer: string;
+        title: string;
+        description: string;
+        votes: Record<string, string>;
+        status: string;
+        resolution_reason?: string | null;
+        created_at: string;
+      }[];
+    }>(
       `/api/social/proposals?limit=${limit}${status ? `&status=${encodeURIComponent(status)}` : ""}`,
     ),
-  voteSocialProposal: (proposalId: string, voter: string, vote: "agree" | "disagree" | "abstain") =>
-    fetcher<{ proposal_id: string; status: string; votes: Record<string, string>; resolution_reason?: string | null }>(
+  voteSocialProposal: (
+    proposalId: string,
+    voter: string,
+    vote: "agree" | "disagree" | "abstain",
+  ) =>
+    fetcher<{
+      proposal_id: string;
+      status: string;
+      votes: Record<string, string>;
+      resolution_reason?: string | null;
+    }>(
       `/api/social/proposals/${encodeURIComponent(proposalId)}/vote?voter=${encodeURIComponent(voter)}&vote=${encodeURIComponent(vote)}`,
       { method: "POST" },
     ),
   getCollectivePolicy: () =>
-    fetcher<{ policy: { quorum_min_votes: number; majority_ratio: number; tie_breaker: string; allow_human_escalation: boolean; escalation_threshold_ratio?: number } }>(
+    fetcher<{
+      policy: {
+        quorum_min_votes: number;
+        majority_ratio: number;
+        tie_breaker: string;
+        allow_human_escalation: boolean;
+        escalation_threshold_ratio?: number;
+      };
+    }>("/api/social/collective-policy"),
+  updateCollectivePolicy: (updates: {
+    quorum_min_votes?: number;
+    majority_ratio?: number;
+    tie_breaker?: string;
+    allow_human_escalation?: boolean;
+    escalation_threshold_ratio?: number;
+  }) =>
+    fetcher<{ policy: Record<string, unknown> }>(
       "/api/social/collective-policy",
+      {
+        method: "PATCH",
+        body: JSON.stringify(updates),
+      },
     ),
-  updateCollectivePolicy: (updates: { quorum_min_votes?: number; majority_ratio?: number; tie_breaker?: string; allow_human_escalation?: boolean; escalation_threshold_ratio?: number }) =>
-    fetcher<{ policy: Record<string, unknown> }>("/api/social/collective-policy", {
-      method: "PATCH",
-      body: JSON.stringify(updates),
+  resolveSocialProposal: (
+    proposalId: string,
+    resolution: "passed" | "rejected",
+    reason?: string,
+  ) =>
+    fetcher<{
+      proposal_id: string;
+      status: string;
+      votes: Record<string, string>;
+      resolution_reason: string | null;
+    }>(`/api/social/proposals/${encodeURIComponent(proposalId)}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ resolution, reason }),
     }),
-  resolveSocialProposal: (proposalId: string, resolution: "passed" | "rejected", reason?: string) =>
-    fetcher<{ proposal_id: string; status: string; votes: Record<string, string>; resolution_reason: string | null }>(
-      `/api/social/proposals/${encodeURIComponent(proposalId)}/resolve`,
-      { method: "POST", body: JSON.stringify({ resolution, reason }) },
-    ),
-  shareSocialLearning: (teacher: string, pattern: string, communityId = "general") =>
-    fetcher<{ id: string; teacher: string; pattern: string; community_id: string; adopted_by: string[]; rejected_by: string[]; created_at: string }>(
-      "/api/social/learnings",
-      { method: "POST", body: JSON.stringify({ teacher, pattern, community_id: communityId }) },
-    ),
+  shareSocialLearning: (
+    teacher: string,
+    pattern: string,
+    communityId = "general",
+  ) =>
+    fetcher<{
+      id: string;
+      teacher: string;
+      pattern: string;
+      community_id: string;
+      adopted_by: string[];
+      rejected_by: string[];
+      created_at: string;
+    }>("/api/social/learnings", {
+      method: "POST",
+      body: JSON.stringify({ teacher, pattern, community_id: communityId }),
+    }),
   getSocialLearnings: (teacher?: string, limit = 30) =>
-    fetcher<{ learnings: { id: string; teacher: string; pattern: string; community_id: string; adopted_by: string[]; rejected_by: string[]; created_at: string }[] }>(
+    fetcher<{
+      learnings: {
+        id: string;
+        teacher: string;
+        pattern: string;
+        community_id: string;
+        adopted_by: string[];
+        rejected_by: string[];
+        created_at: string;
+      }[];
+    }>(
       `/api/social/learnings?limit=${limit}${teacher ? `&teacher=${encodeURIComponent(teacher)}` : ""}`,
     ),
 
   // Heartbeat (Faz 11.2)
   getHeartbeatTasks: () =>
-    fetcher<{ tasks: { name: string; frequency: string; enabled: boolean; last_run: string | null; run_count: number; error_count: number }[] }>(
-      "/api/heartbeat/tasks",
-    ),
+    fetcher<{
+      tasks: {
+        name: string;
+        frequency: string;
+        enabled: boolean;
+        last_run: string | null;
+        run_count: number;
+        error_count: number;
+      }[];
+    }>("/api/heartbeat/tasks"),
   triggerHeartbeatTask: (name: string) =>
-    fetcher<{ task: string; result: unknown }>(`/api/heartbeat/tasks/${encodeURIComponent(name)}/trigger`, { method: "POST" }),
+    fetcher<{ task: string; result: unknown }>(
+      `/api/heartbeat/tasks/${encodeURIComponent(name)}/trigger`,
+      { method: "POST" },
+    ),
   toggleHeartbeatTask: (name: string, enabled: boolean) =>
     fetcher<{ name: string; enabled: boolean }>(
       `/api/heartbeat/tasks/${encodeURIComponent(name)}?enabled=${enabled}`,
       { method: "PATCH" },
     ),
   getHeartbeatEvents: (limit = 30) =>
-    fetcher<{ events: { type: string; task: string; timestamp: string; result?: unknown; error?: string }[] }>(
-      `/api/heartbeat/events?limit=${limit}`,
-    ),
+    fetcher<{
+      events: {
+        type: string;
+        task: string;
+        timestamp: string;
+        result?: unknown;
+        error?: string;
+      }[];
+    }>(`/api/heartbeat/events?limit=${limit}`),
 
   // Agent Identity (SOUL.md Pattern)
   getAgentIdentity: (role: string) =>
@@ -691,7 +821,12 @@ export const api = {
 };
 
 // ── Image Studio API (generate + improve prompt) ─────────────────
-export const IMAGE_MODELS = ["zimage", "flux", "imagen-4", "grok-imagine"] as const;
+export const IMAGE_MODELS = [
+  "zimage",
+  "flux",
+  "imagen-4",
+  "grok-imagine",
+] as const;
 
 export type ImageModel = (typeof IMAGE_MODELS)[number];
 
@@ -726,10 +861,13 @@ export const imageStudioApi = {
   list: () => fetcher<ImageListItem[]>("/api/images"),
 
   delete: (filename: string) =>
-    fetcher<{ deleted: boolean; filename: string }>(`/api/images/${encodeURIComponent(filename)}`, {
-      method: "DELETE",
-      headers: authHeaders(),
-    }),
+    fetcher<{ deleted: boolean; filename: string }>(
+      `/api/images/${encodeURIComponent(filename)}`,
+      {
+        method: "DELETE",
+        headers: authHeaders(),
+      },
+    ),
 
   /** Fetch image as blob for download (uses auth). */
   async downloadBlob(filename: string): Promise<Blob> {
@@ -1412,6 +1550,48 @@ export const domainApi = {
       },
     );
   },
+  // ── Documents (Faz 14.5) ──────────────────────────────────────
+  uploadDocument: async (file: File) => {
+    const token = getAuthToken();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/api/documents/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        clearAuthOn401();
+        throw new Error("Oturum süresi doldu");
+      }
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Upload failed: ${res.status}`);
+    }
+    return res.json() as Promise<{
+      file_id: string;
+      filename: string;
+      content_type: string;
+      size_bytes: number;
+      extracted_text: string;
+      char_count: number;
+    }>;
+  },
+  listDocuments: () =>
+    fetcher<{
+      files: Array<{
+        file_id: string;
+        filename: string;
+        content_type: string;
+        size_bytes: number;
+        uploaded_at: string;
+      }>;
+    }>("/api/documents/uploads"),
+  deleteDocument: (fileId: string) =>
+    fetcher<{ deleted: boolean; file_id: string }>(
+      `/api/documents/uploads/${fileId}`,
+      { method: "DELETE" },
+    ),
 };
 
 export function authHeaders(): Record<string, string> {
@@ -1431,7 +1611,7 @@ export async function fetchBlob(
   const initHeaders =
     init?.headers instanceof Headers
       ? Object.fromEntries(init.headers.entries())
-      : (init?.headers as Record<string, string> | undefined) ?? {};
+      : ((init?.headers as Record<string, string> | undefined) ?? {});
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { ...authHeaders, ...initHeaders },

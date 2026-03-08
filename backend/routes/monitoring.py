@@ -178,11 +178,14 @@ async def record_user_behavior(
     metadata: dict | None = None,
     user: dict = Depends(get_current_user),
 ):
-    """Record user behavior event."""
+    """Record user behavior event. No 500 on DB failure so CORS headers are always sent."""
     from tools.pg_connection import get_conn, release_conn
 
     uid = user["user_id"]
-    conn = get_conn()
+    try:
+        conn = get_conn()
+    except Exception:
+        return {"recorded": False}
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -198,9 +201,14 @@ async def record_user_behavior(
                 ),
             )
         conn.commit()
+        return {"recorded": True}
+    except Exception:
+        return {"recorded": False}
     finally:
-        release_conn(conn)
-    return {"recorded": True}
+        try:
+            release_conn(conn)
+        except Exception:
+            pass
 
 
 @router.get("/api/analytics/user-behavior")
@@ -208,15 +216,23 @@ async def get_user_behavior_analytics(
     limit: int = 100,
     user: dict = Depends(get_current_user),
 ):
-    """Get user behavior analytics."""
+    """Get user behavior analytics. Returns empty data on DB error to avoid 500 + CORS."""
     from tools.pg_connection import get_conn, release_conn
 
     _audit("user_behavior_view", user["user_id"])
     uid = user["user_id"]
-    conn = get_conn()
+    empty = {
+        "total_events": 0,
+        "by_action": [],
+        "recent": [],
+        "timestamp": _utcnow().isoformat(),
+    }
+    try:
+        conn = get_conn()
+    except Exception:
+        return empty
     try:
         with conn.cursor() as cur:
-            # Aggregate by action
             cur.execute(
                 """SELECT action, COUNT(*) as count
                    FROM user_behavior WHERE user_id = %s
@@ -224,33 +240,50 @@ async def get_user_behavior_analytics(
                 (uid,),
             )
             action_rows = cur.fetchall()
-            action_summary = [
-                {"action": row[0], "count": row[1]} for row in action_rows
-            ]
+            action_summary = []
+            for r in action_rows:
+                if isinstance(r, dict):
+                    action_summary.append({"action": r.get("action", ""), "count": r.get("count", 0)})
+                else:
+                    action_summary.append({"action": r[0], "count": r[1] if len(r) > 1 else 0})
 
-            # Recent entries
             cur.execute(
                 """SELECT * FROM user_behavior WHERE user_id = %s
                    ORDER BY timestamp DESC LIMIT %s""",
                 (uid, limit),
             )
             recent_rows = cur.fetchall()
-            col_names = [desc[0] for desc in cur.description]
-            recent = [dict(zip(col_names, row)) for row in recent_rows]
+            if cur.description:
+                col_names = [desc[0] for desc in cur.description]
+                recent = [
+                    dict(zip(col_names, row)) if isinstance(row, (list, tuple)) else dict(row)
+                    for row in recent_rows
+                ]
+            else:
+                recent = []
 
-            # Total count (RealDictCursor returns dict)
             cur.execute(
                 "SELECT COUNT(*) AS total FROM user_behavior WHERE user_id = %s", (uid,)
             )
             row = cur.fetchone()
-            total = (row.get("total", row.get("count", 0)) or 0) if row else 0
-
+            total = 0
+            if row is not None:
+                if isinstance(row, dict):
+                    total = row.get("total", row.get("count", 0)) or 0
+                else:
+                    total = row[0] if row else 0
+    except Exception:
+        return empty
     finally:
-        release_conn(conn)
+        try:
+            release_conn(conn)
+        except Exception:
+            pass
 
+    by_action_dict = {item["action"]: item["count"] for item in action_summary}
     return {
         "total_events": total,
-        "by_action": action_summary,
+        "by_action": by_action_dict,
         "recent": recent,
         "timestamp": _utcnow().isoformat(),
     }

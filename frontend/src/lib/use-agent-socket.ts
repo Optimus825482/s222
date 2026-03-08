@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { WSMessage, WSLiveEvent, Thread, PipelineType } from "./types";
+import type {
+  WSMessage,
+  WSLiveEvent,
+  WSStreamEvent,
+  Thread,
+  PipelineType,
+} from "./types";
 import { useAuth } from "@/lib/auth";
 import { setWSStatus, pushWSLiveEvent, clearWSLiveEvents } from "./ws-store";
 
@@ -23,6 +29,7 @@ interface UseAgentSocketOptions {
   /** When false, does not connect (avoids "closed before connection" on redirect). */
   enabled?: boolean;
   onLiveEvent?: (event: WSLiveEvent) => void;
+  onStreamEvent?: (event: WSStreamEvent) => void;
   onResult?: (threadId: string, result: string, thread: Thread) => void;
   onError?: (message: string) => void;
   onStatusChange?: (
@@ -158,6 +165,9 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
                 !!("is_status" in msg && msg.is_status),
               );
             }
+            break;
+          case "stream_event":
+            optsRef.current.onStreamEvent?.(msg as WSStreamEvent);
             break;
         }
       } catch {

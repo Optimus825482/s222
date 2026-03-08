@@ -30,7 +30,7 @@ export function XpAboutDialog({ open, onClose }: Props) {
             </div>
             <div>
               <h2 className="text-[15px] font-bold text-gray-900 leading-tight">
-                Multi-Agent İşletim Sistemi
+                Nexus AI Team
               </h2>
               <p className="text-[11px] text-gray-500 mt-0.5">Sürüm 1.0.0</p>
             </div>
@@ -73,7 +73,7 @@ export function XpAboutDialog({ open, onClose }: Props) {
           </div>
           <div className="flex items-center justify-between mt-5">
             <p className="text-[10px] text-gray-400">
-              © 2025 Tüm hakları saklıdır.
+              © 2025 Nexus AI Team. Tüm hakları saklıdır.
             </p>
             <button
               onClick={onClose}

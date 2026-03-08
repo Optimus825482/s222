@@ -1,0 +1,24 @@
+{
+  "name": "pi-gateway",
+  "version": "1.0.0",
+  "description": "Unified LLM Gateway - OpenAI-compatible proxy via pi-ai",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@mariozechner/pi-ai": "^0.57.1",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

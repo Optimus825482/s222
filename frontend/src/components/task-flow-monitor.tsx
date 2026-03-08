@@ -56,6 +56,7 @@ type LogItem = {
   eventType: string;
   agent: string;
   isLive: boolean;
+  extra?: Record<string, unknown>;
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -239,6 +240,7 @@ function toLogItems(
       eventType: e.event_type,
       agent: e.agent_role ?? "system",
       isLive: false,
+      extra: e.metadata,
     }));
 
   const live: LogItem[] = liveEvents
@@ -250,6 +252,7 @@ function toLogItems(
       eventType: e.event_type,
       agent: e.agent,
       isLive: true,
+      extra: e.extra,
     }));
 
   return [...historical, ...live]
@@ -1232,6 +1235,8 @@ function LogDetailDialog({
     color: "#64748b",
   };
   const agent = getAgentInfo(log.agent);
+  const toolName = log.extra?.tool_name ? String(log.extra.tool_name) : null;
+  const toolSuccess = log.extra?.tool_success;
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -1264,6 +1269,11 @@ function LogDetailDialog({
             <span className={`text-xs ${agentTextColor(log.agent)}`}>
               {agent.name}
             </span>
+            {toolName && (
+              <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
+                {toolName}
+              </span>
+            )}
             {log.isLive && (
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             )}
@@ -1289,8 +1299,22 @@ function LogDetailDialog({
         </div>
         {/* Footer */}
         <div className="px-4 py-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
-          <span>ID: {log.id}</span>
-          <span>Tür: {log.eventType}</span>
+          <div className="flex items-center gap-3">
+            <span>ID: {log.id}</span>
+            <span>Tür: {log.eventType}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {toolName && (
+              <span className="text-slate-400">Araç: {toolName}</span>
+            )}
+            {toolSuccess !== undefined && (
+              <span
+                className={toolSuccess ? "text-emerald-400" : "text-rose-400"}
+              >
+                {toolSuccess ? "✅ Başarılı" : "❌ Başarısız"}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1305,6 +1329,7 @@ function LogStream({ logs }: { logs: LogItem[] }) {
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedLog, setSelectedLog] = useState<LogItem | null>(null);
+  const [collapseThinking, setCollapseThinking] = useState(true);
 
   const toggleFilter = useCallback((key: string) => {
     setActiveFilters((prev) => {
@@ -1341,13 +1366,116 @@ function LogStream({ logs }: { logs: LogItem[] }) {
     return result;
   }, [logs, activeFilters, searchQuery]);
 
+  // Active agents: agents with recent live events (last 15s) without a response/complete
+  const activeAgents = useMemo(() => {
+    const now = Date.now();
+    const recentThreshold = 15_000;
+    const agentLastSeen = new Map<string, number>();
+    const agentCompleted = new Set<string>();
+    for (const log of logs) {
+      if (
+        log.eventType === "response" ||
+        log.eventType === "pipeline_complete"
+      ) {
+        agentCompleted.add(log.agent);
+      }
+      if (log.isLive && now - log.timestamp < recentThreshold) {
+        agentLastSeen.set(
+          log.agent,
+          Math.max(agentLastSeen.get(log.agent) ?? 0, log.timestamp),
+        );
+      }
+    }
+    const active: { role: string; since: number }[] = [];
+    for (const [agent, ts] of agentLastSeen) {
+      if (
+        !agentCompleted.has(agent) ||
+        ts > (agentLastSeen.get(agent) ?? 0) - 5000
+      ) {
+        active.push({ role: agent, since: ts });
+      }
+    }
+    return active;
+  }, [logs]);
+
+  // Elapsed time per agent: time between first agent_start and last response
+  const agentElapsed = useMemo(() => {
+    const starts = new Map<string, number>();
+    const ends = new Map<string, number>();
+    for (const log of logs) {
+      if (log.eventType === "agent_start" && !starts.has(log.agent)) {
+        starts.set(log.agent, log.timestamp);
+      }
+      if (log.eventType === "response") {
+        ends.set(log.agent, log.timestamp);
+      }
+    }
+    const result = new Map<string, number>();
+    for (const [agent, start] of starts) {
+      const end = ends.get(agent);
+      if (end && end > start) {
+        result.set(agent, end - start);
+      }
+    }
+    return result;
+  }, [logs]);
+
+  // Tool usage summary per agent
+  const toolSummary = useMemo(() => {
+    const summary = new Map<string, Map<string, number>>();
+    for (const log of logs) {
+      if (log.eventType === "tool_call" && log.extra?.tool_name) {
+        const toolName = String(log.extra.tool_name);
+        if (!summary.has(log.agent)) summary.set(log.agent, new Map());
+        const agentTools = summary.get(log.agent)!;
+        agentTools.set(toolName, (agentTools.get(toolName) ?? 0) + 1);
+      }
+    }
+    return summary;
+  }, [logs]);
+
   useEffect(() => {
     if (!autoScroll || !scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [filtered.length, autoScroll]);
 
+  // Helper: format elapsed ms
+  const fmtElapsed = (ms: number) => {
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+  };
+
   return (
     <div className="flex flex-col min-h-0 flex-1">
+      {/* Active agent indicator bar */}
+      {activeAgents.length > 0 && (
+        <div className="px-3 lg:px-4 py-1.5 border-b border-slate-800/50 bg-slate-900/60 flex items-center gap-2 flex-wrap">
+          <span className="text-[9px] text-slate-500 uppercase tracking-wider">
+            Aktif:
+          </span>
+          {activeAgents.map(({ role }) => {
+            const info = getAgentInfo(role);
+            return (
+              <span
+                key={role}
+                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border animate-pulse"
+                style={{
+                  borderColor: `${info.color}60`,
+                  color: info.color,
+                  backgroundColor: `${info.color}10`,
+                }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: info.color }}
+                />
+                {info.icon} {role}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       {/* Controls bar */}
       <div className="px-3 lg:px-4 py-2 border-b border-slate-800/70 space-y-2">
         <div className="flex items-center justify-between gap-2">
@@ -1359,6 +1487,21 @@ function LogStream({ logs }: { logs: LogItem[] }) {
             Dinamik Log Akışı
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCollapseThinking((p) => !p)}
+              className={`text-[9px] px-1.5 py-0.5 rounded border transition-all ${
+                collapseThinking
+                  ? "bg-teal-500/10 border-teal-500/30 text-teal-300"
+                  : "bg-transparent border-slate-800 text-slate-500"
+              }`}
+              title={
+                collapseThinking
+                  ? "Düşünce logları kompakt"
+                  : "Düşünce logları genişletilmiş"
+              }
+            >
+              💭 {collapseThinking ? "Kompakt" : "Genişlet"}
+            </button>
             <span className="text-[10px] text-slate-500 font-mono">
               {filtered.length}/{logs.length}
             </span>
@@ -1418,14 +1561,11 @@ function LogStream({ logs }: { logs: LogItem[] }) {
               <button
                 key={key}
                 onClick={() => toggleFilter(key)}
-                className={`
-                  text-[9px] px-1.5 py-0.5 rounded border transition-all
-                  ${
-                    isActive
-                      ? "bg-slate-700/60 border-slate-500/60 text-slate-200"
-                      : "bg-transparent border-slate-800 text-slate-500 hover:text-slate-400 hover:border-slate-700"
-                  }
-                `}
+                className={`text-[9px] px-1.5 py-0.5 rounded border transition-all ${
+                  isActive
+                    ? "bg-slate-700/60 border-slate-500/60 text-slate-200"
+                    : "bg-transparent border-slate-800 text-slate-500 hover:text-slate-400 hover:border-slate-700"
+                }`}
                 aria-pressed={isActive}
                 aria-label={`Filtre: ${cfg?.label ?? key}`}
               >
@@ -1434,12 +1574,41 @@ function LogStream({ logs }: { logs: LogItem[] }) {
             );
           })}
         </div>
+
+        {/* Tool usage summary */}
+        {toolSummary.size > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-800/40">
+            {Array.from(toolSummary.entries()).map(([agent, tools]) => {
+              const info = getAgentInfo(agent);
+              const elapsed = agentElapsed.get(agent);
+              const toolEntries = Array.from(tools.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3);
+              return (
+                <div key={agent} className="flex items-center gap-1 text-[9px]">
+                  <span style={{ color: info.color }}>{info.icon}</span>
+                  {toolEntries.map(([tool, count]) => (
+                    <span key={tool} className="text-slate-500" title={tool}>
+                      {tool.length > 12 ? tool.slice(0, 12) + "…" : tool}×
+                      {count}
+                    </span>
+                  ))}
+                  {elapsed && (
+                    <span className="text-slate-600 font-mono ml-0.5">
+                      ⏱{fmtElapsed(elapsed)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Log entries */}
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto px-3 lg:px-4 py-2 space-y-1"
+        className="flex-1 min-h-0 overflow-y-auto px-3 lg:px-4 py-2 space-y-0.5"
         role="log"
         aria-live="polite"
         aria-label="Canlı görev logları"
@@ -1450,7 +1619,7 @@ function LogStream({ logs }: { logs: LogItem[] }) {
           </p>
         )}
 
-        {filtered.map((log) => {
+        {filtered.map((log, idx) => {
           const eventCfg = EVENT_ICONS[log.eventType] ?? {
             icon: "•",
             label: log.eventType,
@@ -1460,73 +1629,179 @@ function LogStream({ logs }: { logs: LogItem[] }) {
           const isLong = log.content.length > 120;
           const isExpanded = expandedIds.has(log.id);
           const isError = log.eventType === "error";
+          const isThinking =
+            log.eventType === "agent_thinking" || log.eventType === "thinking";
+
+          // Agent transition separator
+          const prevLog = idx > 0 ? filtered[idx - 1] : null;
+          const showAgentSeparator =
+            prevLog && prevLog.agent !== log.agent && log.agent !== "system";
+
+          // Thinking compact mode
+          if (isThinking && collapseThinking && !isExpanded) {
+            return (
+              <div key={log.id}>
+                {showAgentSeparator && (
+                  <div className="flex items-center gap-2 py-1.5 my-1">
+                    <div
+                      className="flex-1 h-px"
+                      style={{ backgroundColor: `${agent.color}30` }}
+                    />
+                    <span
+                      className="text-[9px] font-medium flex items-center gap-1"
+                      style={{ color: agent.color }}
+                    >
+                      {agent.icon} {agent.name}
+                      {agentElapsed.has(log.agent) && (
+                        <span className="text-slate-600 font-mono">
+                          ⏱{fmtElapsed(agentElapsed.get(log.agent)!)}
+                        </span>
+                      )}
+                    </span>
+                    <div
+                      className="flex-1 h-px"
+                      style={{ backgroundColor: `${agent.color}30` }}
+                    />
+                  </div>
+                )}
+                <div
+                  onClick={() => toggleExpand(log.id)}
+                  className="flex items-center gap-2 px-2 py-0.5 rounded cursor-pointer hover:bg-slate-800/30 transition-colors group"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ")
+                      toggleExpand(log.id);
+                  }}
+                >
+                  <span className="text-[9px] text-teal-400/60">💭</span>
+                  <p className="text-[10px] italic text-slate-500 truncate flex-1">
+                    {log.content.slice(0, 80)}
+                    {log.content.length > 80 ? "…" : ""}
+                  </p>
+                  <ChevronRight className="w-2.5 h-2.5 text-slate-600 group-hover:text-slate-400 shrink-0" />
+                  <span className="text-[8px] text-slate-600 font-mono shrink-0">
+                    {toTimeString(log.timestamp)}
+                  </span>
+                </div>
+              </div>
+            );
+          }
 
           return (
-            <article
-              key={log.id}
-              onClick={() => setSelectedLog(log)}
-              className={`
-                rounded border-l-2 px-2.5 py-1.5 transition-all duration-200 cursor-pointer hover:bg-slate-800/40
-                ${eventBorderClass(log.eventType)}
-                ${isError ? "bg-rose-950/20" : "bg-slate-900/40"}
-                ${log.isLive ? "ring-1 ring-cyan-500/15" : ""}
-              `}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") setSelectedLog(log);
-              }}
-              aria-label={`${eventCfg.label} - ${agent.name}: detay için tıkla`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
+            <div key={log.id}>
+              {/* Agent transition separator */}
+              {showAgentSeparator && (
+                <div className="flex items-center gap-2 py-1.5 my-1">
+                  <div
+                    className="flex-1 h-px"
+                    style={{ backgroundColor: `${agent.color}30` }}
+                  />
                   <span
-                    className={`text-[10px] font-semibold ${eventLabelColor(log.eventType)}`}
+                    className="text-[9px] font-medium flex items-center gap-1"
+                    style={{ color: agent.color }}
                   >
-                    {eventCfg.icon} {eventCfg.label}
+                    {agent.icon} {agent.name}
+                    {agentElapsed.has(log.agent) && (
+                      <span className="text-slate-600 font-mono">
+                        ⏱{fmtElapsed(agentElapsed.get(log.agent)!)}
+                      </span>
+                    )}
                   </span>
-                  <span
-                    className={`text-[10px] truncate ${agentTextColor(log.agent)}`}
-                  >
-                    {agent.name}
-                  </span>
-                  {log.isLive && (
+                  <div
+                    className="flex-1 h-px"
+                    style={{ backgroundColor: `${agent.color}30` }}
+                  />
+                </div>
+              )}
+
+              <article
+                onClick={() => setSelectedLog(log)}
+                className={`
+                  rounded border-l-2 px-2.5 py-1.5 transition-all duration-200 cursor-pointer hover:bg-slate-800/40
+                  ${eventBorderClass(log.eventType)}
+                  ${isError ? "bg-rose-950/20" : "bg-slate-900/40"}
+                  ${log.isLive ? "ring-1 ring-cyan-500/15" : ""}
+                `}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setSelectedLog(log);
+                }}
+                aria-label={`${eventCfg.label} - ${agent.name}: detay için tıkla`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0"
-                      aria-label="Canlı"
-                    />
+                      className={`text-[10px] font-semibold ${eventLabelColor(log.eventType)}`}
+                    >
+                      {eventCfg.icon} {eventCfg.label}
+                    </span>
+                    <span
+                      className={`text-[10px] truncate ${agentTextColor(log.agent)}`}
+                    >
+                      {agent.name}
+                    </span>
+                    {log.isLive && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0"
+                        aria-label="Canlı"
+                      />
+                    )}
+                  </div>
+                  <span className="text-[9px] text-slate-600 whitespace-nowrap font-mono">
+                    {toTimeString(log.timestamp)}
+                  </span>
+                </div>
+
+                <div className="mt-1 min-w-0">
+                  {log.eventType === "tool_call" &&
+                    typeof log.extra?.tool_name === "string" && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5 mb-1">
+                        🔧 {log.extra.tool_name}
+                      </span>
+                    )}
+                  {log.eventType === "tool_result" &&
+                    typeof log.extra?.tool_name === "string" && (
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-mono font-semibold rounded px-1.5 py-0.5 mb-1 border ${
+                          log.extra?.tool_success === false
+                            ? "text-rose-300 bg-rose-500/10 border-rose-500/20"
+                            : "text-emerald-300 bg-emerald-500/10 border-emerald-500/20"
+                        }`}
+                      >
+                        {log.extra?.tool_success === false ? "❌" : "✅"}{" "}
+                        {log.extra.tool_name}
+                      </span>
+                    )}
+                  <p
+                    className={`text-[11px] leading-snug break-words ${isError ? "text-rose-300" : isThinking ? "text-slate-500 italic" : "text-slate-400"} ${!isExpanded && isLong ? "line-clamp-2" : ""}`}
+                  >
+                    {log.content}
+                  </p>
+                  {isLong && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(log.id);
+                      }}
+                      className="text-[9px] text-slate-500 hover:text-slate-300 mt-0.5 flex items-center gap-0.5 transition-colors"
+                      aria-expanded={isExpanded}
+                    >
+                      {isExpanded ? (
+                        <>
+                          <ChevronDown className="w-2.5 h-2.5" /> Daralt
+                        </>
+                      ) : (
+                        <>
+                          <ChevronRight className="w-2.5 h-2.5" /> Devamı
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
-                <span className="text-[9px] text-slate-600 whitespace-nowrap font-mono">
-                  {toTimeString(log.timestamp)}
-                </span>
-              </div>
-
-              <div className="mt-1 min-w-0">
-                <p
-                  className={`text-[11px] leading-snug break-words ${isError ? "text-rose-300" : "text-slate-400"} ${!isExpanded && isLong ? "line-clamp-2" : ""}`}
-                >
-                  {log.content}
-                </p>
-                {isLong && (
-                  <button
-                    onClick={() => toggleExpand(log.id)}
-                    className="text-[9px] text-slate-500 hover:text-slate-300 mt-0.5 flex items-center gap-0.5 transition-colors"
-                    aria-expanded={isExpanded}
-                  >
-                    {isExpanded ? (
-                      <>
-                        <ChevronDown className="w-2.5 h-2.5" /> Daralt
-                      </>
-                    ) : (
-                      <>
-                        <ChevronRight className="w-2.5 h-2.5" /> Devamı
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            </article>
+              </article>
+            </div>
           );
         })}
       </div>

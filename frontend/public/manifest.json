@@ -1,7 +1,7 @@
 {
-  "name": "Multi-Agent Ops Center",
-  "short_name": "Agent Ops",
-  "description": "Qwen3 80B Orchestrator + 4 Specialist Agents — 12-Factor Architecture",
+  "name": "Nexus AI Team",
+  "short_name": "Nexus",
+  "description": "Nexus AI Team — Multi-Agent Intelligence Platform",
   "id": "/",
   "start_url": "/",
   "display": "standalone",
@@ -16,13 +16,13 @@
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Multi-Agent Ops Center"
+      "label": "Nexus AI Team"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "label": "Multi-Agent Ops Center"
+      "label": "Nexus AI Team"
     }
   ],
   "icons": [

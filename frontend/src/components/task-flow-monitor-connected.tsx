@@ -16,7 +16,7 @@ export function TaskFlowMonitorConnected() {
   );
   return (
     <TaskFlowMonitor
-      thread={null}
+      thread={snapshot.activeThread}
       liveEvents={snapshot.liveEvents}
     />
   );

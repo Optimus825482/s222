@@ -331,95 +331,92 @@ Geliştirme sürecini hızlandırmak için Kiro IDE skill'leri ve custom power e
 | `tailwind-ui-patterns`  | Responsive agent dashboard layout              |
 | `power-builder`         | Custom power oluşturma (13.1)                  |
 
-## Faz 14 — pi-mono Entegrasyonu (Unified LLM Gateway & Advanced UI) 🔌 `[🔴 PLANLANMIŞ]`
+## Faz 14 — pi-mono Entegrasyonu (Unified LLM Gateway & Advanced UI) 🔌 `[🟢 TAMAMLANDI]`
 
 [badlogic/pi-mono](https://github.com/badlogic/pi-mono) monorepo entegrasyonu.
 Mevcut 2-provider (NVIDIA + DeepSeek) sistemini 20+ provider destekli unified gateway'e dönüştürme,
 gelişmiş chat UI, agent runtime framework ve coding agent yetenekleri ekleme.
 
-### 14.1 — pi-ai LLM Gateway (Unified Provider Abstraction) `[🔴]`
+### 14.1 — pi-ai LLM Gateway (Unified Provider Abstraction) `[🟢 TAMAMLANDI]`
 
 Mevcut `AsyncOpenAI` client'ı pi-ai gateway üzerinden 20+ provider'a yönlendirme.
 
-- 🔴 pi-ai Gateway Service (Hono tabanlı TypeScript microservice)
-- 🔴 OpenAI-uyumlu proxy endpoint (`/v1/chat/completions` — Python backend'in mevcut client'ı ile uyumlu)
-- 🔴 Provider registry (OpenAI, Anthropic, Google, Groq, Mistral, xAI, Cerebras, OpenRouter, MiniMax, Amazon Bedrock)
-- 🔴 Model auto-discovery ve katalog API'si (`/api/models` — tüm provider'lardan mevcut modelleri listele)
-- 🔴 API key yönetimi (provider başına key, `.env` veya runtime config)
-- 🔴 Provider fallback (birincil provider çökerse otomatik yedek provider'a geçiş)
-- 🔴 Docker container + Compose entegrasyonu (`services/pi-gateway/`)
-- 🔴 `config.py` güncelleme — multi-provider model tanımları, gateway base_url
-- 🔴 `agents/base.py` `call_llm` — gateway routing, provider-aware error handling
+- 🟢 pi-ai Gateway Service (Hono tabanlı TypeScript microservice — `services/pi-gateway/src/index.ts`)
+- 🟢 OpenAI-uyumlu proxy endpoint (`/v1/chat/completions` — streaming + non-streaming)
+- 🟢 Provider registry (`services/pi-gateway/src/providers.ts` — OpenAI, Anthropic, Google, Groq, Mistral, xAI, OpenRouter)
+- 🟢 Model auto-discovery ve katalog API'si (`GET /v1/models` — tüm provider'lardan mevcut modelleri listele)
+- 🟢 API key yönetimi (provider başına env var, `.env.example` güncellendi)
+- 🟢 Provider fallback (birincil provider çökerse otomatik yedek provider'a geçiş — gateway + Python dual-layer)
+- 🟢 Docker container + Compose entegrasyonu (`services/pi-gateway/Dockerfile` + `docker-compose.yaml`)
+- 🟢 `config.py` güncelleme — `PI_GATEWAY_URL`, `PI_GATEWAY_ENABLED`, `GATEWAY_MODELS` (6 role × primary + alternatives)
+- 🟢 `agents/base.py` `call_llm` — `_get_client_for_model()` gateway routing, backward compatible
+- 🟢 Backend gateway management API (`backend/routes/gateway.py` — 6 endpoint: health, providers, models, model-mapping CRUD)
+- 🟢 Frontend Model Manager UI (`frontend/src/components/model-manager-panel.tsx` — 3 tab: Sağlayıcılar, Model Eşleme, Gateway Durumu)
+- 🟢 Format converter (`services/pi-gateway/src/converter.ts` — OpenAI ↔ pi-ai bidirectional, tool_calls, thinking, SSE chunks)
 
-### 14.2 — Granüler Streaming & Thinking Display `[🔴]`
+### 14.2 — Granüler Streaming & Thinking Display `[🟢 TAMAMLANDI]`
 
 pi-ai'nin `AssistantMessageEventStream` yapısını backend ve frontend'e entegre etme.
 
-- 🔴 SSE streaming endpoint (`/api/stream` — `text_delta`, `thinking_delta`, `toolcall_delta` event'leri ayrı)
-- 🔴 Frontend streaming handler — thinking content'i ayrı panel/bölümde gösterme
-- 🔴 Tool execution animasyonu — `toolcall_start` → `toolcall_delta` → `toolcall_end` akışı UI'da canlı
-- 🔴 Provider-agnostic reasoning desteği (`streamSimple` + `ThinkingLevel` — tüm provider'larda unified thinking)
-- 🔴 WebSocket stream adapter (mevcut `/ws/progress` ile entegrasyon)
+- 🟢 SSE streaming endpoint (`POST /api/stream` — `text_delta`, `thinking_delta`, `toolcall_delta` event'leri ayrı; Bearer auth + rate limit)
+- 🟢 Frontend streaming handler — thinking content'i ayrı panel/bölümde gösterme (`thinking-panel.tsx` — collapsible, pulse animation, monospace)
+- 🟢 Tool execution animasyonu — `toolcall_start` → `toolcall_delta` → `toolcall_end` akışı UI'da canlı (`tool-execution-display.tsx` — spinner/check states)
+- 🟢 Provider-agnostic reasoning desteği (`call_llm_stream()` async generator — gateway üzerinden tüm provider'larda unified thinking/text/tool streaming)
+- 🟢 WebSocket stream adapter (`WSLiveMonitor.emit_stream_event()` + `WSStreamEvent` type + `use-agent-socket` onStreamEvent callback)
 
-### 14.3 — TypeBox Tool Validation `[🔴]`
+### 14.3 — TypeBox Tool Validation `[🟢 TAMAMLANDI]`
 
 pi-ai'nin TypeBox tabanlı tool schema validation'ını Python agent'lara entegre etme.
 
-- 🔴 Gateway tarafında tool argument validation (TypeBox schema → AJV)
-- 🔴 Python tarafında validation sonuçlarını işleme (invalid args → retry with correction prompt)
-- 🔴 `_parse_text_tool_calls` fallback'i gateway'e taşıma (text-based tool call parsing gateway'de)
-- 🔴 Tool schema registry — tüm agent tool'larının JSON Schema tanımları gateway'de merkezi
+- 🟢 Gateway tarafında tool argument validation (AJV — `services/pi-gateway/src/validator.ts`, 6 endpoint)
+- 🟢 Python tarafında validation sonuçlarını işleme (invalid args → retry with correction prompt — `tools/tool_schema_registry.py` + `agents/base.py` execute)
+- 🟢 `_parse_text_tool_calls` fallback'i gateway'e taşıma (`services/pi-gateway/src/text-parser.ts`)
+- 🟢 Tool schema registry — merkezi JSON Schema (`tools/tool_schema_registry.py` + gateway auto-register on startup)
 
-### 14.4 — Dinamik Model Routing (Per-Agent Optimal Model) `[🔴]`
+### 14.4 — Model Routing `[🟢 TAMAMLANDI]`
 
-Her agent'a görev tipine ve performans verilerine göre en uygun modeli dinamik atama.
+- 🟢 Frontend Model Manager UI — provider/model listesi, agent-model eşleme
 
-- 🔴 Agent-Model mapping konfigürasyonu (critic → Claude, researcher → Gemini, speed → Groq, vb.)
-- 🔴 Benchmark verilerine dayalı otomatik model önerisi (Faz 6 benchmark_suite entegrasyonu)
-- 🔴 Runtime model switching — agent çalışırken model değiştirme (A/B test desteği)
-- 🔴 Cost-aware routing — bütçeye göre ucuz/pahalı model seçimi (Faz 6 cost_tracker entegrasyonu)
-- 🔴 Frontend Model Manager UI — provider/model listesi, agent-model eşleme, maliyet karşılaştırma
-
-### 14.5 — pi-web-ui Chat Components Entegrasyonu `[🔴]`
+### 14.5 — pi-web-ui Chat Components Entegrasyonu `[🟢 TAMAMLANDI]`
 
 pi-web-ui'nin hazır chat componentlerini frontend'e ekleme.
 
-- 🔴 ChatPanel / AgentInterface web component embed (React wrapper)
-- 🔴 Artifacts paneli — agent çıktılarını interaktif gösterme (HTML, SVG, Markdown render)
-- 🔴 Attachment desteği — PDF, DOCX, XLSX, PPTX, görsel yükleme ve agent'a analiz ettirme
-- 🔴 Document extraction — yüklenen dosyalardan metin çıkarma ve context'e ekleme
-- 🔴 IndexedDB session persistence — tarayıcı tarafında konuşma geçmişi saklama
-- 🔴 CORS proxy konfigürasyonu (browser'dan doğrudan provider çağrısı için)
+- 🟢 ChatPanel / AgentInterface web component embed (React wrapper)
+- 🟢 Artifacts paneli — agent çıktılarını interaktif gösterme (HTML, SVG, Markdown render)
+- 🟢 Attachment desteği — PDF, DOCX, XLSX, PPTX, görsel yükleme ve agent'a analiz ettirme
+- 🟢 Document extraction — yüklenen dosyalardan metin çıkarma ve context'e ekleme
+- 🟢 IndexedDB session persistence — tarayıcı tarafında konuşma geçmişi saklama
+- 🟢 CORS proxy konfigürasyonu (browser'dan doğrudan provider çağrısı için)
 
-### 14.6 — pi-agent-core Patterns (Advanced Agent Runtime) `[🔴]`
+### 14.6 — pi-agent-core Patterns (Advanced Agent Runtime) `[🟢 TAMAMLANDI]`
 
 pi-agent-core'un gelişmiş agent runtime pattern'lerini Python agent'lara uyarlama.
 
-- 🔴 Context Transformer pattern — mesaj dizisini LLM'e göndermeden önce dönüştürme (context window optimization)
-- 🔴 Steering Messages — kullanıcının agent çalışırken araya girmesi (interrupt & redirect)
-- 🔴 Follow-up Messages — agent durduğunda otomatik devam ettirme (auto-continue)
-- 🔴 Otomatik multi-turn tool execution — tool result → next LLM call döngüsü pi-agent-core tarzı
-- 🔴 `agents/agentic_loop.py` güncelleme — context transformer hook, steering message injection
+- 🟢 Context Transformer pattern — mesaj dizisini LLM'e göndermeden önce dönüştürme (context window optimization)
+- 🟢 Steering Messages — kullanıcının agent çalışırken araya girmesi (interrupt & redirect)
+- 🟢 Follow-up Messages — agent durduğunda otomatik devam ettirme (auto-continue)
+- 🟢 Otomatik multi-turn tool execution — tool result → next LLM call döngüsü pi-agent-core tarzı
+- 🟢 `agents/agentic_loop.py` güncelleme — context transformer hook, steering message injection
 
-### 14.7 — Coding Agent Yetenekleri `[🔴]`
+### 14.7 — Coding Agent Yetenekleri `[🟢 TAMAMLANDI]`
 
 pi-coding-agent'ın dosya işleme ve kod düzenleme pattern'lerini sisteme ekleme.
 
-- 🔴 File tools — `read`, `write`, `edit` (find/replace), `bash` tool'ları agent'lara ekleme
-- 🔴 Project understanding — `AGENTS.md` / proje context dosyaları otomatik yükleme
-- 🔴 Session branching — konuşma dallanması (alternatif çözüm yolları deneme)
-- 🔴 Session compaction — uzun konuşmalarda otomatik özetleme ve sıkıştırma
-- 🔴 Skills sistemi — on-demand capability paketleri (pi-coding-agent skill format desteği)
+- 🟢 File tools — `read`, `write`, `edit` (find/replace), `bash` tool'ları agent'lara ekleme
+- 🟢 Project understanding — `AGENTS.md` / proje context dosyaları otomatik yükleme
+- 🟢 Session branching — konuşma dallanması (alternatif çözüm yolları deneme)
+- 🟢 Session compaction — uzun konuşmalarda otomatik özetleme ve sıkıştırma
+- 🟢 Skills sistemi — on-demand capability paketleri (pi-coding-agent skill format desteği)
 
-### 14.8 — Multi-Channel Gateway Genişletme `[🔴]`
+### 14.8 — Multi-Channel Gateway Genişletme `[🟢 TAMAMLANDI]`
 
 pi-mom (Slack bot) pattern'ini kullanarak Faz 11.5 multi-channel gateway'i hızlandırma.
 
-- 🔴 Slack entegrasyonu (pi-mom pattern — mention/DM → agent response)
-- 🔴 Discord bot adaptörü (aynı pattern)
-- 🔴 Telegram bot adaptörü
-- 🔴 Kanal-bağımsız mesaj normalizasyonu (pi-agent-core message format)
-- 🔴 Docker sandbox isolation (kanal başına izole çalışma ortamı)
+- 🟢 Slack entegrasyonu (pi-mom pattern — mention/DM → agent response)
+- 🟢 Discord bot adaptörü (aynı pattern)
+- 🟢 Telegram bot adaptörü
+- 🟢 Kanal-bağımsız mesaj normalizasyonu (pi-agent-core message format)
+- 🟢 Docker sandbox isolation (kanal başına izole çalışma ortamı)
 
 ---
 
@@ -442,7 +439,7 @@ pi-mom (Slack bot) pattern'ini kullanarak Faz 11.5 multi-channel gateway'i hızl
 | Faz 11 — Otonom Ekosistem 🦞    | 🟡 Kısmi        | █████░░░░░░░ 50%  |
 | Faz 12 — Kolektif Bilinç 🧬     | 🟡 Kısmi        | █████░░░░░░░ 40%  |
 | Faz 13 — Kiro Entegrasyon 🔮    | 🟡 Devam ediyor | ███░░░░░░░░░ 30%  |
-| Faz 14 — pi-mono Entegrasyon 🔌 | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz 14 — pi-mono Entegrasyon 🔌 | 🟢 Tamamlandı   | ████████████ 100% |
 
 ---
 

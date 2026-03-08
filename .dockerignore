@@ -13,3 +13,7 @@ data/memory.db
 data/memory.db-wal
 data/memory.db-shm
 !data/.gitkeep
+
+# Pi-Gateway
+services/pi-gateway/node_modules/
+services/pi-gateway/.env

@@ -6,7 +6,7 @@
  * Also holds a pending thread ID for cross-panel navigation.
  */
 
-import type { WSLiveEvent } from "./types";
+import type { WSLiveEvent, Thread } from "./types";
 
 type Status = "idle" | "connecting" | "running" | "complete" | "error";
 type Listener = () => void;
@@ -17,6 +17,7 @@ interface WSStore {
   status: Status;
   liveEvents: WSLiveEvent[];
   pendingThreadId: string | null;
+  activeThread: Thread | null;
   listeners: Set<Listener>;
 }
 
@@ -24,14 +25,23 @@ const store: WSStore = {
   status: "idle",
   liveEvents: [],
   pendingThreadId: null,
+  activeThread: null,
   listeners: new Set(),
 };
 
 /** Cached snapshot — only replaced when notify() fires */
-let _snapshot = { status: store.status, liveEvents: store.liveEvents };
+let _snapshot = {
+  status: store.status,
+  liveEvents: store.liveEvents,
+  activeThread: store.activeThread,
+};
 
 function notify() {
-  _snapshot = { status: store.status, liveEvents: store.liveEvents };
+  _snapshot = {
+    status: store.status,
+    liveEvents: store.liveEvents,
+    activeThread: store.activeThread,
+  };
   store.listeners.forEach((fn) => fn());
 }
 
@@ -85,4 +95,17 @@ export function consumePendingThread(): string | null {
     // no notify needed — consumer already read it
   }
   return id;
+}
+
+/* ── Active thread for cross-panel data sharing ── */
+
+/** Set the active thread so other panels (Görev Merkezi etc.) can read it */
+export function setActiveThread(thread: Thread | null) {
+  store.activeThread = thread;
+  notify();
+}
+
+/** Get the current active thread */
+export function getActiveThread(): Thread | null {
+  return store.activeThread;
 }

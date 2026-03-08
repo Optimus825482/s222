@@ -25,6 +25,15 @@ NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 
+# ── PI AI Gateway ────────────────────────────────────────────────
+PI_GATEWAY_URL = os.getenv("PI_GATEWAY_URL", "http://localhost:3100/v1")
+PI_GATEWAY_ENABLED = os.getenv("PI_GATEWAY_ENABLED", "false").lower() == "true"
+PI_GATEWAY_FALLBACK_ENABLED = os.getenv("PI_GATEWAY_FALLBACK_ENABLED", "true").lower() == "true"
+PI_GATEWAY_FALLBACK_MAX_RETRIES = int(os.getenv("PI_GATEWAY_FALLBACK_MAX_RETRIES", "2"))
+
+# Streaming configuration (Faz 14.2)
+PI_GATEWAY_STREAMING_ENABLED = os.getenv("PI_GATEWAY_STREAMING_ENABLED", "true").lower() == "true"
+
 # Base URL without trailing slash (app appends /search)
 _SEARXNG_RAW = os.getenv(
     "SEARXNG_URL",
@@ -122,6 +131,53 @@ MODELS = {
 }
 
 MODEL_KEYS = list(MODELS.keys())
+
+# ── Gateway Multi-Provider Model Definitions ─────────────────────
+
+GATEWAY_MODELS = {
+    "orchestrator": {
+        "primary": {"id": "qwen/qwen3-next-80b-a3b-instruct", "provider": "nvidia"},
+        "alternatives": [
+            {"id": "claude-sonnet-4-20250514", "provider": "anthropic"},
+            {"id": "gpt-4o", "provider": "openai"},
+        ],
+    },
+    "thinker": {
+        "primary": {"id": "minimaxai/minimax-m2.1", "provider": "nvidia"},
+        "alternatives": [
+            {"id": "claude-sonnet-4-20250514", "provider": "anthropic"},
+            {"id": "gemini-2.5-pro-preview-06-05", "provider": "google"},
+        ],
+    },
+    "speed": {
+        "primary": {"id": "stepfun-ai/step-3.5-flash", "provider": "nvidia"},
+        "alternatives": [
+            {"id": "llama-3.3-70b-versatile", "provider": "groq"},
+            {"id": "gpt-4o-mini", "provider": "openai"},
+        ],
+    },
+    "researcher": {
+        "primary": {"id": "z-ai/glm4.7", "provider": "nvidia"},
+        "alternatives": [
+            {"id": "gemini-2.5-flash-preview-05-20", "provider": "google"},
+            {"id": "mistral-large-latest", "provider": "mistral"},
+        ],
+    },
+    "reasoner": {
+        "primary": {"id": "nvidia/nemotron-3-nano-30b-a3b", "provider": "nvidia"},
+        "alternatives": [
+            {"id": "claude-sonnet-4-20250514", "provider": "anthropic"},
+            {"id": "o4-mini", "provider": "openai"},
+        ],
+    },
+    "critic": {
+        "primary": {"id": "deepseek-chat", "provider": "deepseek"},
+        "alternatives": [
+            {"id": "claude-sonnet-4-20250514", "provider": "anthropic"},
+            {"id": "gpt-4o", "provider": "openai"},
+        ],
+    },
+}
 
 # ── Agent Role → Model Key Mapping ───────────────────────────────
 

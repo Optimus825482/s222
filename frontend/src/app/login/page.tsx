@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -61,28 +61,29 @@ export default function LoginPage() {
         style={{ background: "linear-gradient(180deg,#0a3a8a,#0052d6)" }}
       >
         <span className="text-[9px] sm:text-[10px] text-blue-200/60">
-          Multi-Agent Ops Center
+          Nexus AI Team
         </span>
       </div>
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 sm:py-8 min-h-0">
         <div className="mb-5 sm:mb-8 text-center shrink-0">
-          <div
-            className="text-4xl sm:text-6xl mb-2 sm:mb-3"
-            style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,.3))" }}
-          >
-            🖥️
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/nexus-logo.png"
+            alt="Nexus Logo"
+            className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-2 sm:mb-3 rounded-2xl"
+            style={{ filter: "drop-shadow(0 2px 12px rgba(0,0,0,.4))" }}
+          />
           <h1
             className="text-xl sm:text-3xl font-bold text-white tracking-wide"
             style={{ textShadow: "0 2px 4px rgba(0,0,0,.3)" }}
           >
-            Ops Center
+            Nexus
           </h1>
           <p
             className="text-xs sm:text-sm text-blue-100/80 mt-1"
             style={{ textShadow: "0 1px 2px rgba(0,0,0,.2)" }}
           >
-            Multi-Agent Intelligence Platform
+            Nexus AI Team
           </p>
         </div>
         <div
@@ -151,7 +152,19 @@ export default function LoginPage() {
               <form
                 onSubmit={submit}
                 className="flex flex-col items-center gap-3 sm:gap-4"
+                aria-label="Giriş formu"
               >
+                {/* Erişilebilirlik: parola formlarında kullanıcı adı alanı önerilir */}
+                <input
+                  type="text"
+                  name="username"
+                  value={picked ?? ""}
+                  readOnly
+                  autoComplete="username"
+                  aria-hidden="true"
+                  tabIndex={-1}
+                  className="absolute opacity-0 w-0 h-0 pointer-events-none"
+                />
                 <button
                   type="button"
                   onClick={back}

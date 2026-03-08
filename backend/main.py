@@ -106,6 +106,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Agent identity init skipped (non-critical): {e}")
 
+    # Register tool schemas with pi-gateway (Faz 14.3)
+    try:
+        from tools.tool_schema_registry import register_with_gateway
+        gw_result = await register_with_gateway()
+        gw_status = gw_result.get("status", gw_result.get("registered", "?"))
+        print(f"[Backend] Tool schema registration: {gw_status}")
+    except Exception as e:
+        print(f"[Backend] Tool schema registration skipped (non-critical): {e}")
+
     # Heartbeat scheduler (Faz 11.2 — proaktif agent görevleri)
     try:
         from tools.heartbeat import get_heartbeat_scheduler
@@ -200,6 +209,8 @@ from routes.social import router as social_router
 from routes.heartbeat_routes import router as heartbeat_router
 from routes.chat_ws import router as chat_ws_router
 from routes.learning_hub import router as learning_hub_router
+from routes.gateway import router as gateway_router
+from routes.documents import router as documents_router
 
 app.include_router(auth_router)
 app.include_router(skills_router)
@@ -214,6 +225,8 @@ app.include_router(social_router)
 app.include_router(heartbeat_router)
 app.include_router(chat_ws_router)
 app.include_router(learning_hub_router)
+app.include_router(gateway_router)
+app.include_router(documents_router)
 
 print("[Backend] All route modules loaded successfully")
-print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub")
+print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents")

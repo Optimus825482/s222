@@ -146,6 +146,22 @@ export interface WSLiveEvent {
   logKey?: string;
 }
 
+/** Granular streaming event from LLM (Faz 14.2) */
+export interface WSStreamEvent {
+  type: "stream_event";
+  event_type:
+    | "text_delta"
+    | "thinking_delta"
+    | "toolcall_start"
+    | "toolcall_delta"
+    | "toolcall_end"
+    | "done";
+  agent: string;
+  delta: string;
+  extra: Record<string, unknown>;
+  timestamp: number;
+}
+
 export interface WSResult {
   type: "result";
   thread_id: string;
@@ -168,6 +184,7 @@ export interface WSOrchestratorChatReply {
 
 export type WSMessage =
   | WSLiveEvent
+  | WSStreamEvent
   | WSResult
   | WSError
   | WSOrchestratorChatReply

@@ -1037,6 +1037,8 @@ RESEARCHER_TOOLS = [
     GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
+    MCP_CALL_TOOL,
+    MCP_LIST_TOOLS_TOOL,
 ]
 
 # ── Thinker Tools ────────────────────────────────────────────────
@@ -1059,6 +1061,8 @@ THINKER_TOOLS = [
     GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
+    MCP_CALL_TOOL,
+    MCP_LIST_TOOLS_TOOL,
 ]
 
 # ── Speed Tools ──────────────────────────────────────────────────
@@ -1081,12 +1085,15 @@ SPEED_TOOLS = [
     GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
+    MCP_CALL_TOOL,
+    MCP_LIST_TOOLS_TOOL,
 ]
 
 # ── Reasoner Tools ───────────────────────────────────────────────
 
 REASONER_TOOLS = [
     WEB_SEARCH_TOOL,
+    WEB_FETCH_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
     LIST_MEMORIES_TOOL,
@@ -1102,6 +1109,8 @@ REASONER_TOOLS = [
     GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
+    MCP_CALL_TOOL,
+    MCP_LIST_TOOLS_TOOL,
 ]
 
 # ── Critic Tools (DeepSeek) ────────────────────────────────────────
@@ -1123,6 +1132,8 @@ CRITIC_TOOLS = [
     GENERATE_CHART_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
+    MCP_CALL_TOOL,
+    MCP_LIST_TOOLS_TOOL,
 ]
 
 # ── Agent → Tools Mapping ────────────────────────────────────────

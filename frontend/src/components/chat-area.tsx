@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { Thread, AgentEvent } from "@/lib/types";
 import { getAgentInfo } from "@/lib/agents";
 import { Brain, CheckCircle, Clock, Coins } from "lucide-react";
+import { detectArtifacts, ArtifactCard } from "@/components/artifacts-panel";
 
 interface Props {
   thread: Thread | null;
@@ -377,12 +378,14 @@ function WelcomeScreen({
         </div>
       )}
       <div className="text-center max-w-sm">
-        <Brain
-          className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-4 text-pink-400"
-          aria-hidden="true"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/nexus-logo.png"
+          alt="Nexus Logo"
+          className="w-12 h-12 md:w-14 md:h-14 mx-auto mb-4 rounded-xl"
         />
         <h1 className="text-lg md:text-xl font-bold text-slate-200 mb-2">
-          Multi-Agent Ops Center
+          Nexus AI Team
         </h1>
         <p className="text-sm text-slate-500 mb-6">
           Görev gönder — orchestrator analiz edip specialist agent&apos;lara
@@ -468,6 +471,19 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
         <div className="text-sm text-slate-300 leading-relaxed break-words overflow-hidden">
           {renderMarkdown(event.content)}
         </div>
+
+        {/* Artifacts — interactive HTML/SVG/CSV/Mermaid rendering */}
+        {(() => {
+          const artifacts = detectArtifacts(event.content);
+          if (artifacts.length === 0) return null;
+          return (
+            <div className="space-y-3 mt-3">
+              {artifacts.map((a) => (
+                <ArtifactCard key={a.id} artifact={a} />
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Mobile-friendly metadata footer for final results */}
         {isFinal && lastTask && (

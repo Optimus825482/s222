@@ -250,7 +250,7 @@ export function XpWindow({
       {/* Window Body */}
       <div className="xp-window-body flex-1 min-h-0 overflow-hidden">
         <div className="xp-window-content h-full flex flex-col overflow-hidden">
-          {children}
+          {children ?? null}
         </div>
       </div>
 

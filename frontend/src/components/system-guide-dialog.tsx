@@ -153,7 +153,7 @@ export function SystemGuideDialog({ open, onClose }: Props) {
             <span className="text-2xl">🧠</span>
             <div>
               <h2 className="text-base font-bold text-slate-100">
-                Multi-Agent Ops Center
+                Nexus AI Team
               </h2>
               <p className="text-[11px] text-slate-500">
                 Sistem Rehberi — Paneller &amp; Agent&apos;lar
@@ -261,7 +261,7 @@ export function SystemGuideDialog({ open, onClose }: Props) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-slate-800 text-center text-[10px] text-slate-600">
-          © 2026 Multi-Agent Ops Center · Erkan Erdem &amp; Yiğit Avcı
+          © 2026 Nexus AI Team · Erkan Erdem &amp; Yiğit Avcı
         </div>
       </div>
     </div>

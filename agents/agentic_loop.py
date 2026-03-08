@@ -1,15 +1,18 @@
 """
-Agentic Loop — Otonom görev zincirleme (Faz 11.1).
+Agentic Loop — Otonom görev zincirleme (Faz 11.1 + Faz 14.6).
 Tool call zincirleme, iterasyon limiti, token/maliyet gardları, context window guard.
+Faz 14.6: Context Transformer, Follow-up Config, Steering Message support.
 Multi-parallel orchestration ile uyumlu: her agent execute() içinde bu gardlar uygulanır.
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
+import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Callable, Awaitable
 
 # Cost per 1K tokens (USD) — model id → rate
 COST_PER_1K: dict[str, float] = {
@@ -99,3 +102,163 @@ def compress_messages_if_needed(
         "content": "[Context truncated to stay within limits. Earlier conversation was summarized.]",
     }
     return system_msgs + [summary_note] + keep
+
+
+# ---------------------------------------------------------------------------
+# Faz 14.6: Context Transformer — mesaj dizisini LLM'e göndermeden önce dönüştürme
+# ---------------------------------------------------------------------------
+
+# Transform function signature: (messages, config) -> messages
+TransformFn = Callable[[list[dict[str, Any]], "LoopConfig"], list[dict[str, Any]]]
+
+
+@dataclass
+class ContextTransformer:
+    """Pluggable context transformation pipeline.
+
+    Transforms are applied in order before each LLM call.
+    Built-in transforms: trim_redundant_tool_results, inject_summary.
+    Agents can register custom transforms via `add_transform()`.
+    """
+
+    _transforms: list[TransformFn] = field(default_factory=list)
+
+    def add_transform(self, fn: TransformFn) -> None:
+        self._transforms.append(fn)
+
+    def apply(self, messages: list[dict[str, Any]], config: LoopConfig | None = None) -> list[dict[str, Any]]:
+        cfg = config or get_loop_config()
+        result = messages
+        for fn in self._transforms:
+            result = fn(result, cfg)
+        return result
+
+
+def trim_redundant_tool_results(messages: list[dict[str, Any]], config: LoopConfig) -> list[dict[str, Any]]:
+    """Trim long tool results in older messages to save context window space."""
+    if len(messages) <= 10:
+        return messages
+    trimmed = []
+    cutoff = len(messages) - 8  # keep last 8 messages intact
+    for i, msg in enumerate(messages):
+        if i < cutoff and msg.get("role") == "tool":
+            content = msg.get("content", "")
+            if len(content) > 500:
+                trimmed.append({**msg, "content": content[:400] + "\n...[trimmed]"})
+                continue
+        trimmed.append(msg)
+    return trimmed
+
+
+def inject_context_summary(messages: list[dict[str, Any]], config: LoopConfig) -> list[dict[str, Any]]:
+    """If message count exceeds threshold, inject a summary note after system messages."""
+    if len(messages) <= config.max_messages_before_compress:
+        return messages
+    # Count tool interactions for summary
+    tool_count = sum(1 for m in messages if m.get("role") == "tool")
+    user_count = sum(1 for m in messages if m.get("role") == "user")
+    summary = (
+        f"[Context summary: {len(messages)} messages, {tool_count} tool calls, "
+        f"{user_count} user messages. Focus on the latest task.]"
+    )
+    # Find insertion point (after system messages)
+    insert_idx = 0
+    for i, m in enumerate(messages):
+        if m.get("role") == "system":
+            insert_idx = i + 1
+        else:
+            break
+    # Don't duplicate if already present
+    if insert_idx < len(messages) and "[Context summary:" in (messages[insert_idx].get("content") or ""):
+        return messages
+    return messages[:insert_idx] + [{"role": "user", "content": summary}] + messages[insert_idx:]
+
+
+def get_default_transformer() -> ContextTransformer:
+    """Create a transformer with default built-in transforms."""
+    ct = ContextTransformer()
+    ct.add_transform(trim_redundant_tool_results)
+    ct.add_transform(inject_context_summary)
+    return ct
+
+
+# ---------------------------------------------------------------------------
+# Faz 14.6: Follow-up Config — agent durduğunda otomatik devam ettirme
+# ---------------------------------------------------------------------------
+
+# Patterns that indicate the agent wants to continue
+_DEFAULT_CONTINUE_PATTERNS = [
+    r"devam\s+ed",           # Turkish: devam edelim / edeceğim
+    r"continue\s+with",
+    r"next\s+step",
+    r"I(?:'ll| will)\s+now",
+    r"let me also",
+    r"şimdi\s+de",
+    r"ayrıca",
+]
+
+
+@dataclass
+class FollowUpConfig:
+    """Configuration for automatic follow-up messages when agent signals continuation."""
+    enabled: bool = field(
+        default_factory=lambda: os.getenv("AGENTIC_FOLLOWUP_ENABLED", "true").lower() == "true"
+    )
+    max_follow_ups: int = field(
+        default_factory=lambda: int(os.getenv("AGENTIC_MAX_FOLLOWUPS", "3"))
+    )
+    trigger_patterns: list[str] = field(default_factory=lambda: list(_DEFAULT_CONTINUE_PATTERNS))
+    follow_up_message: str = "Devam et — önceki yanıtını tamamla."
+
+    def should_follow_up(self, response_text: str) -> bool:
+        """Check if the response text indicates the agent wants to continue."""
+        if not self.enabled:
+            return False
+        text = response_text.strip()
+        # If response ends abruptly (mid-sentence) — likely needs continuation
+        if text and not text[-1] in ".!?…\"')\u200b":
+            return True
+        # Check trigger patterns
+        last_chunk = text[-200:] if len(text) > 200 else text
+        for pattern in self.trigger_patterns:
+            if re.search(pattern, last_chunk, re.IGNORECASE):
+                return True
+        return False
+
+
+def get_followup_config() -> FollowUpConfig:
+    return FollowUpConfig()
+
+
+# ---------------------------------------------------------------------------
+# Faz 14.6: Steering Queue — kullanıcının agent çalışırken araya girmesi
+# ---------------------------------------------------------------------------
+
+class SteeringQueue:
+    """Thread-safe queue for injecting user steering messages into a running agent loop.
+
+    Usage:
+        - Backend (chat_ws.py) pushes steering messages via `push()`
+        - Agent execute() loop checks `pop()` each iteration
+        - Steering messages are injected as high-priority user messages
+    """
+
+    def __init__(self) -> None:
+        self._queue: asyncio.Queue[str] = asyncio.Queue()
+
+    def push(self, message: str) -> None:
+        """Push a steering message (non-blocking)."""
+        try:
+            self._queue.put_nowait(message)
+        except asyncio.QueueFull:
+            pass  # drop if somehow full
+
+    def pop(self) -> str | None:
+        """Pop a steering message if available (non-blocking). Returns None if empty."""
+        try:
+            return self._queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def has_messages(self) -> bool:
+        return not self._queue.empty()
