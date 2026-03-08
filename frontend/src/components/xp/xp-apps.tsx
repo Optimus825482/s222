@@ -245,6 +245,24 @@ const LearningHubPanel = dynamic(
     })),
   { ssr: false },
 );
+const ModelManagerPanel = dynamic(
+  () => import("@/components/model-manager-panel"),
+  { ssr: false },
+);
+const SkillCreatorPanel = dynamic(
+  () =>
+    import("@/components/skill-creator-panel").then((m) => ({
+      default: m.SkillCreatorPanel,
+    })),
+  { ssr: false },
+);
+const XpMarketplacePanel = dynamic(
+  () =>
+    import("@/components/xp-marketplace-panel").then((m) => ({
+      default: m.XpMarketplacePanel,
+    })),
+  { ssr: false },
+);
 
 // ── Panel imports from xp/panels ──
 import { XpAgentsPanel } from "./panels/xp-agents-panel";
@@ -252,6 +270,7 @@ import { XpSessionsPanel } from "./panels/xp-sessions-panel";
 import { XpToolsPanel } from "./panels/xp-tools-panel";
 import { XpSkillsHubPanel } from "./panels/xp-skills-hub-panel";
 import { XpRoadmapPanel } from "./panels/xp-roadmap-panel";
+import { XpLiveLogPanel } from "./panels/xp-live-log-panel";
 
 // ── App definition type ──
 export interface DesktopApp {
@@ -830,5 +849,63 @@ export const APPS: DesktopApp[] = [
         <LearningHubPanel />
       </div>
     ),
+  },
+  {
+    id: "model-manager",
+    title: "Model Yönetimi",
+    icon: <FeatherIcon name="cpu" color="#f472b6" />,
+    color: "#f472b6",
+    group: "Sistem",
+    description:
+      "Provider/model seçimi, agent-model eşleme, gateway durumu ve doğrulama.",
+    defaultW: 700,
+    defaultH: 560,
+    render: () => (
+      <div className="p-4 overflow-auto h-full">
+        <ModelManagerPanel />
+      </div>
+    ),
+  },
+  {
+    id: "skill-creator",
+    title: "Skill Oluşturucu",
+    icon: <FeatherIcon name="edit" color="#8b5cf6" />,
+    color: "#8b5cf6",
+    group: "Araçlar",
+    description: "Skill doğrulama, test ve oluşturma aracı.",
+    defaultW: 700,
+    defaultH: 560,
+    render: () => (
+      <div className="p-4 overflow-auto h-full">
+        <SkillCreatorPanel />
+      </div>
+    ),
+  },
+  {
+    id: "skill-marketplace",
+    title: "Marketplace",
+    icon: <FeatherIcon name="shopping-cart" color="#f59e0b" />,
+    color: "#f59e0b",
+    group: "Araçlar",
+    description: "Skill ve domain uzmanlığı mağazası — keşfet, yükle, yönet.",
+    defaultW: 700,
+    defaultH: 560,
+    render: () => (
+      <div className="overflow-hidden h-full">
+        <XpMarketplacePanel />
+      </div>
+    ),
+  },
+  {
+    id: "live-log",
+    title: "Canlı Log",
+    icon: <FeatherIcon name="terminal" color="#06b6d4" />,
+    color: "#06b6d4",
+    group: "Ana",
+    description:
+      "WebSocket üzerinden canlı olay akışı — agent aktivitelerini anlık izleyin.",
+    defaultW: 600,
+    defaultH: 500,
+    render: () => <XpLiveLogPanel />,
   },
 ];
