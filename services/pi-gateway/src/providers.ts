@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import type { KnownProvider } from "@mariozechner/pi-ai";
 import { getModels, getEnvApiKey } from "@mariozechner/pi-ai";
 
@@ -16,6 +19,29 @@ const TRACKED_PROVIDERS: TrackedProvider[] = [
   { provider: "nvidia", envVar: "NVIDIA_API_KEY" },
   { provider: "openrouter", envVar: "OPENROUTER_API_KEY" },
 ];
+
+/** Cache for custom models from models.json */
+let _customModelsCache: Record<string, any[]> | null = null;
+
+function loadCustomModels(): Record<string, any[]> {
+  if (_customModelsCache) return _customModelsCache;
+  try {
+    const raw = readFileSync(
+      join(homedir(), ".pi", "agent", "models.json"),
+      "utf-8",
+    );
+    const parsed = JSON.parse(raw);
+    const result: Record<string, any[]> = {};
+    for (const [name, cfg] of Object.entries(parsed.providers ?? {})) {
+      result[name] = (cfg as any).models ?? [];
+    }
+    _customModelsCache = result;
+    return result;
+  } catch {
+    _customModelsCache = {};
+    return {};
+  }
+}
 
 export interface ProviderStatus {
   provider: string;
@@ -36,6 +62,7 @@ function hasApiKey(provider: string, envVar: string): boolean {
 
 /** Check which providers have API keys set */
 export function getConfiguredProviders(): ProviderStatus[] {
+  const custom = loadCustomModels();
   return TRACKED_PROVIDERS.map(({ provider, envVar }) => {
     const hasKey = hasApiKey(provider, envVar);
     let modelCount = 0;
@@ -43,7 +70,8 @@ export function getConfiguredProviders(): ProviderStatus[] {
       try {
         modelCount = getModels(provider as KnownProvider).length;
       } catch {
-        /* not a native provider or no models */
+        // Not a native provider — count from models.json
+        modelCount = custom[provider]?.length ?? 0;
       }
     }
     return { provider, configured: hasKey, envVar, modelCount };
@@ -61,8 +89,12 @@ export function getAllAvailableModels() {
     supportsImages: boolean;
   }> = [];
 
+  const custom = loadCustomModels();
+
   for (const { provider, envVar } of TRACKED_PROVIDERS) {
     if (!hasApiKey(provider, envVar)) continue;
+
+    let found = false;
     try {
       const models = getModels(provider as KnownProvider);
       for (const m of models) {
@@ -75,8 +107,23 @@ export function getAllAvailableModels() {
           supportsImages: m.input.includes("image"),
         });
       }
+      found = models.length > 0;
     } catch {
-      // Provider not natively supported or unavailable, skip
+      // Not a native KnownProvider
+    }
+
+    // Fallback: load from models.json for custom providers
+    if (!found && custom[provider]) {
+      for (const m of custom[provider]) {
+        results.push({
+          id: `${provider}/${m.id}`,
+          provider,
+          name: m.name ?? m.id,
+          contextWindow: m.contextWindow ?? 128000,
+          reasoning: m.reasoning ?? false,
+          supportsImages: Array.isArray(m.input) && m.input.includes("image"),
+        });
+      }
     }
   }
   return results;

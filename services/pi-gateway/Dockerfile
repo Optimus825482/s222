@@ -12,5 +12,7 @@ ENV NODE_ENV=production
 COPY package.json ./
 RUN npm install --omit=dev
 COPY --from=builder /app/dist ./dist
+RUN mkdir -p /root/.pi/agent
+COPY models.json /root/.pi/agent/models.json
 EXPOSE 3100
 CMD ["node", "dist/index.js"]
