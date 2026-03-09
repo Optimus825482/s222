@@ -186,7 +186,6 @@ export function XpTaskbar({
               Nexus AI Team
             </span>
           </div>
-
           {/* Body: single hover zone so moving from category to flyout doesn't close (no shake) */}
           <div
             className="flex max-h-[calc(100dvh-140px)]"
@@ -375,13 +374,7 @@ export function XpTaskbar({
               )}
             </div>
           </div>
-
-                  {/* Flyout rendered at body level for proper z-index */}
-                </>
-              )}
-            </div>
-          </div>
-
+          {/* Flyout rendered at body level for proper z-index */})
           {/* Footer */}
           <div className="xp-start-footer h-[40px] flex items-center justify-end px-4 gap-2">
             <button
