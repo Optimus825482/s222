@@ -244,3 +244,62 @@ def get_best_agent_for_task(task_type: str) -> str | None:
     finally:
         if conn is not None:
             release_conn(conn)
+
+def get_performance_baseline(agent_role: str | None = None) -> dict[str, Any]:
+    """Return aggregated performance baseline for an agent (or all agents).
+
+    Returns dict with keys: agent_role, total_tasks, success_count,
+    task_success_rate_pct, avg_score, avg_latency.
+    """
+    empty: dict[str, Any] = {
+        "agent_role": agent_role,
+        "total_tasks": 0,
+        "success_count": 0,
+        "task_success_rate_pct": 0.0,
+        "avg_score": 0.0,
+        "avg_latency": 0.0,
+    }
+    conn = None
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        if agent_role:
+            cur.execute("""
+                SELECT
+                    COUNT(*)                              AS total_tasks,
+                    COUNT(*) FILTER (WHERE score >= 3.0)  AS success_count,
+                    ROUND(AVG(score)::numeric, 2)         AS avg_score,
+                    ROUND(AVG(latency_ms)::numeric, 0)    AS avg_latency
+                FROM evaluations
+                WHERE agent_role = %s
+            """, (agent_role,))
+        else:
+            cur.execute("""
+                SELECT
+                    COUNT(*)                              AS total_tasks,
+                    COUNT(*) FILTER (WHERE score >= 3.0)  AS success_count,
+                    ROUND(AVG(score)::numeric, 2)         AS avg_score,
+                    ROUND(AVG(latency_ms)::numeric, 0)    AS avg_latency
+                FROM evaluations
+            """)
+        row = cur.fetchone()
+        if not row or not row["total_tasks"]:
+            return empty
+        total = int(row["total_tasks"])
+        success = int(row["success_count"])
+        return {
+            "agent_role": agent_role,
+            "total_tasks": total,
+            "success_count": success,
+            "task_success_rate_pct": round(success / total * 100, 1) if total else 0.0,
+            "avg_score": float(row["avg_score"] or 0),
+            "avg_latency": float(row["avg_latency"] or 0),
+        }
+    except Exception as e:
+        logger.warning(f"Failed to get performance baseline: {e}")
+        return empty
+    finally:
+        if conn is not None:
+            release_conn(conn)
+
+
