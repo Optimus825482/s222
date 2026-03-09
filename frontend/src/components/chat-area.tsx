@@ -291,10 +291,16 @@ function renderMarkdown(text: string): React.ReactNode[] {
 
 export function ChatArea({ thread, isProcessing, status }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const wsSnap = useSyncExternalStore(
+    subscribeWS,
+    getWSSnapshot,
+    getWSSnapshot,
+  );
 
+  // Auto-scroll on new events OR when stream text updates
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [thread?.events?.length]);
+  }, [thread?.events?.length, wsSnap.streamText]);
 
   if (!thread || !thread.events.length) {
     return <WelcomeScreen isProcessing={isProcessing} status={status} />;
@@ -365,6 +371,14 @@ export function ChatArea({ thread, isProcessing, status }: Props) {
       {chatEvents.map((event) => (
         <ChatBubble key={event.id} event={event} thread={thread} />
       ))}
+      {/* Live stream bubble — shows orchestrator response as it's being generated */}
+      {isProcessing && (wsSnap.streamText || wsSnap.streamThinking) && (
+        <LiveStreamBubble
+          agent={wsSnap.streamAgent}
+          text={wsSnap.streamText}
+          thinking={wsSnap.streamThinking}
+        />
+      )}
       <div ref={bottomRef} />
     </div>
   );
@@ -577,6 +591,74 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
             badge="CONFIDENCE"
             onClose={() => setShowConfModal(false)}
           />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LiveStreamBubble({
+  agent,
+  text,
+  thinking,
+}: {
+  agent: string;
+  text: string;
+  thinking: string;
+}) {
+  const info = getAgentInfo(agent || "orchestrator");
+  const hasText = text.length > 0;
+
+  return (
+    <div className="animate-slide-up">
+      <div
+        className="rounded-2xl rounded-bl-md px-3 md:px-4 py-3 max-w-[100%] md:max-w-[85%] bg-surface-raised border border-border"
+        style={{ borderColor: `${info.color}40` }}
+      >
+        {/* Agent header with typing indicator */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg" aria-hidden="true">
+            {info.icon}
+          </span>
+          <span className="text-xs font-bold" style={{ color: info.color }}>
+            {info.name}
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-slate-500">
+            <span className="inline-flex gap-0.5">
+              <span
+                className="w-1 h-1 rounded-full bg-slate-400 animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              />
+              <span
+                className="w-1 h-1 rounded-full bg-slate-400 animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              />
+              <span
+                className="w-1 h-1 rounded-full bg-slate-400 animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              />
+            </span>
+            yazıyor
+          </span>
+        </div>
+
+        {/* Thinking (collapsed, subtle) */}
+        {thinking && !hasText && (
+          <div className="text-xs text-slate-500 italic mb-1 line-clamp-2">
+            💭 {thinking.slice(-200)}
+          </div>
+        )}
+
+        {/* Live text */}
+        {hasText && (
+          <div className="text-sm text-slate-300 leading-relaxed break-words overflow-hidden">
+            {renderMarkdown(text)}
+          </div>
+        )}
+
+        {/* Minimal pulsing bar when no text yet */}
+        {!hasText && !thinking && (
+          <div className="h-1 w-16 rounded-full bg-gradient-to-r from-slate-700 via-slate-500 to-slate-700 animate-pulse" />
         )}
       </div>
     </div>
