@@ -47,14 +47,14 @@ def _get_llm_client() -> openai.AsyncOpenAI:
 # ── Pydantic Models ──────────────────────────────────────────────
 
 class GenerateRequest(BaseModel):
-    prompt: str = Field(..., min_length=3, max_length=2000)
+    prompt: str = Field(..., min_length=3, max_length=8000)
     slide_count: int = Field(default=8, ge=3, le=30)
     language: str = Field(default="tr", max_length=5)
     style: str = Field(default="professional", max_length=30)
 
 
 class EnhancePromptRequest(BaseModel):
-    prompt: str = Field(..., min_length=3, max_length=2000)
+    prompt: str = Field(..., min_length=3, max_length=8000)
 
 
 class RegenerateSlideRequest(BaseModel):
@@ -355,7 +355,7 @@ RULES:
 
     # Sanitize output
     enhanced = {
-        "enhanced_prompt": str(result["enhanced_prompt"])[:3000],
+        "enhanced_prompt": str(result["enhanced_prompt"])[:7000],
         "suggested_slide_count": max(3, min(30, int(result.get("suggested_slide_count", 8)))),
         "suggested_style": str(result.get("suggested_style", "professional")),
     }
