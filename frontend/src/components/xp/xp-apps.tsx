@@ -244,6 +244,13 @@ const PresentationBuilderPanel = dynamic(
   () => import("@/components/presentation-builder-panel"),
   { ssr: false },
 );
+const ResiliencePanel = dynamic(
+  () =>
+    import("@/components/resilience").then((m) => ({
+      default: m.ResiliencePanel,
+    })),
+  { ssr: false },
+);
 
 // ── Panel imports from xp/panels ──
 import { XpAgentsPanel } from "./panels/xp-agents-panel";
@@ -920,6 +927,18 @@ export const APPS: DesktopApp[] = [
         <XpMarketplacePanel />
       </div>
     ),
+  },
+  {
+    id: "resilience",
+    title: "Resilience & Monitoring",
+    icon: <FeatherIcon name="shield" color="#ef4444" />,
+    color: "#ef4444",
+    group: "Sistem",
+    description:
+      "Sistem sağlığı, Prometheus metrikleri, dinamik eşikler, chaos engineering, bilgi moderasyonu ve federated learning izleme.",
+    defaultW: 780,
+    defaultH: 580,
+    render: () => <ResiliencePanel />,
   },
   {
     id: "presentations",
