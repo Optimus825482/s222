@@ -569,6 +569,147 @@ MCP_LIST_TOOLS_TOOL = {
 
 # ── Dynamic Skill Management Tools ──────────────────────────────
 
+# ── Inter-Agent Communication Tools ──────────────────────────────
+
+SEND_AGENT_MESSAGE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "send_agent_message",
+        "description": (
+            "Send a message to another agent for collaboration or task delegation. "
+            "Use when you need help from another agent, want to delegate a subtask, "
+            "or need to share important findings with the team. "
+            "Available agents: orchestrator, thinker, researcher, speed, reasoner, critic"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "to_agent": {
+                    "type": "string",
+                    "description": "Target agent role (orchestrator, thinker, researcher, speed, reasoner, critic) or 'broadcast' for all",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Message content - be specific about what you need",
+                },
+                "message_type": {
+                    "type": "string",
+                    "enum": ["direct", "collab_request", "task_delegation", "alert"],
+                    "description": "Type of message: direct=simple message, collab_request=ask for help, task_delegation=delegate subtask, alert=important notification",
+                },
+                "requires_response": {
+                    "type": "boolean",
+                    "description": "Whether you expect a response from the target agent",
+                },
+                "context": {
+                    "type": "object",
+                    "description": "Additional context for collaboration requests",
+                },
+            },
+            "required": ["to_agent", "content"],
+        },
+    },
+}
+
+CHECK_AGENT_MESSAGES_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "check_agent_messages",
+        "description": (
+            "Check for pending messages from other agents. "
+            "Use to see if other agents have sent you collaboration requests, "
+            "task delegations, or important notifications."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+}
+
+SHARE_KNOWLEDGE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "share_knowledge",
+        "description": (
+            "Share knowledge with all agents in the team. "
+            "Use when you discover something useful that other agents should know. "
+            "Examples: user preferences, important findings, context about the task."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "description": "Knowledge key (e.g. 'user_preference_theme', 'important_finding_1')",
+                },
+                "value": {
+                    "description": "Knowledge value (any type)",
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Tags for categorization (e.g. ['preference', 'user'], ['finding', 'research'])",
+                },
+            },
+            "required": ["key", "value"],
+        },
+    },
+}
+
+GET_SHARED_KNOWLEDGE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_shared_knowledge",
+        "description": (
+            "Get knowledge shared by other agents. "
+            "Use to access team knowledge before starting your task."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "description": "Knowledge key to retrieve (omit to get all shared knowledge)",
+                },
+            },
+        },
+    },
+}
+
+SUGGEST_COLLABORATOR_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "suggest_collaborator",
+        "description": (
+            "Get a suggestion for which agent to collaborate with based on task type. "
+            "Use when you need help but aren't sure which agent to ask."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task_type": {
+                    "type": "string",
+                    "enum": ["research", "analysis", "code", "math", "review", "planning", "verification"],
+                    "description": "Type of task you need help with",
+                },
+            },
+            "required": ["task_type"],
+        },
+    },
+}
+
+# Inter-agent tools combined
+INTER_AGENT_TOOLS = [
+    SEND_AGENT_MESSAGE_TOOL,
+    CHECK_AGENT_MESSAGES_TOOL,
+    SHARE_KNOWLEDGE_TOOL,
+    GET_SHARED_KNOWLEDGE_TOOL,
+    SUGGEST_COLLABORATOR_TOOL,
+]
+
+# ── Dynamic Skill Management Tools ──────────────────────────────
+
 CREATE_SKILL_TOOL = {
     "type": "function",
     "function": {
@@ -1069,6 +1210,12 @@ ORCHESTRATOR_TOOLS = [
             },
         },
     },
+    # Inter-Agent Communication
+    SEND_AGENT_MESSAGE_TOOL,
+    CHECK_AGENT_MESSAGES_TOOL,
+    SHARE_KNOWLEDGE_TOOL,
+    GET_SHARED_KNOWLEDGE_TOOL,
+    SUGGEST_COLLABORATOR_TOOL,
 ]
 
 # ── Researcher Tools ─────────────────────────────────────────────
@@ -1092,6 +1239,12 @@ RESEARCHER_TOOLS = [
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Inter-Agent Communication
+    SEND_AGENT_MESSAGE_TOOL,
+    CHECK_AGENT_MESSAGES_TOOL,
+    SHARE_KNOWLEDGE_TOOL,
+    GET_SHARED_KNOWLEDGE_TOOL,
+    SUGGEST_COLLABORATOR_TOOL,
 ]
 
 # ── Thinker Tools ────────────────────────────────────────────────
@@ -1116,6 +1269,12 @@ THINKER_TOOLS = [
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Inter-Agent Communication
+    SEND_AGENT_MESSAGE_TOOL,
+    CHECK_AGENT_MESSAGES_TOOL,
+    SHARE_KNOWLEDGE_TOOL,
+    GET_SHARED_KNOWLEDGE_TOOL,
+    SUGGEST_COLLABORATOR_TOOL,
 ]
 
 # ── Speed Tools ──────────────────────────────────────────────────
@@ -1140,6 +1299,12 @@ SPEED_TOOLS = [
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Inter-Agent Communication
+    SEND_AGENT_MESSAGE_TOOL,
+    CHECK_AGENT_MESSAGES_TOOL,
+    SHARE_KNOWLEDGE_TOOL,
+    GET_SHARED_KNOWLEDGE_TOOL,
+    SUGGEST_COLLABORATOR_TOOL,
 ]
 
 # ── Reasoner Tools ───────────────────────────────────────────────
@@ -1164,6 +1329,12 @@ REASONER_TOOLS = [
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Inter-Agent Communication
+    SEND_AGENT_MESSAGE_TOOL,
+    CHECK_AGENT_MESSAGES_TOOL,
+    SHARE_KNOWLEDGE_TOOL,
+    GET_SHARED_KNOWLEDGE_TOOL,
+    SUGGEST_COLLABORATOR_TOOL,
 ]
 
 # ── Critic Tools (DeepSeek) ────────────────────────────────────────
@@ -1187,6 +1358,12 @@ CRITIC_TOOLS = [
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Inter-Agent Communication
+    SEND_AGENT_MESSAGE_TOOL,
+    CHECK_AGENT_MESSAGES_TOOL,
+    SHARE_KNOWLEDGE_TOOL,
+    GET_SHARED_KNOWLEDGE_TOOL,
+    SUGGEST_COLLABORATOR_TOOL,
 ]
 
 # ── Agent → Tools Mapping ────────────────────────────────────────

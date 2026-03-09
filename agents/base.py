@@ -132,6 +132,10 @@ class BaseAgent(ABC):
         self._handoff_manager = None
         self._task_delegation = None
         self._perf_collector = None
+        
+        # Inter-Agent Communication (Faz 16)
+        self._message_bus = None
+        self._pending_messages: list = []
 
     @abstractmethod
     def system_prompt(self) -> str:
@@ -761,6 +765,144 @@ class BaseAgent(ABC):
 
     # ── End Agent Communication Protocol ─────────────────────────
 
+    # ── Inter-Agent Communication (Faz 16) ─────────────────────────
+    
+    def _get_message_bus(self):
+        """Get the inter-agent message bus (lazy init)."""
+        if self._message_bus is None:
+            from tools.inter_agent_comm import get_message_bus
+            self._message_bus = get_message_bus()
+        return self._message_bus
+    
+    async def send_agent_message(
+        self,
+        to_agent: str,
+        content: str,
+        message_type: str = "direct",
+        metadata: dict = None,
+        requires_response: bool = False,
+    ) -> str:
+        """
+        Send a message to another agent.
+        
+        Args:
+            to_agent: Target agent role (or "broadcast" for all)
+            content: Message content
+            message_type: "direct", "collab_request", "task_delegation", "alert"
+            metadata: Optional metadata
+            requires_response: Whether a response is expected
+            
+        Returns:
+            Message ID
+        """
+        from tools.inter_agent_comm import (
+            MessageType,
+            AgentMessage,
+            send_collaboration_request,
+            send_task_delegation,
+            broadcast_alert,
+        )
+        
+        bus = self._get_message_bus()
+        
+        if message_type == "collab_request":
+            return await send_collaboration_request(
+                from_agent=self.role.value,
+                to_agent=to_agent,
+                task_description=content,
+                context=metadata,
+            )
+        elif message_type == "task_delegation":
+            return await send_task_delegation(
+                from_agent=self.role.value,
+                to_agent=to_agent,
+                task=content,
+            )
+        elif message_type == "alert" or to_agent == "broadcast":
+            await broadcast_alert(
+                from_agent=self.role.value,
+                alert_content=content,
+                metadata=metadata,
+            )
+            return "broadcast_sent"
+        else:
+            # Direct message
+            message = AgentMessage(
+                from_agent=self.role.value,
+                to_agent=to_agent,
+                message_type=MessageType.DIRECT,
+                content=content,
+                metadata=metadata or {},
+                requires_response=requires_response,
+            )
+            await bus.send(message)
+            return message.id
+    
+    async def receive_agent_messages(self, timeout: float = 0.1) -> list:
+        """
+        Check for pending messages from other agents.
+        
+        Returns:
+            List of AgentMessage objects
+        """
+        bus = self._get_message_bus()
+        messages = []
+        
+        while True:
+            msg = await bus.receive(self.role.value, timeout=timeout)
+            if msg is None:
+                break
+            messages.append(msg)
+        
+        return messages
+    
+    def share_knowledge(self, key: str, value: Any, tags: list[str] = None) -> None:
+        """
+        Share knowledge with all agents.
+        
+        Args:
+            key: Knowledge key (e.g., "user_preference_theme")
+            value: Knowledge value
+            tags: Optional tags for categorization
+        """
+        from tools.inter_agent_comm import share_knowledge
+        share_knowledge(
+            key=key,
+            value=value,
+            source_agent=self.role.value,
+            tags=tags,
+        )
+    
+    def get_shared_knowledge(self, key: str = None) -> Any:
+        """
+        Get shared knowledge.
+        
+        Args:
+            key: Knowledge key (None for all knowledge)
+            
+        Returns:
+            Knowledge value or dict of all knowledge
+        """
+        from tools.inter_agent_comm import get_shared_knowledge, get_message_bus
+        if key:
+            return get_shared_knowledge(key)
+        else:
+            bus = self._get_message_bus()
+            return bus.get_all_knowledge()
+    
+    def suggest_collaborator(self, task_type: str) -> Optional[str]:
+        """
+        Suggest a collaborator agent for a task type.
+        
+        Args:
+            task_type: Type of task (research, analysis, code, math, review)
+            
+        Returns:
+            Suggested agent role or None
+        """
+        from tools.inter_agent_comm import suggest_collaborator
+        return suggest_collaborator(self.role.value, task_type)
+
     def _emit(self, event_type: str, content: str, **extra):
         """Emit event to live monitor if attached."""
         if self._live_monitor:
@@ -914,18 +1056,60 @@ class BaseAgent(ABC):
                     )
                     self._emit("steering", f"Kullanıcı talimatı alındı: {steering_msg[:80]}")
 
-            try:
-                result = await self.call_llm(messages, tools)
-            except Exception as e:
-                # 12-Factor #9: Compact errors
-                error_msg = f"LLM call failed: {type(e).__name__}: {e}"
+            # Retry mechanism for LLM calls
+            from tools.agent_retry import (
+                RetryConfig,
+                should_retry,
+                classify_error,
+                record_failure,
+                record_success,
+            )
+            
+            retry_config = RetryConfig()
+            last_error = None
+            
+            for retry_attempt in range(retry_config.max_retries + 1):
+                try:
+                    result = await self.call_llm(messages, tools)
+                    # Success - record and continue
+                    record_success(self.role.value, None)  # type: ignore
+                    break
+                except Exception as e:
+                    last_error = e
+                    error_str = f"{type(e).__name__}: {e}"
+                    
+                    # Check if should retry
+                    should, delay = should_retry(e, retry_attempt, retry_config)
+                    
+                    if not should:
+                        # Permanent error - don't retry
+                        error_msg = f"LLM call failed permanently: {error_str}"
+                        thread.add_event(EventType.ERROR, error_msg, agent_role=self.role)
+                        thread.update_metrics(self.role, 0, 0, success=False)
+                        self._emit("error", error_msg)
+                        try:
+                            tracker.set_error(agent_id, error_msg[:200])
+                        except Exception:
+                            pass
+                        return f"[Error] {error_msg}"
+                    
+                    # Log retry attempt
+                    thread.add_event(
+                        EventType.AGENT_THINKING,
+                        f"LLM call failed (attempt {retry_attempt + 1}), retrying in {delay:.0f}ms: {error_str[:100]}",
+                        agent_role=self.role,
+                    )
+                    self._emit("warning", f"Retry {retry_attempt + 1}: {error_str[:80]}")
+                    
+                    # Wait before retry
+                    if delay > 0:
+                        await asyncio.sleep(delay / 1000)
+            else:
+                # All retries exhausted
+                error_msg = f"LLM call failed after {retry_config.max_retries} retries: {last_error}"
                 thread.add_event(EventType.ERROR, error_msg, agent_role=self.role)
                 thread.update_metrics(self.role, 0, 0, success=False)
-                self._emit("error", error_msg)
-                try:
-                    tracker.set_error(agent_id, error_msg[:200])
-                except Exception:
-                    pass
+                record_failure(self.role.value, None)  # type: ignore
                 return f"[Error] {error_msg}"
 
             # Track thinking content
@@ -1221,6 +1405,71 @@ class BaseAgent(ABC):
             return f"[Sandbox] {e}"
         except Exception:
             pass  # Never break tool flow for sandbox import/init errors
+
+        # Inter-Agent Communication Tools
+        if fn_name == "send_agent_message":
+            try:
+                msg_id = await self.send_agent_message(
+                    to_agent=fn_args["to_agent"],
+                    content=fn_args["content"],
+                    message_type=fn_args.get("message_type", "direct"),
+                    metadata=fn_args.get("context"),
+                    requires_response=fn_args.get("requires_response", False),
+                )
+                return f"[Inter-Agent] Message sent to {fn_args['to_agent']} (ID: {msg_id})"
+            except Exception as e:
+                return f"[Inter-Agent Error] Failed to send message: {e}"
+
+        if fn_name == "check_agent_messages":
+            try:
+                messages = await self.receive_agent_messages(timeout=0.1)
+                if not messages:
+                    return "[Inter-Agent] No pending messages"
+                result = f"[Inter-Agent] {len(messages)} pending messages:\n"
+                for msg in messages:
+                    result += f"- From {msg.from_agent}: {msg.content[:100]}...\n"
+                return result
+            except Exception as e:
+                return f"[Inter-Agent Error] Failed to check messages: {e}"
+
+        if fn_name == "share_knowledge":
+            try:
+                self.share_knowledge(
+                    key=fn_args["key"],
+                    value=fn_args["value"],
+                    tags=fn_args.get("tags"),
+                )
+                return f"[Shared Knowledge] Key '{fn_args['key']}' shared with all agents"
+            except Exception as e:
+                return f"[Shared Knowledge Error] {e}"
+
+        if fn_name == "get_shared_knowledge":
+            try:
+                key = fn_args.get("key")
+                if key:
+                    value = self.get_shared_knowledge(key)
+                    if value is None:
+                        return f"[Shared Knowledge] No value for key '{key}'"
+                    return f"[Shared Knowledge] {key}: {value}"
+                else:
+                    all_knowledge = self.get_shared_knowledge()
+                    if not all_knowledge:
+                        return "[Shared Knowledge] No shared knowledge available"
+                    result = "[Shared Knowledge] All knowledge:\n"
+                    for k, v in all_knowledge.items():
+                        result += f"- {k}: {str(v)[:100]}\n"
+                    return result
+            except Exception as e:
+                return f"[Shared Knowledge Error] {e}"
+
+        if fn_name == "suggest_collaborator":
+            try:
+                suggested = self.suggest_collaborator(fn_args["task_type"])
+                if suggested:
+                    return f"[Collaborator Suggestion] For '{fn_args['task_type']}' tasks, consider asking: {suggested}"
+                return f"[Collaborator Suggestion] No specific collaborator for '{fn_args['task_type']}'"
+            except Exception as e:
+                return f"[Collaborator Suggestion Error] {e}"
 
         # Shared tools available to all agents
         if fn_name == "web_search":

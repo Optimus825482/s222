@@ -915,3 +915,87 @@ async def api_update_presentation(presentation_id: str, req: PresentationUpdateR
             return {"success": True, "presentation": p}
     
     raise HTTPException(404, f"Sunum bulunamadı: {presentation_id}")
+
+
+# ── User Feedback Endpoints (RLHF) ───────────────────────────────────────
+
+class FeedbackRequest(BaseModel):
+    thread_id: str
+    agent_role: str
+    rating: str  # "positive", "negative", "neutral"
+    message_id: str = ""
+    feedback_text: str = ""
+    task_input: str = ""
+    task_output: str = ""
+
+
+class FeedbackStatsRequest(BaseModel):
+    agent_role: str = ""
+    days: int = 7
+
+
+@router.post("/api/feedback/submit")
+async def api_submit_feedback(req: FeedbackRequest, user=Depends(get_current_user)):
+    """Submit user feedback for a response (👍👎)."""
+    from tools.user_feedback import submit_feedback
+    
+    result = submit_feedback(
+        thread_id=req.thread_id,
+        agent_role=req.agent_role,
+        rating=req.rating,
+        message_id=req.message_id or None,
+        user_id=user.get("user_id") if user else None,
+        feedback_text=req.feedback_text or None,
+        task_input=req.task_input or None,
+        task_output=req.task_output or None,
+    )
+    
+    if result["success"]:
+        _audit(user, "feedback_submit", f"{req.rating} for {req.agent_role}")
+    
+    return result
+
+
+@router.get("/api/feedback/thread/{thread_id}")
+async def api_get_thread_feedback(thread_id: str, user=Depends(get_current_user)):
+    """Get all feedback for a thread."""
+    from tools.user_feedback import get_feedback_for_thread
+    
+    feedback = get_feedback_for_thread(thread_id)
+    return {"feedback": feedback}
+
+
+@router.get("/api/feedback/stats")
+async def api_get_feedback_stats(agent_role: str = "", user=Depends(get_current_user)):
+    """Get aggregated feedback stats for agents."""
+    from tools.user_feedback import get_agent_feedback_stats
+    
+    stats = get_agent_feedback_stats(agent_role or None)
+    return {"stats": stats}
+
+
+@router.get("/api/feedback/leaderboard")
+async def api_get_feedback_leaderboard(limit: int = 10, user=Depends(get_current_user)):
+    """Get agents ranked by satisfaction rate."""
+    from tools.user_feedback import get_feedback_leaderboard
+    
+    leaderboard = get_feedback_leaderboard(limit)
+    return {"leaderboard": leaderboard}
+
+
+@router.get("/api/feedback/trends")
+async def api_get_feedback_trends(days: int = 7, user=Depends(get_current_user)):
+    """Get feedback trends over time."""
+    from tools.user_feedback import get_feedback_trends
+    
+    trends = get_feedback_trends(days)
+    return trends
+
+
+@router.get("/api/feedback/rlhf-data")
+async def api_get_rlhf_data(limit: int = 100, user=Depends(get_current_user)):
+    """Get training data for RLHF."""
+    from tools.user_feedback import get_rlhf_training_data
+    
+    data = get_rlhf_training_data(limit)
+    return data
