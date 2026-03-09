@@ -153,31 +153,33 @@ class PerformanceAwareSelector:
         self._load_agent_baselines()
 
     def _load_agent_baselines(self) -> None:
-        """Load agent performance from eval stats."""
+        """Load agent performance from PostgreSQL evaluations table."""
         try:
-            from tools.agent_eval import EVAL_DB_PATH
-            if EVAL_DB_PATH.exists():
-                import sqlite3
-                conn = sqlite3.connect(str(EVAL_DB_PATH))
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute("""
-                    SELECT agent_role,
-                           COUNT(*) as total,
-                           AVG(score) as avg_score,
-                           AVG(latency_ms) as avg_latency
-                    FROM evaluations
-                    GROUP BY agent_role
-                """).fetchall()
-                conn.close()
-
-                for row in rows:
-                    self.agent_performance[row["agent_role"]] = {
-                        "total_tasks": row["total"],
-                        "avg_score": float(row["avg_score"] or 0),
-                        "avg_latency_ms": float(row["avg_latency"] or 0),
-                    }
+            from tools.pg_connection import get_conn, release_conn
+            conn = get_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT agent_role,
+                               COUNT(*) as total,
+                               AVG(score) as avg_score,
+                               AVG(latency_ms) as avg_latency
+                        FROM evaluations
+                        GROUP BY agent_role
+                    """)
+                    rows = cur.fetchall()
+                    for row in rows:
+                        self.agent_performance[row["agent_role"]] = {
+                            "total_tasks": row["total"],
+                            "avg_score": float(row["avg_score"] or 0),
+                            "avg_latency_ms": float(row["avg_latency"] or 0),
+                        }
+            finally:
+                release_conn(conn)
         except Exception as e:
             logger.warning("Failed to load agent baselines: %s", e)
+
+
 
     def get_agent_score(self, agent_role: str, task_complexity: str = "medium") -> float:
         """Get overall score for an agent (0-100)."""

@@ -30,15 +30,16 @@ class FeedbackLoop:
         from tools.pg_connection import release_conn
         release_conn(conn)
 
-
     def _ensure_table(self):
         if self._initialized:
             return
         try:
             conn = self._get_conn()
             with conn.cursor() as cur:
+                # Separate table from migration 006's optimization_history
+                # (which tracks recommendation actions with different schema)
                 cur.execute("""
-                    CREATE TABLE IF NOT EXISTS optimization_history (
+                    CREATE TABLE IF NOT EXISTS feedback_optimization_log (
                         id SERIAL PRIMARY KEY,
                         optimization_type VARCHAR(32) NOT NULL,
                         agent_role VARCHAR(32) NOT NULL,
@@ -49,12 +50,12 @@ class FeedbackLoop:
                         created_at TIMESTAMPTZ DEFAULT NOW()
                     )
                 """)
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_opt_created ON optimization_history(created_at)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_fol_created ON feedback_optimization_log(created_at)")
             conn.commit()
             self._release(conn)
             self._initialized = True
         except Exception as e:
-            logger.warning(f"optimization_history table init failed: {e}")
+            logger.warning(f"feedback_optimization_log table init failed: {e}")
 
     async def start(self) -> None:
         """Subscribe to 'metrics' and 'experiments' channels on event bus."""
@@ -136,7 +137,7 @@ class FeedbackLoop:
         Process EXPERIMENT_CONCLUDED event:
         1. Get winning strategy details
         2. Update agent_param_overrides with winning prompt
-        3. Log to optimization_history
+        3. Log to feedback_optimization_log
         """
         try:
             payload = msg.payload if hasattr(msg, "payload") else {}
@@ -208,13 +209,13 @@ class FeedbackLoop:
         self, opt_type: str, agent_role: str, task_type: str,
         before: str, after: str, reason: str,
     ) -> None:
-        """Insert into optimization_history table."""
+        """Insert into feedback_optimization_log table."""
         self._ensure_table()
         try:
             conn = self._get_conn()
             with conn.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO optimization_history
+                    """INSERT INTO feedback_optimization_log
                        (optimization_type, agent_role, task_type, before_value, after_value, reason)
                        VALUES (%s, %s, %s, %s, %s, %s)""",
                     (opt_type, agent_role, task_type, before, after, reason),
@@ -225,13 +226,13 @@ class FeedbackLoop:
             logger.error(f"_log_optimization failed: {e}")
 
     def get_optimization_log(self, limit: int = 50, offset: int = 0) -> list[dict]:
-        """Get optimization history."""
+        """Get feedback optimization history."""
         self._ensure_table()
         try:
             conn = self._get_conn()
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM optimization_history ORDER BY created_at DESC LIMIT %s OFFSET %s",
+                    "SELECT * FROM feedback_optimization_log ORDER BY created_at DESC LIMIT %s OFFSET %s",
                     (limit, offset),
                 )
                 rows = cur.fetchall()
