@@ -10,7 +10,9 @@ export function MetricsTab() {
 
   const load = useCallback(() => {
     setErr("");
-    fetch("/api/metrics")
+    // Backend URL - environment variable veya fallback
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ykok0ckoooo880w0cwo0w0w0.77.42.68.4.sslip.io";
+    fetch(`${apiUrl}/api/metrics`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.text();
