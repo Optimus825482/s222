@@ -8,6 +8,7 @@ Supports:
 - Tool listing per server
 - Tool execution with JSON-RPC
 - Connection pooling and retry
+- Proper MCP lifecycle handshake (initialize → initialized → tools/list)
 """
 
 from __future__ import annotations
@@ -15,69 +16,162 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import subprocess
-import sqlite3
+import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from tools.pg_connection import get_conn, release_conn
 
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 MCP_CONFIG_PATH = DATA_DIR / "mcp_servers.json"
-MCP_DB_PATH = DATA_DIR / "mcp_history.db"
-
-_conn: sqlite3.Connection | None = None
 
 
-def _get_conn() -> sqlite3.Connection:
-    global _conn
-    if _conn is None:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        _conn = sqlite3.connect(str(MCP_DB_PATH), check_same_thread=False)
-        _conn.row_factory = sqlite3.Row
-        _conn.execute("PRAGMA journal_mode=WAL")
-        _init_schema(_conn)
-    return _conn
+def _ensure_tables() -> None:
+    """Create MCP tables in PostgreSQL if they don't exist."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS mcp_servers (
+                    id          TEXT PRIMARY KEY,
+                    name        TEXT NOT NULL,
+                    command     TEXT NOT NULL,
+                    args        TEXT NOT NULL DEFAULT '[]',
+                    env         TEXT NOT NULL DEFAULT '{}',
+                    description TEXT,
+                    active      BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS mcp_tools (
+                    id          TEXT PRIMARY KEY,
+                    server_id   TEXT NOT NULL REFERENCES mcp_servers(id),
+                    name        TEXT NOT NULL,
+                    description TEXT,
+                    parameters  TEXT NOT NULL DEFAULT '{}',
+                    discovered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS mcp_call_history (
+                    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    server_id   TEXT NOT NULL,
+                    tool_name   TEXT NOT NULL,
+                    arguments   TEXT,
+                    result      TEXT,
+                    success     BOOLEAN NOT NULL DEFAULT TRUE,
+                    latency_ms  DOUBLE PRECISION,
+                    called_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_mcp_tools_server ON mcp_tools(server_id);
+                CREATE INDEX IF NOT EXISTS idx_mcp_history_server ON mcp_call_history(server_id);
+                CREATE INDEX IF NOT EXISTS idx_mcp_history_called ON mcp_call_history(called_at DESC);
+            """)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    finally:
+        release_conn(conn)
 
 
-def _init_schema(conn: sqlite3.Connection) -> None:
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS mcp_servers (
-            id          TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            command     TEXT NOT NULL,
-            args        TEXT NOT NULL DEFAULT '[]',
-            env         TEXT NOT NULL DEFAULT '{}',
-            description TEXT,
-            active      INTEGER NOT NULL DEFAULT 1,
-            created_at  TEXT NOT NULL
-        );
+# Run on import
+_ensure_tables()
 
-        CREATE TABLE IF NOT EXISTS mcp_tools (
-            id          TEXT PRIMARY KEY,
-            server_id   TEXT NOT NULL,
-            name        TEXT NOT NULL,
-            description TEXT,
-            parameters  TEXT NOT NULL DEFAULT '{}',
-            discovered_at TEXT NOT NULL,
-            FOREIGN KEY (server_id) REFERENCES mcp_servers(id)
-        );
 
-        CREATE TABLE IF NOT EXISTS mcp_call_history (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            server_id   TEXT NOT NULL,
-            tool_name   TEXT NOT NULL,
-            arguments   TEXT,
-            result      TEXT,
-            success     INTEGER NOT NULL DEFAULT 1,
-            latency_ms  REAL,
-            called_at   TEXT NOT NULL
-        );
+# ── MCP Protocol Handshake ───────────────────────────────────────
 
-        CREATE INDEX IF NOT EXISTS idx_mcp_tools_server ON mcp_tools(server_id);
-        CREATE INDEX IF NOT EXISTS idx_mcp_history_server ON mcp_call_history(server_id);
-    """)
+MCP_PROTOCOL_VERSION = "2024-11-05"
+
+def _build_initialize_request() -> str:
+    """Build JSON-RPC initialize request per MCP spec."""
+    return json.dumps({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": MCP_PROTOCOL_VERSION,
+            "capabilities": {},
+            "clientInfo": {
+                "name": "pi-mcp-client",
+                "version": "2.0.0",
+            },
+        },
+    }) + "\n"
+
+
+def _build_initialized_notification() -> str:
+    """Build JSON-RPC initialized notification per MCP spec."""
+    return json.dumps({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+    }) + "\n"
+
+
+def _build_tools_list_request() -> str:
+    """Build JSON-RPC tools/list request."""
+    return json.dumps({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {},
+    }) + "\n"
+
+
+def _build_tool_call_request(tool_name: str, arguments: dict | None = None) -> str:
+    """Build JSON-RPC tools/call request."""
+    return json.dumps({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+            "name": tool_name,
+            "arguments": arguments or {},
+        },
+    }) + "\n"
+
+
+async def _read_json_response(
+    stdout: asyncio.StreamReader,
+    timeout: float = 15.0,
+) -> dict | None:
+    """Read a single JSON-RPC response line from stdout."""
+    try:
+        line = await asyncio.wait_for(stdout.readline(), timeout=timeout)
+        if not line:
+            return None
+        text = line.decode().strip()
+        if text.startswith("{"):
+            return json.loads(text)
+    except (asyncio.TimeoutError, json.JSONDecodeError):
+        pass
+    return None
+
+
+async def _mcp_handshake(
+    proc: asyncio.subprocess.Process,
+    stdout: asyncio.StreamReader,
+) -> bool:
+    """Perform MCP initialize → initialized handshake. Returns True on success."""
+    # Step 1: Send initialize request
+    proc.stdin.write(_build_initialize_request().encode())
+    await proc.stdin.drain()
+
+    # Step 2: Read initialize response
+    response = await _read_json_response(stdout, timeout=10.0)
+    if not response or "result" not in response:
+        return False
+
+    # Step 3: Send initialized notification
+    proc.stdin.write(_build_initialized_notification().encode())
+    await proc.stdin.drain()
+
+    # Small delay to let server process the notification
+    await asyncio.sleep(0.1)
+    return True
 
 
 # ── Server Management ────────────────────────────────────────────
@@ -91,67 +185,79 @@ def register_server(
     description: str = "",
 ) -> dict[str, Any]:
     """Register an MCP server configuration."""
-    conn = _get_conn()
-    now = datetime.now(timezone.utc).isoformat()
-
-    conn.execute(
-        """INSERT OR REPLACE INTO mcp_servers (id, name, command, args, env, description, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (
-            server_id,
-            name,
-            command,
-            json.dumps(args or []),
-            json.dumps(env or {}),
-            description,
-            now,
-        ),
-    )
-    conn.commit()
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO mcp_servers (id, name, command, args, env, description)
+                   VALUES (%s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (id) DO UPDATE SET
+                       name = EXCLUDED.name,
+                       command = EXCLUDED.command,
+                       args = EXCLUDED.args,
+                       env = EXCLUDED.env,
+                       description = EXCLUDED.description""",
+                (
+                    server_id,
+                    name,
+                    command,
+                    json.dumps(args or []),
+                    json.dumps(env or {}),
+                    description,
+                ),
+            )
+        conn.commit()
+    finally:
+        release_conn(conn)
     logger.info(f"MCP server registered: {server_id} ({name})")
     return {"id": server_id, "name": name, "command": command}
 
 
 def list_servers(active_only: bool = True) -> list[dict[str, Any]]:
     """List registered MCP servers with discovered tool counts."""
-    conn = _get_conn()
-    query = "SELECT * FROM mcp_servers"
-    if active_only:
-        query += " WHERE active = 1"
-    rows = conn.execute(query).fetchall()
-
-    # Get tool counts per server in one query
-    tool_counts: dict[str, int] = {}
+    conn = get_conn()
     try:
-        tc_rows = conn.execute(
-            "SELECT server_id, COUNT(*) as cnt FROM mcp_tools GROUP BY server_id"
-        ).fetchall()
-        tool_counts = {r["server_id"]: r["cnt"] for r in tc_rows}
-    except Exception:
-        pass
-
-    return [
-        {
-            "id": r["id"],
-            "name": r["name"],
-            "command": r["command"],
-            "args": json.loads(r["args"]),
-            "description": r["description"],
-            "active": bool(r["active"]),
-            "tool_count": tool_counts.get(r["id"], 0),
-        }
-        for r in rows
-    ]
+        with conn.cursor() as cur:
+            query = """
+                SELECT s.*, COALESCE(tc.cnt, 0) as tool_count
+                FROM mcp_servers s
+                LEFT JOIN (
+                    SELECT server_id, COUNT(*) as cnt FROM mcp_tools GROUP BY server_id
+                ) tc ON tc.server_id = s.id
+            """
+            if active_only:
+                query += " WHERE s.active = TRUE"
+            cur.execute(query)
+            rows = cur.fetchall()
+            return [
+                {
+                    "id": r["id"],
+                    "name": r["name"],
+                    "command": r["command"],
+                    "args": json.loads(r["args"]) if isinstance(r["args"], str) else r["args"],
+                    "description": r["description"],
+                    "active": r["active"],
+                    "tool_count": r["tool_count"],
+                }
+                for r in rows
+            ]
+    finally:
+        release_conn(conn)
 
 
 def remove_server(server_id: str) -> bool:
     """Deactivate an MCP server."""
-    conn = _get_conn()
-    cur = conn.execute(
-        "UPDATE mcp_servers SET active = 0 WHERE id = ?", (server_id,)
-    )
-    conn.commit()
-    return cur.rowcount > 0
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE mcp_servers SET active = FALSE WHERE id = %s", (server_id,)
+            )
+            affected = cur.rowcount
+        conn.commit()
+        return affected > 0
+    finally:
+        release_conn(conn)
 
 
 # ── Load from config file ────────────────────────────────────────
@@ -165,7 +271,14 @@ def load_servers_from_config(config_path: str | Path | None = None) -> int:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    servers = data.get("mcpServers", data.get("servers", {}))
+    raw = data.get("mcpServers", data.get("servers", {}))
+
+    # Support both dict format {"id": {...config}} and list format [{...config}]
+    if isinstance(raw, list):
+        servers = {s["id"]: s for s in raw if "id" in s}
+    else:
+        servers = raw
+
     count = 0
     for sid, cfg in servers.items():
         register_server(
@@ -182,36 +295,33 @@ def load_servers_from_config(config_path: str | Path | None = None) -> int:
     return count
 
 
-# ── Tool Discovery ───────────────────────────────────────────────
+# ── Tool Discovery (with proper MCP handshake) ──────────────────
 
 async def discover_tools(server_id: str) -> list[dict[str, Any]]:
     """
     Discover available tools from an MCP server via JSON-RPC.
-    Starts the server process, sends tools/list, parses response.
+    Performs proper MCP lifecycle: initialize → initialized → tools/list.
     """
-    conn = _get_conn()
-    server = conn.execute(
-        "SELECT * FROM mcp_servers WHERE id = ? AND active = 1", (server_id,)
-    ).fetchone()
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM mcp_servers WHERE id = %s AND active = TRUE",
+                (server_id,),
+            )
+            server = cur.fetchone()
+    finally:
+        release_conn(conn)
 
     if not server:
         return []
 
     command = server["command"]
-    args = json.loads(server["args"])
-    env_vars = json.loads(server["env"])
+    args = json.loads(server["args"]) if isinstance(server["args"], str) else server["args"]
+    env_vars = json.loads(server["env"]) if isinstance(server["env"], str) else server["env"]
 
     try:
-        import os
-        env = {**os.environ, **env_vars}
-
-        # JSON-RPC request for tools/list
-        request = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {},
-        }) + "\n"
+        env = {**os.environ, **{k: v for k, v in env_vars.items() if v}}
 
         proc = await asyncio.create_subprocess_exec(
             command, *args,
@@ -221,31 +331,72 @@ async def discover_tools(server_id: str) -> list[dict[str, Any]]:
             env=env,
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(input=request.encode()),
-            timeout=15.0,
-        )
+        # Perform MCP handshake
+        handshake_ok = await _mcp_handshake(proc, proc.stdout)
+        if not handshake_ok:
+            logger.warning(f"MCP handshake failed for {server_id}, trying direct tools/list")
+            # Fallback: some older servers might not need handshake
+            # Kill and restart for clean state
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:
+                pass
+            proc = await asyncio.create_subprocess_exec(
+                command, *args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
+            # Try direct tools/list (legacy fallback)
+            proc.stdin.write(_build_tools_list_request().encode())
+            await proc.stdin.drain()
+            response = await _read_json_response(proc.stdout, timeout=10.0)
+        else:
+            # Send tools/list after successful handshake
+            proc.stdin.write(_build_tools_list_request().encode())
+            await proc.stdin.drain()
+            response = await _read_json_response(proc.stdout, timeout=10.0)
 
-        response = json.loads(stdout.decode().strip().split("\n")[-1])
+        # Clean up process
+        try:
+            proc.stdin.close()
+            proc.kill()
+            await proc.wait()
+        except Exception:
+            pass
+
+        if not response or "result" not in response:
+            logger.warning(f"No tools response from MCP server: {server_id}")
+            return []
+
         tools = response.get("result", {}).get("tools", [])
 
         # Save discovered tools to DB
-        now = datetime.now(timezone.utc).isoformat()
-        for tool in tools:
-            tool_id = f"{server_id}:{tool['name']}"
-            conn.execute(
-                """INSERT OR REPLACE INTO mcp_tools (id, server_id, name, description, parameters, discovered_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (
-                    tool_id,
-                    server_id,
-                    tool["name"],
-                    tool.get("description", ""),
-                    json.dumps(tool.get("inputSchema", {})),
-                    now,
-                ),
-            )
-        conn.commit()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                for tool in tools:
+                    tool_id = f"{server_id}:{tool['name']}"
+                    cur.execute(
+                        """INSERT INTO mcp_tools (id, server_id, name, description, parameters)
+                           VALUES (%s, %s, %s, %s, %s)
+                           ON CONFLICT (id) DO UPDATE SET
+                               description = EXCLUDED.description,
+                               parameters = EXCLUDED.parameters,
+                               discovered_at = NOW()""",
+                        (
+                            tool_id,
+                            server_id,
+                            tool["name"],
+                            tool.get("description", ""),
+                            json.dumps(tool.get("inputSchema", {})),
+                        ),
+                    )
+            conn.commit()
+        finally:
+            release_conn(conn)
 
         logger.info(f"Discovered {len(tools)} tools from MCP server: {server_id}")
         return [
@@ -268,27 +419,29 @@ async def discover_tools(server_id: str) -> list[dict[str, Any]]:
 
 def list_discovered_tools(server_id: str | None = None) -> list[dict[str, Any]]:
     """List previously discovered tools from DB."""
-    conn = _get_conn()
-    if server_id:
-        rows = conn.execute(
-            "SELECT * FROM mcp_tools WHERE server_id = ?", (server_id,)
-        ).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM mcp_tools").fetchall()
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            if server_id:
+                cur.execute("SELECT * FROM mcp_tools WHERE server_id = %s", (server_id,))
+            else:
+                cur.execute("SELECT * FROM mcp_tools")
+            rows = cur.fetchall()
+            return [
+                {
+                    "id": r["id"],
+                    "server_id": r["server_id"],
+                    "name": r["name"],
+                    "description": r["description"],
+                    "parameters": json.loads(r["parameters"]) if isinstance(r["parameters"], str) else r["parameters"],
+                }
+                for r in rows
+            ]
+    finally:
+        release_conn(conn)
 
-    return [
-        {
-            "id": r["id"],
-            "server_id": r["server_id"],
-            "name": r["name"],
-            "description": r["description"],
-            "parameters": json.loads(r["parameters"]),
-        }
-        for r in rows
-    ]
 
-
-# ── Tool Execution ───────────────────────────────────────────────
+# ── Tool Execution (with proper MCP handshake) ──────────────────
 
 async def call_mcp_tool(
     server_id: str,
@@ -298,36 +451,29 @@ async def call_mcp_tool(
 ) -> dict[str, Any]:
     """
     Execute a tool on an MCP server via JSON-RPC.
-    Returns result dict with success status, output, and latency.
+    Performs proper MCP lifecycle: initialize → initialized → tools/call.
     """
-    import time
-    conn = _get_conn()
-
-    server = conn.execute(
-        "SELECT * FROM mcp_servers WHERE id = ? AND active = 1", (server_id,)
-    ).fetchone()
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM mcp_servers WHERE id = %s AND active = TRUE",
+                (server_id,),
+            )
+            server = cur.fetchone()
+    finally:
+        release_conn(conn)
 
     if not server:
         return {"success": False, "error": f"Server '{server_id}' not found or inactive"}
 
     command = server["command"]
-    args = json.loads(server["args"])
-    env_vars = json.loads(server["env"])
-
-    request = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tools/call",
-        "params": {
-            "name": tool_name,
-            "arguments": arguments or {},
-        },
-    }) + "\n"
+    args = json.loads(server["args"]) if isinstance(server["args"], str) else server["args"]
+    env_vars = json.loads(server["env"]) if isinstance(server["env"], str) else server["env"]
 
     t0 = time.monotonic()
     try:
-        import os
-        env = {**os.environ, **env_vars}
+        env = {**os.environ, **{k: v for k, v in env_vars.items() if v}}
 
         proc = await asyncio.create_subprocess_exec(
             command, *args,
@@ -337,31 +483,45 @@ async def call_mcp_tool(
             env=env,
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(input=request.encode()),
-            timeout=timeout,
-        )
+        # Perform MCP handshake
+        handshake_ok = await _mcp_handshake(proc, proc.stdout)
+        if not handshake_ok:
+            logger.warning(f"MCP handshake failed for {server_id}, trying direct call")
+
+        # Send tool call
+        proc.stdin.write(_build_tool_call_request(tool_name, arguments).encode())
+        await proc.stdin.drain()
+
+        response = await _read_json_response(proc.stdout, timeout=timeout)
+
+        # Clean up
+        try:
+            proc.stdin.close()
+            proc.kill()
+            await proc.wait()
+        except Exception:
+            pass
 
         latency_ms = (time.monotonic() - t0) * 1000
-        output = stdout.decode().strip()
 
-        # Parse last JSON line (skip any logging output)
-        json_lines = [l for l in output.split("\n") if l.strip().startswith("{")]
-        if json_lines:
-            response = json.loads(json_lines[-1])
-            result_data = response.get("result", {})
-            content = result_data.get("content", [])
-            text_parts = [c.get("text", "") for c in content if c.get("type") == "text"]
-            result_text = "\n".join(text_parts) if text_parts else json.dumps(result_data)
-        else:
-            result_text = output
-            response = {}
+        if not response:
+            _log_call(server_id, tool_name, arguments, "NO_RESPONSE", False, latency_ms)
+            return {"success": False, "error": "No response from server", "server": server_id}
 
-        success = "error" not in response
-        _log_call(server_id, tool_name, arguments, result_text, success, latency_ms)
+        if "error" in response:
+            error_msg = json.dumps(response["error"])
+            _log_call(server_id, tool_name, arguments, error_msg, False, latency_ms)
+            return {"success": False, "error": error_msg, "server": server_id}
+
+        result_data = response.get("result", {})
+        content = result_data.get("content", [])
+        text_parts = [c.get("text", "") for c in content if c.get("type") == "text"]
+        result_text = "\n".join(text_parts) if text_parts else json.dumps(result_data)
+
+        _log_call(server_id, tool_name, arguments, result_text, True, latency_ms)
 
         return {
-            "success": success,
+            "success": True,
             "output": result_text,
             "latency_ms": round(latency_ms, 1),
             "server": server_id,
@@ -389,21 +549,25 @@ def _log_call(
 ) -> None:
     """Log MCP tool call to history."""
     try:
-        conn = _get_conn()
-        conn.execute(
-            """INSERT INTO mcp_call_history (server_id, tool_name, arguments, result, success, latency_ms, called_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (
-                server_id,
-                tool_name,
-                json.dumps(arguments) if arguments else None,
-                result[:5000],
-                int(success),
-                latency_ms,
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-        conn.commit()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO mcp_call_history
+                       (server_id, tool_name, arguments, result, success, latency_ms)
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (
+                        server_id,
+                        tool_name,
+                        json.dumps(arguments) if arguments else None,
+                        result[:5000],
+                        success,
+                        latency_ms,
+                    ),
+                )
+            conn.commit()
+        finally:
+            release_conn(conn)
     except Exception:
         pass
 
@@ -412,41 +576,47 @@ def _log_call(
 
 def get_call_history(server_id: str | None = None, limit: int = 20) -> list[dict]:
     """Get recent MCP tool call history."""
-    conn = _get_conn()
-    if server_id:
-        rows = conn.execute(
-            "SELECT * FROM mcp_call_history WHERE server_id = ? ORDER BY called_at DESC LIMIT ?",
-            (server_id, limit),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM mcp_call_history ORDER BY called_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-
-    return [
-        {
-            "server_id": r["server_id"],
-            "tool_name": r["tool_name"],
-            "success": bool(r["success"]),
-            "latency_ms": r["latency_ms"],
-            "called_at": r["called_at"],
-        }
-        for r in rows
-    ]
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            if server_id:
+                cur.execute(
+                    """SELECT server_id, tool_name, success, latency_ms, called_at
+                       FROM mcp_call_history WHERE server_id = %s
+                       ORDER BY called_at DESC LIMIT %s""",
+                    (server_id, limit),
+                )
+            else:
+                cur.execute(
+                    """SELECT server_id, tool_name, success, latency_ms, called_at
+                       FROM mcp_call_history ORDER BY called_at DESC LIMIT %s""",
+                    (limit,),
+                )
+            rows = cur.fetchall()
+            return [
+                {
+                    "server_id": r["server_id"],
+                    "tool_name": r["tool_name"],
+                    "success": r["success"],
+                    "latency_ms": r["latency_ms"],
+                    "called_at": str(r["called_at"]),
+                }
+                for r in rows
+            ]
+    finally:
+        release_conn(conn)
 
 
 # ── Default Server Seeding ───────────────────────────────────────
 
 DEFAULT_MCP_SERVERS: list[dict] = [
-    # ── Arama & İçerik ───────────────────────────────────────────
     {
         "id": "brave-search",
         "name": "Brave Search",
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-brave-search"],
         "env": {"BRAVE_API_KEY": ""},
-        "description": "Brave Search API — Whoogle'a ek olarak ikinci web arama motoru",
+        "description": "Brave Search API",
     },
     {
         "id": "fetch",
@@ -454,7 +624,7 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "command": "uvx",
         "args": ["mcp-server-fetch"],
         "env": {},
-        "description": "URL içerik çekme — JS gerektirmeyen sayfalar, API yanıtları, ham HTML",
+        "description": "URL content fetching",
     },
     {
         "id": "puppeteer",
@@ -462,16 +632,15 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
         "env": {},
-        "description": "Headless browser — JS gerektiren sayfalar, SPA'lar, screenshot, form doldurma",
+        "description": "Headless browser for JS-rendered pages",
     },
-    # ── Akademik & Bilgi ─────────────────────────────────────────
     {
         "id": "arxiv",
         "name": "arXiv Research",
         "command": "uvx",
         "args": ["mcp-server-arxiv"],
         "env": {},
-        "description": "arXiv akademik makale arama — AI/ML/CS araştırmaları için thinker/researcher agent'a kritik",
+        "description": "Academic paper search",
     },
     {
         "id": "wikipedia",
@@ -479,16 +648,15 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "command": "uvx",
         "args": ["mcp-server-wikipedia-search"],
         "env": {},
-        "description": "Wikipedia arama ve içerik çekme — genel bilgi, tanımlar, tarihsel veriler",
+        "description": "Wikipedia search and content",
     },
-    # ── Veri & Finans ────────────────────────────────────────────
     {
         "id": "yahoo-finance",
         "name": "Yahoo Finance",
         "command": "uvx",
         "args": ["mcp-yahoo-finance"],
         "env": {},
-        "description": "Hisse senedi fiyatları, finansal veriler, piyasa haberleri — finans analizleri için",
+        "description": "Stock prices and financial data",
     },
     {
         "id": "time-mcp",
@@ -496,16 +664,15 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "command": "uvx",
         "args": ["mcp-server-time"],
         "env": {},
-        "description": "Gerçek zamanlı saat ve timezone dönüşümleri — agent'ların tarih/saat hesaplamaları için",
+        "description": "Real-time clock and timezone conversions",
     },
-    # ── Dosya & Veri İşleme ──────────────────────────────────────
     {
         "id": "filesystem",
         "name": "Filesystem",
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-filesystem", "./data"],
         "env": {},
-        "description": "Yerel dosya sistemi okuma/yazma — data/ dizinine erişim, proje dosyaları",
+        "description": "Local filesystem read/write for data/ directory",
     },
     {
         "id": "sequential-thinking",
@@ -513,16 +680,15 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
         "env": {},
-        "description": "Adım adım düşünme zinciri — karmaşık problem çözme, reasoner agent için ideal",
+        "description": "Step-by-step reasoning chain",
     },
-    # ── Veritabanı ───────────────────────────────────────────────
     {
         "id": "postgres",
         "name": "PostgreSQL",
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-postgres"],
         "env": {"POSTGRES_CONNECTION_STRING": ""},
-        "description": "Direkt PostgreSQL sorguları — veritabanı analizi, şema keşfi, veri sorgulama",
+        "description": "Direct PostgreSQL queries",
     },
     {
         "id": "sqlite",
@@ -530,34 +696,33 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "command": "uvx",
         "args": ["mcp-server-sqlite", "--db-path", "./data/memory.db"],
         "env": {},
-        "description": "SQLite veritabanı sorguları — yerel DB analizi, data/ klasöründeki DB'lere erişim",
+        "description": "SQLite database queries",
     },
 ]
 
 
 def seed_default_servers(overwrite: bool = False) -> int:
-    """
-    Register default MCP servers for orchestration on first startup.
-    Skips servers already registered unless overwrite=True.
-    Returns count of newly registered servers.
-    """
-    conn = _get_conn()
+    """Register default MCP servers on first startup."""
+    conn = get_conn()
     count = 0
-    for srv in DEFAULT_MCP_SERVERS:
-        existing = conn.execute(
-            "SELECT id FROM mcp_servers WHERE id = ?", (srv["id"],)
-        ).fetchone()
-        if existing and not overwrite:
-            continue
-        register_server(
-            server_id=srv["id"],
-            name=srv["name"],
-            command=srv["command"],
-            args=srv["args"],
-            env=srv["env"],
-            description=srv["description"],
-        )
-        count += 1
+    try:
+        with conn.cursor() as cur:
+            for srv in DEFAULT_MCP_SERVERS:
+                if not overwrite:
+                    cur.execute("SELECT id FROM mcp_servers WHERE id = %s", (srv["id"],))
+                    if cur.fetchone():
+                        continue
+                register_server(
+                    server_id=srv["id"],
+                    name=srv["name"],
+                    command=srv["command"],
+                    args=srv["args"],
+                    env=srv["env"],
+                    description=srv["description"],
+                )
+                count += 1
+    finally:
+        release_conn(conn)
     if count:
         logger.info(f"Seeded {count} default MCP servers")
     return count

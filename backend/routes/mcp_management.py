@@ -13,7 +13,8 @@ if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
 from deps import get_current_user, _audit
-from tools.mcp_client import list_servers, discover_tools, call_mcp_tool, _get_conn
+from tools.mcp_client import list_servers, discover_tools, call_mcp_tool
+from tools.pg_connection import get_conn, release_conn
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
@@ -130,19 +131,24 @@ async def mcp_toggle_server(
     server_id: str,
     user: dict = Depends(get_current_user),
 ):
-    """Enable/disable a server (toggle active flag in SQLite)."""
-    conn = _get_conn()
-    row = conn.execute("SELECT id, active FROM mcp_servers WHERE id = ?", (server_id,)).fetchone()
-    if not row:
-        raise HTTPException(404, f"Server '{server_id}' not found")
+    """Enable/disable a server (toggle active flag in PostgreSQL)."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, active FROM mcp_servers WHERE id = %s", (server_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(404, f"Server '{server_id}' not found")
 
-    new_active = 0 if row["active"] else 1
-    conn.execute("UPDATE mcp_servers SET active = ? WHERE id = ?", (new_active, server_id))
-    conn.commit()
+            new_active = not row["active"]
+            cur.execute("UPDATE mcp_servers SET active = %s WHERE id = %s", (new_active, server_id))
+        conn.commit()
+    finally:
+        release_conn(conn)
 
     state = "enabled" if new_active else "disabled"
     _audit("mcp_server_toggle", user["user_id"], f"{server_id} → {state}")
-    return {"server_id": server_id, "active": bool(new_active), "state": state}
+    return {"server_id": server_id, "active": new_active, "state": state}
 
 
 @router.get("/status")
@@ -187,11 +193,6 @@ async def mcp_usage_stats(user: dict = Depends(get_current_user)):
         "model_breakdown": {},
         "timeline": {},
     }
-
-    try:
-        from tools.pg_connection import get_conn, release_conn
-    except Exception:
-        return empty
 
     uid = user["user_id"]
     try:

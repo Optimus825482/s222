@@ -58,15 +58,24 @@ async def lifespan(app: FastAPI):
         if _mig_path.exists():
             _mig_sql = _mig_path.read_text(encoding="utf-8")
             _mig_conn = get_conn()
-            with _mig_conn.cursor() as cur:
-                cur.execute(_mig_sql)
-            _mig_conn.commit()
-            release_conn(_mig_conn)
-            print("[Backend] Migration 005 (agent_metrics_log) applied")
+            try:
+                with _mig_conn.cursor() as cur:
+                    for stmt in _mig_sql.split(";"):
+                        stmt = stmt.strip()
+                        if stmt and not stmt.startswith("--"):
+                            cur.execute(stmt)
+                _mig_conn.commit()
+                print("[Backend] Migration 005 (agent_metrics_log) applied", flush=True)
+            except Exception as e:
+                _mig_conn.rollback()
+                print(f"[Backend] Migration 005 failed: {e}", flush=True)
+            finally:
+                release_conn(_mig_conn)
     except Exception as e:
-        print(f"[Backend] Migration 005 failed (non-critical): {e}")
+        print(f"[Backend] Migration 005 load failed: {e}", flush=True)
 
     # Run migration 006: SQLite → PostgreSQL (schedules, benchmarks, evaluations, etc.)
+    # Execute statement-by-statement to avoid psycopg2 multi-statement issues
     try:
         from tools.pg_connection import get_conn, release_conn
         import pathlib
@@ -74,13 +83,22 @@ async def lifespan(app: FastAPI):
         if _mig006_path.exists():
             _mig006_sql = _mig006_path.read_text(encoding="utf-8")
             _mig006_conn = get_conn()
-            with _mig006_conn.cursor() as cur:
-                cur.execute(_mig006_sql)
-            _mig006_conn.commit()
-            release_conn(_mig006_conn)
-            print("[Backend] Migration 006 (SQLite→PG) applied")
+            try:
+                with _mig006_conn.cursor() as cur:
+                    # Split by semicolons and execute each statement individually
+                    for stmt in _mig006_sql.split(";"):
+                        stmt = stmt.strip()
+                        if stmt and not stmt.startswith("--"):
+                            cur.execute(stmt)
+                _mig006_conn.commit()
+                print("[Backend] Migration 006 (SQLite→PG) applied", flush=True)
+            except Exception as e:
+                _mig006_conn.rollback()
+                print(f"[Backend] Migration 006 failed: {e}", flush=True)
+            finally:
+                release_conn(_mig006_conn)
     except Exception as e:
-        print(f"[Backend] Migration 006 failed (non-critical): {e}")
+        print(f"[Backend] Migration 006 load failed: {e}", flush=True)
 
     # Create analytics tables
     try:
