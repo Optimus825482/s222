@@ -386,16 +386,46 @@ class AutoOptimizer:
         conn = get_conn()
         try:
             with conn.cursor() as cur:
-                # Dedup: skip if a pending recommendation with same title exists
-                cur.execute(
-                    "SELECT id FROM recommendations WHERE title = %s AND status = 'pending'",
-                    (title,),
-                )
+                # Improved dedup: skip if similar recommendation exists within last 7 days
+                # Check same title + same category + overlapping affected_agents
+                cur.execute("""
+                    SELECT id, affected_agents, created_at FROM recommendations 
+                    WHERE title = %s 
+                    AND category = %s 
+                    AND status = 'pending'
+                    AND created_at > NOW() - INTERVAL '7 days'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (title, category))
                 existing = cur.fetchone()
+                
                 if existing:
-                    cur.execute("SELECT * FROM recommendations WHERE id = %s", (existing["id"],))
-                    row = cur.fetchone()
-                    return self._row_to_dict(row)
+                    # Check if affected agents overlap
+                    existing_agents = []
+                    try:
+                        existing_agents = json.loads(existing["affected_agents"]) if existing["affected_agents"] else []
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                    
+                    # If same agents affected, skip creating duplicate
+                    if set(existing_agents) == set(affected_agents):
+                        cur.execute("SELECT * FROM recommendations WHERE id = %s", (existing["id"],))
+                        row = cur.fetchone()
+                        logger.debug("Skipping duplicate recommendation: %s", title)
+                        return self._row_to_dict(row)
+                    
+                    # If overlapping agents, update existing instead of creating new
+                    if set(existing_agents) & set(affected_agents):
+                        merged_agents = list(set(existing_agents) | set(affected_agents))
+                        cur.execute(
+                            "UPDATE recommendations SET affected_agents = %s, updated_at = %s WHERE id = %s",
+                            (json.dumps(merged_agents, ensure_ascii=False), now, existing["id"]),
+                        )
+                        cur.execute("SELECT * FROM recommendations WHERE id = %s", (existing["id"],))
+                        row = cur.fetchone()
+                        conn.commit()
+                        logger.info("Merged recommendation %d with new affected agents", existing["id"])
+                        return self._row_to_dict(row)
 
                 cur.execute(
                     """INSERT INTO recommendations
@@ -521,12 +551,13 @@ class AutoOptimizer:
             "apply_rate_pct": apply_rate,
         }
 
-    def apply_recommendation(self, rec_id: int, notes: str = "") -> dict[str, Any]:
-        """Mark a recommendation as applied.
+    def apply_recommendation(self, rec_id: int, notes: str = "", auto: bool = False) -> dict[str, Any]:
+        """Apply a recommendation with real actions based on category.
 
         Args:
             rec_id: Recommendation ID.
             notes: Optional notes about how it was applied.
+            auto: If True, this was auto-applied (skips critical priority).
 
         Returns the updated recommendation or error dict.
         """
@@ -544,19 +575,38 @@ class AutoOptimizer:
                 if existing["status"] != "pending":
                     return {"error": f"Recommendation {rec_id} is already '{existing['status']}'"}
 
+                # Auto-apply safety: skip critical recommendations
+                if auto and existing["priority"] == "critical":
+                    logger.info("Skipping auto-apply for critical recommendation %d", rec_id)
+                    return {"error": "Critical recommendations require manual approval"}
+
+                category = existing["category"]
+                affected_agents = []
+                try:
+                    affected_agents = json.loads(existing["affected_agents"]) if existing["affected_agents"] else []
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+                # Execute category-specific actions
+                action_result = self._execute_category_action(category, affected_agents, existing, cur)
+
                 now = datetime.now(timezone.utc).isoformat()
+                full_notes = notes
+                if action_result:
+                    full_notes = f"{notes}\n[ACTION: {action_result}]" if notes else f"[ACTION: {action_result}]"
+
                 cur.execute(
                     "UPDATE recommendations SET status = 'applied', notes = %s, updated_at = %s WHERE id = %s",
-                    (notes, now, rec_id),
+                    (full_notes, now, rec_id),
                 )
                 cur.execute(
                     "INSERT INTO optimization_history (recommendation_id, action, notes, performed_at) "
                     "VALUES (%s, %s, %s, %s)",
-                    (rec_id, "applied", notes, now),
+                    (rec_id, "applied" if not auto else "auto_applied", full_notes, now),
                 )
                 conn.commit()
 
-                logger.info("Recommendation %d applied: %s", rec_id, notes or "(no notes)")
+                logger.info("Recommendation %d applied (%s): %s", rec_id, "auto" if auto else "manual", full_notes or "(no notes)")
 
                 cur.execute("SELECT * FROM recommendations WHERE id = %s", (rec_id,))
                 updated = cur.fetchone()
@@ -564,6 +614,103 @@ class AutoOptimizer:
             release_conn(conn)
 
         return self._row_to_dict(updated)
+
+    def _execute_category_action(self, category: str, affected_agents: list[str], rec: dict, cur) -> str | None:
+        """Execute real actions based on recommendation category.
+
+        Returns a description of the action taken, or None if no action.
+        """
+        action_desc = None
+
+        if category == "performance":
+            # Action: Lower latency threshold for affected agents (use faster model)
+            for agent in affected_agents:
+                cur.execute("""
+                    INSERT INTO agent_param_overrides (agent_role, parameter, value, reason, created_at)
+                    VALUES (%s, 'prefer_speed', 'true', %s, NOW())
+                    ON CONFLICT (agent_role, parameter) DO UPDATE SET value = 'true', reason = EXCLUDED.reason
+                """, (agent, rec.get("title", "Performance optimization")[:200]))
+            action_desc = f"Enabled speed preference for {', '.join(affected_agents)}"
+
+        elif category == "reliability":
+            # Action: Enable circuit breaker for affected agents
+            for agent in affected_agents:
+                cur.execute("""
+                    INSERT INTO agent_param_overrides (agent_role, parameter, value, reason, created_at)
+                    VALUES (%s, 'circuit_breaker_enabled', 'true', %s, NOW())
+                    ON CONFLICT (agent_role, parameter) DO UPDATE SET value = 'true', reason = EXCLUDED.reason
+                """, (agent, rec.get("title", "Reliability improvement")[:200]))
+                # Also add retry logic
+                cur.execute("""
+                    INSERT INTO agent_param_overrides (agent_role, parameter, value, reason, created_at)
+                    VALUES (%s, 'max_retries', '3', %s, NOW())
+                    ON CONFLICT (agent_role, parameter) DO UPDATE SET value = '3', reason = EXCLUDED.reason
+                """, (agent, "Auto-configured retry logic"))
+            action_desc = f"Enabled circuit breaker + retry for {', '.join(affected_agents)}"
+
+        elif category == "quality":
+            # Action: Enable stricter validation for affected agents
+            for agent in affected_agents:
+                cur.execute("""
+                    INSERT INTO agent_param_overrides (agent_role, parameter, value, reason, created_at)
+                    VALUES (%s, 'strict_validation', 'true', %s, NOW())
+                    ON CONFLICT (agent_role, parameter) DO UPDATE SET value = 'true', reason = EXCLUDED.reason
+                """, (agent, rec.get("title", "Quality improvement")[:200]))
+            action_desc = f"Enabled strict validation for {', '.join(affected_agents)}"
+
+        elif category == "cost":
+            # Action: Mark agent as inactive or reduce priority
+            for agent in affected_agents:
+                cur.execute("""
+                    INSERT INTO agent_param_overrides (agent_role, parameter, value, reason, created_at)
+                    VALUES (%s, 'active', 'false', %s, NOW())
+                    ON CONFLICT (agent_role, parameter) DO UPDATE SET value = 'false', reason = EXCLUDED.reason
+                """, (agent, rec.get("title", "Cost optimization - agent inactive")[:200]))
+            action_desc = f"Deactivated idle agents: {', '.join(affected_agents)}"
+
+        return action_desc
+
+    def auto_apply_safe_recommendations(self, confidence_threshold: float = 0.8) -> dict[str, Any]:
+        """Auto-apply safe recommendations (high confidence, non-critical).
+
+        Called by feedback loop after analyzing metrics.
+
+        Args:
+            confidence_threshold: Minimum confidence for auto-apply (default 0.8).
+
+        Returns summary of auto-applied recommendations.
+        """
+        applied = []
+        skipped = []
+
+        pending = self.get_recommendations(status="pending")
+
+        for rec in pending:
+            # Skip critical and low confidence
+            if rec.get("priority") == "critical":
+                skipped.append({"id": rec["id"], "reason": "critical_priority"})
+                continue
+
+            # Check if confidence exists and is high enough
+            confidence = rec.get("confidence", 0.5)
+            if confidence < confidence_threshold:
+                skipped.append({"id": rec["id"], "reason": f"low_confidence ({confidence:.2f})"})
+                continue
+
+            # Apply it
+            result = self.apply_recommendation(rec["id"], auto=True)
+            if "error" not in result:
+                applied.append(rec["id"])
+            else:
+                skipped.append({"id": rec["id"], "reason": result["error"]})
+
+        logger.info("Auto-applied %d recommendations, skipped %d", len(applied), len(skipped))
+        return {
+            "applied_count": len(applied),
+            "skipped_count": len(skipped),
+            "applied_ids": applied,
+            "skipped": skipped,
+        }
 
     def dismiss_recommendation(self, rec_id: int, reason: str = "") -> dict[str, Any]:
         """Dismiss a recommendation with an optional reason.

@@ -1171,6 +1171,27 @@ class BaseAgent(ABC):
                 )
                 continue  # Back to LLM for continuation
 
+            # ── Reflexion: Self-evaluation and improvement ───────────────
+            try:
+                import config
+                if config.REFLEXION_ENABLED:
+                    from tools.reflexion import evaluate_and_improve
+                    content, reflexion_eval = await evaluate_and_improve(
+                        agent=self,
+                        question=task_input,
+                        response=content,
+                        threshold=config.REFLEXION_SCORE_THRESHOLD,
+                        max_iterations=config.REFLEXION_MAX_ITERATIONS,
+                    )
+                    if reflexion_eval:
+                        thread.add_event(
+                            EventType.AGENT_THINKING,
+                            f"Reflexion: avg_score={sum(reflexion_eval.get('scores', {}).values()) / 5:.1f}/5",
+                            agent_role=self.role,
+                        )
+            except Exception as e:
+                logger.debug(f"Reflexion skipped: {e}")
+
             return content
 
         # Max steps reached — treat as normal completion with note

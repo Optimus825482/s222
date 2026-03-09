@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 # ── Quality thresholds ──────────────────────────────────────────────
-MIN_KNOWLEDGE_LEN = 80          # chars — shorter is likely garbage
-MIN_DESCRIPTION_LEN = 20        # chars
-MAX_KEYWORD_RATIO_DIGITS = 0.5  # if >50% of keywords are numeric → junk
+MIN_KNOWLEDGE_LEN = 200         # chars — shorter is likely garbage (was 80)
+MIN_DESCRIPTION_LEN = 30        # chars — shorter is likely garbage (was 20)
+MAX_KEYWORD_RATIO_DIGITS = 0.3  # if >30% of keywords are numeric → junk (was 0.5)
 GARBAGE_PATTERNS = [
     r"(?i)max steps reached",
     r"(?i)timeout",
@@ -31,8 +31,17 @@ GARBAGE_PATTERNS = [
     r"(?i)tamamlanan görev",       # generic Turkish "completed task"
     r"(?i)başarıyla tamamlandı",   # "completed successfully" — not a skill
     r"(?i)hata oluştu",           # "error occurred"
+    r"^Task:",                     # Task descriptions are NOT skills!
+    r"^Bu agent sistemini",        # User questions are NOT skills!
+    r"^Görev:",                    # Turkish "Task:"
+    r"auto-discovered",            # Generic auto-discovered label
+    r"^Bu bir",                    # Generic "This is a..."
+    r"^Kullanıcı",                 # User input
 ]
 GARBAGE_RE = [re.compile(p) for p in GARBAGE_PATTERNS]
+
+# Minimum occurrences for pattern → skill conversion
+MIN_PATTERN_OCCURRENCES = 5  # Increased from 3 to reduce noise
 
 
 def _is_garbage_content(text: str) -> bool:

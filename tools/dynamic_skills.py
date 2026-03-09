@@ -311,17 +311,47 @@ def auto_create_skill_from_pattern(
     category: str = "learned",
     keywords: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Auto-create a skill from a learned agent pattern. Uses readable name and topic keywords."""
+    """Auto-create a skill from a learned agent pattern. Uses readable name and topic keywords.
+    
+    QUALITY CHECKS:
+    - Rejects descriptions starting with "Task:" or "Görev:"
+    - Rejects descriptions that are just user questions
+    - Requires minimum knowledge length of 100 chars
+    """
     import hashlib
+    import re
+    
     clean_desc = pattern_description.strip()[:200]
+    
+    # Quality checks - reject low-quality patterns
     if not clean_desc:
-        clean_desc = "Tamamlanan görev"
+        return {"error": "empty_description", "ok": False}
+    
+    # Reject task descriptions (they are NOT skills!)
+    if clean_desc.lower().startswith(("task:", "görev:", "bu agent", "kullanıcı")):
+        logger.warning(f"Rejected low-quality skill pattern: {clean_desc[:50]}...")
+        return {"error": "rejected_task_description", "ok": False}
+    
+    # Reject if it looks like a question (ends with ?)
+    if "?" in clean_desc[:50]:
+        logger.warning(f"Rejected question-like skill pattern: {clean_desc[:50]}...")
+        return {"error": "rejected_question", "ok": False}
+    
+    # Require minimum knowledge
+    if len(knowledge.strip()) < 100:
+        return {"error": "knowledge_too_short", "ok": False}
+    
     skill_id = "auto-" + hashlib.md5(clean_desc.encode()).hexdigest()[:8]
     name = _skill_name_from_description(clean_desc)
     topic_kw = _topic_keywords_from_description(clean_desc)
     all_keywords = list(dict.fromkeys((keywords or []) + topic_kw))[:12]
+    
+    # Filter out garbage keywords
+    all_keywords = [kw for kw in all_keywords if len(kw) > 2 and not kw.isdigit() and kw.lower() != "auto-discovered"]
+    
     if not all_keywords:
-        all_keywords = ["task-completion"]
+        all_keywords = ["learned-pattern"]
+    
     return create_skill(
         skill_id=skill_id,
         name=name,

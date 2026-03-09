@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent.parent / "data"
 PATTERN_STORE = DATA_DIR / "pattern_executions.json"
 _MAX_RECORDS = 200
-_MIN_OCCURRENCES = 3
+_MIN_OCCURRENCES = 5  # Increased from 3 - patterns must repeat more to become skills
 
 
 def _load_store() -> list[dict]:

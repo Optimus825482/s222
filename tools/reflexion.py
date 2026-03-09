@@ -117,3 +117,84 @@ def save_reflection_insight(question: str, evaluation: dict, improved: bool) -> 
         )
     except Exception:
         pass  # Silent — never break execution
+
+
+async def evaluate_and_improve(
+    agent,
+    question: str,
+    response: str,
+    threshold: float = 3.5,
+    max_iterations: int = 1,
+) -> tuple[str, dict[str, Any] | None]:
+    """Evaluate response and optionally improve it.
+    
+    Args:
+        agent: The agent instance (has _call_llm method)
+        question: Original question/input
+        response: Agent's response to evaluate
+        threshold: Score threshold for improvement (1-5 scale)
+        max_iterations: Max improvement iterations
+        
+    Returns:
+        Tuple of (final_response, evaluation_dict or None)
+    """
+    import config
+    
+    if not config.REFLEXION_ENABLED:
+        return response, None
+    
+    # Check if this agent should use reflexion
+    if config.REFLEXION_AGENTS and agent.role.value not in config.REFLEXION_AGENTS:
+        return response, None
+    
+    iteration = 0
+    current_response = response
+    evaluation = None
+    
+    while iteration < max_iterations:
+        # Build evaluation prompt
+        eval_prompt = build_evaluation_prompt(question, current_response)
+        
+        try:
+            # Call LLM for evaluation
+            eval_response = await agent._call_llm([{"role": "user", "content": eval_prompt}])
+            evaluation = parse_evaluation(eval_response)
+            
+            if not evaluation:
+                logger.warning("Failed to parse evaluation JSON")
+                break
+            
+            # Check if improvement needed
+            if not should_improve(evaluation, threshold):
+                logger.info(f"Reflexion: Response passed (avg score >= {threshold})")
+                break
+            
+            if not config.REFLEXION_AUTO_IMPROVE:
+                logger.info(f"Reflexion: Score below threshold but auto-improve disabled")
+                break
+            
+            # Build improvement prompt
+            weaknesses = evaluation.get("weaknesses", [])
+            improvements = evaluation.get("improvements", [])
+            
+            improve_prompt = build_improvement_prompt(
+                question=question,
+                response=current_response,
+                weaknesses=weaknesses,
+                improvements=improvements,
+            )
+            
+            # Get improved response
+            current_response = await agent._call_llm([{"role": "user", "content": improve_prompt}])
+            iteration += 1
+            
+            logger.info(f"Reflexion: Improved response (iteration {iteration})")
+            
+            # Save insight
+            save_reflection_insight(question, evaluation, improved=True)
+            
+        except Exception as e:
+            logger.error(f"Reflexion error: {e}")
+            break
+    
+    return current_response, evaluation

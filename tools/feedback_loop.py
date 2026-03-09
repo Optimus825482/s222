@@ -161,6 +161,14 @@ class FeedbackLoop:
                     except Exception as e:
                         logger.debug(f"Skill re-rank failed: {e}")
 
+            # Auto-apply safe recommendations periodically (every 50 metrics)
+            try:
+                total_metrics = sum(len(v) for v in self._recent_metrics.values())
+                if total_metrics % 50 == 0:
+                    self._auto_apply_safe_recommendations()
+            except Exception as e:
+                logger.debug(f"Auto-apply check failed: {e}")
+
         except Exception as e:
             logger.error(f"_on_metric_recorded error: {e}")
 
@@ -279,6 +287,32 @@ class FeedbackLoop:
         except Exception as e:
             logger.error(f"get_optimization_log failed: {e}")
             return []
+
+    def _auto_apply_safe_recommendations(self) -> None:
+        """Auto-apply safe (non-critical) recommendations.
+        
+        Called periodically by feedback loop.
+        Uses auto_optimizer's auto_apply_safe_recommendations method.
+        """
+        try:
+            from tools.auto_optimizer import get_auto_optimizer
+            opt = get_auto_optimizer()
+            result = opt.auto_apply_safe_recommendations(confidence_threshold=0.85)
+            
+            if result["applied_count"] > 0:
+                logger.info(
+                    "Auto-applied %d recommendations: %s",
+                    result["applied_count"],
+                    result["applied_ids"],
+                )
+                self._log_optimization(
+                    "auto_apply", "system", "all",
+                    f"{result['skipped_count']} skipped",
+                    f"{result['applied_count']} applied",
+                    f"IDs: {result['applied_ids']}",
+                )
+        except Exception as e:
+            logger.error(f"_auto_apply_safe_recommendations failed: {e}")
 
 
 # ── Singleton ────────────────────────────────────────────────────

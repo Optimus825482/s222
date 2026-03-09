@@ -195,9 +195,33 @@ async def lifespan(app: FastAPI):
 
     # Heartbeat scheduler (Faz 11.2 — proaktif agent görevleri)
     try:
-        from tools.heartbeat import get_heartbeat_scheduler
-        await get_heartbeat_scheduler().start()
-        print("[Backend] Heartbeat scheduler started")
+        from tools.heartbeat import get_heartbeat_scheduler, HeartbeatTask, HeartbeatFrequency
+        scheduler = get_heartbeat_scheduler()
+        
+        # Evolution task: periodic auto-optimizer analysis
+        async def run_evolution_analysis():
+            try:
+                from tools.auto_optimizer import get_auto_optimizer
+                opt = get_auto_optimizer()
+                new_recs = opt.analyze_and_recommend()
+                auto_result = opt.auto_apply_safe_recommendations(confidence_threshold=0.85)
+                return {
+                    "new_recommendations": len(new_recs),
+                    "auto_applied": auto_result.get("applied_count", 0),
+                    "skipped": auto_result.get("skipped_count", 0),
+                }
+            except Exception as e:
+                return {"error": str(e)}
+        
+        scheduler.register(HeartbeatTask(
+            name="evolution_analysis",
+            frequency=HeartbeatFrequency.HOURLY,
+            handler=run_evolution_analysis,
+            enabled=True,
+        ))
+        
+        await scheduler.start()
+        print("[Backend] Heartbeat scheduler started (with evolution task)")
     except Exception as e:
         print(f"[Backend] Heartbeat scheduler failed (non-critical): {e}")
 

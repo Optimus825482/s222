@@ -300,3 +300,20 @@ def get_iterative_eval_runtime_config() -> dict[str, float | int | str]:
         "fast_score_threshold": fast_threshold,
         "min_improvement_delta": min_delta,
     }
+
+
+# ── Reflexion / Self-Evaluation Settings ───────────────────────────────
+# Enable automatic self-evaluation after each agent response
+REFLEXION_ENABLED = os.getenv("REFLEXION_ENABLED", "false").lower() == "true"
+
+# Minimum score threshold for improvement (1-5 scale)
+REFLEXION_SCORE_THRESHOLD = float(os.getenv("REFLEXION_SCORE_THRESHOLD", "3.5"))
+
+# Which agents should use reflexion (comma-separated, empty = all)
+REFLEXION_AGENTS = os.getenv("REFLEXION_AGENTS", "").split(",") if os.getenv("REFLEXION_AGENTS") else []
+
+# Auto-improve if score below threshold
+REFLEXION_AUTO_IMPROVE = os.getenv("REFLEXION_AUTO_IMPROVE", "false").lower() == "true"
+
+# Max improvement iterations per response
+REFLEXION_MAX_ITERATIONS = int(os.getenv("REFLEXION_MAX_ITERATIONS", "1"))

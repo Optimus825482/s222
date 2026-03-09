@@ -258,6 +258,11 @@ import { XpSessionsPanel } from "./panels/xp-sessions-panel";
 import { XpToolsPanel } from "./panels/xp-tools-panel";
 import { XpSkillsHubPanel } from "./panels/xp-skills-hub-panel";
 import { XpRoadmapPanel } from "./panels/xp-roadmap-panel";
+import { XpCollaborationPanel } from "./panels/xp-collaboration";
+import { XpAnalyticsPanel } from "./panels/xp-analytics";
+import { XpAgentCenter } from "./panels/xp-agent-center";
+import { XpUnifiedMarketplace } from "./panels/xp-unified-marketplace";
+import { XpToolsUnified } from "./panels/xp-tools-unified";
 
 // ── App definition type ──
 export interface DesktopApp {
@@ -820,6 +825,18 @@ export const APPS: DesktopApp[] = [
     ),
   },
   {
+    id: "collaboration",
+    title: "İşbirliği Merkezi",
+    icon: <FeatherIcon name="users" color="#8b5cf6" />,
+    color: "#8b5cf6",
+    group: "İşbirliği",
+    description:
+      "Birleşik işbirliği paneli — Paylaşımlı Alan, Bağlam Panosu, Düzenleyici ve Worktree sekmeleri.",
+    defaultW: 900,
+    defaultH: 600,
+    render: () => <XpCollaborationPanel />,
+  },
+  {
     id: "marketplace",
     title: "Domain Marketplace",
     icon: <FeatherIcon name="shopping-bag" color="#a855f7" />,
@@ -881,6 +898,54 @@ export const APPS: DesktopApp[] = [
         <LearningHubPanel />
       </div>
     ),
+  },
+  {
+    id: "analytics",
+    title: "Analitik Merkezi",
+    icon: <FeatherIcon name="bar-chart-2" color="#10b981" />,
+    color: "#10b981",
+    group: "Analitik",
+    description:
+      "Benchmark, performans, maliyet takibi, hata analizi ve otomatik optimizasyon.",
+    defaultW: 800,
+    defaultH: 600,
+    render: () => <XpAnalyticsPanel />,
+  },
+  {
+    id: "agent-center",
+    title: "Agent Merkezi",
+    icon: <FeatherIcon name="users" color="#ec4899" />,
+    color: "#ec4899",
+    group: "Agent",
+    description:
+      "Birleşik agent yönetimi — Agentlar, Otonom İzleme, Koordinasyon, İletişim, Kimlik ve Roller sekmeleri.",
+    defaultW: 900,
+    defaultH: 600,
+    render: () => <XpAgentCenter />,
+  },
+  {
+    id: "unified-marketplace",
+    title: "Pazar Merkezi",
+    icon: <FeatherIcon name="shopping-bag" color="#a855f7" />,
+    color: "#a855f7",
+    group: "Araçlar",
+    description:
+      "Birleşik pazar yeri — Domain Marketplace, Yetenekler ve Skill Marketplace sekmeleri.",
+    defaultW: 800,
+    defaultH: 600,
+    render: () => <XpUnifiedMarketplace />,
+  },
+  {
+    id: "tools-unified",
+    title: "Araçlar Merkezi",
+    icon: <FeatherIcon name="tool" color="#8b5cf6" />,
+    color: "#8b5cf6",
+    group: "Araçlar",
+    description:
+      "Birleşik araçlar paneli — Araçlar, Skill Oluşturucu ve Adaptif Araçlar sekmeleri.",
+    defaultW: 800,
+    defaultH: 600,
+    render: () => <XpToolsUnified />,
   },
   {
     id: "model-manager",
