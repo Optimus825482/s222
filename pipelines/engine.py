@@ -12,9 +12,9 @@ import time
 from typing import Any
 
 # Max seconds for one sub-agent run; prevents one stuck agent from blocking the pipeline
-SUBTASK_TIMEOUT = 120
+SUBTASK_TIMEOUT = 60
 # Max seconds for entire parallel/consensus gather
-PIPELINE_GATHER_TIMEOUT = 300
+PIPELINE_GATHER_TIMEOUT = 120
 ITERATIVE_SCORE_THRESHOLD = 0.8
 ITERATIVE_MIN_IMPROVEMENT_DELTA = 0.05
 ITERATIVE_DEFAULT_MAX_ROUNDS = 3
