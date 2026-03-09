@@ -28,6 +28,14 @@ import PollinationsImage from "./pollinations-image";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
+interface SlideColors {
+  background: string;
+  text: string;
+  accent: string;
+  accent_secondary: string;
+  muted: string;
+}
+
 interface Slide {
   id: number;
   title: string;
@@ -43,6 +51,7 @@ interface Slide {
     | "quote"
     | "closing";
   imageUrl?: string;
+  colors?: SlideColors;
 }
 
 type ViewMode = "edit" | "preview";
@@ -72,6 +81,113 @@ const THEME_OPTIONS: { value: ThemeKey; label: string; preview: string }[] = [
   { value: "gradient", label: "Gradient Wave", preview: "🌊" },
   { value: "neon", label: "Neon Cyber", preview: "⚡" },
 ];
+
+/* ─── Preset Color Palettes (Harmonious Color Theory) ─────────── */
+
+// Her palet renk teorisi ile uyumlu: ana renk, tamamlayıcı, vurgular
+const COLOR_PALETTES: {
+  name: string;
+  description: string;
+  colors: SlideColors;
+}[] = [
+  {
+    name: "Professional Blue",
+    description: "Güvenilir, kurumsal, profesyonel",
+    colors: {
+      background: "#0f172a", // Koyu lacivert
+      text: "#f1f5f9", // Açık gri
+      accent: "#3b82f6", // Canlı mavi (ana)
+      accent_secondary: "#06b6d4", // Camgöbeği (tamamlayıcı)
+      muted: "#64748b", // Soluk gri
+    },
+  },
+  {
+    name: "Creative Purple",
+    description: "Yaratıcı, modern, yenilikçi",
+    colors: {
+      background: "#1e1b4b", // Koyu mor
+      text: "#f5f3ff", // Açık lavanta
+      accent: "#a855f7", // Canlı mor (ana)
+      accent_secondary: "#ec4899", // Pembe (tamamlayıcı)
+      muted: "#a78bfa", // Soluk mor
+    },
+  },
+  {
+    name: "Nature Green",
+    description: "Doğal, taze, organik",
+    colors: {
+      background: "#052e16", // Koyu yeşil
+      text: "#ecfdf5", // Açık yeşil
+      accent: "#22c55e", // Canlı yeşil (ana)
+      accent_secondary: "#eab308", // Altın sarısı (tamamlayıcı)
+      muted: "#86efac", // Soluk yeşil
+    },
+  },
+  {
+    name: "Dark Elegance",
+    description: "Şık, modern, minimalist",
+    colors: {
+      background: "#09090b", // Siyah
+      text: "#fafafa", // Beyaz
+      accent: "#f97316", // Turuncu (ana)
+      accent_secondary: "#14b8a6", // Turkuaz (tamamlayıcı)
+      muted: "#71717a", // Gri
+    },
+  },
+  {
+    name: "Light Minimal",
+    description: "Temiz, sade, açık",
+    colors: {
+      background: "#ffffff", // Beyaz
+      text: "#18181b", // Siyah
+      accent: "#2563eb", // Mavi (ana)
+      accent_secondary: "#dc2626", // Kırmızı (tamamlayıcı)
+      muted: "#a1a1aa", // Gri
+    },
+  },
+  {
+    name: "Warm Sunset",
+    description: "Sıcak, enerjik, dostane",
+    colors: {
+      background: "#1c1917", // Koyu kahve
+      text: "#fef3c7", // Krem
+      accent: "#f59e0b", // Turuncu (ana)
+      accent_secondary: "#ef4444", // Kırmızı (tamamlayıcı)
+      muted: "#fcd34d", // Soluk sarı
+    },
+  },
+  {
+    name: "Tech Neon",
+    description: "Fütüristik, cyber, teknolojik",
+    colors: {
+      background: "#030712", // Koyu siyah
+      text: "#e0f2fe", // Açık mavi
+      accent: "#00ff88", // Neon yeşil (ana)
+      accent_secondary: "#00d4ff", // Neon mavi (tamamlayıcı)
+      muted: "#22d3ee", // Camgöbeği
+    },
+  },
+  {
+    name: "Classic Navy",
+    description: "Klasik, güvenilir, zamansız",
+    colors: {
+      background: "#0c1222", // Lacivert
+      text: "#f8fafc", // Beyaz
+      accent: "#fbbf24", // Altın (ana)
+      accent_secondary: "#c0c0c0", // Gümüş (tamamlayıcı)
+      muted: "#94a3b8", // Gri
+    },
+  },
+];
+
+// Default colors used when no custom colors are set
+const DEFAULT_COLORS: SlideColors = {
+  background: "#000000",
+  text: "#ffffff",
+  accent: "#a855f7",
+  accent_secondary: "#7c3aed",
+  muted: "#6b7280",
+};
 
 /* ─── Main Component ────────────────────────────────────────── */
 
@@ -266,6 +382,47 @@ export default function PresentationBuilderPanel() {
     [currentSlideIndex],
   );
 
+  const updateSlideColors = useCallback(
+    (colorField: keyof SlideColors, value: string) => {
+      setSlides((prev) => {
+        const next = [...prev];
+        const currentColors = next[currentSlideIndex].colors || DEFAULT_COLORS;
+        next[currentSlideIndex] = {
+          ...next[currentSlideIndex],
+          colors: {
+            ...currentColors,
+            [colorField]: value,
+          },
+        };
+        return next;
+      });
+    },
+    [currentSlideIndex],
+  );
+
+  const applyColorPalette = useCallback(
+    (palette: SlideColors) => {
+      setSlides((prev) => {
+        const next = [...prev];
+        next[currentSlideIndex] = {
+          ...next[currentSlideIndex],
+          colors: { ...palette },
+        };
+        return next;
+      });
+    },
+    [currentSlideIndex],
+  );
+
+  const resetSlideColors = useCallback(() => {
+    setSlides((prev) => {
+      const next = [...prev];
+      const { colors, ...rest } = next[currentSlideIndex];
+      next[currentSlideIndex] = rest as Slide;
+      return next;
+    });
+  }, [currentSlideIndex]);
+
   const updateBullet = useCallback(
     (bulletIndex: number, value: string) => {
       setSlides((prev) => {
@@ -313,6 +470,13 @@ export default function PresentationBuilderPanel() {
       notes: "",
       image_prompt: "",
       layout: "content",
+      colors: {
+        background: "#ffffff",
+        text: "#1e293b",
+        accent: "#3b82f6",
+        accent_secondary: "#8b5cf6",
+        muted: "#64748b",
+      },
     };
     setSlides((prev) => [...prev, newSlide]);
     setCurrentSlideIndex(slides.length);
@@ -333,6 +497,11 @@ export default function PresentationBuilderPanel() {
       t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
     const renderSlide = (s: Slide, i: number): string => {
+      // Build custom color CSS custom properties if colors exist
+      const customColorStyle = s.colors
+        ? ` style="--slide-bg:${s.colors.background};--slide-text:${s.colors.text};--slide-accent:${s.colors.accent};--slide-accent-secondary:${s.colors.accent_secondary};--slide-muted:${s.colors.muted}"`
+        : "";
+
       const num = `<div class="sn">${i + 1} / ${slides.length}</div>`;
       const img = s.imageUrl
         ? `<img src="${s.imageUrl}" alt="${esc(s.title)}" loading="lazy"/>`
@@ -347,7 +516,7 @@ export default function PresentationBuilderPanel() {
 
       switch (s.layout) {
         case "title":
-          return `<section class="slide slide-title">
+          return `<section class="slide slide-title"${customColorStyle}>
   ${img ? `<div class="bg-img">${img}</div>` : ""}
   <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <div class="center-content">
@@ -356,7 +525,7 @@ export default function PresentationBuilderPanel() {
   </div>${num}</section>`;
 
         case "two-column":
-          return `<section class="slide slide-twocol">
+          return `<section class="slide slide-twocol"${customColorStyle}>
   <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <h2>${esc(s.title)}</h2>
   <div class="cols">
@@ -368,7 +537,7 @@ export default function PresentationBuilderPanel() {
   </div>${num}</section>`;
 
         case "image-focus":
-          return `<section class="slide slide-imgfocus">
+          return `<section class="slide slide-imgfocus"${customColorStyle}>
   <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <h2>${esc(s.title)}</h2>
   <div class="hero-img">${img || `<div class="img-placeholder"></div>`}</div>
@@ -376,7 +545,7 @@ export default function PresentationBuilderPanel() {
 ${num}</section>`;
 
         case "quote":
-          return `<section class="slide slide-quote">
+          return `<section class="slide slide-quote"${customColorStyle}>
   <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <div class="quote-mark">\u201C</div>
   <blockquote>${esc(s.content || s.title)}</blockquote>
@@ -384,7 +553,7 @@ ${num}</section>`;
 ${num}</section>`;
 
         case "closing":
-          return `<section class="slide slide-closing">
+          return `<section class="slide slide-closing"${customColorStyle}>
   ${img ? `<div class="bg-img">${img}</div>` : ""}
   <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <div class="center-content">
@@ -401,7 +570,7 @@ ${num}</section>`;
   </div>${num}</section>`;
 
         default: // "content"
-          return `<section class="slide slide-content">
+          return `<section class="slide slide-content"${customColorStyle}>
   <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <h2>${esc(s.title)}</h2>
   ${s.content ? `<p class="body-text">${esc(s.content)}</p>` : ""}
@@ -662,6 +831,25 @@ body{background:#0a0a0f}
 
 /* Theme overrides */
 ${selectedCSS}
+
+/* Custom slide colors override */
+.slide[style*="--slide-bg"]{background:var(--slide-bg)!important}
+.slide[style*="--slide-text"]{color:var(--slide-text)!important}
+.slide[style*="--slide-text"] h1,.slide[style*="--slide-text"] h2{color:var(--slide-text)!important}
+.slide[style*="--slide-text"] .subtitle,.slide[style*="--slide-text"] .body-text,.slide[style*="--slide-text"] .caption{color:var(--slide-muted)!important}
+.slide[style*="--slide-text"] li{color:var(--slide-text)!important}
+.slide[style*="--slide-text"] p{color:var(--slide-muted)!important}
+.slide[style*="--slide-text"] blockquote{color:var(--slide-text)!important}
+.slide[style*="--slide-accent"] .decor-tl{border-color:var(--slide-accent)!important}
+.slide[style*="--slide-accent"] .decor-br{border-color:var(--slide-accent-secondary,var(--slide-accent))!important}
+.slide[style*="--slide-accent"] .quote-mark{color:var(--slide-accent)!important}
+.slide[style*="--slide-accent"] cite{color:var(--slide-accent)!important}
+.slide[style*="--slide-accent"] li::before{background:var(--slide-accent)!important;box-shadow:none!important}
+.slide[style*="--slide-accent"] h2::after{background:var(--slide-accent)!important}
+.slide[style*="--slide-accent"] .closing-points span{background:color-mix(in srgb,var(--slide-accent) 10%,transparent)!important;border-color:color-mix(in srgb,var(--slide-accent) 30%,transparent)!important;color:var(--slide-accent)!important}
+.slide[style*="--slide-accent-secondary"] .col-img{border-color:color-mix(in srgb,var(--slide-accent-secondary) 30%,transparent)!important}
+.slide[style*="--slide-accent-secondary"] .hero-img{border-color:color-mix(in srgb,var(--slide-accent-secondary) 30%,transparent)!important}
+.slide[style*="--slide-muted"] .sn{color:var(--slide-muted)!important;opacity:.6!important}
 
 @media print{.slide{page-break-after:always;min-height:100vh}}
 </style>
@@ -1134,6 +1322,138 @@ ${slidesHtml}
                 placeholder="English image prompt..."
               />
             </div>
+
+            {/* Color Customization Section */}
+            <div className="border-t border-white/10 pt-3 mt-2">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[10px] uppercase tracking-wider text-white/30 flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-gradient-to-br from-purple-500 to-blue-500" />
+                  Renkler
+                </label>
+                {currentSlide.colors && (
+                  <button
+                    onClick={resetSlideColors}
+                    className="text-[10px] text-red-400/70 hover:text-red-400 transition-colors"
+                    title="Temaya sıfırla"
+                  >
+                    Sıfırla
+                  </button>
+                )}
+              </div>
+
+              {/* Color Pickers */}
+              <div className="space-y-2 mb-3">
+                {/* Background Color */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={currentSlide.colors?.background || DEFAULT_COLORS.background}
+                    onChange={(e) => updateSlideColors("background", e.target.value)}
+                    className="w-6 h-6 rounded cursor-pointer border border-white/20 bg-transparent"
+                    title="Arka Plan Rengi"
+                  />
+                  <span className="text-xs text-white/50 flex-1">Arka Plan</span>
+                  <span className="text-[10px] text-white/30 font-mono">
+                    {currentSlide.colors?.background || DEFAULT_COLORS.background}
+                  </span>
+                </div>
+
+                {/* Text Color */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={currentSlide.colors?.text || DEFAULT_COLORS.text}
+                    onChange={(e) => updateSlideColors("text", e.target.value)}
+                    className="w-6 h-6 rounded cursor-pointer border border-white/20 bg-transparent"
+                    title="Metin Rengi"
+                  />
+                  <span className="text-xs text-white/50 flex-1">Metin</span>
+                  <span className="text-[10px] text-white/30 font-mono">
+                    {currentSlide.colors?.text || DEFAULT_COLORS.text}
+                  </span>
+                </div>
+
+                {/* Accent Color */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={currentSlide.colors?.accent || DEFAULT_COLORS.accent}
+                    onChange={(e) => updateSlideColors("accent", e.target.value)}
+                    className="w-6 h-6 rounded cursor-pointer border border-white/20 bg-transparent"
+                    title="Vurgu Rengi"
+                  />
+                  <span className="text-xs text-white/50 flex-1">Vurgu</span>
+                  <span className="text-[10px] text-white/30 font-mono">
+                    {currentSlide.colors?.accent || DEFAULT_COLORS.accent}
+                  </span>
+                </div>
+
+                {/* Accent Secondary Color */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={currentSlide.colors?.accent_secondary || DEFAULT_COLORS.accent_secondary}
+                    onChange={(e) => updateSlideColors("accent_secondary", e.target.value)}
+                    className="w-6 h-6 rounded cursor-pointer border border-white/20 bg-transparent"
+                    title="İkincil Vurgu Rengi"
+                  />
+                  <span className="text-xs text-white/50 flex-1">Vurgu 2</span>
+                  <span className="text-[10px] text-white/30 font-mono">
+                    {currentSlide.colors?.accent_secondary || DEFAULT_COLORS.accent_secondary}
+                  </span>
+                </div>
+
+                {/* Muted Color */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={currentSlide.colors?.muted || DEFAULT_COLORS.muted}
+                    onChange={(e) => updateSlideColors("muted", e.target.value)}
+                    className="w-6 h-6 rounded cursor-pointer border border-white/20 bg-transparent"
+                    title="Soluk Renk"
+                  />
+                  <span className="text-xs text-white/50 flex-1">Soluk</span>
+                  <span className="text-[10px] text-white/30 font-mono">
+                    {currentSlide.colors?.muted || DEFAULT_COLORS.muted}
+                  </span>
+                </div>
+              </div>
+
+              {/* Preset Palettes */}
+              <div>
+                <label className="text-[9px] uppercase tracking-wider text-white/25 mb-1.5 block">
+                  Hazır Paletler
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {COLOR_PALETTES.map((palette) => (
+                    <button
+                      key={palette.name}
+                      onClick={() => applyColorPalette(palette.colors)}
+                      className="group flex flex-col items-center gap-1 p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all"
+                      title={palette.name}
+                    >
+                      <div className="flex gap-0.5">
+                        <div
+                          className="w-2.5 h-2.5 rounded-sm"
+                          style={{ backgroundColor: palette.colors.background }}
+                        />
+                        <div
+                          className="w-2.5 h-2.5 rounded-sm"
+                          style={{ backgroundColor: palette.colors.accent }}
+                        />
+                        <div
+                          className="w-2.5 h-2.5 rounded-sm"
+                          style={{ backgroundColor: palette.colors.text }}
+                        />
+                      </div>
+                      <span className="text-[8px] text-white/40 group-hover:text-white/70 transition-colors">
+                        {palette.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1222,27 +1542,51 @@ function SlideCanvas({
   slideNumber: number;
   totalSlides: number;
 }) {
+  // Determine background style - use custom colors if set, otherwise use defaults based on layout
+  const getBgStyle = (): React.CSSProperties => {
+    // If custom colors are set, use the background color directly
+    if (slide.colors?.background) {
+      return { background: slide.colors.background };
+    }
+
+    // Default backgrounds based on layout
+    switch (slide.layout) {
+      case "title":
+        return { background: "linear-gradient(135deg, #4c1d95, #1e1b4b, #0f172a)" };
+      case "closing":
+        return { background: "linear-gradient(135deg, #1e293b, #0f172a, #020617)" };
+      case "quote":
+        return { background: "linear-gradient(135deg, #faf5ff, #f3e8ff)" };
+      default:
+        return { background: "#ffffff" };
+    }
+  };
+
+  const bgStyle = getBgStyle();
+
+  // Determine text colors - use custom colors if set
   const isDark = slide.layout === "title" || slide.layout === "closing";
+  const hasCustomColors = !!slide.colors;
 
-  const bgStyle: React.CSSProperties =
-    slide.layout === "title"
-      ? { background: "linear-gradient(135deg, #4c1d95, #1e1b4b, #0f172a)" }
-      : slide.layout === "closing"
-        ? { background: "linear-gradient(135deg, #1e293b, #0f172a, #020617)" }
-        : slide.layout === "quote"
-          ? { background: "linear-gradient(135deg, #faf5ff, #f3e8ff)" }
-          : { background: "#ffffff" };
+  const textColor = hasCustomColors
+    ? "" // We'll use inline style with custom color
+    : isDark
+      ? "text-white"
+      : slide.layout === "quote"
+        ? "text-purple-900"
+        : "text-gray-800";
 
-  const textColor = isDark
-    ? "text-white"
-    : slide.layout === "quote"
-      ? "text-purple-900"
-      : "text-gray-800";
-  const subColor = isDark
-    ? "text-white/70"
-    : slide.layout === "quote"
-      ? "text-purple-700"
-      : "text-gray-600";
+  const subColor = hasCustomColors
+    ? "" // We'll use inline style with custom color
+    : isDark
+      ? "text-white/70"
+      : slide.layout === "quote"
+        ? "text-purple-700"
+        : "text-gray-600";
+
+  const accentColor = slide.colors?.accent || "#a855f7";
+  const textCol = slide.colors?.text || (isDark ? "#ffffff" : "#1e293b");
+  const mutedColor = slide.colors?.muted || "#6b7280";
 
   return (
     <div
@@ -1251,6 +1595,7 @@ function SlideCanvas({
         ...bgStyle,
         aspectRatio: "16/9",
         maxHeight: "calc(100vh - 200px)",
+        color: textCol,
       }}
     >
       <div className="absolute inset-0 p-8 flex flex-col">
@@ -1270,11 +1615,15 @@ function SlideCanvas({
             <div className="relative z-10">
               <h1
                 className={`text-3xl md:text-4xl font-bold ${textColor} mb-4`}
+                style={hasCustomColors ? { color: textCol } : undefined}
               >
                 {slide.title}
               </h1>
               {slide.content && (
-                <p className={`text-lg ${subColor} max-w-2xl`}>
+                <p 
+                  className={`text-lg ${subColor} max-w-2xl`}
+                  style={hasCustomColors ? { color: mutedColor } : undefined}
+                >
                   {slide.content}
                 </p>
               )}
@@ -1285,11 +1634,17 @@ function SlideCanvas({
         {/* Content Layout */}
         {slide.layout === "content" && (
           <div className="flex-1 flex flex-col">
-            <h2 className={`text-2xl font-bold ${textColor} mb-4`}>
+            <h2 
+              className={`text-2xl font-bold ${textColor} mb-4`}
+              style={hasCustomColors ? { color: textCol } : undefined}
+            >
               {slide.title}
             </h2>
             {slide.content && (
-              <p className={`text-sm ${subColor} mb-4 leading-relaxed`}>
+              <p 
+                className={`text-sm ${subColor} mb-4 leading-relaxed`}
+                style={hasCustomColors ? { color: mutedColor } : undefined}
+              >
                 {slide.content}
               </p>
             )}
@@ -1299,8 +1654,12 @@ function SlideCanvas({
                   <li
                     key={i}
                     className={`flex items-start gap-2 text-sm ${subColor}`}
+                    style={hasCustomColors ? { color: mutedColor } : undefined}
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5 shrink-0" />
+                    <span 
+                      className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" 
+                      style={{ backgroundColor: accentColor }}
+                    />
                     {b}
                   </li>
                 ))}
@@ -1312,13 +1671,19 @@ function SlideCanvas({
         {/* Two Column Layout */}
         {slide.layout === "two-column" && (
           <div className="flex-1 flex flex-col">
-            <h2 className={`text-2xl font-bold ${textColor} mb-4`}>
+            <h2 
+              className={`text-2xl font-bold ${textColor} mb-4`}
+              style={hasCustomColors ? { color: textCol } : undefined}
+            >
               {slide.title}
             </h2>
             <div className="flex-1 grid grid-cols-2 gap-6">
               <div>
                 {slide.content && (
-                  <p className={`text-sm ${subColor} leading-relaxed`}>
+                  <p 
+                    className={`text-sm ${subColor} leading-relaxed`}
+                    style={hasCustomColors ? { color: mutedColor } : undefined}
+                  >
                     {slide.content}
                   </p>
                 )}
@@ -1328,8 +1693,12 @@ function SlideCanvas({
                       <li
                         key={i}
                         className={`flex items-start gap-2 text-sm ${subColor}`}
+                        style={hasCustomColors ? { color: mutedColor } : undefined}
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5 shrink-0" />
+                        <span 
+                          className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" 
+                          style={{ backgroundColor: accentColor }}
+                        />
                         {b}
                       </li>
                     ))}
@@ -1345,8 +1714,8 @@ function SlideCanvas({
                     placeholderClassName="w-full h-full rounded-lg bg-gray-100"
                   />
                 ) : (
-                  <div className="w-full h-full rounded-lg bg-gray-100 flex items-center justify-center">
-                    <ImageIcon className="w-12 h-12 text-gray-300" />
+                  <div className="w-full h-full rounded-lg bg-gray-100/20 flex items-center justify-center">
+                    <ImageIcon className="w-12 h-12 text-gray-300/50" />
                   </div>
                 )}
               </div>
@@ -1357,7 +1726,10 @@ function SlideCanvas({
         {/* Image Focus Layout */}
         {slide.layout === "image-focus" && (
           <div className="flex-1 flex flex-col">
-            <h2 className={`text-2xl font-bold ${textColor} mb-3`}>
+            <h2 
+              className={`text-2xl font-bold ${textColor} mb-3`}
+              style={hasCustomColors ? { color: textCol } : undefined}
+            >
               {slide.title}
             </h2>
             <div className="flex-1 rounded-lg overflow-hidden">
@@ -1369,13 +1741,16 @@ function SlideCanvas({
                   placeholderClassName="w-full h-full bg-gray-100"
                 />
               ) : (
-                <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                  <ImageIcon className="w-16 h-16 text-gray-300" />
+                <div className="w-full h-full bg-gray-100/20 flex items-center justify-center">
+                  <ImageIcon className="w-16 h-16 text-gray-300/50" />
                 </div>
               )}
             </div>
             {slide.content && (
-              <p className={`text-xs ${subColor} mt-2 text-center`}>
+              <p 
+                className={`text-xs ${subColor} mt-2 text-center`}
+                style={hasCustomColors ? { color: mutedColor } : undefined}
+              >
                 {slide.content}
               </p>
             )}
@@ -1385,14 +1760,23 @@ function SlideCanvas({
         {/* Quote Layout */}
         {slide.layout === "quote" && (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-12">
-            <div className="text-6xl text-purple-300 mb-4">&ldquo;</div>
+            <div 
+              className="text-6xl mb-4"
+              style={{ color: accentColor, opacity: 0.5 }}
+            >
+              &ldquo;
+            </div>
             <blockquote
               className={`text-xl md:text-2xl font-medium ${textColor} italic leading-relaxed mb-4`}
+              style={hasCustomColors ? { color: textCol } : undefined}
             >
               {slide.content || slide.title}
             </blockquote>
             {slide.bullets[0] && (
-              <cite className={`text-sm ${subColor} not-italic`}>
+              <cite 
+                className={`text-sm ${subColor} not-italic`}
+                style={hasCustomColors ? { color: mutedColor } : undefined}
+              >
                 — {slide.bullets[0]}
               </cite>
             )}

@@ -4,8 +4,10 @@ Uses NVIDIA-hosted LLMs for research + orchestration, web search for context.
 """
 
 import asyncio
+import colorsys
 import json
 import logging
+import random
 import re
 import sys
 from pathlib import Path
@@ -26,6 +28,190 @@ from tools.search import web_search
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/presentations", tags=["presentations"])
+
+# ── Color Utilities ───────────────────────────────────────────────────
+
+def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    """Convert hex color to RGB tuple."""
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+
+
+def rgb_to_hex(r: int, g: int, b: int) -> str:
+    """Convert RGB tuple to hex color."""
+    r = max(0, min(255, r))
+    g = max(0, min(255, g))
+    b = max(0, min(255, b))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def rgb_to_hsl(r: int, g: int, b: int) -> tuple[float, float, float]:
+    """Convert RGB to HSL (hue, saturation, lightness) all 0-1."""
+    r_norm, g_norm, b_norm = r / 255, g / 255, b / 255
+    h, l, s = colorsys.rgb_to_hls(r_norm, g_norm, b_norm)
+    return (h, s, l)
+
+
+def hsl_to_rgb(h: float, s: float, l: float) -> tuple[int, int, int]:
+    """Convert HSL to RGB."""
+    r, g, b = colorsys.hls_to_rgb(h, l, s)
+    return (int(r * 255), int(g * 255), int(b * 255))
+
+
+def get_luminance(r: int, g: int, b: int) -> float:
+    """Calculate relative luminance (WCAG formula)."""
+    def linearize(c: float) -> float:
+        c = c / 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
+
+
+def get_contrast_ratio(fg_hex: str, bg_hex: str) -> float:
+    """Calculate contrast ratio between two hex colors (WCAG)."""
+    fg_rgb = hex_to_rgb(fg_hex)
+    bg_rgb = hex_to_rgb(bg_hex)
+    fg_lum = get_luminance(*fg_rgb)
+    bg_lum = get_luminance(*bg_rgb)
+    lighter = max(fg_lum, bg_lum)
+    darker = min(fg_lum, bg_lum)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def adjust_lightness_for_contrast(hex_color: str, target_contrast: float, against_light: bool) -> str:
+    """Adjust color lightness to achieve target contrast against white or black."""
+    rgb = hex_to_rgb(hex_color)
+    h, s, _ = rgb_to_hsl(*rgb)
+    bg_lum = 1.0 if against_light else 0.0
+    
+    lo = 0.0 if against_light else 0.5
+    hi = 0.5 if against_light else 1.0
+    
+    for _ in range(50):
+        mid = (lo + hi) / 2
+        test_rgb = hsl_to_rgb(h, s, mid)
+        fg_lum = get_luminance(*test_rgb)
+        lighter = max(fg_lum, bg_lum)
+        darker = min(fg_lum, bg_lum)
+        contrast = (lighter + 0.05) / (darker + 0.05)
+        
+        if against_light:
+            if contrast < target_contrast:
+                hi = mid
+            else:
+                lo = mid
+        else:
+            if contrast < target_contrast:
+                lo = mid
+            else:
+                hi = mid
+    
+    final_l = lo if against_light else hi
+    return rgb_to_hex(*hsl_to_rgb(h, s, final_l))
+
+
+def generate_harmonious_palette(base_hue: float, is_dark: bool = True) -> dict[str, str]:
+    """Generate a harmonious color palette from a base hue.
+    
+    Args:
+        base_hue: Base hue value (0-1)
+        is_dark: Whether to generate a dark theme palette
+        
+    Returns:
+        Dict with background, text, accent, accent_secondary, muted colors
+    """
+    # Saturation and lightness values for harmonious palette
+    if is_dark:
+        # Dark theme: dark background, light text
+        bg_sat, bg_light = 0.15, 0.08 + random.uniform(0, 0.04)  # Very dark with slight tint
+        text_sat, text_light = 0.02, 0.95  # Nearly white
+        accent_sat = 0.7 + random.uniform(0, 0.2)
+        accent_light = 0.55 + random.uniform(0, 0.15)
+        accent2_hue = (base_hue + 0.4 + random.uniform(-0.1, 0.1)) % 1.0  # Complementary-ish
+        muted_sat, muted_light = 0.1, 0.5
+    else:
+        # Light theme: light background, dark text
+        bg_sat, bg_light = 0.03, 0.98  # Nearly white with slight tint
+        text_sat, text_light = 0.1, 0.12  # Nearly black
+        accent_sat = 0.65 + random.uniform(0, 0.25)
+        accent_light = 0.45 + random.uniform(0, 0.1)
+        accent2_hue = (base_hue + 0.4 + random.uniform(-0.1, 0.1)) % 1.0
+        muted_sat, muted_light = 0.05, 0.45
+    
+    # Generate base colors
+    bg_rgb = hsl_to_rgb(base_hue, bg_sat, bg_light)
+    text_rgb = hsl_to_rgb(base_hue, text_sat, text_light)
+    accent_rgb = hsl_to_rgb(base_hue, accent_sat, accent_light)
+    accent2_rgb = hsl_to_rgb(accent2_hue, accent_sat, accent_light)
+    muted_rgb = hsl_to_rgb(base_hue, muted_sat, muted_light)
+    
+    bg_hex = rgb_to_hex(*bg_rgb)
+    text_hex = rgb_to_hex(*text_rgb)
+    accent_hex = rgb_to_hex(*accent_rgb)
+    accent2_hex = rgb_to_hex(*accent2_rgb)
+    muted_hex = rgb_to_hex(*muted_rgb)
+    
+    # Ensure contrast compliance (WCAG AA: 4.5:1 for text)
+    # Adjust text for contrast against background
+    text_contrast = get_contrast_ratio(text_hex, bg_hex)
+    if text_contrast < 4.5:
+        text_hex = adjust_lightness_for_contrast(text_hex, 4.5, not is_dark)
+    
+    # Ensure accent has sufficient contrast for readability
+    accent_contrast = get_contrast_ratio(accent_hex, bg_hex)
+    if accent_contrast < 3.0:
+        accent_hex = adjust_lightness_for_contrast(accent_hex, 3.0, not is_dark)
+    
+    return {
+        "background": bg_hex,
+        "text": text_hex,
+        "accent": accent_hex,
+        "accent_secondary": accent2_hex,
+        "muted": muted_hex,
+    }
+
+
+def generate_slide_color(index: int, total: int, style: str = "professional") -> dict[str, str]:
+    """Generate a unique color palette for a slide.
+    
+    Creates varied but harmonious colors across slides to avoid "same colors" issue.
+    
+    Args:
+        index: Slide index (0-based)
+        total: Total number of slides
+        style: Presentation style (affects color choices)
+        
+    Returns:
+        Dict with background, text, accent, accent_secondary, muted colors
+    """
+    # Define style-specific hue ranges
+    style_hues = {
+        "professional": [0.55, 0.65],  # Blues
+        "creative": [0.0, 0.15],  # Reds, oranges
+        "minimal": [0.0, 0.02],  # Near-neutral
+        "academic": [0.58, 0.62],  # Blues
+        "corporate": [0.58, 0.65],  # Blues with purple
+    }
+    
+    hue_range = style_hues.get(style, style_hues["professional"])
+    
+    # Distribute hues across slides with golden ratio for natural variation
+    golden_ratio = 0.618033988749895
+    base_hue = hue_range[0] + (hue_range[1] - hue_range[0]) * ((index * golden_ratio) % 1.0)
+    
+    # Add subtle variation
+    base_hue += random.uniform(-0.05, 0.05)
+    base_hue = base_hue % 1.0
+    
+    # Determine if first/last slides should be dark (for impact)
+    is_dark = True
+    if style == "minimal":
+        is_dark = index == 0 or index == total - 1  # Only first/last dark
+    elif total > 4 and 2 <= index < total - 2:
+        # Mix dark and light for middle slides
+        is_dark = random.random() > 0.4
+    
+    return generate_harmonious_palette(base_hue, is_dark)
+
 
 # ── LLM Client ───────────────────────────────────────────────────
 
@@ -77,6 +263,15 @@ class SlideSchema(BaseModel):
     notes: str
     image_prompt: str
     layout: str
+    colors: dict[str, str] = Field(
+        default_factory=lambda: {
+            "background": "#0f172a",
+            "text": "#f8fafc",
+            "accent": "#3b82f6",
+            "accent_secondary": "#8b5cf6",
+            "muted": "#64748b",
+        }
+    )
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -232,6 +427,14 @@ DESIGN PRINCIPLES:
 - "image-focus" layout: use when a visual tells the story better than text
 - image_prompt must be cinematic and specific — describe scene, lighting, style, mood
 
+COLOR PALETTE DESIGN:
+- Each slide has a unique color palette for visual variety
+- Colors must have WCAG AA contrast (4.5:1 for text, 3:1 for large text)
+- Dark themes: dark backgrounds (#0a0a0a to #1a1a2e range) with light text (#f0f0f0)
+- Light themes: light backgrounds (#fafafa to #f5f5f5) with dark text (#1a1a1a)
+- Accent colors: vibrant for emphasis, harmonious with background
+- NEVER use pure white (#ffffff) or pure black (#000000) backgrounds
+
 Return ONLY valid JSON — no markdown, no explanation."""
 
     slide_generation_prompt = f"""Create a {body.slide_count}-slide presentation.
@@ -253,10 +456,25 @@ Return a JSON object:
       "bullets": ["Crisp point (max 12 words)", "Another crisp point"],
       "notes": "Speaker notes",
       "image_prompt": "Cinematic English prompt: subject, scene, lighting, style, mood, color palette",
-      "layout": "title"
+      "layout": "title",
+      "colors": {{
+        "background": "#0f172a",
+        "text": "#f8fafc",
+        "accent": "#3b82f6",
+        "accent_secondary": "#8b5cf6",
+        "muted": "#64748b"
+      }}
     }}
   ]
 }}
+
+COLOR PALETTE RULES:
+- background: Dark (#0a0a14 to #1e1e2e) for impact slides, light (#f8f9fa) for content slides
+- text: Must have 4.5:1 contrast ratio against background
+- accent: Vibrant color for highlights and emphasis
+- accent_secondary: Harmonious complementary color
+- muted: Low saturation for secondary text and borders
+- VARY colors between slides - avoid identical palettes
 
 LAYOUT STRATEGY for {body.slide_count} slides:
 - Slide 1: "title" — bold opening with topic + subtitle
@@ -275,6 +493,7 @@ STRICT RULES:
 - Content: max 25 words — this is a subtitle, NOT a paragraph
 - Bullets: 2-4 per slide, max 12 words each — punchy, not sentences
 - NEVER use the same layout 3 times in a row
+- NEVER give all slides the same colors - vary backgrounds and accents
 - Speaker notes should be conversational guidance for the presenter
 - Style tone: {body.style}"""
 
@@ -303,6 +522,36 @@ STRICT RULES:
         elif layout not in LAYOUT_OPTIONS:
             layout = "content"
 
+        # Handle colors - use LLM provided or generate harmonious palette
+        colors = s.get("colors")
+        if not isinstance(colors, dict) or not all(k in colors for k in ["background", "text", "accent"]):
+            # Generate colors programmatically with contrast checking
+            colors = generate_slide_color(i, len(slides_raw), body.style)
+        else:
+            # Validate and fix contrast if needed
+            bg = str(colors.get("background", "#0f172a"))
+            text = str(colors.get("text", "#f8fafc"))
+            if not bg.startswith("#"):
+                bg = "#0f172a"
+            if not text.startswith("#"):
+                text = "#f8fafc"
+            try:
+                contrast = get_contrast_ratio(text, bg)
+                if contrast < 4.5:
+                    # Fix contrast by adjusting text color
+                    is_light_bg = sum(hex_to_rgb(bg)) > 384  # ~128 per channel
+                    text = adjust_lightness_for_contrast(text, 4.5, is_light_bg)
+            except Exception:
+                bg, text = "#0f172a", "#f8fafc"
+            
+            colors = {
+                "background": bg,
+                "text": text,
+                "accent": str(colors.get("accent", "#3b82f6")),
+                "accent_secondary": str(colors.get("accent_secondary", "#8b5cf6")),
+                "muted": str(colors.get("muted", "#64748b")),
+            }
+
         slides.append({
             "id": i + 1,
             "title": str(s.get("title", f"Slide {i + 1}")),
@@ -311,6 +560,7 @@ STRICT RULES:
             "notes": str(s.get("notes", "")),
             "image_prompt": str(s.get("image_prompt", "")),
             "layout": layout,
+            "colors": colors,
         })
 
     _audit("presentation_generate", user["user_id"], detail=f"slides={len(slides)}, prompt={body.prompt[:80]}")
@@ -375,7 +625,7 @@ async def regenerate_slide(
     """Regenerate a single slide with specific instructions."""
     system_prompt = (
         "You are a presentation designer. Regenerate a single slide based on the context and instruction. "
-        "Return ONLY valid JSON for one slide object."
+        "Return ONLY valid JSON for one slide object. Include a harmonious color palette."
     )
 
     user_prompt = f"""Regenerate slide at index {body.slide_index}.
@@ -393,10 +643,23 @@ Return JSON for a single slide:
   "bullets": ["Point 1", "Point 2", "Point 3"],
   "notes": "Speaker notes",
   "image_prompt": "English image generation prompt",
-  "layout": "content"
+  "layout": "content",
+  "colors": {{
+    "background": "#0f172a",
+    "text": "#f8fafc",
+    "accent": "#3b82f6",
+    "accent_secondary": "#8b5cf6",
+    "muted": "#64748b"
+  }}
 }}
 
-Layout options: {LAYOUT_OPTIONS}"""
+Layout options: {LAYOUT_OPTIONS}
+
+Color rules:
+- background: Dark (#0a0a14 to #1e1e2e) or light (#f8f9fa)
+- text: Must contrast well with background
+- accent: Vibrant highlight color
+- Vary from any colors in the presentation context"""
 
     raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=45)
 
@@ -412,6 +675,34 @@ Layout options: {LAYOUT_OPTIONS}"""
     if layout not in LAYOUT_OPTIONS:
         layout = "content"
 
+    # Handle colors
+    colors = slide_data.get("colors")
+    if not isinstance(colors, dict) or not all(k in colors for k in ["background", "text", "accent"]):
+        colors = generate_slide_color(body.slide_index, 5, "professional")
+    else:
+        # Validate colors
+        bg = str(colors.get("background", "#0f172a"))
+        text = str(colors.get("text", "#f8fafc"))
+        if not bg.startswith("#"):
+            bg = "#0f172a"
+        if not text.startswith("#"):
+            text = "#f8fafc"
+        try:
+            contrast = get_contrast_ratio(text, bg)
+            if contrast < 4.5:
+                is_light_bg = sum(hex_to_rgb(bg)) > 384
+                text = adjust_lightness_for_contrast(text, 4.5, is_light_bg)
+        except Exception:
+            bg, text = "#0f172a", "#f8fafc"
+        
+        colors = {
+            "background": bg,
+            "text": text,
+            "accent": str(colors.get("accent", "#3b82f6")),
+            "accent_secondary": str(colors.get("accent_secondary", "#8b5cf6")),
+            "muted": str(colors.get("muted", "#64748b")),
+        }
+
     slide = {
         "id": body.slide_index + 1,
         "title": str(slide_data.get("title", f"Slide {body.slide_index + 1}")),
@@ -420,6 +711,7 @@ Layout options: {LAYOUT_OPTIONS}"""
         "notes": str(slide_data.get("notes", "")),
         "image_prompt": str(slide_data.get("image_prompt", "")),
         "layout": layout,
+        "colors": colors,
     }
 
     _audit("presentation_regenerate_slide", user["user_id"], detail=f"slide_index={body.slide_index}")
