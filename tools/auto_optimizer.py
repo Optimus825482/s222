@@ -137,7 +137,7 @@ class AutoOptimizer:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT agent_role,
-                           ROUND(AVG(latency_ms), 0) AS avg_latency,
+                           ROUND(AVG(latency_ms)::numeric, 0) AS avg_latency,
                            COUNT(*) AS total
                     FROM evaluations
                     WHERE latency_ms > 0

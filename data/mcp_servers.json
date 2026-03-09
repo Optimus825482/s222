@@ -1,14 +1,6 @@
 {
   "servers": [
     {
-      "id": "brave-search",
-      "name": "Brave Search",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-      "env": { "BRAVE_API_KEY": "" },
-      "description": "Brave Search API"
-    },
-    {
       "id": "fetch",
       "name": "Web Fetch",
       "command": "uvx",
@@ -28,7 +20,7 @@
       "id": "arxiv",
       "name": "arXiv Research",
       "command": "uvx",
-      "args": ["mcp-server-arxiv"],
+      "args": ["arxiv-mcp-server"],
       "env": {},
       "description": "Academic paper search"
     },
@@ -36,7 +28,7 @@
       "id": "wikipedia",
       "name": "Wikipedia",
       "command": "uvx",
-      "args": ["mcp-server-wikipedia-search"],
+      "args": ["wikipedia-mcp-server@latest"],
       "env": {},
       "description": "Wikipedia search and content"
     },
@@ -76,8 +68,12 @@
       "id": "postgres",
       "name": "PostgreSQL",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres"],
-      "env": { "POSTGRES_CONNECTION_STRING": "" },
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://agent:agent_secret_2024@postgres:5432/multiagent"
+      ],
+      "env": {},
       "description": "Direct PostgreSQL queries"
     },
     {
