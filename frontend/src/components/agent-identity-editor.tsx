@@ -207,7 +207,7 @@ export function AgentIdentityEditor() {
           {preview ? (
             <div className="w-full h-64 bg-slate-900/50 border border-slate-700/30 rounded p-3 overflow-y-auto select-text cursor-text">
               {contents[tab].trim() ? (
-                <div className="prose prose-invert prose-sm max-w-none prose-headings:text-slate-200 prose-p:text-slate-300 prose-strong:text-slate-200 prose-code:text-cyan-300 prose-code:bg-slate-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700/30 prose-li:text-slate-300 prose-a:text-cyan-400">
+                <div className="prose prose-invert prose-sm max-w-none prose-headings:text-slate-700 prose-p:text-slate-300 prose-strong:text-slate-700 prose-code:text-cyan-300 prose-code:bg-slate-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700/30 prose-li:text-slate-300 prose-a:text-cyan-400">
                   <ReactMarkdown>
                     {stripFrontmatter(contents[tab])}
                   </ReactMarkdown>

@@ -144,7 +144,7 @@ export function ChatInput({ onSend, onStop, isProcessing, onSteering }: Props) {
         <button
           onClick={() => fileRef.current?.click()}
           disabled={isProcessing || attachments.length >= 5}
-          className="p-2.5 rounded-xl border border-border text-slate-400 hover:text-slate-200 hover:border-slate-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
+          className="p-2.5 rounded-xl border border-border text-slate-400 hover:text-slate-700 hover:border-slate-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
           aria-label="Dosya ekle"
           title="Dosya ekle (PDF, DOCX, XLSX, PPTX, görsel)"
         >

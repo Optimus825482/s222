@@ -227,7 +227,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => removeToast(t.id)}
-                className="shrink-0 mt-0.5 rounded p-0.5 text-slate-500 hover:text-slate-200 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-slate-400"
+                className="shrink-0 mt-0.5 rounded p-0.5 text-slate-500 hover:text-slate-700 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-slate-400"
                 aria-label="Bildirimi kapat"
               >
                 <svg

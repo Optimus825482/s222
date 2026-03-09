@@ -231,7 +231,7 @@ export function DetailModal({
         >
           {content ? (
             <div
-              className="prose prose-invert prose-sm max-w-none prose-headings:text-slate-200 prose-p:text-slate-300 prose-strong:text-slate-200 prose-code:text-cyan-300 prose-code:bg-slate-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:border prose-pre:border-border prose-li:text-slate-300 prose-a:text-cyan-400 [&_*]:select-text"
+              className="prose prose-invert prose-sm max-w-none prose-headings:text-slate-700 prose-p:text-slate-300 prose-strong:text-slate-700 prose-code:text-cyan-300 prose-code:bg-slate-800/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:border prose-pre:border-border prose-li:text-slate-300 prose-a:text-cyan-400 [&_*]:select-text"
               style={{ userSelect: "text", WebkitUserSelect: "text" }}
             >
               <ReactMarkdown>

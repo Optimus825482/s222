@@ -17,7 +17,7 @@ export function TimeFilterBar({
           className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
             value === f.value
               ? "bg-cyan-600 text-white"
-              : "bg-slate-700/50 text-slate-400 hover:text-slate-200"
+              : "bg-slate-700/50 text-slate-400 hover:text-slate-700"
           }`}
         >
           {f.label}

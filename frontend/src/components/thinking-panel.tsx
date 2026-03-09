@@ -56,14 +56,14 @@ export function ThinkingPanel({ thinking, agent, isStreaming }: Props) {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setFullScreen(false)}
-                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-700 transition-colors"
                 aria-label="Küçült"
               >
                 <Minimize2 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setFullScreen(false)}
-                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-700 transition-colors"
                 aria-label="Kapat"
               >
                 <X className="w-4 h-4" />

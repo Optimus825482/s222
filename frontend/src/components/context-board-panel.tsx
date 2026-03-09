@@ -137,7 +137,7 @@ function AddItemForm({ onAdded }: { onAdded: () => void }) {
     <div className="space-y-1.5">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-200 bg-white/5 hover:bg-white/8 rounded border border-border/50 transition-colors"
+        className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-700 bg-white/5 hover:bg-white/8 rounded border border-border/50 transition-colors"
       >
         {open ? "▾ Formu Kapat" : "＋ Yeni Öğe Ekle"}
       </button>

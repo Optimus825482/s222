@@ -162,7 +162,7 @@ export function SystemGuideDialog({ open, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-200 transition-colors text-xl leading-none p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-white/5"
+            className="text-slate-500 hover:text-slate-700 transition-colors text-xl leading-none p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-white/5"
             aria-label="Kapat"
           >
             ✕

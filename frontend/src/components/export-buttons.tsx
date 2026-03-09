@@ -317,7 +317,7 @@ function ExportBtn({
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      className="px-3 lg:px-4 min-h-[44px] rounded-lg bg-surface-overlay text-[11px] text-slate-400 hover:text-slate-200 border border-border hover:border-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+      className="px-3 lg:px-4 min-h-[44px] rounded-lg bg-surface-overlay text-[11px] text-slate-400 hover:text-slate-700 border border-border hover:border-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
     >
       {icon} {label}
     </button>

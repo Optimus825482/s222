@@ -1284,7 +1284,7 @@ function LogDetailDialog({
             </span>
             <button
               onClick={onClose}
-              className="text-slate-500 hover:text-slate-200 transition-colors text-lg leading-none"
+              className="text-slate-500 hover:text-slate-700 transition-colors text-lg leading-none"
               aria-label="Kapat"
             >
               ✕

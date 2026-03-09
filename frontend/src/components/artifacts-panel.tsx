@@ -153,7 +153,7 @@ function CopyBtn({ text }: { text: string }) {
   return (
     <button
       onClick={handle}
-      className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-colors"
+      className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-700 transition-colors"
       title="Kopyala"
       aria-label="Kaynak kodunu kopyala"
     >
@@ -182,7 +182,7 @@ function DownloadBtn({
   return (
     <button
       onClick={handle}
-      className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-colors"
+      className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-700 transition-colors"
       title="İndir"
       aria-label="Dosya olarak indir"
     >
@@ -419,7 +419,7 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
           <DownloadBtn content={artifact.content} type={artifact.type} />
           <button
             onClick={() => setFullscreen((f) => !f)}
-            className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-700 transition-colors"
             title={fullscreen ? "Küçült" : "Tam ekran"}
             aria-label={fullscreen ? "Tam ekrandan çık" : "Tam ekran"}
           >
@@ -431,7 +431,7 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
           </button>
           <button
             onClick={() => setCollapsed((c) => !c)}
-            className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-slate-700 transition-colors"
             title={collapsed ? "Genişlet" : "Daralt"}
             aria-label={collapsed ? "Genişlet" : "Daralt"}
           >

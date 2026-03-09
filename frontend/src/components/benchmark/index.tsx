@@ -20,7 +20,7 @@ export function BenchmarkPanel() {
             className={`px-3 py-2 text-xs transition-colors whitespace-nowrap ${
               tab === t.key
                 ? "text-cyan-400 border-b-2 border-cyan-400"
-                : "text-slate-400 hover:text-slate-200"
+                : "text-slate-400 hover:text-slate-700"
             }`}
           >
             {t.icon} {t.label}

@@ -59,7 +59,7 @@ function Tab({
       className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
         active
           ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-          : "text-slate-400 hover:text-slate-200 border border-transparent hover:border-border"
+          : "text-slate-400 hover:text-slate-700 border border-transparent hover:border-border"
       }`}
     >
       {children}

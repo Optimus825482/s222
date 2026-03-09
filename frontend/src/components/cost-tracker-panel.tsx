@@ -603,7 +603,7 @@ export default function CostTrackerPanel() {
             className={`px-3 py-2 text-xs transition-colors border-b-2 ${
               tab === t.key
                 ? "border-emerald-400 text-emerald-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-400 hover:text-slate-700"
             }`}
             aria-selected={tab === t.key}
             role="tab"

@@ -36,7 +36,7 @@ export function PipelineSelector({ selected, onSelect }: Props) {
                 ${
                   isSelected
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                    : "bg-surface-raised text-slate-400 hover:text-slate-200 hover:bg-surface-overlay border border-border"
+                    : "bg-surface-raised text-slate-400 hover:text-slate-700 hover:bg-surface-overlay border border-border"
                 }
               `}
             >

@@ -630,14 +630,14 @@ export function RoadmapDialog({ open, onClose }: Props) {
             <button
               type="button"
               onClick={() => setFullScreen(!fullScreen)}
-              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
+              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-400 hover:text-slate-700 hover:border-slate-500 transition-colors"
               aria-label={fullScreen ? "Küçült" : "Tam ekran"}
             >
               {fullScreen ? "Küçült" : "Tam ekran"}
             </button>
             <button
               onClick={onClose}
-              className="text-slate-500 hover:text-slate-200 transition-colors text-xl leading-none p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-white/5"
+              className="text-slate-500 hover:text-slate-700 transition-colors text-xl leading-none p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-white/5"
               aria-label="Kapat"
             >
               ✕

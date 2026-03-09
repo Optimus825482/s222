@@ -766,7 +766,7 @@ export default function AutoOptimizerPanel() {
             className={`px-3 py-2 text-xs transition-colors border-b-2 ${
               tab === t.key
                 ? "border-cyan-400 text-cyan-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-400 hover:text-slate-700"
             }`}
             aria-selected={tab === t.key}
             role="tab"

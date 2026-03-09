@@ -101,7 +101,7 @@ export function MemoryTimelinePanel() {
                 className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
                   groupBy === key
                     ? "bg-slate-200 text-[#0f1219] border-slate-200"
-                    : "border-border text-slate-400 hover:text-slate-200"
+                    : "border-border text-slate-400 hover:text-slate-700"
                 }`}
               >
                 {label}
@@ -117,7 +117,7 @@ export function MemoryTimelinePanel() {
                 className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
                   hours === Number(key)
                     ? "bg-slate-200 text-[#0f1219] border-slate-200"
-                    : "border-border text-slate-400 hover:text-slate-200"
+                    : "border-border text-slate-400 hover:text-slate-700"
                 }`}
               >
                 {label}
