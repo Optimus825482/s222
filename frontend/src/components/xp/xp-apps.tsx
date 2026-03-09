@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { FeatherIcon } from "./xp-feather-icon";
 
 // ── Lazy-loaded panel components ──
-const ChatDesktopPanel = dynamic(() => import("@/components/xp-chat-panel"), {
+const ChatDesktopPanel = dynamic(() => import("./panels/xp-chat-panel"), {
   ssr: false,
 });
 const UnifiedTaskMonitor = dynamic(
@@ -97,14 +97,14 @@ const AutoOptimizerPanel = dynamic(
 );
 const XpReportsPanel = dynamic(
   () =>
-    import("@/components/xp-reports-panel").then((m) => ({
+    import("./panels/xp-reports-panel").then((m) => ({
       default: m.XpReportsPanel,
     })),
   { ssr: false },
 );
 const XpSearchPanel = dynamic(
   () =>
-    import("@/components/xp-search-panel").then((m) => ({
+    import("./panels/xp-search-panel").then((m) => ({
       default: m.XpSearchPanel,
     })),
   { ssr: false },
@@ -221,7 +221,7 @@ const SkillCreatorPanel = dynamic(
 );
 const XpMarketplacePanel = dynamic(
   () =>
-    import("@/components/xp-marketplace-panel").then((m) => ({
+    import("./panels/xp-marketplace-panel").then((m) => ({
       default: m.XpMarketplacePanel,
     })),
   { ssr: false },

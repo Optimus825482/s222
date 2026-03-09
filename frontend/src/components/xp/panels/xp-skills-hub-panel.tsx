@@ -23,7 +23,7 @@ const SkillCreatorPanel = dynamic(
 );
 const XpMarketplacePanel = dynamic(
   () =>
-    import("@/components/xp-marketplace-panel").then((m) => ({
+    import("./xp-marketplace-panel").then((m) => ({
       default: m.XpMarketplacePanel,
     })),
   { ssr: false },
