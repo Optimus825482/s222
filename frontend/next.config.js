@@ -5,12 +5,14 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
   async rewrites() {
+    // Docker'da BACKEND_URL environment variable'ı kullan, yoksa localhost (development)
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:8001";
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:8001/api/:path*",
+        destination: `${backendUrl}/api/:path*`,
       },
-      { source: "/ws/:path*", destination: "http://localhost:8001/ws/:path*" },
+      { source: "/ws/:path*", destination: `${backendUrl}/ws/:path*` },
     ];
   },
   async headers() {
