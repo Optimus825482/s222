@@ -6,6 +6,7 @@ import { trackBehavior } from "@/lib/behavior-tracker";
 import type { ThreadSummary, Thread, Task, AgentEvent } from "@/lib/types";
 import {
   ArrowLeft,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Download,
@@ -13,6 +14,7 @@ import {
   FolderOpen,
   Loader2,
   MessageSquare,
+  Presentation,
   Trash2,
   Cpu,
   Zap,
@@ -305,14 +307,27 @@ function PresentationDetailView({
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ backgroundColor: "#fff", color: "#1a1a1a" }}>
+    <div
+      className="flex flex-col h-full"
+      style={{ backgroundColor: "#fff", color: "#1a1a1a" }}
+    >
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}>
-        <button onClick={onBack} className="p-1 rounded" style={{ color: "#333" }}>
+      <div
+        className="flex items-center gap-2 px-3 py-2 border-b"
+        style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}
+      >
+        <button
+          onClick={onBack}
+          className="p-1 rounded"
+          style={{ color: "#333" }}
+        >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <Presentation className="w-4 h-4" style={{ color: "#8b5cf6" }} />
-        <span className="text-[13px] font-semibold truncate" style={{ color: "#003399" }}>
+        <span
+          className="text-[13px] font-semibold truncate"
+          style={{ color: "#003399" }}
+        >
           {presentation.title}
         </span>
         <div className="ml-auto flex items-center gap-1">
@@ -322,7 +337,11 @@ function PresentationDetailView({
             className="p-1.5 rounded text-[10px] flex items-center gap-1"
             style={{ color: "#065f46", backgroundColor: "#ecfdf5" }}
           >
-            {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            {downloading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
             <span>İndir</span>
           </button>
           <button
@@ -337,15 +356,25 @@ function PresentationDetailView({
       </div>
 
       {/* Stats */}
-      <div className="flex flex-wrap gap-3 px-3 py-2 border-b text-[11px]" style={{ backgroundColor: "#faf8f0", borderColor: "#ece9d8" }}>
+      <div
+        className="flex flex-wrap gap-3 px-3 py-2 border-b text-[11px]"
+        style={{ backgroundColor: "#faf8f0", borderColor: "#ece9d8" }}
+      >
         <span style={{ color: "#555" }}>{presentation.slide_count} slayt</span>
         <span style={{ color: "#555" }}>Tema: {presentation.theme}</span>
-        <span style={{ color: "#555" }}>Palet: {presentation.palette_name}</span>
-        <span style={{ color: "#555" }}>{formatDate(presentation.created_at)}</span>
+        <span style={{ color: "#555" }}>
+          Palet: {presentation.palette_name}
+        </span>
+        <span style={{ color: "#555" }}>
+          {formatDate(presentation.created_at)}
+        </span>
       </div>
 
       {/* Slide Navigation */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "#ece9d8" }}>
+      <div
+        className="flex items-center gap-2 px-3 py-2 border-b"
+        style={{ borderColor: "#ece9d8" }}
+      >
         <button
           onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
           disabled={currentSlide === 0}
@@ -358,7 +387,11 @@ function PresentationDetailView({
           {currentSlide + 1} / {presentation.slides.length}
         </span>
         <button
-          onClick={() => setCurrentSlide(Math.min(presentation.slides.length - 1, currentSlide + 1))}
+          onClick={() =>
+            setCurrentSlide(
+              Math.min(presentation.slides.length - 1, currentSlide + 1),
+            )
+          }
           disabled={currentSlide === presentation.slides.length - 1}
           className="p-1 rounded disabled:opacity-50"
           style={{ color: "#333" }}
@@ -391,8 +424,14 @@ function PresentationDetailView({
           color: slide?.colors?.text || "#f1f5f9",
         }}
       >
-        <div className="w-full max-w-2xl aspect-video rounded-lg shadow-xl p-8 flex flex-col justify-center" style={{ backgroundColor: slide?.colors?.background || "#1a1a2e" }}>
-          <h2 className="text-2xl font-bold mb-4" style={{ color: slide?.colors?.accent || "#8b5cf6" }}>
+        <div
+          className="w-full max-w-2xl aspect-video rounded-lg shadow-xl p-8 flex flex-col justify-center"
+          style={{ backgroundColor: slide?.colors?.background || "#1a1a2e" }}
+        >
+          <h2
+            className="text-2xl font-bold mb-4"
+            style={{ color: slide?.colors?.accent || "#8b5cf6" }}
+          >
             {slide?.title}
           </h2>
           {slide?.content && (
@@ -410,7 +449,11 @@ function PresentationDetailView({
           )}
           {slide?.imageUrl && (
             <div className="mt-4 rounded overflow-hidden">
-              <img src={slide.imageUrl} alt={slide.title} className="w-full h-32 object-cover" />
+              <img
+                src={slide.imageUrl}
+                alt={slide.title}
+                className="w-full h-32 object-cover"
+              />
             </div>
           )}
         </div>
@@ -1081,7 +1124,8 @@ export function XpReportsPanel() {
   const [detailThread, setDetailThread] = useState<Thread | null>(null);
   const [projectContent, setProjectContent] = useState<string | null>(null);
   const [projectTitle, setProjectTitle] = useState("");
-  const [detailPresentation, setDetailPresentation] = useState<PresentationDetail | null>(null);
+  const [detailPresentation, setDetailPresentation] =
+    useState<PresentationDetail | null>(null);
 
   // Context menu
   const [ctxMenu, setCtxMenu] = useState<ContextMenu | null>(null);
@@ -1312,10 +1356,6 @@ export function XpReportsPanel() {
       />
     );
   }
-        onDelete={deletePresentation}
-      />
-    );
-  }
 
   // ── Render: List View ──
   return (
@@ -1541,7 +1581,7 @@ export function XpReportsPanel() {
               </button>
             ))}
           </div>
-        ) : (
+        ) : activeFolder === "projects" ? (
           /* Project list */
           <div>
             {projects.length === 0 && !loading && (
@@ -1683,7 +1723,9 @@ export function XpReportsPanel() {
               >
                 <Play
                   className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: w.status === "completed" ? "#10b981" : "#ef4444" }}
+                  style={{
+                    color: w.status === "completed" ? "#10b981" : "#ef4444",
+                  }}
                 />
                 <div className="min-w-0 flex-1">
                   <div
@@ -1699,7 +1741,8 @@ export function XpReportsPanel() {
                     <span
                       className="px-1.5 py-0.5 rounded"
                       style={{
-                        backgroundColor: w.status === "completed" ? "#dcfce7" : "#fee2e2",
+                        backgroundColor:
+                          w.status === "completed" ? "#dcfce7" : "#fee2e2",
                         color: w.status === "completed" ? "#166534" : "#991b1b",
                       }}
                     >

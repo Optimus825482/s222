@@ -999,3 +999,94 @@ async def api_get_rlhf_data(limit: int = 100, user=Depends(get_current_user)):
     
     data = get_rlhf_training_data(limit)
     return data
+
+
+# ── Inter-Agent Communication Monitoring ─────────────────────────────────
+
+@router.get("/api/inter-agent/messages")
+async def api_get_inter_agent_messages(limit: int = 50, user=Depends(get_current_user)):
+    """Get inter-agent message history."""
+    from tools.inter_agent_comm import get_message_bus
+    
+    bus = get_message_bus()
+    messages = bus.get_history(limit=limit)
+    
+    return {
+        "messages": messages,
+        "total": len(messages),
+    }
+
+
+@router.get("/api/inter-agent/knowledge")
+async def api_get_inter_agent_knowledge(user=Depends(get_current_user)):
+    """Get all shared knowledge between agents."""
+    from tools.inter_agent_comm import get_message_bus
+    
+    bus = get_message_bus()
+    all_knowledge = bus.get_all_knowledge()
+    
+    # Convert to list format
+    knowledge_list = []
+    for key, value in all_knowledge.items():
+        knowledge_list.append({
+            "key": key,
+            "value": value,
+            "source_agent": "unknown",
+            "tags": [],
+            "created_at": "",
+        })
+    
+    return {
+        "knowledge": knowledge_list,
+        "total": len(knowledge_list),
+    }
+
+
+@router.get("/api/inter-agent/status")
+async def api_get_inter_agent_status(user=Depends(get_current_user)):
+    """Get status of all agents in the communication system."""
+    from tools.inter_agent_comm import get_message_bus, get_agent_capabilities
+    from tools.agent_retry import get_agent_health
+    
+    bus = get_message_bus()
+    health = get_agent_health()
+    
+    agents = []
+    active_count = 0
+    
+    for agent_role in ["orchestrator", "thinker", "researcher", "speed", "reasoner", "critic"]:
+        pending = bus.get_pending_count(agent_role)
+        agent_health = health.get(agent_role, {})
+        status = agent_health.get("status", "healthy")
+        
+        if status == "healthy":
+            active_count += 1
+        
+        agents.append({
+            "agent_role": agent_role,
+            "pending_messages": pending,
+            "status": status,
+            "capabilities": get_agent_capabilities(agent_role),
+            "failures": agent_health.get("failures", 0),
+        })
+    
+    return {
+        "agents": agents,
+        "active_agents": active_count,
+        "total_messages": len(bus.get_history(limit=1000)),
+        "total_knowledge": len(bus.get_all_knowledge()),
+    }
+
+
+@router.post("/api/inter-agent/clear")
+async def api_clear_inter_agent_data(user=Depends(get_current_user)):
+    """Clear inter-agent message history and knowledge."""
+    from tools.inter_agent_comm import get_message_bus
+    
+    bus = get_message_bus()
+    bus._history = []
+    bus.clear_knowledge()
+    
+    _audit(user, "inter_agent_clear", "Cleared all inter-agent data")
+    
+    return {"success": True, "message": "Inter-agent data cleared"}

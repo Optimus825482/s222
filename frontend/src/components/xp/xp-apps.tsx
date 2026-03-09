@@ -128,6 +128,11 @@ const ResiliencePanel = dynamic(
   { ssr: false },
 );
 
+const InterAgentMonitorPanel = dynamic(
+  () => import("@/components/inter-agent-monitor-panel"),
+  { ssr: false },
+);
+
 // ── Panel imports from xp/panels ──
 import { XpAgentsPanel } from "./panels/xp-agents-panel";
 import { XpSessionsPanel } from "./panels/xp-sessions-panel";
@@ -355,6 +360,18 @@ export const APPS: DesktopApp[] = [
     defaultW: 400,
     defaultH: 480,
     render: () => <XpAgentsPanel />,
+  },
+  {
+    id: "inter-agent-monitor",
+    title: "Agent İletişim Monitörü",
+    icon: <FeatherIcon name="message-circle" color="#06b6d4" />,
+    color: "#06b6d4",
+    group: "Agent",
+    description:
+      "Agentlar arası mesajlaşma, bilgi paylaşımı ve işbirliği izleme paneli.",
+    defaultW: 700,
+    defaultH: 550,
+    render: () => <InterAgentMonitorPanel />,
   },
 
   // ═══════════════════════════════════════════════════════════
