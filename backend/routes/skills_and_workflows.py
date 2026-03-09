@@ -771,3 +771,147 @@ Rules:
         raise
     except Exception as e:
         raise HTTPException(502, f"Workflow oluşturma hatası: {str(e)}")
+
+
+# ── Presentation Archive Endpoints ────────────────────────────────
+
+import json as _json
+from datetime import datetime, timezone
+from pathlib import Path as _Path
+
+PRESENTATIONS_FILE = _Path(__file__).parent.parent / "data" / "presentations.json"
+
+def _ensure_presentations_file():
+    """Ensure presentations JSON file exists."""
+    PRESENTATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not PRESENTATIONS_FILE.exists():
+        PRESENTATIONS_FILE.write_text("[]", encoding="utf-8")
+
+def _load_presentations() -> list[dict]:
+    """Load presentations from JSON file."""
+    _ensure_presentations_file()
+    try:
+        return _json.loads(PRESENTATIONS_FILE.read_text(encoding="utf-8"))
+    except:
+        return []
+
+def _save_presentations(data: list[dict]):
+    """Save presentations to JSON file."""
+    _ensure_presentations_file()
+    PRESENTATIONS_FILE.write_text(_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+class PresentationSaveRequest(BaseModel):
+    title: str
+    slides: list[dict]
+    theme: str = "geist"
+    style: str = "professional"
+    palette_name: str = "Professional Blue"
+
+
+class PresentationUpdateRequest(BaseModel):
+    presentation_id: str
+    title: str | None = None
+    slides: list[dict] | None = None
+
+
+@router.post("/api/presentations/save")
+async def api_save_presentation(req: PresentationSaveRequest, user=Depends(get_current_user)):
+    """Save a presentation to archive."""
+    presentations = _load_presentations()
+    
+    presentation_id = f"pres-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    
+    presentation = {
+        "id": presentation_id,
+        "title": req.title,
+        "slides": req.slides,
+        "slide_count": len(req.slides),
+        "theme": req.theme,
+        "style": req.style,
+        "palette_name": req.palette_name,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "user": user.get("sub", "anonymous") if user else "anonymous",
+    }
+    
+    presentations.insert(0, presentation)  # En başa ekle
+    
+    # Maksimum 50 sunum tut
+    if len(presentations) > 50:
+        presentations = presentations[:50]
+    
+    _save_presentations(presentations)
+    _audit(user, "presentation_save", req.title)
+    
+    return {"success": True, "presentation_id": presentation_id, "presentation": presentation}
+
+
+@router.get("/api/presentations/list")
+async def api_list_presentations(user=Depends(get_current_user)):
+    """List all saved presentations."""
+    presentations = _load_presentations()
+    
+    # Sadece özet bilgileri döndür
+    summaries = [
+        {
+            "id": p["id"],
+            "title": p["title"],
+            "slide_count": p["slide_count"],
+            "theme": p.get("theme", "geist"),
+            "style": p.get("style", "professional"),
+            "palette_name": p.get("palette_name", "Professional Blue"),
+            "created_at": p["created_at"],
+            "updated_at": p.get("updated_at", p["created_at"]),
+        }
+        for p in presentations
+    ]
+    
+    return {"presentations": summaries}
+
+
+@router.get("/api/presentations/{presentation_id}")
+async def api_get_presentation(presentation_id: str, user=Depends(get_current_user)):
+    """Get a specific presentation by ID."""
+    presentations = _load_presentations()
+    
+    for p in presentations:
+        if p["id"] == presentation_id:
+            return {"presentation": p}
+    
+    raise HTTPException(404, f"Sunum bulunamadı: {presentation_id}")
+
+
+@router.delete("/api/presentations/{presentation_id}")
+async def api_delete_presentation(presentation_id: str, user=Depends(get_current_user)):
+    """Delete a presentation."""
+    presentations = _load_presentations()
+    
+    for i, p in enumerate(presentations):
+        if p["id"] == presentation_id:
+            deleted = presentations.pop(i)
+            _save_presentations(presentations)
+            _audit(user, "presentation_delete", deleted["title"])
+            return {"success": True, "deleted_id": presentation_id}
+    
+    raise HTTPException(404, f"Sunum bulunamadı: {presentation_id}")
+
+
+@router.put("/api/presentations/{presentation_id}")
+async def api_update_presentation(presentation_id: str, req: PresentationUpdateRequest, user=Depends(get_current_user)):
+    """Update a presentation."""
+    presentations = _load_presentations()
+    
+    for p in presentations:
+        if p["id"] == presentation_id:
+            if req.title:
+                p["title"] = req.title
+            if req.slides:
+                p["slides"] = req.slides
+                p["slide_count"] = len(req.slides)
+            p["updated_at"] = datetime.now(timezone.utc).isoformat()
+            _save_presentations(presentations)
+            _audit(user, "presentation_update", p["title"])
+            return {"success": True, "presentation": p}
+    
+    raise HTTPException(404, f"Sunum bulunamadı: {presentation_id}")

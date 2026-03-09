@@ -743,6 +743,450 @@ WORKFLOW_TEMPLATES: dict[str, Workflow] = {
         ],
         variables={"topic": ""},
     ),
+    # ─────────────────────────────────────────────────────────────
+    # YENİ ŞABLONLAR
+    # ─────────────────────────────────────────────────────────────
+    "competitor-analysis": Workflow(
+        workflow_id="tpl-competitor-analysis",
+        name="Rakip Analizi",
+        description="Rakipleri araştır → Özellik karşılaştır → SWOT analizi → Stratejik öneriler",
+        steps=[
+            WorkflowStep(
+                step_id="search_competitors",
+                step_type="tool_call",
+                tool_name="web_search",
+                tool_args={"query": "{{company}} competitors alternatives", "max_results": 8},
+                on_error="retry",
+            ),
+            WorkflowStep(
+                step_id="analyze_features",
+                step_type="agent_call",
+                agent_role="researcher",
+                agent_prompt=(
+                    "Analyze the competitive landscape for: {{company}}\n\n"
+                    "Search results:\n{{search_competitors}}\n\n"
+                    "Create a feature comparison matrix with top 5 competitors."
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="swot_analysis",
+                step_type="agent_call",
+                agent_role="thinker",
+                agent_prompt=(
+                    "Perform SWOT analysis for {{company}} based on:\n\n"
+                    "Feature Analysis:\n{{analyze_features}}\n\n"
+                    "Identify: Strengths, Weaknesses, Opportunities, Threats."
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="strategy",
+                step_type="agent_call",
+                agent_role="speed",
+                agent_prompt=(
+                    "Based on SWOT analysis, create strategic recommendations:\n\n"
+                    "{{swot_analysis}}\n\n"
+                    "Format: Quick Wins → Medium-term → Long-term strategies."
+                ),
+                timeout_seconds=60,
+            ),
+        ],
+        variables={"company": ""},
+    ),
+    "bug-investigation": Workflow(
+        workflow_id="tpl-bug-investigation",
+        name="Hata Araştırması",
+        description="Hata tanımı → Olası nedenler → Çözüm önerileri → Test planı",
+        steps=[
+            WorkflowStep(
+                step_id="search_similar",
+                step_type="tool_call",
+                tool_name="web_search",
+                tool_args={"query": "{{bug_description}} solution fix", "max_results": 5},
+                on_error="skip",
+            ),
+            WorkflowStep(
+                step_id="analyze_bug",
+                step_type="agent_call",
+                agent_role="reasoner",
+                agent_prompt=(
+                    "Analyze this bug systematically:\n\n"
+                    "Bug Description: {{bug_description}}\n\n"
+                    "Similar Issues Found:\n{{search_similar}}\n\n"
+                    "1. Identify possible root causes\n"
+                    "2. Rank by likelihood\n"
+                    "3. Suggest debugging steps"
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="propose_fix",
+                step_type="agent_call",
+                agent_role="thinker",
+                agent_prompt=(
+                    "Propose solutions for this bug:\n\n"
+                    "Analysis:\n{{analyze_bug}}\n\n"
+                    "For each solution: describe approach, complexity, risk level."
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="test_plan",
+                step_type="agent_call",
+                agent_role="speed",
+                agent_prompt=(
+                    "Create a test plan to verify the fix:\n\n"
+                    "Proposed Solutions:\n{{propose_fix}}\n\n"
+                    "Include: unit tests, integration tests, edge cases to verify."
+                ),
+                timeout_seconds=60,
+            ),
+        ],
+        variables={"bug_description": ""},
+    ),
+    "content-creator": Workflow(
+        workflow_id="tpl-content-creator",
+        name="İçerik Üretici",
+        description="Konu araştırması → İçerik taslağı → Yazım → Düzenleme",
+        steps=[
+            WorkflowStep(
+                step_id="research_topic",
+                step_type="agent_call",
+                agent_role="researcher",
+                agent_prompt=(
+                    "Research the topic for content creation: {{topic}}\n\n"
+                    "Target audience: {{audience}}\n"
+                    "Content type: {{content_type}}\n\n"
+                    "Gather key points, statistics, and expert opinions."
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="create_outline",
+                step_type="agent_call",
+                agent_role="thinker",
+                agent_prompt=(
+                    "Create a detailed content outline:\n\n"
+                    "Research:\n{{research_topic}}\n\n"
+                    "Structure: Introduction → Main Points → Conclusion\n"
+                    "Include hooks, subheadings, and key takeaways."
+                ),
+                timeout_seconds=60,
+            ),
+            WorkflowStep(
+                step_id="write_content",
+                step_type="agent_call",
+                agent_role="speed",
+                agent_prompt=(
+                    "Write the full content based on outline:\n\n"
+                    "Outline:\n{{create_outline}}\n\n"
+                    "Style: {{style}}\n"
+                    "Tone: {{tone}}\n\n"
+                    "Write engaging, well-structured content."
+                ),
+                timeout_seconds=120,
+            ),
+            WorkflowStep(
+                step_id="edit_polish",
+                step_type="agent_call",
+                agent_role="critic",
+                agent_prompt=(
+                    "Review and improve this content:\n\n"
+                    "{{write_content}}\n\n"
+                    "Check: grammar, clarity, engagement, SEO optimization.\n"
+                    "Provide the polished final version."
+                ),
+                timeout_seconds=60,
+            ),
+        ],
+        variables={"topic": "", "audience": "genel", "content_type": "blog", "style": "profesyonel", "tone": "arkadaş canlısı"},
+    ),
+    "idea-validator": Workflow(
+        workflow_id="tpl-idea-validator",
+        name="Fikir Doğrulama",
+        description="Pazar araştırması → Fizibilite analizi → Risk değerlendirmesi → Git/Karar ver",
+        steps=[
+            WorkflowStep(
+                step_id="market_research",
+                step_type="tool_call",
+                tool_name="web_search",
+                tool_args={"query": "{{idea}} market size demand trends", "max_results": 5},
+            ),
+            WorkflowStep(
+                step_id="feasibility",
+                step_type="agent_call",
+                agent_role="thinker",
+                agent_prompt=(
+                    "Assess feasibility of this idea:\n\n"
+                    "Idea: {{idea}}\n\n"
+                    "Market Research:\n{{market_research}}\n\n"
+                    "Evaluate: Technical feasibility, Market demand, Resource requirements"
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="risks",
+                step_type="agent_call",
+                agent_role="reasoner",
+                agent_prompt=(
+                    "Identify risks and challenges:\n\n"
+                    "Feasibility Analysis:\n{{feasibility}}\n\n"
+                    "Categorize: Technical risks, Market risks, Financial risks\n"
+                    "Rate each risk: High/Medium/Low"
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="decision",
+                step_type="agent_call",
+                agent_role="critic",
+                agent_prompt=(
+                    "Make a GO/NO-GO decision:\n\n"
+                    "Feasibility: {{feasibility}}\n\n"
+                    "Risks: {{risks}}\n\n"
+                    "Provide:\n"
+                    "1. Clear recommendation (GO/NO-GO/MODIFY)\n"
+                    "2. Key reasons\n"
+                    "3. Conditions for success\n"
+                    "4. Next steps if GO"
+                ),
+                timeout_seconds=60,
+            ),
+        ],
+        variables={"idea": ""},
+    ),
+    "learning-path": Workflow(
+        workflow_id="tpl-learning-path",
+        name="Öğrenme Yolu",
+        description="Mevcut seviye analizi → Kaynak araştırması → Yol haritası → Öneriler",
+        steps=[
+            WorkflowStep(
+                step_id="assess_level",
+                step_type="agent_call",
+                agent_role="reasoner",
+                agent_prompt=(
+                    "Assess current knowledge level for: {{skill}}\n\n"
+                    "User background: {{background}}\n"
+                    "Goals: {{goals}}\n\n"
+                    "Determine: Current level (Beginner/Intermediate/Advanced)\n"
+                    "Knowledge gaps, Prerequisites needed"
+                ),
+                timeout_seconds=60,
+            ),
+            WorkflowStep(
+                step_id="find_resources",
+                step_type="tool_call",
+                tool_name="web_search",
+                tool_args={"query": "best {{skill}} learning resources courses tutorials", "max_results": 8},
+            ),
+            WorkflowStep(
+                step_id="create_roadmap",
+                step_type="agent_call",
+                agent_role="thinker",
+                agent_prompt=(
+                    "Create a learning roadmap:\n\n"
+                    "Skill: {{skill}}\n"
+                    "Assessment: {{assess_level}}\n\n"
+                    "Resources Found:\n{{find_resources}}\n\n"
+                    "Create: Week-by-week plan with milestones and resources."
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="recommendations",
+                step_type="agent_call",
+                agent_role="speed",
+                agent_prompt=(
+                    "Provide actionable recommendations:\n\n"
+                    "Roadmap:\n{{create_roadmap}}\n\n"
+                    "Include:\n"
+                    "- Top 3 free resources\n"
+                    "- Top 3 paid resources\n"
+                    "- Practice projects\n"
+                    "- Community/forums to join"
+                ),
+                timeout_seconds=60,
+            ),
+        ],
+        variables={"skill": "", "background": "", "goals": ""},
+    ),
+    "meeting-prep": Workflow(
+        workflow_id="tpl-meeting-prep",
+        name="Toplantı Hazırlığı",
+        description="Gündem araştırması → Konuşma noktaları → Soru listesi → Özet belgesi",
+        steps=[
+            WorkflowStep(
+                step_id="research_context",
+                step_type="tool_call",
+                tool_name="web_search",
+                tool_args={"query": "{{meeting_topic}} latest news updates", "max_results": 5},
+                on_error="skip",
+            ),
+            WorkflowStep(
+                step_id="talking_points",
+                step_type="agent_call",
+                agent_role="thinker",
+                agent_prompt=(
+                    "Prepare talking points for meeting:\n\n"
+                    "Topic: {{meeting_topic}}\n"
+                    "Type: {{meeting_type}}\n"
+                    "Participants: {{participants}}\n\n"
+                    "Context:\n{{research_context}}\n\n"
+                    "Create 5-7 key talking points with supporting data."
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="questions",
+                step_type="agent_call",
+                agent_role="reasoner",
+                agent_prompt=(
+                    "Generate strategic questions:\n\n"
+                    "Talking Points:\n{{talking_points}}\n\n"
+                    "Create:\n"
+                    "- Clarifying questions\n"
+                    "- Strategic questions\n"
+                    "- Questions to anticipate from others"
+                ),
+                timeout_seconds=60,
+            ),
+            WorkflowStep(
+                step_id="brief_doc",
+                step_type="agent_call",
+                agent_role="speed",
+                agent_prompt=(
+                    "Create meeting brief document:\n\n"
+                    "Talking Points:\n{{talking_points}}\n\n"
+                    "Questions:\n{{questions}}\n\n"
+                    "Format: Executive Summary → Key Points → Questions → Action Items template"
+                ),
+                timeout_seconds=60,
+            ),
+        ],
+        variables={"meeting_topic": "", "meeting_type": "strategic", "participants": ""},
+    ),
+    "api-documentation": Workflow(
+        workflow_id="tpl-api-documentation",
+        name="API Dokümantasyonu",
+        description="Endpoint analizi → OpenAPI şeması → Örnekler → Kullanım kılavuzu",
+        steps=[
+            WorkflowStep(
+                step_id="analyze_endpoints",
+                step_type="agent_call",
+                agent_role="thinker",
+                agent_prompt=(
+                    "Analyze API endpoints:\n\n"
+                    "API Description:\n{{api_description}}\n\n"
+                    "Endpoints:\n{{endpoints}}\n\n"
+                    "Map each endpoint: method, path, params, response."
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="create_schema",
+                step_type="agent_call",
+                agent_role="reasoner",
+                agent_prompt=(
+                    "Create OpenAPI 3.0 schema:\n\n"
+                    "Analysis:\n{{analyze_endpoints}}\n\n"
+                    "Generate complete OpenAPI YAML with:\n"
+                    "- Info section\n"
+                    "- Servers\n"
+                    "- Paths\n"
+                    "- Components/schemas"
+                ),
+                timeout_seconds=120,
+            ),
+            WorkflowStep(
+                step_id="examples",
+                step_type="agent_call",
+                agent_role="speed",
+                agent_prompt=(
+                    "Create code examples:\n\n"
+                    "Schema:\n{{create_schema}}\n\n"
+                    "Generate examples in:\n"
+                    "- cURL\n"
+                    "- JavaScript (fetch)\n"
+                    "- Python (requests)\n"
+                    "- TypeScript (axios)"
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="guide",
+                step_type="agent_call",
+                agent_role="speed",
+                agent_prompt=(
+                    "Create API usage guide:\n\n"
+                    "Examples:\n{{examples}}\n\n"
+                    "Include:\n"
+                    "- Authentication\n"
+                    "- Rate limits\n"
+                    "- Error handling\n"
+                    "- Best practices"
+                ),
+                timeout_seconds=60,
+            ),
+        ],
+        variables={"api_description": "", "endpoints": ""},
+    ),
+    "security-audit": Workflow(
+        workflow_id="tpl-security-audit",
+        name="Güvenlik Denetimi",
+        description="Zafiyet taraması → Risk analizi → Düzeltme önerileri → Rapor",
+        steps=[
+            WorkflowStep(
+                step_id="scan_vulnerabilities",
+                step_type="tool_call",
+                tool_name="web_search",
+                tool_args={"query": "{{system_type}} security vulnerabilities CVE", "max_results": 5},
+                on_error="skip",
+            ),
+            WorkflowStep(
+                step_id="analyze_risks",
+                step_type="agent_call",
+                agent_role="reasoner",
+                agent_prompt=(
+                    "Analyze security risks:\n\n"
+                    "System: {{system_type}}\n"
+                    "Known Vulnerabilities:\n{{scan_vulnerabilities}}\n\n"
+                    "Assess:\n"
+                    "- Attack vectors\n"
+                    "- Impact severity\n"
+                    "- Exploit likelihood"
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="recommendations",
+                step_type="agent_call",
+                agent_role="thinker",
+                agent_prompt=(
+                    "Create security recommendations:\n\n"
+                    "Risk Analysis:\n{{analyze_risks}}\n\n"
+                    "For each risk:\n"
+                    "- Mitigation steps\n"
+                    "- Priority (Critical/High/Medium/Low)\n"
+                    "- Implementation effort"
+                ),
+                timeout_seconds=90,
+            ),
+            WorkflowStep(
+                step_id="report",
+                step_type="agent_call",
+                agent_role="speed",
+                agent_prompt=(
+                    "Generate security audit report:\n\n"
+                    "Risks:\n{{analyze_risks}}\n\n"
+                    "Recommendations:\n{{recommendations}}\n\n"
+                    "Format: Executive Summary → Findings → Recommendations → Action Plan"
+                ),
+                timeout_seconds=60,
+            ),
+        ],
+        variables={"system_type": ""},
+    ),
 }
 
 

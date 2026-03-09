@@ -275,15 +275,43 @@ function XpMcpWrapper() {
 }
 
 // ── All desktop applications ──
+// Nexus AI Team Logo Component
+const NexusLogo = ({ size = 24, color = "#6366f1" }: { size?: number; color?: string }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Outer ring */}
+    <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.5" fill="none" />
+    {/* Inner hexagon representing AI nodes */}
+    <path
+      d="M12 4L18.5 8V16L12 20L5.5 16V8L12 4Z"
+      stroke={color}
+      strokeWidth="1.5"
+      fill="none"
+    />
+    {/* Center node */}
+    <circle cx="12" cy="12" r="3" fill={color} />
+    {/* Connection lines */}
+    <line x1="12" y1="4" x2="12" y2="9" stroke={color} strokeWidth="1" />
+    <line x1="12" y1="15" x2="12" y2="20" stroke={color} strokeWidth="1" />
+    <line x1="5.5" y1="8" x2="9" y2="10.5" stroke={color} strokeWidth="1" />
+    <line x1="18.5" y1="8" x2="15" y2="10.5" stroke={color} strokeWidth="1" />
+  </svg>
+);
+
 export const APPS: DesktopApp[] = [
   {
     id: "chat",
-    title: "Sohbet",
-    icon: <FeatherIcon name="message-square" color="#3b82f6" />,
-    color: "#3b82f6",
+    title: "Nexus AI Team",
+    icon: <NexusLogo size={24} color="#6366f1" />,
+    color: "#6366f1",
     group: "Ana",
     description:
-      "Agent'larla sohbet edin, görev gönderin. Orchestrator mesajınızı analiz edip uygun specialist agent'lara yönlendirir.",
+      "6 uzman AI agent ile sohbet edin. Orchestrator mesajınızı analiz edip uygun specialist agent'lara yönlendirir.",
     defaultW: 700,
     defaultH: 500,
     render: () => <ChatDesktopPanel />,

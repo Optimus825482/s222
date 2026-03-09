@@ -218,7 +218,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 // ── Types ────────────────────────────────────────────────────────
 
-type Folder = "threads" | "projects";
+type Folder = "threads" | "projects" | "presentations" | "workflows";
 
 interface ProjectSummary {
   name: string;
@@ -227,12 +227,242 @@ interface ProjectSummary {
   total_phases: number;
 }
 
+interface PresentationSummary {
+  id: string;
+  title: string;
+  slide_count: number;
+  theme: string;
+  style: string;
+  palette_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface PresentationDetail extends PresentationSummary {
+  slides: Array<{
+    id: number;
+    title: string;
+    content: string;
+    bullets: string[];
+    layout: string;
+    imageUrl?: string;
+    colors?: {
+      background: string;
+      text: string;
+      accent: string;
+      accent_secondary: string;
+      muted: string;
+    };
+  }>;
+}
+
 interface ContextMenu {
   x: number;
   y: number;
   type: Folder;
   id: string;
   label: string;
+}
+
+// ── Presentation Detail View ─────────────────────────────────────
+
+function PresentationDetailView({
+  presentation,
+  onBack,
+  onDelete,
+}: {
+  presentation: PresentationDetail;
+  onBack: () => void;
+  onDelete: (id: string) => void;
+}) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [downloading, setDownloading] = useState(false);
+  const slide = presentation.slides[currentSlide];
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      // Sunumu HTML olarak indir
+      const html = generatePresentationHTML(presentation);
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${presentation.title.replace(/[^a-zA-Z0-9]/g, "_")}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download error:", err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (confirm(`"${presentation.title}" silinsin mi?`)) {
+      onDelete(presentation.id);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full" style={{ backgroundColor: "#fff", color: "#1a1a1a" }}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}>
+        <button onClick={onBack} className="p-1 rounded" style={{ color: "#333" }}>
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <Presentation className="w-4 h-4" style={{ color: "#8b5cf6" }} />
+        <span className="text-[13px] font-semibold truncate" style={{ color: "#003399" }}>
+          {presentation.title}
+        </span>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="p-1.5 rounded text-[10px] flex items-center gap-1"
+            style={{ color: "#065f46", backgroundColor: "#ecfdf5" }}
+          >
+            {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            <span>İndir</span>
+          </button>
+          <button
+            onClick={handleDelete}
+            className="p-1.5 rounded text-[10px] flex items-center gap-1"
+            style={{ color: "#dc2626", backgroundColor: "#fef2f2" }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Sil</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="flex flex-wrap gap-3 px-3 py-2 border-b text-[11px]" style={{ backgroundColor: "#faf8f0", borderColor: "#ece9d8" }}>
+        <span style={{ color: "#555" }}>{presentation.slide_count} slayt</span>
+        <span style={{ color: "#555" }}>Tema: {presentation.theme}</span>
+        <span style={{ color: "#555" }}>Palet: {presentation.palette_name}</span>
+        <span style={{ color: "#555" }}>{formatDate(presentation.created_at)}</span>
+      </div>
+
+      {/* Slide Navigation */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "#ece9d8" }}>
+        <button
+          onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+          disabled={currentSlide === 0}
+          className="p-1 rounded disabled:opacity-50"
+          style={{ color: "#333" }}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-[11px]" style={{ color: "#666" }}>
+          {currentSlide + 1} / {presentation.slides.length}
+        </span>
+        <button
+          onClick={() => setCurrentSlide(Math.min(presentation.slides.length - 1, currentSlide + 1))}
+          disabled={currentSlide === presentation.slides.length - 1}
+          className="p-1 rounded disabled:opacity-50"
+          style={{ color: "#333" }}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+        {/* Slide thumbnails */}
+        <div className="flex gap-1 ml-2 overflow-x-auto flex-1">
+          {presentation.slides.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentSlide(i)}
+              className="px-2 py-1 rounded text-[10px] whitespace-nowrap"
+              style={{
+                backgroundColor: i === currentSlide ? "#8b5cf6" : "#f3f4f6",
+                color: i === currentSlide ? "#fff" : "#333",
+              }}
+            >
+              {s.title.slice(0, 15)}...
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Slide Preview */}
+      <div
+        className="flex-1 flex items-center justify-center p-4"
+        style={{
+          backgroundColor: slide?.colors?.background || "#1a1a2e",
+          color: slide?.colors?.text || "#f1f5f9",
+        }}
+      >
+        <div className="w-full max-w-2xl aspect-video rounded-lg shadow-xl p-8 flex flex-col justify-center" style={{ backgroundColor: slide?.colors?.background || "#1a1a2e" }}>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: slide?.colors?.accent || "#8b5cf6" }}>
+            {slide?.title}
+          </h2>
+          {slide?.content && (
+            <p className="text-sm mb-4 opacity-90">{slide.content}</p>
+          )}
+          {slide?.bullets && slide.bullets.length > 0 && (
+            <ul className="space-y-2">
+              {slide.bullets.map((b: string, i: number) => (
+                <li key={i} className="flex items-start gap-2 text-sm">
+                  <span style={{ color: slide?.colors?.accent }}>•</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {slide?.imageUrl && (
+            <div className="mt-4 rounded overflow-hidden">
+              <img src={slide.imageUrl} alt={slide.title} className="w-full h-32 object-cover" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function generatePresentationHTML(presentation: PresentationDetail): string {
+  const slides = presentation.slides
+    .map((slide, i) => {
+      const colors = slide.colors || {
+        background: "#1a1a2e",
+        text: "#f1f5f9",
+        accent: "#8b5cf6",
+      };
+      return `
+      <section class="slide" style="background: ${colors.background}; color: ${colors.text}">
+        <div class="slide-content">
+          <h2 style="color: ${colors.accent}">${slide.title}</h2>
+          ${slide.content ? `<p>${slide.content}</p>` : ""}
+          ${slide.bullets?.length ? `<ul>${slide.bullets.map((b) => `<li>${b}</li>`).join("")}</ul>` : ""}
+          ${slide.imageUrl ? `<img src="${slide.imageUrl}" alt="${slide.title}" />` : ""}
+        </div>
+      </section>
+    `;
+    })
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>${presentation.title}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .slide { height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+    .slide-content { max-width: 800px; text-align: center; }
+    h2 { font-size: 2.5rem; margin-bottom: 1rem; }
+    p { font-size: 1.25rem; opacity: 0.9; margin-bottom: 1rem; }
+    ul { text-align: left; list-style: none; }
+    li { padding: 0.5rem 0; font-size: 1.1rem; }
+    li::before { content: "•"; margin-right: 0.5rem; }
+    img { max-width: 100%; max-height: 200px; object-fit: cover; border-radius: 0.5rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  ${slides}
+</body>
+</html>`;
 }
 
 // ── Structured Event Renderer ────────────────────────────────────
