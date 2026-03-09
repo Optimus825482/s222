@@ -821,3 +821,87 @@ async def auto_discover_skills(user: dict = Depends(get_current_user)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Skill discovery failed: {e}")
+
+
+# ── Reflexion Settings API ────────────────────────────────────────
+
+class ReflexionConfigModel(BaseModel):
+    enabled: bool = True
+    auto_improve: bool = True
+    score_threshold: float = 0.7
+    max_iterations: int = 3
+
+
+@router.get("/api/reflexion/config")
+async def get_reflexion_config():
+    """Get current reflexion configuration from environment."""
+    import os
+    return {
+        "enabled": os.getenv("REFLEXION_ENABLED", "true").lower() == "true",
+        "auto_improve": os.getenv("REFLEXION_AUTO_IMPROVE", "true").lower() == "true",
+        "score_threshold": float(os.getenv("REFLEXION_SCORE_THRESHOLD", "0.7")),
+        "max_iterations": int(os.getenv("REFLEXION_MAX_ITERATIONS", "3")),
+    }
+
+
+@router.post("/api/reflexion/config")
+async def update_reflexion_config(config: ReflexionConfigModel, user: dict = Depends(get_current_user)):
+    """Update reflexion configuration (writes to .env file)."""
+    import os
+    from pathlib import Path
+    
+    _audit("update_reflexion_config", user["user_id"])
+    
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    
+    # Read current .env
+    env_lines = []
+    if env_path.exists():
+        env_lines = env_path.read_text().splitlines()
+    
+    # Update values
+    updates = {
+        "REFLEXION_ENABLED": str(config.enabled).lower(),
+        "REFLEXION_AUTO_IMPROVE": str(config.auto_improve).lower(),
+        "REFLEXION_SCORE_THRESHOLD": str(config.score_threshold),
+        "REFLEXION_MAX_ITERATIONS": str(config.max_iterations),
+    }
+    
+    # Modify existing lines or add new ones
+    updated_keys = set()
+    for i, line in enumerate(env_lines):
+        for key, val in updates.items():
+            if line.startswith(f"{key}="):
+                env_lines[i] = f"{key}={val}"
+                updated_keys.add(key)
+    
+    # Add missing keys
+    for key, val in updates.items():
+        if key not in updated_keys:
+            env_lines.append(f"{key}={val}")
+    
+    # Write back
+    env_path.write_text("\n".join(env_lines) + "\n")
+    
+    return {"ok": True, "config": config.model_dump()}
+
+
+@router.get("/api/reflexion/results")
+async def get_reflexion_results(limit: int = 20):
+    """Get recent reflexion evaluation results."""
+    import json
+    from pathlib import Path
+    
+    results_file = Path(__file__).parent.parent.parent / "data" / "reflexion_results.json"
+    
+    if not results_file.exists():
+        return []
+    
+    try:
+        data = json.loads(results_file.read_text())
+        results = data.get("results", [])[-limit:]
+        return results
+    except Exception:
+        return []
+    except Exception:
+        return []

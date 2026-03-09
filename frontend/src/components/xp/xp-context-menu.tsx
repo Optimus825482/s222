@@ -126,7 +126,7 @@ export function DesktopContextMenu({
       <button
         onClick={() => {
           onClose();
-          onOpenApp("insights");
+          onOpenApp("resilience");
         }}
         className="w-full text-left px-4 py-1.5 hover:bg-[#2f71cd] hover:text-white flex items-center gap-2.5"
       >

@@ -8,6 +8,7 @@ import { FeatherIcon } from "./xp-feather-icon";
 const ChatDesktopPanel = dynamic(() => import("./panels/xp-chat-panel"), {
   ssr: false,
 });
+
 const UnifiedTaskMonitor = dynamic(
   () =>
     import("@/components/unified-task-monitor").then((m) => ({
@@ -15,13 +16,7 @@ const UnifiedTaskMonitor = dynamic(
     })),
   { ssr: false },
 );
-const AutonomousOversightPanel = dynamic(
-  () =>
-    import("@/components/monitoring-panels").then((m) => ({
-      default: m.AutonomousOversightPanel,
-    })),
-  { ssr: false },
-);
+
 const MemoryTimelinePanel = dynamic(
   () =>
     import("@/components/memory-panels").then((m) => ({
@@ -36,65 +31,17 @@ const MemoryCorrelationPanel = dynamic(
     })),
   { ssr: false },
 );
-const AgentEvolutionPanel = dynamic(
-  () =>
-    import("@/components/agent-evolution-panel").then((m) => ({
-      default: m.AgentEvolutionPanel,
-    })),
-  { ssr: false },
-);
-const CoordinationPanel = dynamic(
-  () =>
-    import("@/components/coordination-panel").then((m) => ({
-      default: m.CoordinationPanel,
-    })),
-  { ssr: false },
-);
 
-const AutonomousEvolutionPanel = dynamic(
-  () =>
-    import("@/components/agent-evolution-panel").then((m) => ({
-      default: m.AutonomousEvolutionPanel,
-    })),
-  { ssr: false },
-);
-const AgentCommsPanel = dynamic(
-  () =>
-    import("@/components/agent-comms-panel").then((m) => ({
-      default: m.AgentCommsPanel,
-    })),
-  { ssr: false },
-);
-const AgentIdentityEditor = dynamic(
-  () =>
-    import("@/components/agent-identity-editor").then((m) => ({
-      default: m.AgentIdentityEditor,
-    })),
-  { ssr: false },
-);
-const BenchmarkPanel = dynamic(
-  () =>
-    import("@/components/benchmark").then((m) => ({
-      default: m.BenchmarkPanel,
-    })),
-  { ssr: false },
-);
-const ErrorPatternsPanel = dynamic(
-  () => import("@/components/error-patterns-panel"),
-  { ssr: false },
-);
-const CostTrackerPanel = dynamic(
-  () => import("@/components/cost-tracker-panel"),
-  { ssr: false },
-);
-const PerformanceDashboard = dynamic(
-  () => import("@/components/performance-dashboard"),
-  { ssr: false },
-);
-const AutoOptimizerPanel = dynamic(
-  () => import("@/components/auto-optimizer-panel"),
-  { ssr: false },
-);
+
+
+
+
+
+
+
+
+
+
 const XpReportsPanel = dynamic(
   () =>
     import("./panels/xp-reports-panel").then((m) => ({
@@ -151,48 +98,12 @@ const WorkflowHistoryPanel = dynamic(
     })),
   { ssr: false },
 );
-const ContextBoardPanel = dynamic(
-  () =>
-    import("@/components/context-board-panel").then((m) => ({
-      default: m.ContextBoardPanel,
-    })),
-  { ssr: false },
-);
-const DynamicRolePanel = dynamic(
-  () =>
-    import("@/components/dynamic-role-panel").then((m) => ({
-      default: m.DynamicRolePanel,
-    })),
-  { ssr: false },
-);
-const CollaborativeEditorPanel = dynamic(
-  () =>
-    import("@/components/collaborative-editor-panel").then((m) => ({
-      default: m.CollaborativeEditorPanel,
-    })),
-  { ssr: false },
-);
-const WorktreePanel = dynamic(
-  () =>
-    import("@/components/worktree-panel").then((m) => ({
-      default: m.WorktreePanel,
-    })),
-  { ssr: false },
-);
-const DomainMarketplacePanel = dynamic(
-  () =>
-    import("@/components/domain-marketplace-panel").then((m) => ({
-      default: m.DomainMarketplacePanel,
-    })),
-  { ssr: false },
-);
-const AdaptiveToolSelectorPanel = dynamic(
-  () =>
-    import("@/components/adaptive-tool-selector-panel").then((m) => ({
-      default: m.AdaptiveToolSelectorPanel,
-    })),
-  { ssr: false },
-);
+
+
+
+
+
+
 const WorkflowOptimizerPanel = dynamic(
   () =>
     import("@/components/workflow-optimizer-panel").then((m) => ({
@@ -212,27 +123,9 @@ const ModelManagerPanel = dynamic(
   () => import("@/components/model-manager-panel"),
   { ssr: false },
 );
-const SkillCreatorPanel = dynamic(
-  () =>
-    import("@/components/skill-creator-panel").then((m) => ({
-      default: m.SkillCreatorPanel,
-    })),
-  { ssr: false },
-);
-const XpMarketplacePanel = dynamic(
-  () =>
-    import("./panels/xp-marketplace-panel").then((m) => ({
-      default: m.XpMarketplacePanel,
-    })),
-  { ssr: false },
-);
-const SharedWorkspacePanel = dynamic(
-  () =>
-    import("@/components/shared-workspace-panel").then((m) => ({
-      default: m.SharedWorkspacePanel,
-    })),
-  { ssr: false },
-);
+
+
+
 const McpUsagePanel = dynamic(
   () =>
     import("@/components/mcp-usage-panel").then((m) => ({
@@ -255,7 +148,6 @@ const ResiliencePanel = dynamic(
 // ── Panel imports from xp/panels ──
 import { XpAgentsPanel } from "./panels/xp-agents-panel";
 import { XpSessionsPanel } from "./panels/xp-sessions-panel";
-import { XpToolsPanel } from "./panels/xp-tools-panel";
 import { XpSkillsHubPanel } from "./panels/xp-skills-hub-panel";
 import { XpRoadmapPanel } from "./panels/xp-roadmap-panel";
 import { XpCollaborationPanel } from "./panels/xp-collaboration";
@@ -263,6 +155,7 @@ import { XpAnalyticsPanel } from "./panels/xp-analytics";
 import { XpAgentCenter } from "./panels/xp-agent-center";
 import { XpUnifiedMarketplace } from "./panels/xp-unified-marketplace";
 import { XpToolsUnified } from "./panels/xp-tools-unified";
+import { ReflexionSettingsPanel } from "@/components/reflexion-settings-panel";
 
 // ── App definition type ──
 export interface DesktopApp {
@@ -407,22 +300,7 @@ export const APPS: DesktopApp[] = [
     defaultH: 600,
     render: () => <UnifiedTaskMonitor />,
   },
-  {
-    id: "autonomous-oversight",
-    title: "Otonom İzleme",
-    icon: <FeatherIcon name="eye" color="#a78bfa" />,
-    color: "#a78bfa",
-    group: "Agent",
-    description:
-      "Otonom agent davranışları ve konuşmalarını tek ekrandan izleyin — canlı aktivite, otonom sohbetler, heartbeat.",
-    defaultW: 600,
-    defaultH: 560,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <AutonomousOversightPanel />
-      </div>
-    ),
-  },
+  
 
   {
     id: "memory",
@@ -441,112 +319,14 @@ export const APPS: DesktopApp[] = [
     ),
   },
 
-  {
-    id: "evolution",
-    title: "Gelişim",
-    icon: <FeatherIcon name="trending-up" color="#10b981" />,
-    color: "#10b981",
-    group: "Agent",
-    description: "Agent'ların zaman içindeki performans gelişimini takip edin.",
-    defaultW: 650,
-    defaultH: 480,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <AgentEvolutionPanel />
-      </div>
-    ),
-  },
-  {
-    id: "coordination",
-    title: "Koordinasyon",
-    icon: <FeatherIcon name="link-2" color="#f59e0b" />,
-    color: "#f59e0b",
-    group: "Agent",
-    description: "Agent'lar arası koordinasyon ve iş birliği haritası.",
-    defaultW: 650,
-    defaultH: 480,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <CoordinationPanel />
-      </div>
-    ),
-  },
+  
+  
 
-  {
-    id: "autonomous",
-    title: "Özerk Evrim",
-    icon: <FeatherIcon name="hexagon" color="#a78bfa" />,
-    color: "#a78bfa",
-    group: "Agent",
-    description: "Agent'ların özerk öğrenme ve evrim süreçlerini izleyin.",
-    defaultW: 650,
-    defaultH: 480,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <AutonomousEvolutionPanel />
-      </div>
-    ),
-  },
-  {
-    id: "comms",
-    title: "İletişim",
-    icon: <FeatherIcon name="radio" color="#f43f5e" />,
-    color: "#f43f5e",
-    group: "Agent",
-    description: "Agent'lar arası mesajlaşma ve iletişim kanalları.",
-    defaultW: 600,
-    defaultH: 500,
-    render: () => (
-      <div className="overflow-hidden h-full">
-        <AgentCommsPanel />
-      </div>
-    ),
-  },
-  {
-    id: "identity",
-    title: "Agent Kimliği",
-    icon: <FeatherIcon name="user" color="#8b5cf6" />,
-    color: "#8b5cf6",
-    group: "Agent",
-    description: "Agent kimlikleri ve tercihlerini düzenleyin.",
-    defaultW: 500,
-    defaultH: 420,
-    render: () => (
-      <div className="overflow-auto h-full p-3">
-        <AgentIdentityEditor />
-      </div>
-    ),
-  },
-  {
-    id: "benchmark",
-    title: "Benchmark",
-    icon: <FeatherIcon name="award" color="#eab308" />,
-    color: "#eab308",
-    group: "Analitik",
-    description: "Agent performans kıyaslama testleri.",
-    defaultW: 650,
-    defaultH: 480,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <BenchmarkPanel />
-      </div>
-    ),
-  },
-  {
-    id: "errors",
-    title: "Hata Analizi",
-    icon: <FeatherIcon name="alert-triangle" color="#ef4444" />,
-    color: "#ef4444",
-    group: "Analitik",
-    description: "Hata örüntülerini tespit edin ve analiz edin.",
-    defaultW: 650,
-    defaultH: 480,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <ErrorPatternsPanel />
-      </div>
-    ),
-  },
+  
+  
+  
+  
+  
   {
     id: "search",
     title: "Arama",
@@ -562,51 +342,9 @@ export const APPS: DesktopApp[] = [
       </div>
     ),
   },
-  {
-    id: "optimizer",
-    title: "Optimizer",
-    icon: <FeatherIcon name="zap" color="#f97316" />,
-    color: "#f97316",
-    group: "Analitik",
-    description: "Otomatik optimizasyon motoru.",
-    defaultW: 650,
-    defaultH: 480,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <AutoOptimizerPanel />
-      </div>
-    ),
-  },
-  {
-    id: "performance",
-    title: "Performans",
-    icon: <FeatherIcon name="activity" color="#06b6d4" />,
-    color: "#06b6d4",
-    group: "Analitik",
-    description: "Agent performans metriklerini izleyin.",
-    defaultW: 750,
-    defaultH: 520,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <PerformanceDashboard />
-      </div>
-    ),
-  },
-  {
-    id: "costs",
-    title: "Maliyet",
-    icon: <FeatherIcon name="dollar-sign" color="#84cc16" />,
-    color: "#84cc16",
-    group: "Analitik",
-    description: "API kullanım maliyetlerini takip edin.",
-    defaultW: 650,
-    defaultH: 480,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <CostTrackerPanel />
-      </div>
-    ),
-  },
+  
+  
+  
   {
     id: "reports",
     title: "Raporlar",
@@ -670,17 +408,6 @@ export const APPS: DesktopApp[] = [
         <RagPanel />
       </div>
     ),
-  },
-  {
-    id: "tools",
-    title: "Araçlar",
-    icon: <FeatherIcon name="tool" color="#8b5cf6" />,
-    color: "#8b5cf6",
-    group: "Sistem",
-    description: "Skills, MCP, Teachability ve Eval araçlarını yönetin.",
-    defaultW: 450,
-    defaultH: 550,
-    render: () => <XpToolsPanel />,
   },
   {
     id: "roadmap",
@@ -747,83 +474,7 @@ export const APPS: DesktopApp[] = [
     defaultH: 550,
     render: () => <XpMcpWrapper />,
   },
-  {
-    id: "context-board",
-    title: "Bağlam Panosu",
-    icon: <FeatherIcon name="clipboard" color="#14b8a6" />,
-    color: "#14b8a6",
-    group: "Agent",
-    description: "Paylaşımlı çalışma alanı — agent'ların ortak bağlam panosu.",
-    defaultW: 600,
-    defaultH: 520,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <ContextBoardPanel />
-      </div>
-    ),
-  },
-  {
-    id: "dynamic-roles",
-    title: "Dinamik Roller",
-    icon: <FeatherIcon name="user-check" color="#8b5cf6" />,
-    color: "#8b5cf6",
-    group: "Agent",
-    description:
-      "Dinamik rol atama — agent'lara çalışma zamanında roller atayın.",
-    defaultW: 620,
-    defaultH: 540,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <DynamicRolePanel />
-      </div>
-    ),
-  },
-  {
-    id: "collab-editor",
-    title: "Collaborative Editor",
-    icon: <FeatherIcon name="edit-3" color="#10b981" />,
-    color: "#10b981",
-    group: "İşbirliği",
-    description: "Çoklu agent eşzamanlı dosya düzenleme",
-    defaultW: 900,
-    defaultH: 600,
-    render: () => (
-      <div className="h-full">
-        <CollaborativeEditorPanel />
-      </div>
-    ),
-  },
-  {
-    id: "worktree",
-    title: "Worktree Collaboration",
-    icon: <FeatherIcon name="git-branch" color="#f59e0b" />,
-    color: "#f59e0b",
-    group: "İşbirliği",
-    description: "Git worktree bazlı paralel geliştirme",
-    defaultW: 900,
-    defaultH: 600,
-    render: () => (
-      <div className="h-full">
-        <WorktreePanel />
-      </div>
-    ),
-  },
-  {
-    id: "shared-workspace",
-    title: "Shared Workspace",
-    icon: <FeatherIcon name="folder-plus" color="#14b8a6" />,
-    color: "#14b8a6",
-    group: "İşbirliği",
-    description:
-      "Paylaşımlı çalışma alanları — notlar, kodlar, kararlar ve bulgular.",
-    defaultW: 800,
-    defaultH: 560,
-    render: () => (
-      <div className="h-full">
-        <SharedWorkspacePanel />
-      </div>
-    ),
-  },
+  
   {
     id: "collaboration",
     title: "İşbirliği Merkezi",
@@ -835,37 +486,6 @@ export const APPS: DesktopApp[] = [
     defaultW: 900,
     defaultH: 600,
     render: () => <XpCollaborationPanel />,
-  },
-  {
-    id: "marketplace",
-    title: "Domain Marketplace",
-    icon: <FeatherIcon name="shopping-bag" color="#a855f7" />,
-    color: "#a855f7",
-    group: "Araçlar",
-    description:
-      "Alan uzmanlığı skill'leri — finans, hukuk, mühendislik, akademik.",
-    defaultW: 700,
-    defaultH: 550,
-    render: () => (
-      <div className="overflow-hidden h-full">
-        <DomainMarketplacePanel />
-      </div>
-    ),
-  },
-  {
-    id: "adaptive-tools",
-    title: "Adaptif Araçlar",
-    icon: <FeatherIcon name="sliders" color="#06b6d4" />,
-    color: "#06b6d4",
-    group: "Araçlar",
-    description: "Kullanım, öneriler, matris ve tercih bazlı araç seçimi.",
-    defaultW: 750,
-    defaultH: 550,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <AdaptiveToolSelectorPanel />
-      </div>
-    ),
   },
   {
     id: "workflow-optimizer",
@@ -963,36 +583,8 @@ export const APPS: DesktopApp[] = [
       </div>
     ),
   },
-  {
-    id: "skill-creator",
-    title: "Skill Oluşturucu",
-    icon: <FeatherIcon name="edit" color="#8b5cf6" />,
-    color: "#8b5cf6",
-    group: "Araçlar",
-    description: "Skill doğrulama, test ve oluşturma aracı.",
-    defaultW: 700,
-    defaultH: 560,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <SkillCreatorPanel />
-      </div>
-    ),
-  },
-  {
-    id: "skill-marketplace",
-    title: "Marketplace",
-    icon: <FeatherIcon name="shopping-cart" color="#f59e0b" />,
-    color: "#f59e0b",
-    group: "Araçlar",
-    description: "Skill ve domain uzmanlığı mağazası — keşfet, yükle, yönet.",
-    defaultW: 700,
-    defaultH: 560,
-    render: () => (
-      <div className="overflow-hidden h-full">
-        <XpMarketplacePanel />
-      </div>
-    ),
-  },
+  
+  
   {
     id: "resilience",
     title: "Resilience & Monitoring",
@@ -1004,6 +596,17 @@ export const APPS: DesktopApp[] = [
     defaultW: 780,
     defaultH: 580,
     render: () => <ResiliencePanel />,
+  },
+  {
+    id: "reflexion-settings",
+    title: "Reflexion Ayarları",
+    icon: <FeatherIcon name="cpu" color="#a855f7" />,
+    color: "#a855f7",
+    group: "Sistem",
+    description: "Reflexion mekanizması ayarları ve konfigürasyonu.",
+    defaultW: 600,
+    defaultH: 500,
+    render: () => <ReflexionSettingsPanel />,
   },
   {
     id: "presentations",

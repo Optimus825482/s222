@@ -413,7 +413,7 @@ export function XpTaskbar({
                   </button>
                   <button
                     onClick={() => {
-                      onOpenApp("insights");
+                      onOpenApp("resilience");
                       setStartOpen(false);
                     }}
                     className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
@@ -433,7 +433,7 @@ export function XpTaskbar({
                   </button>
                   <button
                     onClick={() => {
-                      onOpenApp("optimizer");
+                      onOpenApp("analytics");
                       setStartOpen(false);
                     }}
                     className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
@@ -484,7 +484,7 @@ export function XpTaskbar({
                   </button>
                   <button
                     onClick={() => {
-                      onOpenApp("tools");
+                      onOpenApp("tools-unified");
                       setStartOpen(false);
                     }}
                     className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"

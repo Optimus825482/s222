@@ -94,6 +94,50 @@ def should_improve(evaluation: dict[str, Any], threshold: float = 3.5) -> bool:
     return avg < threshold
 
 
+def save_reflection_result(agent_role: str, question: str, evaluation: dict, improved: bool) -> None:
+    """Save reflexion result to JSON file for UI display."""
+    import os
+    from pathlib import Path
+    from datetime import datetime, timezone
+    
+    try:
+        data_dir = Path(__file__).parent.parent / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        results_file = data_dir / "reflexion_results.json"
+        
+        # Load existing results
+        results = []
+        if results_file.exists():
+            try:
+                results = json.loads(results_file.read_text()).get("results", [])
+            except Exception:
+                results = []
+        
+        # Calculate score
+        scores = evaluation.get("scores", {})
+        values = [v for v in scores.values() if isinstance(v, (int, float))]
+        avg_score = sum(values) / len(values) if values else 0
+        
+        # Add new result
+        results.append({
+            "agent_role": agent_role,
+            "score": round(avg_score / 5, 2),  # Normalize to 0-1
+            "issues": evaluation.get("weaknesses", [])[:3],
+            "improvements": evaluation.get("improvements", [])[:3],
+            "improved": improved,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        
+        # Keep last 100 results
+        results = results[-100:]
+        
+        # Save
+        results_file.write_text(json.dumps({"results": results}, ensure_ascii=False, indent=2))
+        
+    except Exception as e:
+        logger.warning(f"Failed to save reflexion result: {e}")
+
+
 def save_reflection_insight(question: str, evaluation: dict, improved: bool) -> None:
     """Save reflection insight to memory for future learning."""
     try:
@@ -193,8 +237,15 @@ async def evaluate_and_improve(
             # Save insight
             save_reflection_insight(question, evaluation, improved=True)
             
+            # Save result for UI
+            save_reflection_result(agent.role.value, question, evaluation, improved=True)
+            
         except Exception as e:
             logger.error(f"Reflexion error: {e}")
             break
+    
+    # Save final evaluation result for UI (even if no improvement)
+    if evaluation:
+        save_reflection_result(agent.role.value, question, evaluation, improved=iteration > 0)
     
     return current_response, evaluation
