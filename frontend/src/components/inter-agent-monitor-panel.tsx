@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   MessageSquare,
   Users,
   Database,
-  TrendingUp,
   Send,
   RefreshCw,
   Bell,
 } from "lucide-react";
+import { fetcher } from "@/lib/api";
 
 interface AgentMessage {
   id: string;
@@ -55,7 +55,9 @@ const AGENT_ICONS: Record<string, string> = {
 };
 
 export default function InterAgentMonitorPanel() {
-  const [activeTab, setActiveTab] = useState<"messages" | "knowledge" | "agents">("messages");
+  const [activeTab, setActiveTab] = useState<
+    "messages" | "knowledge" | "agents"
+  >("messages");
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [knowledge, setKnowledge] = useState<SharedKnowledge[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<AgentStatus[]>([]);
@@ -65,37 +67,49 @@ export default function InterAgentMonitorPanel() {
     total_knowledge: 0,
     active_agents: 0,
   });
+  const errorCountRef = useRef(0);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch message history
-      const msgRes = await fetch("/api/inter-agent/messages");
-      if (msgRes.ok) {
-        const msgData = await msgRes.json();
-        setMessages(msgData.messages || []);
-      }
+      const [msgData, knowData, statusData] = await Promise.allSettled([
+        fetcher<{ messages: AgentMessage[]; total: number }>(
+          "/api/inter-agent/messages?limit=50",
+        ),
+        fetcher<{ knowledge: SharedKnowledge[]; total: number }>(
+          "/api/inter-agent/knowledge",
+        ),
+        fetcher<{
+          agents: AgentStatus[];
+          active_agents: number;
+          total_messages: number;
+          total_knowledge: number;
+        }>("/api/inter-agent/status"),
+      ]);
 
-      // Fetch shared knowledge
-      const knowRes = await fetch("/api/inter-agent/knowledge");
-      if (knowRes.ok) {
-        const knowData = await knowRes.json();
-        setKnowledge(knowData.knowledge || []);
+      if (msgData.status === "fulfilled") {
+        setMessages(msgData.value.messages || []);
       }
-
-      // Fetch agent statuses
-      const statusRes = await fetch("/api/inter-agent/status");
-      if (statusRes.ok) {
-        const statusData = await statusRes.json();
-        setAgentStatuses(statusData.agents || []);
+      if (knowData.status === "fulfilled") {
+        setKnowledge(knowData.value.knowledge || []);
+      }
+      if (statusData.status === "fulfilled") {
+        const s = statusData.value;
+        setAgentStatuses(s.agents || []);
         setStats({
-          total_messages: statusData.total_messages || 0,
-          total_knowledge: statusData.total_knowledge || 0,
-          active_agents: statusData.active_agents || 0,
+          total_messages: s.total_messages || 0,
+          total_knowledge: s.total_knowledge || 0,
+          active_agents: s.active_agents || 0,
         });
       }
+
+      // Reset error count on any success
+      errorCountRef.current = 0;
     } catch (err) {
-      console.error("Failed to fetch inter-agent data:", err);
+      errorCountRef.current += 1;
+      if (errorCountRef.current <= 3) {
+        console.error("Failed to fetch inter-agent data:", err);
+      }
     } finally {
       setLoading(false);
     }
@@ -103,7 +117,11 @@ export default function InterAgentMonitorPanel() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000); // Refresh every 5 seconds
+    const interval = setInterval(() => {
+      // Stop polling after 5 consecutive failures
+      if (errorCountRef.current >= 5) return;
+      fetchData();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -157,21 +175,27 @@ export default function InterAgentMonitorPanel() {
             <Send className="w-3 h-3" />
             Toplam Mesaj
           </div>
-          <div className="text-2xl font-bold text-blue-400">{stats.total_messages}</div>
+          <div className="text-2xl font-bold text-blue-400">
+            {stats.total_messages}
+          </div>
         </div>
         <div className="bg-slate-800 rounded-lg p-3">
           <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
             <Database className="w-3 h-3" />
             Paylaşılan Bilgi
           </div>
-          <div className="text-2xl font-bold text-green-400">{stats.total_knowledge}</div>
+          <div className="text-2xl font-bold text-green-400">
+            {stats.total_knowledge}
+          </div>
         </div>
         <div className="bg-slate-800 rounded-lg p-3">
           <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
             <Users className="w-3 h-3" />
             Aktif Agent
           </div>
-          <div className="text-2xl font-bold text-purple-400">{stats.active_agents}</div>
+          <div className="text-2xl font-bold text-purple-400">
+            {stats.active_agents}
+          </div>
         </div>
       </div>
 
@@ -220,7 +244,9 @@ export default function InterAgentMonitorPanel() {
               <div className="text-center text-slate-500 py-8">
                 <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Henüz mesaj yok</p>
-                <p className="text-xs mt-1">Agentlar birbirleriyle iletişim kurduğunda burada görünecek</p>
+                <p className="text-xs mt-1">
+                  Agentlar birbirleriyle iletişim kurduğunda burada görünecek
+                </p>
               </div>
             ) : (
               messages.map((msg) => (
@@ -230,10 +256,14 @@ export default function InterAgentMonitorPanel() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-xs ${getMessageTypeColor(msg.message_type)}`}>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs ${getMessageTypeColor(msg.message_type)}`}
+                      >
                         {msg.message_type}
                       </span>
-                      <span className="text-xs text-slate-500">{formatDate(msg.created_at)}</span>
+                      <span className="text-xs text-slate-500">
+                        {formatDate(msg.created_at)}
+                      </span>
                     </div>
                     {msg.requires_response && (
                       <span className="text-xs text-amber-400 flex items-center gap-1">
@@ -243,15 +273,21 @@ export default function InterAgentMonitorPanel() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-sm">
-                    <span className={`px-2 py-0.5 rounded text-xs ${AGENT_COLORS[msg.from_agent] || "bg-slate-600"}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs ${AGENT_COLORS[msg.from_agent] || "bg-slate-600"}`}
+                    >
                       {AGENT_ICONS[msg.from_agent]} {msg.from_agent}
                     </span>
                     <span className="text-slate-500">→</span>
-                    <span className={`px-2 py-0.5 rounded text-xs ${AGENT_COLORS[msg.to_agent] || "bg-slate-600"}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs ${AGENT_COLORS[msg.to_agent] || "bg-slate-600"}`}
+                    >
                       {AGENT_ICONS[msg.to_agent]} {msg.to_agent}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-300 mt-2 line-clamp-2">{msg.content}</p>
+                  <p className="text-sm text-slate-300 mt-2 line-clamp-2">
+                    {msg.content}
+                  </p>
                 </div>
               ))
             )}
@@ -264,7 +300,9 @@ export default function InterAgentMonitorPanel() {
               <div className="text-center text-slate-500 py-8">
                 <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Henüz paylaşılan bilgi yok</p>
-                <p className="text-xs mt-1">Agentlar bilgi paylaştığında burada görünecek</p>
+                <p className="text-xs mt-1">
+                  Agentlar bilgi paylaştığında burada görünecek
+                </p>
               </div>
             ) : (
               knowledge.map((know, idx) => (
@@ -273,8 +311,12 @@ export default function InterAgentMonitorPanel() {
                   className="bg-slate-800 rounded-lg p-3 border border-slate-700"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-green-400">{know.key}</span>
-                    <span className="text-xs text-slate-500">{formatDate(know.created_at)}</span>
+                    <span className="text-sm font-medium text-green-400">
+                      {know.key}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {formatDate(know.created_at)}
+                    </span>
                   </div>
                   <p className="text-sm text-slate-300 mb-2">
                     {typeof know.value === "object"
@@ -282,11 +324,16 @@ export default function InterAgentMonitorPanel() {
                       : String(know.value).slice(0, 200)}
                   </p>
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded text-xs ${AGENT_COLORS[know.source_agent] || "bg-slate-600"}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs ${AGENT_COLORS[know.source_agent] || "bg-slate-600"}`}
+                    >
                       {AGENT_ICONS[know.source_agent]} {know.source_agent}
                     </span>
                     {know.tags?.map((tag, i) => (
-                      <span key={i} className="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-400">
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-400"
+                      >
                         #{tag}
                       </span>
                     ))}
@@ -312,11 +359,15 @@ export default function InterAgentMonitorPanel() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full ${AGENT_COLORS[agent.agent_role] || "bg-slate-600"} flex items-center justify-center text-lg`}>
+                      <div
+                        className={`w-10 h-10 rounded-full ${AGENT_COLORS[agent.agent_role] || "bg-slate-600"} flex items-center justify-center text-lg`}
+                      >
                         {AGENT_ICONS[agent.agent_role]}
                       </div>
                       <div>
-                        <h3 className="font-medium capitalize">{agent.agent_role}</h3>
+                        <h3 className="font-medium capitalize">
+                          {agent.agent_role}
+                        </h3>
                         <p className="text-xs text-slate-400">
                           {agent.pending_messages > 0
                             ? `${agent.pending_messages} bekleyen mesaj`
@@ -327,10 +378,14 @@ export default function InterAgentMonitorPanel() {
                     <div className="flex items-center gap-2">
                       <span
                         className={`w-2 h-2 rounded-full ${
-                          agent.status === "healthy" ? "bg-green-500" : "bg-red-500"
+                          agent.status === "healthy"
+                            ? "bg-green-500"
+                            : "bg-red-500"
                         }`}
                       />
-                      <span className="text-xs text-slate-400">{agent.status}</span>
+                      <span className="text-xs text-slate-400">
+                        {agent.status}
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -380,6 +380,7 @@ from routes.presentations import router as presentations_router
 from routes.metrics import router as metrics_router
 from routes.resilience import router as resilience_router
 from routes.federated import router as federated_router
+from routes.inter_agent import router as inter_agent_router
 
 app.include_router(auth_router)
 app.include_router(skills_router)
@@ -406,6 +407,7 @@ app.include_router(presentations_router)
 app.include_router(metrics_router)
 app.include_router(resilience_router)
 app.include_router(federated_router)
+app.include_router(inter_agent_router)
 
 print("[Backend] All route modules loaded successfully")
-print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations, resilience, federated")
+print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations, resilience, federated, inter_agent")
