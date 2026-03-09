@@ -1073,12 +1073,15 @@ export function XpReportsPanel() {
   const [activeFolder, setActiveFolder] = useState<Folder | null>(null);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [presentations, setPresentations] = useState<PresentationSummary[]>([]);
+  const [workflows, setWorkflows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Detail views
   const [detailThread, setDetailThread] = useState<Thread | null>(null);
   const [projectContent, setProjectContent] = useState<string | null>(null);
   const [projectTitle, setProjectTitle] = useState("");
+  const [detailPresentation, setDetailPresentation] = useState<PresentationDetail | null>(null);
 
   // Context menu
   const [ctxMenu, setCtxMenu] = useState<ContextMenu | null>(null);
@@ -1127,15 +1130,44 @@ export function XpReportsPanel() {
     }
   }, []);
 
+  const loadPresentations = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/presentations/list");
+      const data = await res.json();
+      setPresentations(data.presentations || []);
+    } catch (err) {
+      console.error("[XpReports] presentations error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadWorkflows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/workflow-results");
+      const data = await res.json();
+      setWorkflows(data.results || []);
+    } catch (err) {
+      console.error("[XpReports] workflows error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const openFolder = useCallback(
     (folder: Folder) => {
       setActiveFolder(folder);
       setDetailThread(null);
       setProjectContent(null);
+      setDetailPresentation(null);
       if (folder === "threads") loadThreads();
-      else loadProjects();
+      else if (folder === "projects") loadProjects();
+      else if (folder === "presentations") loadPresentations();
+      else if (folder === "workflows") loadWorkflows();
     },
-    [loadThreads, loadProjects],
+    [loadThreads, loadProjects, loadPresentations, loadWorkflows],
   );
 
   // ── Detail view ──
@@ -1184,6 +1216,17 @@ export function XpReportsPanel() {
         const thread = await api.getThread(ctxMenu.id);
         const md = buildThreadMarkdown(thread);
         downloadMarkdown(`thread-${ctxMenu.id.slice(0, 8)}.md`, md);
+      } else if (ctxMenu.type === "presentations") {
+        const res = await fetch(`/api/presentations/${ctxMenu.id}`);
+        const data = await res.json();
+        const html = generatePresentationHTML(data.presentation);
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${ctxMenu.label.replace(/[^a-zA-Z0-9]/g, "_")}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
       } else {
         const data = await api.exportProject(ctxMenu.id);
         downloadMarkdown(`project-${ctxMenu.id}.md`, data.markdown);
@@ -1205,12 +1248,38 @@ export function XpReportsPanel() {
         await api.deleteThread(ctxMenu.id);
         setThreads((prev) => prev.filter((t) => t.id !== ctxMenu.id));
         trackBehavior("thread_delete", ctxMenu.id, { label: ctxMenu.label });
+      } else if (ctxMenu.type === "presentations") {
+        await fetch(`/api/presentations/${ctxMenu.id}`, { method: "DELETE" });
+        setPresentations((prev) => prev.filter((p) => p.id !== ctxMenu.id));
       }
     } catch (err) {
       console.error("[XpReports] delete error:", err);
     }
     setCtxMenu(null);
   }, [ctxMenu]);
+
+  const openPresentationDetail = useCallback(async (id: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/presentations/${id}`);
+      const data = await res.json();
+      setDetailPresentation(data.presentation);
+    } catch (err) {
+      console.error("[XpReports] presentation detail error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const deletePresentation = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/presentations/${id}`, { method: "DELETE" });
+      setPresentations((prev) => prev.filter((p) => p.id !== id));
+      setDetailPresentation(null);
+    } catch (err) {
+      console.error("[XpReports] presentation delete error:", err);
+    }
+  }, []);
 
   // ── Render: Thread Detail ──
   if (detailThread) {
@@ -1229,6 +1298,21 @@ export function XpReportsPanel() {
         title={projectTitle}
         content={projectContent}
         onBack={() => setProjectContent(null)}
+      />
+    );
+  }
+
+  // ── Render: Presentation Detail ──
+  if (detailPresentation) {
+    return (
+      <PresentationDetailView
+        presentation={detailPresentation}
+        onBack={() => setDetailPresentation(null)}
+        onDelete={deletePresentation}
+      />
+    );
+  }
+        onDelete={deletePresentation}
       />
     );
   }
@@ -1331,6 +1415,62 @@ export function XpReportsPanel() {
                 </div>
                 <div className="text-[11px]" style={{ color: "#666" }}>
                   Fikir→Proje dönüşüm raporları
+                </div>
+              </div>
+              <ChevronRight
+                className="w-4 h-4 ml-auto"
+                style={{ color: "#aaa" }}
+              />
+            </button>
+            <button
+              onClick={() => openFolder("presentations")}
+              className="w-full flex items-center gap-3 p-3 rounded border text-left transition-colors"
+              style={{ borderColor: "#d6d2c2", backgroundColor: "#fff" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f5f3ff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#fff";
+              }}
+            >
+              <Presentation className="w-5 h-5" style={{ color: "#8b5cf6" }} />
+              <div>
+                <div
+                  className="text-[13px] font-medium"
+                  style={{ color: "#1a1a1a" }}
+                >
+                  Sunumlar
+                </div>
+                <div className="text-[11px]" style={{ color: "#666" }}>
+                  Oluşturulan sunum arşivi
+                </div>
+              </div>
+              <ChevronRight
+                className="w-4 h-4 ml-auto"
+                style={{ color: "#aaa" }}
+              />
+            </button>
+            <button
+              onClick={() => openFolder("workflows")}
+              className="w-full flex items-center gap-3 p-3 rounded border text-left transition-colors"
+              style={{ borderColor: "#d6d2c2", backgroundColor: "#fff" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#ecfdf5";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#fff";
+              }}
+            >
+              <Play className="w-5 h-5" style={{ color: "#10b981" }} />
+              <div>
+                <div
+                  className="text-[13px] font-medium"
+                  style={{ color: "#1a1a1a" }}
+                >
+                  İş Akışları
+                </div>
+                <div className="text-[11px]" style={{ color: "#666" }}>
+                  Çalıştırılan workflow sonuçları
                 </div>
               </div>
               <ChevronRight
@@ -1461,7 +1601,123 @@ export function XpReportsPanel() {
               </button>
             ))}
           </div>
-        )}
+        ) : activeFolder === "presentations" ? (
+          /* Presentations list */
+          <div>
+            {presentations.length === 0 && !loading && (
+              <div
+                className="p-6 text-center text-[13px]"
+                style={{ color: "#888" }}
+              >
+                Henüz sunum yok
+              </div>
+            )}
+            {presentations.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => openPresentationDetail(p.id)}
+                onContextMenu={(e) =>
+                  handleContextMenu(e, "presentations", p.id, p.title)
+                }
+                className="w-full flex items-start gap-3 p-3 text-left transition-colors border-b"
+                style={{ borderColor: "#ece9d8" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f8f6ee";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <Presentation
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                  style={{ color: "#8b5cf6" }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div
+                    className="text-[13px] truncate"
+                    style={{ color: "#1a1a1a" }}
+                  >
+                    {p.title}
+                  </div>
+                  <div
+                    className="flex items-center gap-2 mt-1 text-[11px]"
+                    style={{ color: "#888" }}
+                  >
+                    <span>{p.slide_count} slayt</span>
+                    <span style={{ color: "#ccc" }}>•</span>
+                    <span>{p.palette_name}</span>
+                    <span style={{ color: "#ccc" }}>•</span>
+                    <span>{formatDate(p.created_at)}</span>
+                  </div>
+                </div>
+                <ChevronRight
+                  className="w-4 h-4 mt-1 shrink-0"
+                  style={{ color: "#ccc" }}
+                />
+              </button>
+            ))}
+          </div>
+        ) : activeFolder === "workflows" ? (
+          /* Workflows list */
+          <div>
+            {workflows.length === 0 && !loading && (
+              <div
+                className="p-6 text-center text-[13px]"
+                style={{ color: "#888" }}
+              >
+                Henüz iş akışı yok
+              </div>
+            )}
+            {workflows.map((w) => (
+              <button
+                key={w.id || w.workflow_id}
+                onClick={() => {}}
+                className="w-full flex items-start gap-3 p-3 text-left transition-colors border-b"
+                style={{ borderColor: "#ece9d8" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f8f6ee";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <Play
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                  style={{ color: w.status === "completed" ? "#10b981" : "#ef4444" }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div
+                    className="text-[13px] truncate"
+                    style={{ color: "#1a1a1a" }}
+                  >
+                    {w.workflow_id}
+                  </div>
+                  <div
+                    className="flex items-center gap-2 mt-1 text-[11px]"
+                    style={{ color: "#888" }}
+                  >
+                    <span
+                      className="px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: w.status === "completed" ? "#dcfce7" : "#fee2e2",
+                        color: w.status === "completed" ? "#166534" : "#991b1b",
+                      }}
+                    >
+                      {w.status}
+                    </span>
+                    <span>{w.duration_ms?.toFixed(0)}ms</span>
+                    <span style={{ color: "#ccc" }}>•</span>
+                    <span>{formatDate(w.created_at)}</span>
+                  </div>
+                </div>
+                <ChevronRight
+                  className="w-4 h-4 mt-1 shrink-0"
+                  style={{ color: "#ccc" }}
+                />
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Context Menu */}

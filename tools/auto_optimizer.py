@@ -54,8 +54,32 @@ class AutoOptimizer:
     # ── Database ─────────────────────────────────────────────────
 
     def _ensure_db(self) -> None:
-        """No-op — tables are created by migration SQL (006)."""
-        pass
+        """Ensure required tables exist."""
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                # Create agent_param_overrides table if not exists
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS agent_param_overrides (
+                        id SERIAL PRIMARY KEY,
+                        agent_role TEXT NOT NULL,
+                        parameter TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        reason TEXT,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        UNIQUE(agent_role, parameter)
+                    )
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_agent_param_overrides_agent 
+                    ON agent_param_overrides(agent_role)
+                """)
+            conn.commit()
+        except Exception as e:
+            logger.warning(f"Failed to ensure agent_param_overrides table: {e}")
+            conn.rollback()
+        finally:
+            release_conn(conn)
 
     # ── Analysis & Recommendation Generation ─────────────────────
 

@@ -689,7 +689,7 @@ export function WorkflowBuilderPanel() {
           ) : (
             <>
               {/* Template Cards */}
-              <div className="grid gap-2">
+              <div className="grid gap-2 max-h-[400px] overflow-y-auto pr-1"
                 {templates.map((tpl) => (
                   <button
                     key={tpl.id}

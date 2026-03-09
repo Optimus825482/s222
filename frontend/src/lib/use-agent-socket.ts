@@ -81,11 +81,9 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     if (!enabled) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    // Build base URL (never includes query params)
-    let baseUrl =
-      currentWsUrlRef.current ||
-      process.env.NEXT_PUBLIC_WS_URL ||
-      "ws://localhost:8001/ws/chat";
+    // Build base URL - ALWAYS prefer environment variable over stored ref
+    // This fixes issues where stale tunnel URLs persist across sessions
+    let baseUrl = process.env.NEXT_PUBLIC_WS_URL || currentWsUrlRef.current || "ws://localhost:8001/ws/chat";
 
     // Strip any existing query params from base
     const qIdx = baseUrl.indexOf("?");

@@ -1092,7 +1092,9 @@ class OrchestratorAgent(BaseAgent):
 
             # Override complexity from intent analysis
             if intent_result.get("complexity"):
+                old_complexity = complexity
                 complexity = intent_result["complexity"]
+                self._emit("routing", f"📊 Karmaşıklık: {old_complexity} → {complexity} (intent analizi)")
 
             thread.add_event(
                 EventType.ROUTING_DECISION,
@@ -1532,6 +1534,16 @@ class OrchestratorAgent(BaseAgent):
             return final
 
         # ── Phase 1: Let orchestrator LLM decide (non-deep queries) ──
+        # Complexity-based routing hint for LLM
+        complexity_hint = {
+            "simple": "Bu basit bir sorgu — tek agent yeterli.",
+            "moderate": "Bu orta seviye bir sorgu — 2-3 agent paralel çalışmalı.",
+            "complex": "Bu karmaşık bir sorgu — 3-5 agent derinlemesine analiz yapmalı.",
+        }.get(complexity, "")
+        
+        if complexity_hint:
+            self._emit("routing", f"📊 Karmaşıklık: {complexity} — {complexity_hint[:50]}")
+        
         decision = await self.execute(user_input, thread)
 
         if live_monitor and live_monitor.should_stop():
@@ -1569,7 +1581,7 @@ class OrchestratorAgent(BaseAgent):
                     ]
                     # Add complementary agents
                     existing_agent = current_task.sub_tasks[0].assigned_agent.value
-                    # Moderate: 2 agents total, Complex: 3 agents total
+                    # Moderate: 2-3 agents total, Complex: 4-5 agents total
                     if complexity == "moderate":
                         complement = {
                             "researcher": ["thinker"],
@@ -1578,14 +1590,16 @@ class OrchestratorAgent(BaseAgent):
                             "speed": ["researcher"],
                             "critic": ["thinker"],
                         }
-                    else:
+                        self._emit("routing", f"📊 Orta seviye → 2 agent paralel")
+                    else:  # complex
                         complement = {
-                            "researcher": ["thinker", "reasoner"],
-                            "thinker": ["researcher", "reasoner"],
-                            "reasoner": ["thinker", "researcher"],
-                            "speed": ["thinker", "researcher"],
-                            "critic": ["thinker", "researcher"],
+                            "researcher": ["thinker", "reasoner", "critic"],
+                            "thinker": ["researcher", "reasoner", "critic"],
+                            "reasoner": ["thinker", "researcher", "speed"],
+                            "speed": ["thinker", "researcher", "reasoner"],
+                            "critic": ["thinker", "researcher", "reasoner"],
                         }
+                        self._emit("routing", f"📊 Karmaşık seviye → 4-5 agent paralel")
                     for agent_name in complement.get(existing_agent, ["thinker", "researcher"]):
                         current_task.sub_tasks.append(SubTask(
                             description=f"Support analysis for: {user_input}",

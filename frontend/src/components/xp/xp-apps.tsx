@@ -32,16 +32,6 @@ const MemoryCorrelationPanel = dynamic(
   { ssr: false },
 );
 
-
-
-
-
-
-
-
-
-
-
 const XpReportsPanel = dynamic(
   () =>
     import("./panels/xp-reports-panel").then((m) => ({
@@ -99,11 +89,6 @@ const WorkflowHistoryPanel = dynamic(
   { ssr: false },
 );
 
-
-
-
-
-
 const WorkflowOptimizerPanel = dynamic(
   () =>
     import("@/components/workflow-optimizer-panel").then((m) => ({
@@ -123,8 +108,6 @@ const ModelManagerPanel = dynamic(
   () => import("@/components/model-manager-panel"),
   { ssr: false },
 );
-
-
 
 const McpUsagePanel = dynamic(
   () =>
@@ -274,40 +257,16 @@ function XpMcpWrapper() {
   );
 }
 
-// ── All desktop applications ──
-// Nexus AI Team Logo Component
-const NexusLogo = ({ size = 24, color = "#6366f1" }: { size?: number; color?: string }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    {/* Outer ring */}
-    <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.5" fill="none" />
-    {/* Inner hexagon representing AI nodes */}
-    <path
-      d="M12 4L18.5 8V16L12 20L5.5 16V8L12 4Z"
-      stroke={color}
-      strokeWidth="1.5"
-      fill="none"
-    />
-    {/* Center node */}
-    <circle cx="12" cy="12" r="3" fill={color} />
-    {/* Connection lines */}
-    <line x1="12" y1="4" x2="12" y2="9" stroke={color} strokeWidth="1" />
-    <line x1="12" y1="15" x2="12" y2="20" stroke={color} strokeWidth="1" />
-    <line x1="5.5" y1="8" x2="9" y2="10.5" stroke={color} strokeWidth="1" />
-    <line x1="18.5" y1="8" x2="15" y2="10.5" stroke={color} strokeWidth="1" />
-  </svg>
-);
-
+// ── All desktop applications - REORGANIZED ──
+// Groups: Ana → Agent → Analitik → Araçlar → Sistem → İşbirliği
 export const APPS: DesktopApp[] = [
+  // ═══════════════════════════════════════════════════════════
+  // GRUP 1: ANA - En sık kullanılan paneller
+  // ═══════════════════════════════════════════════════════════
   {
     id: "chat",
     title: "Nexus AI Team",
-    icon: <NexusLogo size={24} color="#6366f1" />,
+    icon: <FeatherIcon name="cpu" color="#6366f1" />,
     color: "#6366f1",
     group: "Ana",
     description:
@@ -328,8 +287,6 @@ export const APPS: DesktopApp[] = [
     defaultH: 600,
     render: () => <UnifiedTaskMonitor />,
   },
-  
-
   {
     id: "memory",
     title: "Bellek",
@@ -346,33 +303,6 @@ export const APPS: DesktopApp[] = [
       </div>
     ),
   },
-
-  
-  
-
-  
-  
-  
-  
-  
-  {
-    id: "search",
-    title: "Arama",
-    icon: <FeatherIcon name="search" color="#06b6d4" />,
-    color: "#06b6d4",
-    group: "Analitik",
-    description: "Tüm oturumlar, görevler ve agent yanıtları içinde arama.",
-    defaultW: 550,
-    defaultH: 500,
-    render: () => (
-      <div className="overflow-hidden h-full">
-        <XpSearchPanel />
-      </div>
-    ),
-  },
-  
-  
-  
   {
     id: "reports",
     title: "Raporlar",
@@ -400,53 +330,78 @@ export const APPS: DesktopApp[] = [
     render: () => <XpWorkflowsWrapper />,
   },
 
+  // ═══════════════════════════════════════════════════════════
+  // GRUP 2: AGENT - Agent yönetimi ve izleme
+  // ═══════════════════════════════════════════════════════════
+  {
+    id: "agent-center",
+    title: "Agent Merkezi",
+    icon: <FeatherIcon name="users" color="#ec4899" />,
+    color: "#ec4899",
+    group: "Agent",
+    description:
+      "Birleşik agent yönetimi — Agentlar, Otonom İzleme, Koordinasyon, İletişim, Kimlik ve Roller sekmeleri.",
+    defaultW: 900,
+    defaultH: 600,
+    render: () => <XpAgentCenter />,
+  },
   {
     id: "agents",
     title: "Agentlar",
-    icon: <FeatherIcon name="users" color="#ec4899" />,
-    color: "#ec4899",
-    group: "Sistem",
+    icon: <FeatherIcon name="users" color="#a855f7" />,
+    color: "#a855f7",
+    group: "Agent",
     description: "Tüm agent'ların listesi ve durumları.",
     defaultW: 400,
     defaultH: 480,
     render: () => <XpAgentsPanel />,
   },
+
+  // ═══════════════════════════════════════════════════════════
+  // GRUP 3: ANALİTİK - Metrikler, analiz ve görselleştirme
+  // ═══════════════════════════════════════════════════════════
   {
-    id: "sessions",
-    title: "Oturumlar",
-    icon: <FeatherIcon name="archive" color="#3b82f6" />,
-    color: "#3b82f6",
-    group: "Sistem",
-    description: "Geçmiş sohbet oturumlarını listeleyin.",
-    defaultW: 420,
-    defaultH: 500,
-    render: () => <XpSessionsPanel />,
+    id: "analytics",
+    title: "Analitik Merkezi",
+    icon: <FeatherIcon name="bar-chart-2" color="#10b981" />,
+    color: "#10b981",
+    group: "Analitik",
+    description:
+      "Benchmark, performans, maliyet takibi, hata analizi ve otomatik optimizasyon.",
+    defaultW: 800,
+    defaultH: 600,
+    render: () => <XpAnalyticsPanel />,
   },
   {
-    id: "rag",
-    title: "Bilgi Tabanı (RAG)",
-    icon: <FeatherIcon name="database" color="#f472b6" />,
-    color: "#f472b6",
-    group: "Araçlar",
-    description: "Retrieval-Augmented Generation bilgi tabanı.",
-    defaultW: 550,
-    defaultH: 500,
+    id: "learning-hub",
+    title: "Öğrenme Merkezi",
+    icon: <FeatherIcon name="book-open" color="#22d3ee" />,
+    color: "#22d3ee",
+    group: "Analitik",
+    description:
+      "Adaptif öğrenme merkezi — tüm öğrenme mekanizmalarını tek panelde izleyin ve yönetin.",
+    defaultW: 700,
+    defaultH: 560,
     render: () => (
       <div className="p-4 overflow-auto h-full">
-        <RagPanel />
+        <LearningHubPanel />
       </div>
     ),
   },
   {
-    id: "roadmap",
-    title: "Yol Haritası",
-    icon: <FeatherIcon name="map" color="#14b8a6" />,
-    color: "#14b8a6",
-    group: "Sistem",
-    description: "Geliştirme yol haritasını görüntüleyin.",
-    defaultW: 700,
-    defaultH: 550,
-    render: () => <XpRoadmapPanel />,
+    id: "search",
+    title: "Arama",
+    icon: <FeatherIcon name="search" color="#06b6d4" />,
+    color: "#06b6d4",
+    group: "Analitik",
+    description: "Tüm oturumlar, görevler ve agent yanıtları içinde arama.",
+    defaultW: 550,
+    defaultH: 500,
+    render: () => (
+      <div className="overflow-hidden h-full">
+        <XpSearchPanel />
+      </div>
+    ),
   },
   {
     id: "charts",
@@ -480,6 +435,37 @@ export const APPS: DesktopApp[] = [
     ),
   },
   {
+    id: "workflow-optimizer",
+    title: "Workflow Optimizer",
+    icon: <FeatherIcon name="repeat" color="#f97316" />,
+    color: "#f97316",
+    group: "Analitik",
+    description: "İş akışı önerileri, detay ve pattern kütüphanesi.",
+    defaultW: 750,
+    defaultH: 550,
+    render: () => (
+      <div className="p-4 overflow-auto h-full">
+        <WorkflowOptimizerPanel />
+      </div>
+    ),
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // GRUP 4: ARAÇLAR - Yardımcı araçlar ve servisler
+  // ═══════════════════════════════════════════════════════════
+  {
+    id: "tools-unified",
+    title: "Araçlar Merkezi",
+    icon: <FeatherIcon name="tool" color="#8b5cf6" />,
+    color: "#8b5cf6",
+    group: "Araçlar",
+    description:
+      "Birleşik araçlar paneli — Araçlar, Skill Oluşturucu ve Adaptif Araçlar sekmeleri.",
+    defaultW: 800,
+    defaultH: 600,
+    render: () => <XpToolsUnified />,
+  },
+  {
     id: "skills-hub",
     title: "Yetenekler",
     icon: <FeatherIcon name="layers" color="#a855f7" />,
@@ -502,74 +488,20 @@ export const APPS: DesktopApp[] = [
     defaultH: 550,
     render: () => <XpMcpWrapper />,
   },
-  
   {
-    id: "collaboration",
-    title: "İşbirliği Merkezi",
-    icon: <FeatherIcon name="users" color="#8b5cf6" />,
-    color: "#8b5cf6",
-    group: "İşbirliği",
-    description:
-      "Birleşik işbirliği paneli — Paylaşımlı Alan, Bağlam Panosu, Düzenleyici ve Worktree sekmeleri.",
-    defaultW: 900,
-    defaultH: 600,
-    render: () => <XpCollaborationPanel />,
-  },
-  {
-    id: "workflow-optimizer",
-    title: "Workflow Optimizer",
-    icon: <FeatherIcon name="repeat" color="#f97316" />,
-    color: "#f97316",
-    group: "Analitik",
-    description: "İş akışı önerileri, detay ve pattern kütüphanesi.",
-    defaultW: 750,
-    defaultH: 550,
+    id: "rag",
+    title: "Bilgi Tabanı (RAG)",
+    icon: <FeatherIcon name="database" color="#f472b6" />,
+    color: "#f472b6",
+    group: "Araçlar",
+    description: "Retrieval-Augmented Generation bilgi tabanı.",
+    defaultW: 550,
+    defaultH: 500,
     render: () => (
       <div className="p-4 overflow-auto h-full">
-        <WorkflowOptimizerPanel />
+        <RagPanel />
       </div>
     ),
-  },
-
-  {
-    id: "learning-hub",
-    title: "Öğrenme Merkezi",
-    icon: <FeatherIcon name="book-open" color="#22d3ee" />,
-    color: "#22d3ee",
-    group: "Analitik",
-    description:
-      "Adaptif öğrenme merkezi — tüm öğrenme mekanizmalarını tek panelde izleyin ve yönetin.",
-    defaultW: 700,
-    defaultH: 560,
-    render: () => (
-      <div className="p-4 overflow-auto h-full">
-        <LearningHubPanel />
-      </div>
-    ),
-  },
-  {
-    id: "analytics",
-    title: "Analitik Merkezi",
-    icon: <FeatherIcon name="bar-chart-2" color="#10b981" />,
-    color: "#10b981",
-    group: "Analitik",
-    description:
-      "Benchmark, performans, maliyet takibi, hata analizi ve otomatik optimizasyon.",
-    defaultW: 800,
-    defaultH: 600,
-    render: () => <XpAnalyticsPanel />,
-  },
-  {
-    id: "agent-center",
-    title: "Agent Merkezi",
-    icon: <FeatherIcon name="users" color="#ec4899" />,
-    color: "#ec4899",
-    group: "Agent",
-    description:
-      "Birleşik agent yönetimi — Agentlar, Otonom İzleme, Koordinasyon, İletişim, Kimlik ve Roller sekmeleri.",
-    defaultW: 900,
-    defaultH: 600,
-    render: () => <XpAgentCenter />,
   },
   {
     id: "unified-marketplace",
@@ -584,17 +516,25 @@ export const APPS: DesktopApp[] = [
     render: () => <XpUnifiedMarketplace />,
   },
   {
-    id: "tools-unified",
-    title: "Araçlar Merkezi",
-    icon: <FeatherIcon name="tool" color="#8b5cf6" />,
-    color: "#8b5cf6",
+    id: "presentations",
+    title: "Sunum Oluşturucu",
+    icon: <FeatherIcon name="monitor" color="#7c3aed" />,
+    color: "#7c3aed",
     group: "Araçlar",
     description:
-      "Birleşik araçlar paneli — Araçlar, Skill Oluşturucu ve Adaptif Araçlar sekmeleri.",
-    defaultW: 800,
-    defaultH: 600,
-    render: () => <XpToolsUnified />,
+      "AI destekli sunum oluşturucu — konu girin, araştırma yapılsın, slaytlar hazırlansın. Düzenlenebilir canvas, görsel üretimi.",
+    defaultW: 1000,
+    defaultH: 650,
+    render: () => (
+      <div className="overflow-hidden h-full">
+        <PresentationBuilderPanel />
+      </div>
+    ),
   },
+
+  // ═══════════════════════════════════════════════════════════
+  // GRUP 5: SİSTEM - Sistem ayarları ve yapılandırma
+  // ═══════════════════════════════════════════════════════════
   {
     id: "model-manager",
     title: "Model Yönetimi",
@@ -611,8 +551,6 @@ export const APPS: DesktopApp[] = [
       </div>
     ),
   },
-  
-  
   {
     id: "resilience",
     title: "Resilience & Monitoring",
@@ -637,19 +575,57 @@ export const APPS: DesktopApp[] = [
     render: () => <ReflexionSettingsPanel />,
   },
   {
-    id: "presentations",
-    title: "Sunum Oluşturucu",
-    icon: <FeatherIcon name="monitor" color="#7c3aed" />,
-    color: "#7c3aed",
-    group: "Araçlar",
+    id: "roadmap",
+    title: "Yol Haritası",
+    icon: <FeatherIcon name="map" color="#14b8a6" />,
+    color: "#14b8a6",
+    group: "Sistem",
+    description: "Geliştirme yol haritasını görüntüleyin.",
+    defaultW: 700,
+    defaultH: 550,
+    render: () => <XpRoadmapPanel />,
+  },
+  {
+    id: "sessions",
+    title: "Oturumlar",
+    icon: <FeatherIcon name="archive" color="#3b82f6" />,
+    color: "#3b82f6",
+    group: "Sistem",
+    description: "Geçmiş sohbet oturumlarını listeleyin.",
+    defaultW: 420,
+    defaultH: 500,
+    render: () => <XpSessionsPanel />,
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // GRUP 6: İŞBİRLİĞİ - Paylaşım ve işbirliği araçları
+  // ═══════════════════════════════════════════════════════════
+  {
+    id: "collaboration",
+    title: "İşbirliği Merkezi",
+    icon: <FeatherIcon name="users" color="#8b5cf6" />,
+    color: "#8b5cf6",
+    group: "İşbirliği",
     description:
-      "AI destekli sunum oluşturucu — konu girin, araştırma yapılsın, slaytlar hazırlansın. Düzenlenebilir canvas, görsel üretimi.",
-    defaultW: 1000,
-    defaultH: 650,
-    render: () => (
-      <div className="overflow-hidden h-full">
-        <PresentationBuilderPanel />
-      </div>
-    ),
+      "Birleşik işbirliği paneli — Paylaşımlı Alan, Bağlam Panosu, Düzenleyici ve Worktree sekmeleri.",
+    defaultW: 900,
+    defaultH: 600,
+    render: () => <XpCollaborationPanel />,
   },
 ];
+
+// ── Helper functions ──
+
+export function getAppById(id: string): DesktopApp | undefined {
+  return APPS.find((app) => app.id === id);
+}
+
+export function getAppsByGroup(group: string): DesktopApp[] {
+  return APPS.filter((app) => app.group === group);
+}
+
+export function getAllGroups(): string[] {
+  const groups = new Set<string>();
+  APPS.forEach((app) => groups.add(app.group));
+  return Array.from(groups);
+}
