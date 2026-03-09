@@ -1141,12 +1141,13 @@ class OrchestratorAgent(BaseAgent):
                 question = intent_result.get("clarification_question", "")
                 if question:
                     self._emit("pipeline", f"❓ Netleştirme gerekli (güven: {intent_result['confidence']:.0%})")
+                    clarification_msg = f"🤔 Tam olarak ne istediğini anlamak istiyorum:\n\n{question}"
                     thread.add_event(
-                        EventType.HUMAN_REQUEST,
-                        f"Intent confidence low ({intent_result['confidence']:.0%}): {question}",
+                        EventType.AGENT_RESPONSE,
+                        clarification_msg,
                         agent_role=self.role,
                     )
-                    return f"🤔 Tam olarak ne istediğini anlamak istiyorum:\n\n{question}"
+                    return clarification_msg
 
             # Use enhanced prompt from intent analysis
             enhanced = intent_result.get("enhanced_prompt", user_input)

@@ -20,7 +20,12 @@ interface Props {
   status?: "idle" | "connecting" | "running" | "complete" | "error";
 }
 
-const CHAT_EVENTS = new Set(["user_message", "agent_response", "error"]);
+const CHAT_EVENTS = new Set([
+  "user_message",
+  "agent_response",
+  "error",
+  "human_request",
+]);
 
 // ── Lightweight Markdown renderer (no deps) ──────────────────────
 function renderMarkdown(text: string): React.ReactNode[] {
