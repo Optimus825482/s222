@@ -13,7 +13,7 @@ export function SingleResultView({ data }: { data: AnyData }) {
           {data.scenario_name ?? data.scenario_id}
         </span>
         <span className={`font-mono text-sm ${scoreText(score)}`}>
-          {score.toFixed(2)}/5
+          {(score ?? 0).toFixed(2)}/5
         </span>
       </div>
       {Object.keys(dims).length > 0 && (
@@ -34,7 +34,7 @@ export function SingleResultView({ data }: { data: AnyData }) {
                 <span
                   className={`font-mono text-[10px] w-6 text-right ${scoreText(val)}`}
                 >
-                  {val.toFixed(1)}
+                  {(val ?? 0).toFixed(1)}
                 </span>
               </div>
             );

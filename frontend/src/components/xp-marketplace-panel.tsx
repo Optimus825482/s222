@@ -132,7 +132,7 @@ export function XpMarketplacePanel() {
           />
         ))}
         <span className="text-[10px] text-slate-500 ml-1">
-          {r.toFixed(1)}
+          {(r ?? 0).toFixed(1)}
         </span>
       </span>
     );

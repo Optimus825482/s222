@@ -438,7 +438,7 @@ function GatewayTab() {
     },
     {
       label: "Ort. Gecikme",
-      value: `${health.avg_latency_ms.toFixed(1)} ms`,
+      value: `${(health.avg_latency_ms ?? 0).toFixed(1)} ms`,
       accent:
         health.avg_latency_ms > 500 ? "text-amber-400" : "text-emerald-400",
     },

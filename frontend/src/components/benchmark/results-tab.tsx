@@ -87,7 +87,7 @@ export function ResultsTab() {
                   className={`font-mono text-[10px] ${scoreText(score)}`}
                   role="cell"
                 >
-                  {score.toFixed(1)}
+                  {(score ?? 0).toFixed(1)}
                 </span>
                 <span
                   className="text-slate-400 font-mono text-[10px]"

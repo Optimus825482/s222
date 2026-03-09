@@ -236,9 +236,11 @@ export function TrendTab() {
                   </span>
                   <span className="text-slate-600">|</span>
                   <span className="text-slate-500">
-                    İlk: {first.toFixed(2)}
+                    İlk: {(first ?? 0).toFixed(2)}
                   </span>
-                  <span className="text-slate-500">Son: {last.toFixed(2)}</span>
+                  <span className="text-slate-500">
+                    Son: {(last ?? 0).toFixed(2)}
+                  </span>
                 </div>
               );
             })()}

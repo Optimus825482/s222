@@ -146,7 +146,7 @@ export function CompareTab() {
                           }}
                         />
                         <span className="absolute right-1 top-0 text-[10px] text-slate-300 leading-4">
-                          {sA.toFixed(2)}
+                          {(sA ?? 0).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex-1 h-4 bg-slate-800 rounded overflow-hidden relative">
@@ -159,7 +159,7 @@ export function CompareTab() {
                           }}
                         />
                         <span className="absolute right-1 top-0 text-[10px] text-slate-300 leading-4">
-                          {sB.toFixed(2)}
+                          {(sB ?? 0).toFixed(2)}
                         </span>
                       </div>
                     </div>

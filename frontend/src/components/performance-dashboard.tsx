@@ -63,8 +63,9 @@ function fmtMs(v: number): string {
   return `${Math.round(v)} ms`;
 }
 
-function fmtRate(v: number): string {
-  return `${v.toFixed(1)}%`;
+function fmtRate(v: number | undefined | null): string {
+  return `${(v ?? 0).toFixed(1)}%`;
+}%`;
 }
 
 function fmtTokens(v: number): string {
@@ -73,8 +74,9 @@ function fmtTokens(v: number): string {
   return v.toLocaleString();
 }
 
-function fmtCost(v: number): string {
-  return `$${v.toFixed(4)}`;
+function fmtCost(v: number | undefined | null): string {
+  return `${(v ?? 0).toFixed(4)}`;
+}`;
 }
 
 function fmtUptime(seconds: number): string {

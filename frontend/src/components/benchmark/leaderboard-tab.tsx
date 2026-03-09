@@ -70,14 +70,14 @@ export function LeaderboardTab() {
                     />
                   </div>
                   <span className={`font-mono text-[10px] ${scoreText(score)}`}>
-                    {score.toFixed(2)}
+                    {(score ?? 0).toFixed(2)}
                   </span>
                 </span>
                 <span
                   className={`font-mono text-[10px] ${scoreText(best)}`}
                   role="cell"
                 >
-                  {best.toFixed(2)}
+                  {(best ?? 0).toFixed(2)}
                 </span>
                 <span
                   className="text-slate-400 font-mono text-[10px]"
