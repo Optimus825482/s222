@@ -15,12 +15,24 @@
 html {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
 }
 
 body {
   background: var(--bg-surface);
   color: var(--text-primary);
   overscroll-behavior-y: contain;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* Mobile: prevent horizontal scroll, smooth scroll */
+@media (max-width: 768px) {
+  html,
+  body {
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* Safe area support for notched devices */

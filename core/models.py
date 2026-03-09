@@ -24,12 +24,12 @@ def _now() -> datetime:
 # ── Enums ────────────────────────────────────────────────────────
 
 class AgentRole(str, Enum):
-    ORCHESTRATOR = "orchestrator"   # Qwen3 80B
+    ORCHESTRATOR = "orchestrator"   # DeepSeek Chat — intent analysis, routing, synthesis
     THINKER = "thinker"             # MiniMax M2.1
     SPEED = "speed"                 # Step 3.5 Flash
     RESEARCHER = "researcher"       # GLM 4.7
     REASONER = "reasoner"           # Nemotron 3 Nano
-    CRITIC = "critic"               # DeepSeek Chat — code review, fact-check, quality gate
+    CRITIC = "critic"               # Qwen3 80B — quality review, skill creation, fact-check
 
 
 class TaskStatus(str, Enum):

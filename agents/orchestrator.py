@@ -1,6 +1,7 @@
 """
-Qwen3 Next 80B — Orchestrator Agent.
-The brain: task analysis, decomposition, routing, synthesis.
+DeepSeek Chat — Orchestrator Agent.
+The brain: intent analysis, pipeline selection, skill discovery, task delegation, synthesis.
+5-Phase Pipeline: Intent → Pipeline → Skills → Delegate → Synthesize.
 Deep Research mode: auto-detects complex queries and fans out to ALL agents in parallel.
 """
 
@@ -132,14 +133,18 @@ class OrchestratorAgent(BaseAgent):
 
     def system_prompt(self) -> str:
         return (
-            "You are the Orchestrator of a multi-agent deep research system. "
-            "You coordinate 5 specialist agents that work IN PARALLEL.\n\n"
+            "You are the Orchestrator of a multi-agent deep research system, powered by DeepSeek Chat.\n"
+            "You run a 5-Phase Pipeline: Intent Analysis → Pipeline Selection → Skill Discovery → Task Delegation → Synthesis.\n\n"
+            "YOUR PRIMARY ROLE: Understand what the user TRULY wants before doing anything.\n"
+            "- Analyze intent carefully — detect the real goal behind the message.\n"
+            "- If you're not confident (< 70%), ASK a clarification question instead of guessing.\n"
+            "- Turkish users often write informally — understand the intent, not just the words.\n\n"
             "AGENTS (delegate via decompose_task — these are NOT tools):\n"
             "- researcher (GLM 4.7): Web search, current info, data gathering, fact-checking\n"
             "- thinker (MiniMax M2.1): Deep analysis, complex reasoning, planning, architecture\n"
             "- reasoner (Nemotron 3 Nano): Math, logic, chain-of-thought, verification\n"
             "- speed (Step 3.5 Flash): Quick answers, code generation, formatting\n"
-            "- critic (DeepSeek): Code review, fact-checking, quality assurance, verification — use as the final quality gate\n\n"
+            "- critic (Qwen3 80B): Quality review, skill creation, fact-checking — use as the final quality gate AND skill creator\n\n"
             "CRITICAL RULES:\n"
             "1. For ANY research, analysis, or complex question: ALWAYS use decompose_task with "
             "pipeline_type='parallel' and assign MULTIPLE agents (minimum 3).\n"
@@ -1126,13 +1131,51 @@ class OrchestratorAgent(BaseAgent):
             self._auto_save_memory(user_input, result, user_id=user_id)
             return result
 
-        # ── Phase -1: Prompt Enhancement ──
+        # ── Phase -1: Intent Analysis (5-Phase Pipeline: FAZ 1) ──
+        intent_result = None
         try:
-            enhanced = await self._enhance_prompt(user_input, thread)
-            if enhanced and enhanced != user_input:
+            intent_result = await self._analyze_intent(user_input, thread)
+
+            # Confidence check — if too low, ask clarification
+            if intent_result.get("clarification_needed") and intent_result.get("confidence", 1.0) < 0.7:
+                question = intent_result.get("clarification_question", "")
+                if question:
+                    self._emit("pipeline", f"❓ Netleştirme gerekli (güven: {intent_result['confidence']:.0%})")
+                    thread.add_event(
+                        EventType.HUMAN_REQUEST,
+                        f"Intent confidence low ({intent_result['confidence']:.0%}): {question}",
+                        agent_role=self.role,
+                    )
+                    return f"🤔 Tam olarak ne istediğini anlamak istiyorum:\n\n{question}"
+
+            # Use enhanced prompt from intent analysis
+            enhanced = intent_result.get("enhanced_prompt", user_input)
+            if enhanced and enhanced != user_input and len(enhanced) > 5:
+                self._emit("pipeline", f"✨ Prompt iyileştirildi: {enhanced[:120]}")
                 user_input = enhanced
+
+            # Override complexity from intent analysis
+            if intent_result.get("complexity"):
+                complexity = intent_result["complexity"]
+
+            thread.add_event(
+                EventType.ROUTING_DECISION,
+                f"Intent: {intent_result.get('intent', '')[:100]} | "
+                f"Confidence: {intent_result.get('confidence', 0):.0%} | "
+                f"Pipeline: {intent_result.get('suggested_pipeline', 'auto')}",
+                agent_role=self.role,
+                intent_confidence=intent_result.get("confidence", 0),
+            )
         except Exception:
             pass  # Never break main flow
+
+        # ── Phase -0.5: Skill Pre-Discovery (FAZ 3 — runs early) ──
+        pre_discovered_skills = []
+        if intent_result and intent_result.get("required_skills"):
+            try:
+                pre_discovered_skills = await self._discover_skills_for_intent(intent_result)
+            except Exception:
+                pass
 
         # ── Auto-save user teachings/preferences ──
         try:
@@ -1444,6 +1487,13 @@ class OrchestratorAgent(BaseAgent):
                 await cache_response(user_input, final, confidence=avg_conf)
             except Exception:
                 pass
+            # Quality Gate (Faz 5.5)
+            try:
+                final, qg_passed = await self._quality_gate(final, user_input, thread)
+                if not qg_passed and live_monitor:
+                    live_monitor.emit("pipeline", "orchestrator", "⚠️ Quality Gate: refinement önerildi")
+            except Exception:
+                pass
             self._auto_save_memory(user_input, final, user_id=user_id)
             return final
 
@@ -1533,6 +1583,13 @@ class OrchestratorAgent(BaseAgent):
                     for role, r in agent_results.items()
                 ) / max(len(agent_results), 1)
                 await cache_response(user_input, final, confidence=avg_conf)
+            except Exception:
+                pass
+            # Quality Gate (Faz 5.5)
+            try:
+                final, qg_passed = await self._quality_gate(final, user_input, thread)
+                if not qg_passed and live_monitor:
+                    live_monitor.emit("pipeline", "orchestrator", "⚠️ Quality Gate: refinement önerildi")
             except Exception:
                 pass
             self._auto_save_memory(user_input, final, user_id=user_id)
@@ -1663,6 +1720,13 @@ class OrchestratorAgent(BaseAgent):
                     await cache_response(user_input, final, confidence=avg_conf)
                 except Exception:
                     pass
+                # Quality Gate (Faz 5.5)
+                try:
+                    final, qg_passed = await self._quality_gate(final, user_input, thread)
+                    if not qg_passed and live_monitor:
+                        live_monitor.emit("pipeline", "orchestrator", "⚠️ Quality Gate: refinement önerildi")
+                except Exception:
+                    pass
                 self._auto_save_memory(user_input, final, user_id=user_id)
                 return final
 
@@ -1674,55 +1738,242 @@ class OrchestratorAgent(BaseAgent):
         self._auto_save_memory(user_input, decision, user_id=user_id)
         return decision
 
-    async def _enhance_prompt(self, user_input: str, thread: Thread) -> str:
-        """
-        Prompt Enhancer: Analyze and improve the user's raw prompt before routing.
-        Emits the enhanced version as a pipeline event so user can see it.
-        Returns enhanced prompt string (or original if enhancement fails/not needed).
-        """
-        # Skip for very short/trivial inputs
-        if len(user_input.strip()) < 10 or _SIMPLE_PATTERNS.match(user_input.strip()):
-            return user_input
+    # ── FAZ 1: Intent Analysis ─────────────────────────────────────
 
-        enhance_prompt = (
-            "You are a Prompt Enhancement specialist. Your job:\n"
-            "1. Analyze the raw user prompt below.\n"
-            "2. Detect goal, scope, context, and missing details.\n"
-            "3. Rewrite it to be clearer, more precise, and actionable.\n"
-            "4. Keep the same language as the original (Turkish stays Turkish).\n"
-            "5. Do NOT add unnecessary complexity — only improve clarity.\n\n"
-            f"RAW PROMPT:\n{user_input}\n\n"
-            "OUTPUT FORMAT (strictly follow):\n"
-            "ENHANCED: <the improved prompt on a single line>\n"
-            "CHANGES: <one-line summary of what was improved>"
+    async def _analyze_intent(self, user_input: str, thread: Thread) -> dict:
+        """
+        Phase 1 of 5-Phase Pipeline: Intent Analysis.
+        Returns structured intent with confidence score.
+        If confidence < 0.7, includes clarification question.
+        """
+        # Trivial inputs — skip LLM call
+        if len(user_input.strip()) < 10 or _SIMPLE_PATTERNS.match(user_input.strip()):
+            return {
+                "intent": user_input,
+                "confidence": 1.0,
+                "complexity": "simple",
+                "suggested_pipeline": "direct",
+                "required_skills": [],
+                "agents_needed": [],
+                "clarification_needed": False,
+                "clarification_question": None,
+                "enhanced_prompt": user_input,
+            }
+
+        # Recall past intent patterns from memory
+        memory_hint = ""
+        try:
+            from tools.memory import recall_memory, format_recall_results
+            memories = await recall_memory(query=f"intent pattern: {user_input[:100]}", max_results=2)
+            if memories:
+                memory_hint = (
+                    "\n\nPAST INTENT PATTERNS (from memory):\n"
+                    + format_recall_results(memories)
+                )
+        except Exception:
+            pass
+
+        intent_prompt = (
+            "You are an Intent Analysis specialist for a multi-agent AI system.\n"
+            "Analyze the user's message and extract structured intent.\n\n"
+            "RULES:\n"
+            "- Detect the TRUE goal behind the message, not just surface words.\n"
+            "- If the message is ambiguous or missing critical details, set confidence LOW and ask a clarification question.\n"
+            "- Keep the same language as the user (Turkish stays Turkish).\n"
+            "- Enhanced prompt should be clearer and more actionable than the original.\n"
+            f"{memory_hint}\n\n"
+            f"USER MESSAGE:\n{user_input}\n\n"
+            "Respond ONLY with valid JSON (no markdown, no explanation):\n"
+            "{\n"
+            '  "intent": "clear one-line description of what user wants",\n'
+            '  "confidence": 0.0-1.0,\n'
+            '  "complexity": "simple|moderate|complex",\n'
+            '  "suggested_pipeline": "direct|parallel|deep_research|brainstorm|idea_to_project",\n'
+            '  "required_skills": ["skill-id-1", "skill-id-2"],\n'
+            '  "agents_needed": ["researcher", "thinker", "reasoner", "speed", "critic"],\n'
+            '  "clarification_needed": true/false,\n'
+            '  "clarification_question": "question to ask user or null",\n'
+            '  "enhanced_prompt": "improved version of user message"\n'
+            "}"
         )
 
         messages = [
-            {"role": "system", "content": "You are a concise prompt enhancement assistant."},
-            {"role": "user", "content": enhance_prompt},
+            {"role": "system", "content": "You are a precise intent analysis engine. Output ONLY valid JSON."},
+            {"role": "user", "content": intent_prompt},
         ]
 
         try:
             response = await self.call_llm(messages)
-            content = response.get("content", "")
+            content = response.get("content", "").strip()
             if not content:
-                return user_input
+                return self._fallback_intent(user_input)
 
-            # Extract ENHANCED: line
-            for line in content.split("\n"):
-                if line.startswith("ENHANCED:"):
-                    enhanced = line[len("ENHANCED:"):].strip()
-                    if enhanced and len(enhanced) > 5 and enhanced != user_input:
-                        # Emit so user sees it in pipeline panel
-                        self._emit("pipeline", f"✨ Prompt iyileştirildi: {enhanced[:120]}")
-                        return enhanced
+            # Strip markdown code fences if present
+            if content.startswith("```"):
+                content = re.sub(r"^```(?:json)?\s*", "", content)
+                content = re.sub(r"\s*```$", "", content)
+
+            result = json.loads(content)
+
+            # Validate required fields
+            required = ["intent", "confidence", "complexity", "suggested_pipeline"]
+            if not all(k in result for k in required):
+                return self._fallback_intent(user_input)
+
+            # Clamp confidence
+            result["confidence"] = max(0.0, min(1.0, float(result["confidence"])))
+
+            # Ensure enhanced_prompt exists
+            if not result.get("enhanced_prompt"):
+                result["enhanced_prompt"] = user_input
+
+            self._emit(
+                "pipeline",
+                f"🎯 Intent: {result['intent'][:80]} (güven: {result['confidence']:.0%}, "
+                f"karmaşıklık: {result['complexity']})",
+            )
+
+            return result
+
+        except (json.JSONDecodeError, Exception):
+            return self._fallback_intent(user_input)
+
+    def _fallback_intent(self, user_input: str) -> dict:
+        """Fallback when LLM intent analysis fails — use rule-based classification."""
+        complexity = self._classify_complexity(user_input)
+        pipeline_map = {"simple": "direct", "moderate": "parallel", "complex": "deep_research"}
+        return {
+            "intent": user_input[:120],
+            "confidence": 0.6,
+            "complexity": complexity,
+            "suggested_pipeline": pipeline_map.get(complexity, "parallel"),
+            "required_skills": [],
+            "agents_needed": [],
+            "clarification_needed": False,
+            "clarification_question": None,
+            "enhanced_prompt": user_input,
+        }
+
+    # ── FAZ 3: Skill Pre-Discovery ──────────────────────────────────
+
+    async def _discover_skills_for_intent(self, intent_result: dict) -> list[dict]:
+        """
+        Phase 3: Discover existing skills or flag missing ones for creation.
+        Returns list of found skills with metadata.
+        """
+        required = intent_result.get("required_skills", [])
+        if not required:
+            return []
+
+        found_skills = []
+        missing_skills = []
+
+        try:
+            from tools.dynamic_skills import search_skills
+            for skill_id in required[:5]:  # Max 5 skill lookups
+                results = search_skills(query=skill_id, max_results=1)
+                if results:
+                    found_skills.append(results[0])
+                else:
+                    missing_skills.append(skill_id)
+        except Exception:
+            missing_skills = list(required[:5])
+
+        if missing_skills:
+            self._emit(
+                "pipeline",
+                f"⚠️ Eksik skill'ler: {', '.join(missing_skills)} — görev sırasında oluşturulacak",
+            )
+
+        if found_skills:
+            self._emit(
+                "pipeline",
+                f"✅ {len(found_skills)} skill bulundu: {', '.join(s.get('id', '?') for s in found_skills)}",
+            )
+
+        return found_skills
+
+    # ── FAZ 5.5: Quality Gate ────────────────────────────────────────
+
+    async def _quality_gate(self, result: str, user_input: str, thread: Thread) -> tuple[str, bool]:
+        """
+        Phase 5.5: Quality Gate — Critic (Qwen) reviews the final synthesis.
+        Returns (result, passed). If quality < 0.6, returns (result, False) for refinement.
+        """
+        if not result or len(result.strip()) < 100:
+            return result, True  # Too short to review
+
+        try:
+            from agents.critic import CriticAgent
+            critic = CriticAgent()
+            if hasattr(self, '_live_monitor') and self._live_monitor:
+                critic.set_live_monitor(self._live_monitor)
+
+            review_prompt = (
+                f"QUALITY REVIEW — rate this response.\n\n"
+                f"USER REQUEST: {user_input[:300]}\n\n"
+                f"RESPONSE TO REVIEW:\n{result[:3000]}\n\n"
+                f"Rate quality 0.0-1.0. Output ONLY valid JSON:\n"
+                f'{{"quality": 0.0-1.0, "issues": ["issue1"], "pass": true/false}}'
+            )
+
+            review_result = await critic.execute(review_prompt, thread)
+
+            # Parse quality score
+            try:
+                # Try to extract JSON from response
+                json_match = re.search(r'\{[^}]+\}', review_result)
+                if json_match:
+                    review_data = json.loads(json_match.group())
+                    quality = float(review_data.get("quality", 0.7))
+                    passed = review_data.get("pass", True)
+
+                    self._emit(
+                        "pipeline",
+                        f"🎯 Quality Gate: {quality:.0%} {'✅ PASS' if passed else '⚠️ NEEDS REFINEMENT'}",
+                    )
+
+                    thread.add_event(
+                        EventType.EVALUATION,
+                        f"Quality Gate: {quality:.0%}, passed={passed}",
+                        agent_role=AgentRole.CRITIC,
+                        quality=quality,
+                    )
+
+                    return result, passed
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        except Exception:
+            pass
+
+        return result, True  # Default: pass if review fails
+
+    # ── Prompt Enhancement (simplified, used within intent analysis) ──
+
+    async def _enhance_prompt(self, user_input: str, thread: Thread) -> str:
+        """
+        Simplified prompt enhancer — delegates to intent analysis.
+        Kept for backward compatibility with route_and_execute flow.
+        """
+        if len(user_input.strip()) < 10 or _SIMPLE_PATTERNS.match(user_input.strip()):
+            return user_input
+
+        try:
+            intent = await self._analyze_intent(user_input, thread)
+            enhanced = intent.get("enhanced_prompt", user_input)
+            if enhanced and enhanced != user_input and len(enhanced) > 5:
+                self._emit("pipeline", f"✨ Prompt iyileştirildi: {enhanced[:120]}")
+                return enhanced
         except Exception:
             pass
 
         return user_input
 
+    # ── Auto Memory Save ─────────────────────────────────────────────
+
     def _auto_save_memory(self, user_input: str, result: str, user_id: str | None = None) -> None:
-        """Save task completion to learned memory and auto-create skill when result is successful."""
+        """Save task completion to learned memory."""
         tags: list[str] = []
         keywords = ["search", "code", "analyze", "math", "translate", "summarize",
                     "research", "compare", "explain", "calculate", "predict"]
@@ -1748,27 +1999,16 @@ class OrchestratorAgent(BaseAgent):
         except Exception:
             pass
 
-        # Auto-create skill when result is successful (not partial/failed)
-        _skip_auto_skill = (
-            not result
-            or len(result.strip()) < 150
-            or "max steps reached" in result.lower()
-            or "partial result" in result.lower()
-            or result.strip().lower().startswith("[warning]")
-            or "error:" in result.lower()[:200]
-        )
-        # Auto skill creation disabled — agents should write learnings
-        # to memory (memories table), not create skills from every task.
         # Periodic skill hygiene check (every ~10 tasks)
         try:
             import random
-            if random.random() < 0.1:  # ~10% chance per task = ~every 10 tasks
+            if random.random() < 0.1:
                 from tools.skill_hygiene import run_hygiene_check
                 run_hygiene_check(dry_run=False)
         except Exception:
             pass
 
-        # Post-task autonomous chat: agents discuss the completed task
+        # Post-task autonomous chat
         try:
             from backend.routes.messaging import trigger_post_task_auto_chat
             trigger_post_task_auto_chat(

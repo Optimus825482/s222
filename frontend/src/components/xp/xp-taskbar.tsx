@@ -187,16 +187,19 @@ export function XpTaskbar({
             </span>
           </div>
 
-          {/* Body */}
-          <div className="flex max-h-[calc(100dvh-140px)]">
+          {/* Body: single hover zone so moving from category to flyout doesn't close (no shake) */}
+          <div
+            className="flex max-h-[calc(100dvh-140px)]"
+            onMouseEnter={() => {
+              if (flyoutTimerRef.current) {
+                clearTimeout(flyoutTimerRef.current);
+                flyoutTimerRef.current = null;
+              }
+            }}
+            onMouseLeave={handleGroupLeave}
+          >
             {/* Left: Category list (desktop flyout) / flat list (mobile) */}
-            <div
-              className="flex-1 bg-white py-2 px-1 overflow-y-auto"
-              onMouseEnter={() => {
-                if (flyoutTimerRef.current)
-                  clearTimeout(flyoutTimerRef.current);
-              }}
-            >
+            <div className="flex-1 min-w-0 bg-white py-2 px-1 overflow-y-auto">
               {isMobile ? (
                 /* Mobile: accordion-style flat list */
                 <>
@@ -290,13 +293,13 @@ export function XpTaskbar({
                   )}
                 </>
               ) : (
-                /* Desktop: Category names with flyout */
+                /* Desktop: Category names with flyout (no onMouseLeave on items — body handles leave to prevent shake) */
                 <>
                   {groupNames.map((name) => (
                     <button
                       key={name}
+                      type="button"
                       onMouseEnter={() => handleGroupEnter(name)}
-                      onMouseLeave={handleGroupLeave}
                       onClick={() =>
                         setHoveredGroup((prev) => (prev === name ? null : name))
                       }
@@ -319,8 +322,8 @@ export function XpTaskbar({
                     <>
                       <div className="border-t border-gray-200 my-1.5" />
                       <button
+                        type="button"
                         onMouseEnter={() => handleGroupEnter("__removed__")}
-                        onMouseLeave={handleGroupLeave}
                         onClick={() =>
                           setHoveredGroup((prev) =>
                             prev === "__removed__" ? null : "__removed__",

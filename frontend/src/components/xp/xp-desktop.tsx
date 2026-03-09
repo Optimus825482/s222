@@ -62,37 +62,61 @@ export function XpDesktop() {
   } | null>(null);
   const [isDraggingIcon, setIsDraggingIcon] = useState(false);
   const desktopRef = useRef<HTMLDivElement>(null);
+  const iconGridInitializedRef = useRef(false);
 
-  // Initialize icon positions in a grid layout
+  // Window dimensions for resize/rotate — grid recalculates when size changes
+  const [dimensions, setDimensions] = useState({ w: 0, h: 0 });
   useEffect(() => {
-    const isMobile = window.innerWidth < 768;
-    const gap = isMobile ? 80 : 96;
-    const rowH = isMobile ? 84 : 100;
-    const cols = Math.max(1, Math.floor((window.innerHeight - 80) / rowH));
+    const update = () =>
+      setDimensions({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  // Initialize / recalc icon positions (mobile: by width; desktop: by height; resize/rotate: reflow)
+  useEffect(() => {
+    if (dimensions.w === 0 && dimensions.h === 0) return;
+
+    const isMobile = dimensions.w < 768;
+    const gap = isMobile ? 68 : 96;
+    const rowH = isMobile ? 78 : 100;
+    const { w: width, h: height } = dimensions;
+
+    let cols: number;
+    if (isMobile) {
+      const cellW = gap;
+      cols = Math.max(1, Math.floor((width - 16) / cellW));
+    } else {
+      cols = Math.max(1, Math.floor((height - 80) / rowH));
+    }
 
     const defaults: Record<string, { x: number; y: number }> = {};
     APPS.forEach((app, i) => {
-      const col = Math.floor(i / cols);
-      const row = i % cols;
+      const row = Math.floor(i / cols);
+      const col = i % cols;
       defaults[app.id] = { x: 8 + col * gap, y: 8 + row * rowH };
     });
 
-    const stored = localStorage.getItem("xp-icon-positions");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const merged = { ...defaults };
-        for (const app of APPS) {
-          if (parsed[app.id]) merged[app.id] = parsed[app.id];
+    if (!iconGridInitializedRef.current) {
+      iconGridInitializedRef.current = true;
+      const stored = localStorage.getItem("xp-icon-positions");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as Record<string, { x: number; y: number }>;
+          const merged = { ...defaults };
+          for (const app of APPS) {
+            if (parsed[app.id]) merged[app.id] = parsed[app.id];
+          }
+          setIconPositions(merged);
+          return;
+        } catch {
+          /* ignore */
         }
-        setIconPositions(merged);
-        return;
-      } catch {
-        /* ignore */
       }
     }
     setIconPositions(defaults);
-  }, []);
+  }, [dimensions]);
 
   // Save positions to localStorage
   useEffect(() => {

@@ -69,7 +69,7 @@ const AGENTS = [
     border: "border-pink-400/30",
     tag: "Beyin",
     tagColor: "bg-pink-400/10 text-pink-400 border-pink-400/30",
-    desc: "Görev analizi, agent seçimi, iş dağıtımı, sonuç sentezi. Tüm sistemi yönetir.",
+    desc: "Görev analizi, niyet anlama, pipeline seçimi, iş dağıtımı, sonuç sentezi. DeepSeek Chat modeli.",
   },
   {
     icon: "🧠",
@@ -114,7 +114,7 @@ const AGENTS = [
     border: "border-cyan-400/30",
     tag: "Eleştirmen",
     tagColor: "bg-cyan-400/10 text-cyan-400 border-cyan-400/30",
-    desc: "Kalite denetimi, fact-checking, çıktı doğrulama. DeepSeek Critic modeli.",
+    desc: "Kalite denetimi, fact-checking, çıktı doğrulama, skill oluşturma. Qwen3 80B modeli.",
   },
 ];
 

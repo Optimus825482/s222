@@ -57,6 +57,7 @@ export default function RootLayout({
       className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
     >
       <head>
+        <meta charSet="UTF-8" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

@@ -45,17 +45,18 @@ WHOOGLE_URL = _WHOOGLE_RAW.rstrip("/") if _WHOOGLE_RAW else ""
 
 MODELS = {
     "orchestrator": {
-        "id": "qwen/qwen3-next-80b-a3b-instruct",
-        "name": "Qwen3 Next 80B",
+        "id": "deepseek-chat",
+        "name": "DeepSeek Chat",
         "role": "orchestrator",
-        "description": "Orchestrator — task analysis, decomposition, routing, synthesis",
+        "description": "Orchestrator — intent analysis, pipeline selection, task routing, synthesis",
         "max_tokens": 4096,
-        "temperature": 0.6,
-        "top_p": 0.7,
+        "temperature": 0.5,
+        "top_p": 0.9,
         "has_thinking": False,
         "extra_body": None,
         "color": "#ec4899",
         "icon": "🧠",
+        "base_url": "deepseek",
     },
     "thinker": {
         "id": "minimaxai/minimax-m2.1",
@@ -115,18 +116,17 @@ MODELS = {
         "icon": "🌊",
     },
     "critic": {
-        "id": "deepseek-chat",
-        "name": "DeepSeek Chat",
+        "id": "qwen/qwen3-next-80b-a3b-instruct",
+        "name": "Qwen3 Next 80B",
         "role": "critic",
-        "description": "Critic — quality review, fact-checking, weakness detection, improvement suggestions",
+        "description": "Critic + Skill Creator — quality review, fact-checking, skill generation, improvement suggestions",
         "max_tokens": 4096,
-        "temperature": 0.5,
-        "top_p": 0.9,
+        "temperature": 0.6,
+        "top_p": 0.7,
         "has_thinking": False,
         "extra_body": None,
         "color": "#06b6d4",
         "icon": "🎯",
-        "base_url": "deepseek",
     },
 }
 
@@ -136,10 +136,10 @@ MODEL_KEYS = list(MODELS.keys())
 
 GATEWAY_MODELS = {
     "orchestrator": {
-        "primary": {"id": "qwen/qwen3-next-80b-a3b-instruct", "provider": "nvidia"},
+        "primary": {"id": "deepseek-chat", "provider": "deepseek"},
         "alternatives": [
+            {"id": "qwen/qwen3-next-80b-a3b-instruct", "provider": "nvidia"},
             {"id": "claude-sonnet-4-20250514", "provider": "anthropic"},
-            {"id": "gpt-4o", "provider": "openai"},
         ],
     },
     "thinker": {
@@ -171,10 +171,10 @@ GATEWAY_MODELS = {
         ],
     },
     "critic": {
-        "primary": {"id": "deepseek-chat", "provider": "deepseek"},
+        "primary": {"id": "qwen/qwen3-next-80b-a3b-instruct", "provider": "nvidia"},
         "alternatives": [
+            {"id": "deepseek-chat", "provider": "deepseek"},
             {"id": "claude-sonnet-4-20250514", "provider": "anthropic"},
-            {"id": "gpt-4o", "provider": "openai"},
         ],
     },
 }

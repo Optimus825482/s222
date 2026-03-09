@@ -324,8 +324,13 @@ function ExportBtn({
   );
 }
 
+const UTF8_BOM = "\uFEFF";
+
 function download(content: string, filename: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
+  const isMarkdown = mime === "text/markdown" || filename.toLowerCase().endsWith(".md");
+  const body = isMarkdown ? UTF8_BOM + content : content;
+  const type = isMarkdown ? "text/markdown;charset=utf-8" : mime;
+  const blob = new Blob([body], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

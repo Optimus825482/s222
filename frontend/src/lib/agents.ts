@@ -4,12 +4,12 @@ export const AGENT_CONFIG: Record<
   AgentRole,
   { icon: string; color: string; name: string }
 > = {
-  orchestrator: { icon: "🧠", color: "#ec4899", name: "Qwen3 Next 80B" },
+  orchestrator: { icon: "🧠", color: "#ec4899", name: "DeepSeek Chat" },
   thinker: { icon: "🔬", color: "#00e5ff", name: "MiniMax M2.1" },
   speed: { icon: "⚡", color: "#a78bfa", name: "Step 3.5 Flash" },
   researcher: { icon: "🔍", color: "#f59e0b", name: "GLM 4.7" },
   reasoner: { icon: "🌊", color: "#10b981", name: "Nemotron 3 Nano" },
-  critic: { icon: "🎯", color: "#06b6d4", name: "DeepSeek Critic" },
+  critic: { icon: "🎯", color: "#06b6d4", name: "Qwen3 80B Critic" },
 };
 
 /** Orchestration pattern (Kiro: parallel specialists / pipeline / swarm) */

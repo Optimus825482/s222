@@ -307,7 +307,7 @@ export const api = {
   getSkill: (id: string) => fetcher(`/api/skills/${id}`),
   deleteSkill: (id: string) =>
     fetcher(`/api/skills/${id}`, { method: "DELETE" }),
-  /** Improve skill with DeepSeek; returns updated skill. */
+  /** Improve skill with Orchestrator (DeepSeek); returns updated skill. */
   improveSkill: (id: string) =>
     fetcher<{
       id: string;

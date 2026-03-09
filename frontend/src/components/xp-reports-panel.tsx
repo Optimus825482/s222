@@ -75,8 +75,12 @@ function buildCleanReportMarkdown(thread: Thread): string {
   return md;
 }
 
+const UTF8_BOM = "\uFEFF";
+
 function downloadMarkdown(filename: string, content: string) {
-  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const blob = new Blob([UTF8_BOM + content], {
+    type: "text/markdown;charset=utf-8",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
