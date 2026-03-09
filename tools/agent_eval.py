@@ -10,46 +10,18 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
+
+from tools.pg_connection import get_conn, release_conn
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-EVAL_DB_PATH = DATA_DIR / "evaluations.db"
-
-_conn: sqlite3.Connection | None = None
-
-
-def _get_conn() -> sqlite3.Connection:
-    global _conn
-    if _conn is None:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        _conn = sqlite3.connect(str(EVAL_DB_PATH), check_same_thread=False)
-        _conn.row_factory = sqlite3.Row
-        _conn.execute("PRAGMA journal_mode=WAL")
-        _init_schema(_conn)
-    return _conn
-
-
-def _init_schema(conn: sqlite3.Connection) -> None:
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS evaluations (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent_role   TEXT NOT NULL,
-            task_type    TEXT NOT NULL DEFAULT 'general',
-            score        REAL NOT NULL,
-            dimensions   TEXT,
-            task_preview TEXT,
-            tokens_used  INTEGER DEFAULT 0,
-            latency_ms   REAL DEFAULT 0,
-            created_at   TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_eval_agent ON evaluations(agent_role);
-        CREATE INDEX IF NOT EXISTS idx_eval_type ON evaluations(task_type);
-    """)
+# Dummy object whose .exists() always returns True.
+# Callers (auto_optimizer.py, adaptive_tool_selector.py) check
+# EVAL_DB_PATH.exists() before querying — this keeps them happy
+# without a real file on disk.
+EVAL_DB_PATH = type("_", (), {"exists": staticmethod(lambda: True)})()
 
 
 # ── Task Type Detection ──────────────────────────────────────────
@@ -175,6 +147,8 @@ def score_agent_output(
     }
 
 
+# ── DB Persistence ───────────────────────────────────────────────
+
 def _save_evaluation(
     agent_role: str,
     task_type: str,
@@ -184,13 +158,15 @@ def _save_evaluation(
     latency_ms: float,
     task_preview: str,
 ) -> None:
-    """Persist evaluation to SQLite."""
+    """Persist evaluation to PostgreSQL."""
+    conn = None
     try:
-        conn = _get_conn()
-        conn.execute(
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
             """INSERT INTO evaluations
                (agent_role, task_type, score, dimensions, task_preview, tokens_used, latency_ms, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
             (
                 agent_role, task_type, score,
                 json.dumps(dimensions), task_preview[:200],
@@ -201,103 +177,70 @@ def _save_evaluation(
         conn.commit()
     except Exception as e:
         logger.warning(f"Failed to save evaluation: {e}")
+    finally:
+        if conn is not None:
+            release_conn(conn)
 
 
 def get_agent_stats(agent_role: str | None = None) -> list[dict]:
     """Get aggregated stats per agent (optionally filtered)."""
-    conn = _get_conn()
-    if agent_role:
-        rows = conn.execute("""
-            SELECT agent_role, task_type,
-                   COUNT(*) as total_tasks,
-                   ROUND(AVG(score), 2) as avg_score,
-                   ROUND(AVG(latency_ms), 0) as avg_latency,
-                   SUM(tokens_used) as total_tokens
-            FROM evaluations
-            WHERE agent_role = ?
-            GROUP BY agent_role, task_type
-            ORDER BY avg_score DESC
-        """, (agent_role,)).fetchall()
-    else:
-        rows = conn.execute("""
-            SELECT agent_role,
-                   COUNT(*) as total_tasks,
-                   ROUND(AVG(score), 2) as avg_score,
-                   ROUND(AVG(latency_ms), 0) as avg_latency,
-                   SUM(tokens_used) as total_tokens
-            FROM evaluations
-            GROUP BY agent_role
-            ORDER BY avg_score DESC
-        """).fetchall()
-
-    return [dict(r) for r in rows]
-
-
-def get_performance_baseline(agent_role: str | None = None) -> dict[str, Any]:
-    """
-    Build a Performance Baseline report (agent-orchestration-improve-agent skill).
-    Aggregates eval data into: task_success_rate, avg_corrections, tool_efficiency,
-    user_satisfaction_score, avg_latency_ms, token_efficiency_ratio.
-    """
-    conn = _get_conn()
-    # Success = score >= 3.5
-    if agent_role:
-        row = conn.execute("""
-            SELECT
-                COUNT(*) as total_tasks,
-                SUM(CASE WHEN score >= 3.5 THEN 1 ELSE 0 END) as success_count,
-                ROUND(AVG(score), 2) as avg_score,
-                ROUND(AVG(latency_ms), 0) as avg_latency,
-                COALESCE(SUM(tokens_used), 0) as total_tokens
-            FROM evaluations
-            WHERE agent_role = ?
-        """, (agent_role,)).fetchone()
-    else:
-        row = conn.execute("""
-            SELECT
-                COUNT(*) as total_tasks,
-                SUM(CASE WHEN score >= 3.5 THEN 1 ELSE 0 END) as success_count,
-                ROUND(AVG(score), 2) as avg_score,
-                ROUND(AVG(latency_ms), 0) as avg_latency,
-                COALESCE(SUM(tokens_used), 0) as total_tokens
-            FROM evaluations
-        """).fetchone()
-
-    total = row["total_tasks"] or 0
-    success = row["success_count"] or 0
-    avg_score = float(row["avg_score"] or 0)
-    avg_latency = float(row["avg_latency"] or 0)
-    total_tokens = int(row["total_tokens"] or 0)
-
-    task_success_rate = (success / total * 100) if total else 0
-    # Map avg_score 1-5 to satisfaction 1-10
-    user_satisfaction = round((avg_score / 5.0) * 10, 1) if avg_score else 0
-    token_per_task = (total_tokens / total) if total else 0
-
-    return {
-        "task_success_rate_pct": round(task_success_rate, 1),
-        "total_tasks": total,
-        "success_count": success,
-        "avg_score": avg_score,
-        "user_satisfaction_score": min(10, max(1, user_satisfaction)),
-        "avg_latency_ms": round(avg_latency, 0),
-        "total_tokens": total_tokens,
-        "token_efficiency_ratio": f"{total_tokens}:{total}" if total else "0:0",
-        "agent_role": agent_role,
-    }
+    conn = None
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        if agent_role:
+            cur.execute("""
+                SELECT agent_role, task_type,
+                       COUNT(*) as total_tasks,
+                       ROUND(AVG(score)::numeric, 2) as avg_score,
+                       ROUND(AVG(latency_ms)::numeric, 0) as avg_latency,
+                       SUM(tokens_used) as total_tokens
+                FROM evaluations
+                WHERE agent_role = %s
+                GROUP BY agent_role, task_type
+                ORDER BY avg_score DESC
+            """, (agent_role,))
+        else:
+            cur.execute("""
+                SELECT agent_role,
+                       COUNT(*) as total_tasks,
+                       ROUND(AVG(score)::numeric, 2) as avg_score,
+                       ROUND(AVG(latency_ms)::numeric, 0) as avg_latency,
+                       SUM(tokens_used) as total_tokens
+                FROM evaluations
+                GROUP BY agent_role
+                ORDER BY avg_score DESC
+            """)
+        rows = cur.fetchall()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        logger.warning(f"Failed to get agent stats: {e}")
+        return []
+    finally:
+        if conn is not None:
+            release_conn(conn)
 
 
 def get_best_agent_for_task(task_type: str) -> str | None:
     """Recommend the best agent for a given task type based on historical scores."""
-    conn = _get_conn()
-    row = conn.execute("""
-        SELECT agent_role, AVG(score) as avg_score
-        FROM evaluations
-        WHERE task_type = ?
-        GROUP BY agent_role
-        HAVING COUNT(*) >= 3
-        ORDER BY avg_score DESC
-        LIMIT 1
-    """, (task_type,)).fetchone()
-
-    return row["agent_role"] if row else None
+    conn = None
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT agent_role, AVG(score) as avg_score
+            FROM evaluations
+            WHERE task_type = %s
+            GROUP BY agent_role
+            HAVING COUNT(*) >= 3
+            ORDER BY avg_score DESC
+            LIMIT 1
+        """, (task_type,))
+        row = cur.fetchone()
+        return row["agent_role"] if row else None
+    except Exception as e:
+        logger.warning(f"Failed to get best agent for task: {e}")
+        return None
+    finally:
+        if conn is not None:
+            release_conn(conn)

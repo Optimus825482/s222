@@ -66,6 +66,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Migration 005 failed (non-critical): {e}")
 
+    # Run migration 006: SQLite → PostgreSQL (schedules, benchmarks, evaluations, etc.)
+    try:
+        from tools.pg_connection import get_conn, release_conn
+        import pathlib
+        _mig006_path = pathlib.Path(__file__).parent / "migrations" / "006_sqlite_to_pg_migration.sql"
+        if _mig006_path.exists():
+            _mig006_sql = _mig006_path.read_text(encoding="utf-8")
+            _mig006_conn = get_conn()
+            with _mig006_conn.cursor() as cur:
+                cur.execute(_mig006_sql)
+            _mig006_conn.commit()
+            release_conn(_mig006_conn)
+            print("[Backend] Migration 006 (SQLite→PG) applied")
+    except Exception as e:
+        print(f"[Backend] Migration 006 failed (non-critical): {e}")
+
     # Create analytics tables
     try:
         from tools.pg_connection import get_conn, release_conn

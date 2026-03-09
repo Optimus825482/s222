@@ -1135,55 +1135,32 @@ def get_marketplace_catalog() -> list[dict]:
 # ══════════════════════════════════════════════════════════════════
 
 import importlib.util
-import sqlite3
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 DISCOVERY_DIR = Path("data/domain_skills")
-MARKETPLACE_DB = Path("data/dynamic_skills.db")
-
-
-def _ensure_marketplace_db():
-    """Create marketplace tables if not exist."""
-    MARKETPLACE_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(MARKETPLACE_DB))
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS domain_skill_registry (
-            domain_id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            name_tr TEXT NOT NULL,
-            description TEXT,
-            source TEXT DEFAULT 'discovered',
-            enabled INTEGER DEFAULT 1,
-            installed_at TEXT,
-            usage_count INTEGER DEFAULT 0,
-            rating REAL DEFAULT 0.0,
-            version TEXT DEFAULT '1.0.0',
-            author TEXT DEFAULT 'community'
-        )
-    """)
-    conn.commit()
-    conn.close()
 
 
 def _register_builtin_domains():
-    """Register built-in domains in marketplace DB."""
-    _ensure_marketplace_db()
-    conn = sqlite3.connect(str(MARKETPLACE_DB))
-    now = datetime.utcnow().isoformat()
-    for d in DOMAINS.values():
-        conn.execute("""
-            INSERT OR IGNORE INTO domain_skill_registry 
-            (domain_id, name, name_tr, description, source, enabled, installed_at, version, author)
-            VALUES (?, ?, ?, ?, 'builtin', 1, ?, '2.0.0', 'system')
-        """, (d.domain_id, d.name, d.name_tr, d.description, now))
-    conn.commit()
-    conn.close()
+    """Register built-in domains in marketplace DB (PostgreSQL)."""
+    conn = get_conn()
+    try:
+        now = datetime.now(timezone.utc)
+        with conn.cursor() as cur:
+            for d in DOMAINS.values():
+                cur.execute("""
+                    INSERT INTO domain_skill_registry
+                    (domain_id, name, name_tr, description, source, enabled, installed_at, version, author)
+                    VALUES (%s, %s, %s, %s, 'builtin', TRUE, %s, '2.0.0', 'system')
+                    ON CONFLICT DO NOTHING
+                """, (d.domain_id, d.name, d.name_tr, d.description, now))
+        conn.commit()
+    finally:
+        release_conn(conn)
 
 
 def discover_domain_skills() -> dict:
     """Scan data/domain_skills/ for new domain modules and register them."""
-    _ensure_marketplace_db()
     _register_builtin_domains()
 
     DISCOVERY_DIR.mkdir(parents=True, exist_ok=True)
@@ -1228,20 +1205,31 @@ def discover_domain_skills() -> dict:
                     _TOOL_MAP[tool_def["name"]] = fn
 
             # Save to DB
-            conn = sqlite3.connect(str(MARKETPLACE_DB))
-            now = datetime.utcnow().isoformat()
-            conn.execute("""
-                INSERT OR REPLACE INTO domain_skill_registry
-                (domain_id, name, name_tr, description, source, enabled, installed_at,
-                 version, author)
-                VALUES (?, ?, ?, ?, 'discovered', 1, ?,
-                        ?, ?)
-            """, (
-                domain_id, dm.name, dm.name_tr, dm.description, now,
-                config.get("version", "1.0.0"), config.get("author", "community")
-            ))
-            conn.commit()
-            conn.close()
+            conn = get_conn()
+            try:
+                now = datetime.now(timezone.utc)
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO domain_skill_registry
+                        (domain_id, name, name_tr, description, source, enabled, installed_at,
+                         version, author)
+                        VALUES (%s, %s, %s, %s, 'discovered', TRUE, %s, %s, %s)
+                        ON CONFLICT (domain_id) DO UPDATE SET
+                            name = EXCLUDED.name,
+                            name_tr = EXCLUDED.name_tr,
+                            description = EXCLUDED.description,
+                            source = EXCLUDED.source,
+                            enabled = EXCLUDED.enabled,
+                            installed_at = EXCLUDED.installed_at,
+                            version = EXCLUDED.version,
+                            author = EXCLUDED.author
+                    """, (
+                        domain_id, dm.name, dm.name_tr, dm.description, now,
+                        config.get("version", "1.0.0"), config.get("author", "community")
+                    ))
+                conn.commit()
+            finally:
+                release_conn(conn)
 
             discovered.append(domain_id)
             logger.info(f"Discovered domain skill: {domain_id}")
@@ -1259,27 +1247,34 @@ def discover_domain_skills() -> dict:
 
 def toggle_domain_skill(domain_id: str, enabled: bool) -> dict:
     """Enable or disable a domain skill."""
-    _ensure_marketplace_db()
-    conn = sqlite3.connect(str(MARKETPLACE_DB))
-    cur = conn.execute(
-        "UPDATE domain_skill_registry SET enabled = ? WHERE domain_id = ?",
-        (1 if enabled else 0, domain_id)
-    )
-    conn.commit()
-    conn.close()
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE domain_skill_registry SET enabled = %s WHERE domain_id = %s",
+                (enabled, domain_id)
+            )
+            rowcount = cur.rowcount
+        conn.commit()
+    finally:
+        release_conn(conn)
 
-    if cur.rowcount == 0:
+    if rowcount == 0:
         return {"error": f"Domain not found: {domain_id}"}
 
     # If disabling, remove from active DOMAINS (but keep builtin)
     if not enabled and domain_id in DOMAINS:
-        _conn = sqlite3.connect(str(MARKETPLACE_DB))
-        row = _conn.execute(
-            "SELECT source FROM domain_skill_registry WHERE domain_id = ?",
-            (domain_id,)
-        ).fetchone()
-        _conn.close()
-        if row and row[0] == "discovered":
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT source FROM domain_skill_registry WHERE domain_id = %s",
+                    (domain_id,)
+                )
+                row = cur.fetchone()
+        finally:
+            release_conn(conn)
+        if row and row["source"] == "discovered":
             del DOMAINS[domain_id]
     elif enabled and domain_id not in DOMAINS:
         # Re-discover to reload
@@ -1291,27 +1286,31 @@ def toggle_domain_skill(domain_id: str, enabled: bool) -> dict:
 def increment_usage(domain_id: str):
     """Increment usage counter for a domain skill."""
     try:
-        _ensure_marketplace_db()
-        conn = sqlite3.connect(str(MARKETPLACE_DB))
-        conn.execute(
-            "UPDATE domain_skill_registry SET usage_count = usage_count + 1 WHERE domain_id = ?",
-            (domain_id,)
-        )
-        conn.commit()
-        conn.close()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE domain_skill_registry SET usage_count = usage_count + 1 WHERE domain_id = %s",
+                    (domain_id,)
+                )
+            conn.commit()
+        finally:
+            release_conn(conn)
     except Exception:
         pass
 
 
 def get_marketplace_data() -> list[dict]:
     """Get all domain skills with marketplace metadata."""
-    _ensure_marketplace_db()
     _register_builtin_domains()
 
-    conn = sqlite3.connect(str(MARKETPLACE_DB))
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM domain_skill_registry ORDER BY source, domain_id").fetchall()
-    conn.close()
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM domain_skill_registry ORDER BY source, domain_id")
+            rows = cur.fetchall()
+    finally:
+        release_conn(conn)
 
     result = []
     for row in rows:

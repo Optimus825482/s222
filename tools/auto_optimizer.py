@@ -19,17 +19,12 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
-import time
-import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from tools.pg_connection import get_conn, release_conn
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-DB_PATH = DATA_DIR / "auto_optimizer.db"
+logger = logging.getLogger(__name__)
 
 # ── Thresholds ───────────────────────────────────────────────────
 
@@ -54,61 +49,13 @@ class AutoOptimizer:
     """Analyzes cross-system metrics and generates optimization recommendations."""
 
     def __init__(self) -> None:
-        self._conn: sqlite3.Connection | None = None
         self._ensure_db()
 
     # ── Database ─────────────────────────────────────────────────
 
-    def _get_conn(self) -> sqlite3.Connection:
-        """Return a reusable SQLite connection with WAL mode."""
-        if self._conn is None:
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            self._conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
-            self._conn.execute("PRAGMA journal_mode=WAL")
-        return self._conn
-
     def _ensure_db(self) -> None:
-        """Create tables and indexes if they don't exist."""
-        conn = self._get_conn()
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS recommendations (
-                id                INTEGER PRIMARY KEY AUTOINCREMENT,
-                category          TEXT NOT NULL,
-                priority          TEXT NOT NULL DEFAULT 'medium',
-                title             TEXT NOT NULL,
-                description       TEXT NOT NULL,
-                affected_agents   TEXT NOT NULL DEFAULT '[]',
-                suggested_actions TEXT NOT NULL DEFAULT '[]',
-                estimated_impact  TEXT,
-                status            TEXT NOT NULL DEFAULT 'pending',
-                notes             TEXT,
-                created_at        TEXT NOT NULL,
-                updated_at        TEXT
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_rec_category
-                ON recommendations(category);
-            CREATE INDEX IF NOT EXISTS idx_rec_priority
-                ON recommendations(priority);
-            CREATE INDEX IF NOT EXISTS idx_rec_status
-                ON recommendations(status);
-            CREATE INDEX IF NOT EXISTS idx_rec_created
-                ON recommendations(created_at);
-
-            CREATE TABLE IF NOT EXISTS optimization_history (
-                id                INTEGER PRIMARY KEY AUTOINCREMENT,
-                recommendation_id INTEGER NOT NULL,
-                action            TEXT NOT NULL,
-                notes             TEXT,
-                performed_at      TEXT NOT NULL,
-                FOREIGN KEY (recommendation_id) REFERENCES recommendations(id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_oh_rec
-                ON optimization_history(recommendation_id);
-        """)
-        conn.commit()
+        """No-op — tables are created by migration SQL (006)."""
+        pass
 
     # ── Analysis & Recommendation Generation ─────────────────────
 
@@ -137,26 +84,21 @@ class AutoOptimizer:
         logger.info("Auto-optimizer generated %d new recommendations", len(new_recs))
         return new_recs
 
-
     def _check_success_rates(self) -> list[dict[str, Any]]:
         """Check agents with success rate below threshold → reliability."""
         results: list[dict[str, Any]] = []
+        conn = get_conn()
         try:
-            from tools.agent_eval import EVAL_DB_PATH
-            if not EVAL_DB_PATH.exists():
-                return results
-
-            conn = sqlite3.connect(str(EVAL_DB_PATH))
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT agent_role,
-                       COUNT(*) AS total,
-                       SUM(CASE WHEN score >= 3.5 THEN 1 ELSE 0 END) AS success
-                FROM evaluations
-                GROUP BY agent_role
-                HAVING total >= 5
-            """).fetchall()
-            conn.close()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT agent_role,
+                           COUNT(*) AS total,
+                           SUM(CASE WHEN score >= 3.5 THEN 1 ELSE 0 END) AS success
+                    FROM evaluations
+                    GROUP BY agent_role
+                    HAVING COUNT(*) >= 5
+                """)
+                rows = cur.fetchall()
 
             for row in rows:
                 rate = (row["success"] / row["total"]) * 100 if row["total"] else 100
@@ -182,29 +124,27 @@ class AutoOptimizer:
                     results.append(rec)
         except Exception as exc:
             logger.warning("Success rate check failed: %s", exc)
+        finally:
+            release_conn(conn)
 
         return results
 
     def _check_latency(self) -> list[dict[str, Any]]:
         """Check agents with average latency above threshold → performance."""
         results: list[dict[str, Any]] = []
+        conn = get_conn()
         try:
-            from tools.agent_eval import EVAL_DB_PATH
-            if not EVAL_DB_PATH.exists():
-                return results
-
-            conn = sqlite3.connect(str(EVAL_DB_PATH))
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT agent_role,
-                       ROUND(AVG(latency_ms), 0) AS avg_latency,
-                       COUNT(*) AS total
-                FROM evaluations
-                WHERE latency_ms > 0
-                GROUP BY agent_role
-                HAVING total >= 3
-            """).fetchall()
-            conn.close()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT agent_role,
+                           ROUND(AVG(latency_ms), 0) AS avg_latency,
+                           COUNT(*) AS total
+                    FROM evaluations
+                    WHERE latency_ms > 0
+                    GROUP BY agent_role
+                    HAVING COUNT(*) >= 3
+                """)
+                rows = cur.fetchall()
 
             for row in rows:
                 avg_lat = float(row["avg_latency"])
@@ -230,30 +170,28 @@ class AutoOptimizer:
                     results.append(rec)
         except Exception as exc:
             logger.warning("Latency check failed: %s", exc)
+        finally:
+            release_conn(conn)
 
         return results
 
     def _check_error_counts(self) -> list[dict[str, Any]]:
         """Check agents with high error counts → quality."""
         results: list[dict[str, Any]] = []
+        conn = get_conn()
         try:
-            from tools.error_patterns import ERROR_DB_PATH
-            if not ERROR_DB_PATH.exists():
-                return results
-
-            conn = sqlite3.connect(str(ERROR_DB_PATH))
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT agent_role,
-                       COUNT(*) AS error_count,
-                       COUNT(DISTINCT error_type) AS unique_types
-                FROM error_events
-                WHERE created_at >= datetime('now', '-7 days')
-                GROUP BY agent_role
-                HAVING error_count >= 5
-                ORDER BY error_count DESC
-            """).fetchall()
-            conn.close()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT agent_role,
+                           COUNT(*) AS error_count,
+                           COUNT(DISTINCT error_type) AS unique_types
+                    FROM error_events
+                    WHERE created_at >= NOW() - INTERVAL '7 days'
+                    GROUP BY agent_role
+                    HAVING COUNT(*) >= 5
+                    ORDER BY COUNT(*) DESC
+                """)
+                rows = cur.fetchall()
 
             for row in rows:
                 count = row["error_count"]
@@ -278,32 +216,32 @@ class AutoOptimizer:
                 results.append(rec)
         except Exception as exc:
             logger.warning("Error count check failed: %s", exc)
+        finally:
+            release_conn(conn)
 
         return results
 
     def _check_inactive_agents(self) -> list[dict[str, Any]]:
         """Check agents not used in 7+ days → cost."""
         results: list[dict[str, Any]] = []
+        conn = get_conn()
         try:
-            from tools.agent_eval import EVAL_DB_PATH
-            if not EVAL_DB_PATH.exists():
-                return results
-
-            conn = sqlite3.connect(str(EVAL_DB_PATH))
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT agent_role,
-                       MAX(created_at) AS last_used,
-                       COUNT(*) AS total_tasks
-                FROM evaluations
-                GROUP BY agent_role
-            """).fetchall()
-            conn.close()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT agent_role,
+                           MAX(created_at) AS last_used,
+                           COUNT(*) AS total_tasks
+                    FROM evaluations
+                    GROUP BY agent_role
+                """)
+                rows = cur.fetchall()
 
             now = datetime.now(timezone.utc)
             for row in rows:
                 try:
-                    last_used = datetime.fromisoformat(row["last_used"])
+                    last_used = row["last_used"]
+                    if isinstance(last_used, str):
+                        last_used = datetime.fromisoformat(last_used)
                     if last_used.tzinfo is None:
                         last_used = last_used.replace(tzinfo=timezone.utc)
                     days_inactive = (now - last_used).days
@@ -331,27 +269,25 @@ class AutoOptimizer:
                     results.append(rec)
         except Exception as exc:
             logger.warning("Inactive agent check failed: %s", exc)
+        finally:
+            release_conn(conn)
 
         return results
 
     def _check_error_patterns(self) -> list[dict[str, Any]]:
         """Check error patterns with high frequency → critical."""
         results: list[dict[str, Any]] = []
+        conn = get_conn()
         try:
-            from tools.error_patterns import ERROR_DB_PATH
-            if not ERROR_DB_PATH.exists():
-                return results
-
-            conn = sqlite3.connect(str(ERROR_DB_PATH))
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT id, pattern_name, description, error_type,
-                       agent_roles_json, frequency
-                FROM error_patterns
-                WHERE status = 'active' AND frequency >= ?
-                ORDER BY frequency DESC
-            """, (_ERROR_FREQUENCY_THRESHOLD,)).fetchall()
-            conn.close()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, pattern_name, description, error_type,
+                           agent_roles_json, frequency
+                    FROM error_patterns
+                    WHERE status = 'active' AND frequency >= %s
+                    ORDER BY frequency DESC
+                """, (_ERROR_FREQUENCY_THRESHOLD,))
+                rows = cur.fetchall()
 
             for row in rows:
                 agents = []
@@ -381,29 +317,27 @@ class AutoOptimizer:
                 results.append(rec)
         except Exception as exc:
             logger.warning("Error pattern check failed: %s", exc)
+        finally:
+            release_conn(conn)
 
         return results
 
     def _check_benchmark_scores(self) -> list[dict[str, Any]]:
         """Check benchmark scores below baseline → performance."""
         results: list[dict[str, Any]] = []
+        conn = get_conn()
         try:
-            from tools.benchmark_suite import BENCH_DB_PATH
-            if not BENCH_DB_PATH.exists():
-                return results
-
-            conn = sqlite3.connect(str(BENCH_DB_PATH))
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT agent_role,
-                       ROUND(AVG(score), 2) AS avg_score,
-                       COUNT(*) AS total_runs,
-                       ROUND(AVG(latency_ms), 0) AS avg_latency
-                FROM benchmark_results
-                GROUP BY agent_role
-                HAVING total_runs >= 3
-            """).fetchall()
-            conn.close()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT agent_role,
+                           ROUND(AVG(score)::numeric, 2) AS avg_score,
+                           COUNT(*) AS total_runs,
+                           ROUND(AVG(latency_ms)::numeric, 0) AS avg_latency
+                    FROM benchmark_results
+                    GROUP BY agent_role
+                    HAVING COUNT(*) >= 3
+                """)
+                rows = cur.fetchall()
 
             for row in rows:
                 avg = float(row["avg_score"])
@@ -430,6 +364,8 @@ class AutoOptimizer:
                     results.append(rec)
         except Exception as exc:
             logger.warning("Benchmark score check failed: %s", exc)
+        finally:
+            release_conn(conn)
 
         return results
 
@@ -447,37 +383,43 @@ class AutoOptimizer:
     ) -> dict[str, Any]:
         """Insert a new recommendation and return it as a dict."""
         now = datetime.now(timezone.utc).isoformat()
-        conn = self._get_conn()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                # Dedup: skip if a pending recommendation with same title exists
+                cur.execute(
+                    "SELECT id FROM recommendations WHERE title = %s AND status = 'pending'",
+                    (title,),
+                )
+                existing = cur.fetchone()
+                if existing:
+                    cur.execute("SELECT * FROM recommendations WHERE id = %s", (existing["id"],))
+                    row = cur.fetchone()
+                    return self._row_to_dict(row)
 
-        # Dedup: skip if a pending recommendation with same title exists
-        existing = conn.execute(
-            "SELECT id FROM recommendations WHERE title = ? AND status = 'pending'",
-            (title,),
-        ).fetchone()
-        if existing:
-            return self._row_to_dict(
-                conn.execute("SELECT * FROM recommendations WHERE id = ?", (existing["id"],)).fetchone()
-            )
+                cur.execute(
+                    """INSERT INTO recommendations
+                       (category, priority, title, description, affected_agents,
+                        suggested_actions, estimated_impact, status, created_at)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s)
+                       RETURNING id""",
+                    (
+                        category,
+                        priority,
+                        title,
+                        description,
+                        json.dumps(affected_agents, ensure_ascii=False),
+                        json.dumps(suggested_actions, ensure_ascii=False),
+                        estimated_impact,
+                        now,
+                    ),
+                )
+                result = cur.fetchone()
+                rec_id = result["id"]
+                conn.commit()
+        finally:
+            release_conn(conn)
 
-        cursor = conn.execute(
-            """INSERT INTO recommendations
-               (category, priority, title, description, affected_agents,
-                suggested_actions, estimated_impact, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)""",
-            (
-                category,
-                priority,
-                title,
-                description,
-                json.dumps(affected_agents, ensure_ascii=False),
-                json.dumps(suggested_actions, ensure_ascii=False),
-                estimated_impact,
-                now,
-            ),
-        )
-        conn.commit()
-
-        rec_id = cursor.lastrowid
         logger.info("Recommendation created: [%s/%s] %s", category, priority, title)
 
         return {
@@ -508,22 +450,28 @@ class AutoOptimizer:
             priority: Filter by 'critical', 'high', 'medium', 'low'.
             status: Filter by 'pending', 'applied', 'dismissed'. Default 'pending'.
         """
-        conn = self._get_conn()
-        query = "SELECT * FROM recommendations WHERE 1=1"
-        params: list[Any] = []
+        conn = get_conn()
+        try:
+            query = "SELECT * FROM recommendations WHERE 1=1"
+            params: list[Any] = []
 
-        if status is not None:
-            query += " AND status = ?"
-            params.append(status)
-        if category is not None:
-            query += " AND category = ?"
-            params.append(category)
-        if priority is not None:
-            query += " AND priority = ?"
-            params.append(priority)
+            if status is not None:
+                query += " AND status = %s"
+                params.append(status)
+            if category is not None:
+                query += " AND category = %s"
+                params.append(category)
+            if priority is not None:
+                query += " AND priority = %s"
+                params.append(priority)
 
-        query += " ORDER BY created_at DESC"
-        rows = conn.execute(query, params).fetchall()
+            query += " ORDER BY created_at DESC"
+
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+        finally:
+            release_conn(conn)
 
         results = [self._row_to_dict(row) for row in rows]
         # Sort by priority
@@ -532,28 +480,34 @@ class AutoOptimizer:
 
     def get_optimization_stats(self) -> dict[str, Any]:
         """Summary statistics across all recommendations."""
-        conn = self._get_conn()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) AS cnt FROM recommendations")
+                total = cur.fetchone()["cnt"]
 
-        total = conn.execute("SELECT COUNT(*) AS cnt FROM recommendations").fetchone()["cnt"]
+                cur.execute(
+                    "SELECT status, COUNT(*) AS cnt FROM recommendations GROUP BY status"
+                )
+                by_status = {row["status"]: row["cnt"] for row in cur.fetchall()}
 
-        by_status_rows = conn.execute(
-            "SELECT status, COUNT(*) AS cnt FROM recommendations GROUP BY status"
-        ).fetchall()
-        by_status = {row["status"]: row["cnt"] for row in by_status_rows}
+                cur.execute(
+                    "SELECT category, COUNT(*) AS cnt FROM recommendations GROUP BY category"
+                )
+                by_category = {row["category"]: row["cnt"] for row in cur.fetchall()}
 
-        by_category_rows = conn.execute(
-            "SELECT category, COUNT(*) AS cnt FROM recommendations GROUP BY category"
-        ).fetchall()
-        by_category = {row["category"]: row["cnt"] for row in by_category_rows}
+                cur.execute(
+                    "SELECT priority, COUNT(*) AS cnt FROM recommendations GROUP BY priority"
+                )
+                by_priority = {row["priority"]: row["cnt"] for row in cur.fetchall()}
 
-        by_priority_rows = conn.execute(
-            "SELECT priority, COUNT(*) AS cnt FROM recommendations GROUP BY priority"
-        ).fetchall()
-        by_priority = {row["priority"]: row["cnt"] for row in by_priority_rows}
-
-        pending_critical = conn.execute(
-            "SELECT COUNT(*) AS cnt FROM recommendations WHERE status = 'pending' AND priority = 'critical'"
-        ).fetchone()["cnt"]
+                cur.execute(
+                    "SELECT COUNT(*) AS cnt FROM recommendations "
+                    "WHERE status = 'pending' AND priority = 'critical'"
+                )
+                pending_critical = cur.fetchone()["cnt"]
+        finally:
+            release_conn(conn)
 
         applied_count = by_status.get("applied", 0)
         apply_rate = round((applied_count / total) * 100, 1) if total else 0.0
@@ -576,31 +530,39 @@ class AutoOptimizer:
 
         Returns the updated recommendation or error dict.
         """
-        conn = self._get_conn()
-        existing = conn.execute(
-            "SELECT * FROM recommendations WHERE id = ?", (rec_id,)
-        ).fetchone()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM recommendations WHERE id = %s", (rec_id,)
+                )
+                existing = cur.fetchone()
 
-        if not existing:
-            return {"error": f"Recommendation {rec_id} not found"}
+                if not existing:
+                    return {"error": f"Recommendation {rec_id} not found"}
 
-        if existing["status"] != "pending":
-            return {"error": f"Recommendation {rec_id} is already '{existing['status']}'"}
+                if existing["status"] != "pending":
+                    return {"error": f"Recommendation {rec_id} is already '{existing['status']}'"}
 
-        now = datetime.now(timezone.utc).isoformat()
-        conn.execute(
-            "UPDATE recommendations SET status = 'applied', notes = ?, updated_at = ? WHERE id = ?",
-            (notes, now, rec_id),
-        )
-        conn.execute(
-            "INSERT INTO optimization_history (recommendation_id, action, notes, performed_at) VALUES (?, ?, ?, ?)",
-            (rec_id, "applied", notes, now),
-        )
-        conn.commit()
+                now = datetime.now(timezone.utc).isoformat()
+                cur.execute(
+                    "UPDATE recommendations SET status = 'applied', notes = %s, updated_at = %s WHERE id = %s",
+                    (notes, now, rec_id),
+                )
+                cur.execute(
+                    "INSERT INTO optimization_history (recommendation_id, action, notes, performed_at) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (rec_id, "applied", notes, now),
+                )
+                conn.commit()
 
-        logger.info("Recommendation %d applied: %s", rec_id, notes or "(no notes)")
+                logger.info("Recommendation %d applied: %s", rec_id, notes or "(no notes)")
 
-        updated = conn.execute("SELECT * FROM recommendations WHERE id = ?", (rec_id,)).fetchone()
+                cur.execute("SELECT * FROM recommendations WHERE id = %s", (rec_id,))
+                updated = cur.fetchone()
+        finally:
+            release_conn(conn)
+
         return self._row_to_dict(updated)
 
     def dismiss_recommendation(self, rec_id: int, reason: str = "") -> dict[str, Any]:
@@ -612,31 +574,39 @@ class AutoOptimizer:
 
         Returns the updated recommendation or error dict.
         """
-        conn = self._get_conn()
-        existing = conn.execute(
-            "SELECT * FROM recommendations WHERE id = ?", (rec_id,)
-        ).fetchone()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM recommendations WHERE id = %s", (rec_id,)
+                )
+                existing = cur.fetchone()
 
-        if not existing:
-            return {"error": f"Recommendation {rec_id} not found"}
+                if not existing:
+                    return {"error": f"Recommendation {rec_id} not found"}
 
-        if existing["status"] != "pending":
-            return {"error": f"Recommendation {rec_id} is already '{existing['status']}'"}
+                if existing["status"] != "pending":
+                    return {"error": f"Recommendation {rec_id} is already '{existing['status']}'"}
 
-        now = datetime.now(timezone.utc).isoformat()
-        conn.execute(
-            "UPDATE recommendations SET status = 'dismissed', notes = ?, updated_at = ? WHERE id = ?",
-            (reason, now, rec_id),
-        )
-        conn.execute(
-            "INSERT INTO optimization_history (recommendation_id, action, notes, performed_at) VALUES (?, ?, ?, ?)",
-            (rec_id, "dismissed", reason, now),
-        )
-        conn.commit()
+                now = datetime.now(timezone.utc).isoformat()
+                cur.execute(
+                    "UPDATE recommendations SET status = 'dismissed', notes = %s, updated_at = %s WHERE id = %s",
+                    (reason, now, rec_id),
+                )
+                cur.execute(
+                    "INSERT INTO optimization_history (recommendation_id, action, notes, performed_at) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (rec_id, "dismissed", reason, now),
+                )
+                conn.commit()
 
-        logger.info("Recommendation %d dismissed: %s", rec_id, reason or "(no reason)")
+                logger.info("Recommendation %d dismissed: %s", rec_id, reason or "(no reason)")
 
-        updated = conn.execute("SELECT * FROM recommendations WHERE id = ?", (rec_id,)).fetchone()
+                cur.execute("SELECT * FROM recommendations WHERE id = %s", (rec_id,))
+                updated = cur.fetchone()
+        finally:
+            release_conn(conn)
+
         return self._row_to_dict(updated)
 
     def get_agent_optimization_profile(self, agent_role: str) -> dict[str, Any]:
@@ -650,33 +620,35 @@ class AutoOptimizer:
 
         Returns a comprehensive optimization profile dict.
         """
-        conn = self._get_conn()
-
         # Recommendations for this agent
-        rows = conn.execute(
-            "SELECT * FROM recommendations WHERE affected_agents LIKE ?",
-            (f'%"{agent_role}"%',),
-        ).fetchall()
-        recs = [self._row_to_dict(r) for r in rows]
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM recommendations WHERE affected_agents LIKE %s",
+                    (f'%"{agent_role}"%',),
+                )
+                rows = cur.fetchall()
+        finally:
+            release_conn(conn)
 
+        recs = [self._row_to_dict(r) for r in rows]
         pending = [r for r in recs if r["status"] == "pending"]
         applied = [r for r in recs if r["status"] == "applied"]
 
         # Eval stats
         eval_stats: dict[str, Any] = {}
+        conn = get_conn()
         try:
-            from tools.agent_eval import EVAL_DB_PATH
-            if EVAL_DB_PATH.exists():
-                econn = sqlite3.connect(str(EVAL_DB_PATH))
-                econn.row_factory = sqlite3.Row
-                row = econn.execute("""
+            with conn.cursor() as cur:
+                cur.execute("""
                     SELECT COUNT(*) AS total,
-                           ROUND(AVG(score), 2) AS avg_score,
-                           ROUND(AVG(latency_ms), 0) AS avg_latency,
+                           ROUND(AVG(score)::numeric, 2) AS avg_score,
+                           ROUND(AVG(latency_ms)::numeric, 0) AS avg_latency,
                            SUM(CASE WHEN score >= 3.5 THEN 1 ELSE 0 END) AS success_count
-                    FROM evaluations WHERE agent_role = ?
-                """, (agent_role,)).fetchone()
-                econn.close()
+                    FROM evaluations WHERE agent_role = %s
+                """, (agent_role,))
+                row = cur.fetchone()
                 if row and row["total"]:
                     eval_stats = {
                         "total_tasks": row["total"],
@@ -688,22 +660,22 @@ class AutoOptimizer:
                     }
         except Exception:
             pass
+        finally:
+            release_conn(conn)
 
         # Error stats
         error_stats: dict[str, Any] = {}
+        conn = get_conn()
         try:
-            from tools.error_patterns import ERROR_DB_PATH
-            if ERROR_DB_PATH.exists():
-                econn = sqlite3.connect(str(ERROR_DB_PATH))
-                econn.row_factory = sqlite3.Row
-                row = econn.execute("""
+            with conn.cursor() as cur:
+                cur.execute("""
                     SELECT COUNT(*) AS total_errors,
                            COUNT(DISTINCT error_type) AS unique_types
                     FROM error_events
-                    WHERE agent_role = ?
-                    AND created_at >= datetime('now', '-7 days')
-                """, (agent_role,)).fetchone()
-                econn.close()
+                    WHERE agent_role = %s
+                    AND created_at >= NOW() - INTERVAL '7 days'
+                """, (agent_role,))
+                row = cur.fetchone()
                 if row:
                     error_stats = {
                         "errors_last_7d": row["total_errors"],
@@ -711,20 +683,20 @@ class AutoOptimizer:
                     }
         except Exception:
             pass
+        finally:
+            release_conn(conn)
 
         # Benchmark stats
         bench_stats: dict[str, Any] = {}
+        conn = get_conn()
         try:
-            from tools.benchmark_suite import BENCH_DB_PATH
-            if BENCH_DB_PATH.exists():
-                bconn = sqlite3.connect(str(BENCH_DB_PATH))
-                bconn.row_factory = sqlite3.Row
-                row = bconn.execute("""
-                    SELECT ROUND(AVG(score), 2) AS avg_score,
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT ROUND(AVG(score)::numeric, 2) AS avg_score,
                            COUNT(*) AS total_runs
-                    FROM benchmark_results WHERE agent_role = ?
-                """, (agent_role,)).fetchone()
-                bconn.close()
+                    FROM benchmark_results WHERE agent_role = %s
+                """, (agent_role,))
+                row = cur.fetchone()
                 if row and row["total_runs"]:
                     bench_stats = {
                         "avg_benchmark_score": float(row["avg_score"] or 0),
@@ -732,6 +704,8 @@ class AutoOptimizer:
                     }
         except Exception:
             pass
+        finally:
+            release_conn(conn)
 
         # Health score (0-100)
         health = 100.0
@@ -766,23 +740,28 @@ class AutoOptimizer:
 
         Returns list of history entry dicts with recommendation details.
         """
-        conn = self._get_conn()
-        rows = conn.execute("""
-            SELECT oh.id, oh.recommendation_id, oh.action, oh.notes, oh.performed_at,
-                   r.category, r.priority, r.title
-            FROM optimization_history oh
-            JOIN recommendations r ON r.id = oh.recommendation_id
-            ORDER BY oh.performed_at DESC
-            LIMIT ?
-        """, (limit,)).fetchall()
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT oh.id, oh.recommendation_id, oh.action, oh.notes, oh.performed_at,
+                           r.category, r.priority, r.title
+                    FROM optimization_history oh
+                    JOIN recommendations r ON r.id = oh.recommendation_id
+                    ORDER BY oh.performed_at DESC
+                    LIMIT %s
+                """, (limit,))
+                rows = cur.fetchall()
+        finally:
+            release_conn(conn)
 
         return [dict(row) for row in rows]
 
     # ── Helpers ──────────────────────────────────────────────────
 
     @staticmethod
-    def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-        """Convert a sqlite3.Row to a dict, parsing JSON fields."""
+    def _row_to_dict(row: dict) -> dict[str, Any]:
+        """Convert a PG RealDictRow to a dict, parsing JSON fields."""
         d = dict(row)
         for json_field in ("affected_agents", "suggested_actions"):
             if d.get(json_field) and isinstance(d[json_field], str):

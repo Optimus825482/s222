@@ -1,7 +1,7 @@
 """Performance Benchmarking Suite for multi-agent system.
 
 Runs standardised scenarios against agents, scores outputs with
-weighted heuristics, and persists results in SQLite for trend
+weighted heuristics, and persists results in PostgreSQL for trend
 analysis and head-to-head comparisons.
 """
 
@@ -10,16 +10,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import sqlite3
 import time
 import uuid
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Awaitable
 
-logger = logging.getLogger(__name__)
+from tools.pg_connection import get_conn, release_conn
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-BENCH_DB_PATH = DATA_DIR / "benchmarks.db"
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Predefined benchmark scenarios
@@ -141,52 +139,23 @@ class BenchmarkRunner:
     """Execute benchmark scenarios against agents and persist scored results."""
 
     def __init__(self) -> None:
-        self._ensure_db()
+        # Tables created by migration — no _ensure_db needed
+        pass
 
     # -- database -----------------------------------------------------------
 
-    def _ensure_db(self) -> None:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(BENCH_DB_PATH))
-        try:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS benchmark_results (
-                    id            TEXT PRIMARY KEY,
-                    agent_role    TEXT NOT NULL,
-                    scenario_id   TEXT NOT NULL,
-                    scenario_name TEXT NOT NULL,
-                    category      TEXT NOT NULL,
-                    score         REAL NOT NULL,
-                    max_score     REAL NOT NULL,
-                    latency_ms    REAL NOT NULL,
-                    tokens_used   INTEGER NOT NULL DEFAULT 0,
-                    output_preview TEXT,
-                    dimensions    TEXT,
-                    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-                )
-                """
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_br_agent ON benchmark_results(agent_role)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_br_scenario ON benchmark_results(scenario_id)"
-            )
-            conn.commit()
-        finally:
-            conn.close()
-
     def _store_result(self, result: dict) -> None:
-        conn = sqlite3.connect(str(BENCH_DB_PATH))
+        conn = get_conn()
         try:
-            conn.execute(
+            now = datetime.now(timezone.utc).isoformat()
+            cur = conn.cursor()
+            cur.execute(
                 """
                 INSERT INTO benchmark_results
                     (id, agent_role, scenario_id, scenario_name, category,
                      score, max_score, latency_ms, tokens_used,
                      output_preview, dimensions, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     result["id"],
@@ -200,11 +169,12 @@ class BenchmarkRunner:
                     result["tokens_used"],
                     result["output_preview"],
                     json.dumps(result["dimensions"], ensure_ascii=False),
+                    now,
                 ),
             )
             conn.commit()
         finally:
-            conn.close()
+            release_conn(conn)
 
     # -- scoring ------------------------------------------------------------
 
@@ -217,7 +187,6 @@ class BenchmarkRunner:
         length = len(output)
         cat = scenario.get("category", "")
         if cat == "speed":
-            # Speed: concise answers rewarded
             if length < 50:
                 dimensions["substance"] = 1.5
             elif length < 200:
@@ -229,7 +198,6 @@ class BenchmarkRunner:
             else:
                 dimensions["substance"] = 3.0
         else:
-            # Quality/reasoning/creativity: depth rewarded, no cap
             if length < 50:
                 dimensions["substance"] = 1.0
             elif length < 200:
@@ -329,7 +297,6 @@ class BenchmarkRunner:
                 tokens_used = result_raw.get("tokens_used", 0)
             else:
                 output = str(result_raw)
-            # Agent returns str; tokens from thread.agent_metrics after execute
             if tokens_used == 0 and getattr(thread, "agent_metrics", None):
                 m = thread.agent_metrics.get(agent_role)
                 tokens_used = (m.total_tokens if m else 0)
@@ -378,30 +345,20 @@ class BenchmarkRunner:
         category: str | None = None,
         progress_callback: Callable[[dict], Awaitable[None]] | None = None,
     ) -> dict:
-        """Run multiple scenarios and return an aggregated summary.
-
-        If *progress_callback* is provided it is awaited after every
-        individual scenario completes.  The callback receives a dict:
-        ``{"completed": int, "total": int, "agent_role": str,
-           "scenario_id": str, "scenario_name": str, "status": "ok"|"error",
-           "result": dict|None}``
-        """
+        """Run multiple scenarios and return an aggregated summary."""
         from agents import create_agent
 
         scenarios = get_scenarios(category)
         if not scenarios:
             return {"error": "No scenarios found", "results": []}
 
-        # Determine which agents to benchmark
         if agent_role:
             roles = [agent_role]
         else:
-            # Fallback: run for all registered agents
             from agents import _AGENT_REGISTRY, _ensure_registry
             _ensure_registry()
             roles = list(_AGENT_REGISTRY.keys())
 
-        # Build flat task list for progress tracking
         task_list = [(r, s) for r in roles for s in scenarios]
         total = len(task_list)
 
@@ -470,114 +427,123 @@ class BenchmarkRunner:
         self, agent_role: str | None = None, limit: int = 100, days: int | None = None
     ) -> list[dict]:
         """Fetch stored benchmark results, optionally filtered by date range."""
-        conn = sqlite3.connect(str(BENCH_DB_PATH))
-        conn.row_factory = sqlite3.Row
+        conn = get_conn()
         try:
-            conditions = []
+            conditions: list[str] = []
             params: list = []
             if agent_role:
-                conditions.append("agent_role = ?")
+                conditions.append("agent_role = %s")
                 params.append(agent_role)
             if days is not None:
-                conditions.append("created_at >= datetime('now', ?)")
-                params.append(f"-{days} days")
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+                conditions.append("created_at >= %s")
+                params.append(cutoff)
             where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
             params.append(limit)
-            rows = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 f"SELECT * FROM benchmark_results {where} "
-                f"ORDER BY created_at DESC LIMIT ?",
+                f"ORDER BY created_at DESC LIMIT %s",
                 params,
-            ).fetchall()
+            )
+            rows = cur.fetchall()
             return [self._row_to_dict(r) for r in rows]
         finally:
-            conn.close()
+            release_conn(conn)
 
     def get_leaderboard(self, days: int | None = None) -> list[dict]:
-        """Aggregated scores per agent, sorted descending. Optionally filtered by date range."""
-        conn = sqlite3.connect(str(BENCH_DB_PATH))
-        conn.row_factory = sqlite3.Row
+        """Aggregated scores per agent, sorted descending."""
+        conn = get_conn()
         try:
             date_filter = ""
             params: list = []
             if days is not None:
-                date_filter = "WHERE created_at >= datetime('now', ?)"
-                params.append(f"-{days} days")
-            rows = conn.execute(
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+                date_filter = "WHERE created_at >= %s"
+                params.append(cutoff)
+            cur = conn.cursor()
+            cur.execute(
                 f"""
                 SELECT
                     agent_role,
-                    COUNT(*)          AS total_runs,
-                    ROUND(AVG(score), 2)      AS avg_score,
-                    ROUND(MAX(score), 2)      AS best_score,
-                    ROUND(MIN(score), 2)      AS worst_score,
-                    ROUND(AVG(latency_ms), 1) AS avg_latency_ms
+                    COUNT(*)                  AS total_runs,
+                    ROUND(AVG(score)::numeric, 2)      AS avg_score,
+                    ROUND(MAX(score)::numeric, 2)      AS best_score,
+                    ROUND(MIN(score)::numeric, 2)      AS worst_score,
+                    ROUND(AVG(latency_ms)::numeric, 1) AS avg_latency_ms
                 FROM benchmark_results
                 {date_filter}
                 GROUP BY agent_role
                 ORDER BY avg_score DESC
                 """,
                 params,
-            ).fetchall()
+            )
+            rows = cur.fetchall()
             return [dict(r) for r in rows]
         finally:
-            conn.close()
+            release_conn(conn)
 
     def get_history(
         self, agent_role: str, scenario_id: str | None = None, days: int | None = None
     ) -> list[dict]:
-        """Historical scores for trend analysis, optionally filtered by date range."""
-        conn = sqlite3.connect(str(BENCH_DB_PATH))
-        conn.row_factory = sqlite3.Row
+        """Historical scores for trend analysis."""
+        conn = get_conn()
         try:
-            conditions = ["agent_role = ?"]
+            conditions = ["agent_role = %s"]
             params: list = [agent_role]
             if scenario_id:
-                conditions.append("scenario_id = ?")
+                conditions.append("scenario_id = %s")
                 params.append(scenario_id)
             if days is not None:
-                conditions.append("created_at >= datetime('now', ?)")
-                params.append(f"-{days} days")
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+                conditions.append("created_at >= %s")
+                params.append(cutoff)
             where = "WHERE " + " AND ".join(conditions)
-            rows = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 f"SELECT * FROM benchmark_results {where} ORDER BY created_at ASC",
                 params,
-            ).fetchall()
+            )
+            rows = cur.fetchall()
             return [self._row_to_dict(r) for r in rows]
         finally:
-            conn.close()
+            release_conn(conn)
 
     def compare_agents(self, role_a: str, role_b: str) -> dict:
         """Head-to-head comparison between two agents."""
-        conn = sqlite3.connect(str(BENCH_DB_PATH))
-        conn.row_factory = sqlite3.Row
+        conn = get_conn()
         try:
+            cur = conn.cursor()
+
             def _agent_stats(role: str) -> dict:
-                row = conn.execute(
+                cur.execute(
                     """
                     SELECT
-                        COUNT(*)                  AS total_runs,
-                        ROUND(AVG(score), 2)      AS avg_score,
-                        ROUND(AVG(latency_ms), 1) AS avg_latency_ms
+                        COUNT(*)                          AS total_runs,
+                        ROUND(AVG(score)::numeric, 2)      AS avg_score,
+                        ROUND(AVG(latency_ms)::numeric, 1) AS avg_latency_ms
                     FROM benchmark_results
-                    WHERE agent_role = ?
+                    WHERE agent_role = %s
                     """,
                     (role,),
-                ).fetchone()
+                )
+                row = cur.fetchone()
                 if row is None or row["total_runs"] == 0:
                     return {"total_runs": 0, "avg_score": 0.0, "avg_latency_ms": 0.0}
                 return dict(row)
 
             def _category_scores(role: str) -> dict[str, float]:
-                rows = conn.execute(
+                cur.execute(
                     """
-                    SELECT category, ROUND(AVG(score), 2) AS avg
+                    SELECT category, ROUND(AVG(score)::numeric, 2) AS avg
                     FROM benchmark_results
-                    WHERE agent_role = ?
+                    WHERE agent_role = %s
                     GROUP BY category
                     """,
                     (role,),
-                ).fetchall()
-                return {r["category"]: r["avg"] for r in rows}
+                )
+                rows = cur.fetchall()
+                return {r["category"]: float(r["avg"]) for r in rows}
 
             stats_a = _agent_stats(role_a)
             stats_b = _agent_stats(role_b)
@@ -608,12 +574,12 @@ class BenchmarkRunner:
                 "overall_winner": overall_winner,
             }
         finally:
-            conn.close()
+            release_conn(conn)
 
     # -- helpers ------------------------------------------------------------
 
     @staticmethod
-    def _row_to_dict(row: sqlite3.Row) -> dict:
+    def _row_to_dict(row: dict) -> dict:
         d = dict(row)
         if "dimensions" in d and isinstance(d["dimensions"], str):
             try:
