@@ -198,7 +198,70 @@ export function XpTaskbar({
             }}
             onMouseLeave={handleGroupLeave}
           >
-            {/* Left panel: Flyout apps OR System links */}
+            {/* Left: Category list (desktop flyout) / flat list (mobile) */}
+            <div className="flex-1 min-w-0 bg-white py-2 px-1 overflow-y-auto">
+              {isMobile ? (
+                /* Mobile: accordion-style flat list */
+                <></>
+              ) : (
+                /* Desktop: Category names with flyout */
+                <>
+                  {groupNames.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onMouseEnter={() => handleGroupEnter(name)}
+                      onClick={() =>
+                        setHoveredGroup((prev) => (prev === name ? null : name))
+                      }
+                      className={`w-full flex items-center justify-between px-3 py-2.5 text-left rounded-sm transition-colors ${
+                        hoveredGroup === name
+                          ? "bg-[#2f71cd] text-white"
+                          : "text-gray-800 hover:bg-blue-50"
+                      }`}
+                    >
+                      <span className="text-[13px] font-semibold">{name}</span>
+                      <span
+                        className={`text-xs ${hoveredGroup === name ? "text-white/80" : "text-gray-400"}`}
+                      >
+                        ▸
+                      </span>
+                    </button>
+                  ))}
+
+                  {removedApps.length > 0 && (
+                    <>
+                      <div className="border-t border-gray-200 my-1.5" />
+                      <button
+                        type="button"
+                        onMouseEnter={() => handleGroupEnter("__removed__")}
+                        onClick={() =>
+                          setHoveredGroup((prev) =>
+                            prev === "__removed__" ? null : "__removed__",
+                          )
+                        }
+                        className={`w-full flex items-center justify-between px-3 py-2 text-left rounded-sm transition-colors ${
+                          hoveredGroup === "__removed__"
+                            ? "bg-[#2f71cd] text-white"
+                            : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        <span className="text-[11px] font-bold uppercase tracking-wider">
+                          Kaldırılanlar ({removedApps.length})
+                        </span>
+                        <span
+                          className={`text-xs ${hoveredGroup === "__removed__" ? "text-white/80" : "text-gray-400"}`}
+                        >
+                          ▸
+                        </span>
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Right panel: Flyout apps */}
             <div
               className="hidden sm:block w-[200px] xp-start-right py-2 px-2 overflow-y-auto"
               onMouseEnter={() => {
@@ -269,16 +332,6 @@ export function XpTaskbar({
                   </button>
                   <button
                     onClick={() => {
-                      onOpenApp("agents");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <Network className="w-4 h-4 text-cyan-300" />
-                    <span>Ağ Bağlantıları</span>
-                  </button>
-                  <button
-                    onClick={() => {
                       onOpenApp("analytics");
                       setStartOpen(false);
                     }}
@@ -286,26 +339,6 @@ export function XpTaskbar({
                   >
                     <Settings className="w-4 h-4 text-slate-300" />
                     <span>Denetim Masası</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onOpenApp("search");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <Search className="w-4 h-4 text-slate-300" />
-                    <span>Hata Arama</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onHelpOpen?.();
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <HelpCircle className="w-4 h-4 text-slate-300" />
-                    <span>Yardım</span>
                   </button>
                   <div className="border-t border-white/10 my-1.5" />
                   <button
@@ -341,155 +374,7 @@ export function XpTaskbar({
                 </div>
               )}
             </div>
-
-            {/* Right: Category list (desktop flyout) / flat list (mobile) */}
-            <div className="flex-1 min-w-0 bg-white py-2 px-1 overflow-y-auto">
-              {isMobile ? (
-                /* Mobile: accordion-style flat list */
-                <>
-                  {Array.from(groups.entries()).map(
-                    ([groupName, groupApps]) => (
-                      <div key={groupName}>
-                        <details className="group/cat">
-                          <summary className="list-none cursor-pointer px-3 py-2.5 flex items-center justify-between hover:bg-[#2f71cd] hover:text-white text-gray-800 rounded-sm transition-colors">
-                            <span className="text-[13px] font-semibold">
-                              {groupName}
-                            </span>
-                            <span className="text-gray-400 group-open/cat:rotate-90 transition-transform text-xs">
-                              ▸
-                            </span>
-                          </summary>
-                          <div className="pl-2">
-                            {groupApps.map((app) => (
-                              <button
-                                key={app.id}
-                                onClick={() => {
-                                  onOpenApp(app.id);
-                                  setStartOpen(false);
-                                  setStartCtx(null);
-                                }}
-                                onContextMenu={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setStartCtx({
-                                    x: e.clientX,
-                                    y: e.clientY,
-                                    appId: app.id,
-                                    isRemoved: false,
-                                  });
-                                }}
-                                className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-[#2f71cd] hover:text-white text-gray-800 rounded-sm transition-colors group"
-                              >
-                                <span className="w-7 h-7 flex items-center justify-center text-blue-600 group-hover:text-white shrink-0 pointer-events-none">
-                                  {app.icon}
-                                </span>
-                                <span className="text-[13px] font-medium">
-                                  {app.title}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </details>
-                      </div>
-                    ),
-                  )}
-                  {removedApps.length > 0 && (
-                    <div className="border-t border-gray-200 mt-2 pt-2">
-                      <details className="group/rem">
-                        <summary className="list-none cursor-pointer px-3 py-2 flex items-center justify-between text-[11px] font-bold text-gray-500 uppercase tracking-wider hover:bg-gray-100 rounded-sm">
-                          <span>Kaldırılanlar ({removedApps.length})</span>
-                          <span className="text-gray-400 group-open/rem:rotate-90 transition-transform text-xs">
-                            ▸
-                          </span>
-                        </summary>
-                        <div className="pl-2">
-                          {removedApps.map((app) => (
-                            <button
-                              key={app.id}
-                              onClick={() => {
-                                onOpenApp(app.id);
-                                setStartOpen(false);
-                                setStartCtx(null);
-                              }}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setStartCtx({
-                                  x: e.clientX,
-                                  y: e.clientY,
-                                  appId: app.id,
-                                  isRemoved: true,
-                                });
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-[#2f71cd] hover:text-white text-gray-600 rounded-sm transition-colors group/item"
-                            >
-                              <span className="w-7 h-7 flex items-center justify-center text-gray-500 group-hover/item:text-white shrink-0 pointer-events-none">
-                                {app.icon}
-                              </span>
-                              <span className="text-[13px] font-medium">
-                                {app.title}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </details>
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* Desktop: Category names with flyout (no onMouseLeave on items — body handles leave to prevent shake) */
-                <>
-                  {groupNames.map((name) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onMouseEnter={() => handleGroupEnter(name)}
-                      onClick={() =>
-                        setHoveredGroup((prev) => (prev === name ? null : name))
-                      }
-                      className={`w-full flex items-center justify-between px-3 py-2.5 text-left rounded-sm transition-colors ${
-                        hoveredGroup === name
-                          ? "bg-[#2f71cd] text-white"
-                          : "text-gray-800 hover:bg-blue-50"
-                      }`}
-                    >
-                      <span className="text-[13px] font-semibold">{name}</span>
-                      <span
-                        className={`text-xs ${hoveredGroup === name ? "text-white/80" : "text-gray-400"}`}
-                      >
-                        ▸
-                      </span>
-                    </button>
-                  ))}
-
-                  {removedApps.length > 0 && (
-                    <>
-                      <div className="border-t border-gray-200 my-1.5" />
-                      <button
-                        type="button"
-                        onMouseEnter={() => handleGroupEnter("__removed__")}
-                        onClick={() =>
-                          setHoveredGroup((prev) =>
-                            prev === "__removed__" ? null : "__removed__",
-                          )
-                        }
-                        className={`w-full flex items-center justify-between px-3 py-2 text-left rounded-sm transition-colors ${
-                          hoveredGroup === "__removed__"
-                            ? "bg-[#2f71cd] text-white"
-                            : "text-gray-500 hover:bg-gray-100"
-                        }`}
-                      >
-                        <span className="text-[11px] font-bold uppercase tracking-wider">
-                          Kaldırılanlar ({removedApps.length})
-                        </span>
-                        <span
-                          className={`text-xs ${hoveredGroup === "__removed__" ? "text-white/80" : "text-gray-400"}`}
-                        >
-                          ▸
-                        </span>
-                      </button>
-                    </>
-                  )}
+          </div>
 
                   {/* Flyout rendered at body level for proper z-index */}
                 </>
