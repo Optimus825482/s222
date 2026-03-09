@@ -12,9 +12,9 @@ import time
 from typing import Any
 
 # Max seconds for one sub-agent run; prevents one stuck agent from blocking the pipeline
-SUBTASK_TIMEOUT = 60
+SUBTASK_TIMEOUT = 30
 # Max seconds for entire parallel/consensus gather
-PIPELINE_GATHER_TIMEOUT = 120
+PIPELINE_GATHER_TIMEOUT = 60
 ITERATIVE_SCORE_THRESHOLD = 0.8
 ITERATIVE_MIN_IMPROVEMENT_DELTA = 0.05
 ITERATIVE_DEFAULT_MAX_ROUNDS = 3
@@ -184,10 +184,8 @@ class PipelineEngine:
         )
 
         t0 = time.monotonic()
-        # Multiparallel: 2+ sub-tasks always run simultaneously (never sequential)
+        # Respect explicit pipeline type choice - don't force parallel
         effective_type = task.pipeline_type
-        if len(task.sub_tasks) >= 2 and effective_type == PipelineType.SEQUENTIAL:
-            effective_type = PipelineType.PARALLEL
 
         try:
             match effective_type:

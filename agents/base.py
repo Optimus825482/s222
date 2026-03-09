@@ -90,10 +90,10 @@ class BaseAgent(ABC):
     model_key: str
 
     # Max seconds per LLM request and per agent run (avoid endless hangs)
-    LLM_TIMEOUT = 120
-    AGENT_EXECUTE_TIMEOUT = 180
+    LLM_TIMEOUT = 60
+    AGENT_EXECUTE_TIMEOUT = 120
     # Extended timeout for reasoning models (chain-of-thought takes longer)
-    LLM_TIMEOUT_REASONING = 300
+    LLM_TIMEOUT_REASONING = 180
 
     def __init__(self) -> None:
         self.cfg = MODELS[self.model_key]
@@ -124,7 +124,7 @@ class BaseAgent(ABC):
                 timeout=_timeout,
             )
 
-        self.max_steps = 30  # Allow longer agentic loops for complex tasks
+        self.max_steps = 15  # Reduced from 30 for faster responses
         self._live_monitor = None  # LiveMonitor callback for realtime UI
 
         # Agent Communication Protocol (Faz 15) — lazy init
