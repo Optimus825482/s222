@@ -235,7 +235,7 @@ export function ChaosTab() {
         <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 11 }}>
           Geçmiş ({report.total_injections} toplam)
         </div>
-        {report.history.length === 0 ? (
+        {(report.history?.length ?? 0) === 0 ? (
           <div style={{ fontSize: 11, color: "#888" }}>
             Henüz enjeksiyon yok
           </div>
