@@ -43,8 +43,13 @@ class ForkRequest(BaseModel):
 # ── Helper ───────────────────────────────────────────────────────
 
 def _get_conn():
-    from tools.pg_connection import get_pg_connection
-    return get_pg_connection()
+    from tools.pg_connection import get_conn
+    return get_conn()
+
+
+def _release(conn):
+    from tools.pg_connection import release_conn
+    release_conn(conn)
 
 
 def _ensure_ratings_table():
@@ -64,7 +69,7 @@ def _ensure_ratings_table():
             """)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_skill_ratings_skill ON skill_ratings(skill_id)")
         conn.commit()
-        conn.close()
+        _release(conn)
     except Exception as e:
         logger.warning(f"skill_ratings table init failed: {e}")
 
@@ -85,7 +90,7 @@ def _ensure_templates_table():
                 )
             """)
         conn.commit()
-        conn.close()
+        _release(conn)
     except Exception as e:
         logger.warning(f"skill_templates table init failed: {e}")
 
@@ -163,7 +168,7 @@ def submit_rating(skill_id: str, req: RatingRequest):
         conn.commit()
         return {"id": row["id"], "skill_id": skill_id, "score": req.score, "created_at": str(row["created_at"])}
     finally:
-        conn.close()
+        _release(conn)
 
 
 @router.get("/api/skills/{skill_id}/ratings")
@@ -187,7 +192,7 @@ def list_ratings(skill_id: str, page: int = Query(1, ge=1), per_page: int = Quer
             "per_page": per_page,
         }
     finally:
-        conn.close()
+        _release(conn)
 
 
 @router.get("/api/skill-templates")
@@ -200,7 +205,7 @@ def list_templates():
             rows = cur.fetchall()
         return {"templates": [dict(r) for r in rows]}
     finally:
-        conn.close()
+        _release(conn)
 
 
 @router.post("/api/skills/from-template")
@@ -214,7 +219,7 @@ def create_from_template(req: FromTemplateRequest):
         if not tmpl:
             raise HTTPException(status_code=404, detail="Template not found")
     finally:
-        conn.close()
+        _release(conn)
     knowledge = req.knowledge_override or tmpl["knowledge_template"]
     description = req.description or tmpl["description"]
     from tools.dynamic_skills import create_skill

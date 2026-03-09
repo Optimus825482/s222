@@ -23,8 +23,13 @@ class FeedbackLoop:
         self._started = False
 
     def _get_conn(self):
-        from tools.pg_connection import get_pg_connection
-        return get_pg_connection()
+        from tools.pg_connection import get_conn
+        return get_conn()
+
+    def _release(self, conn):
+        from tools.pg_connection import release_conn
+        release_conn(conn)
+
 
     def _ensure_table(self):
         if self._initialized:
@@ -46,7 +51,7 @@ class FeedbackLoop:
                 """)
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_opt_created ON optimization_history(created_at)")
             conn.commit()
-            conn.close()
+            self._release(conn)
             self._initialized = True
         except Exception as e:
             logger.warning(f"optimization_history table init failed: {e}")
@@ -215,7 +220,7 @@ class FeedbackLoop:
                     (opt_type, agent_role, task_type, before, after, reason),
                 )
             conn.commit()
-            conn.close()
+            self._release(conn)
         except Exception as e:
             logger.error(f"_log_optimization failed: {e}")
 
@@ -230,7 +235,7 @@ class FeedbackLoop:
                     (limit, offset),
                 )
                 rows = cur.fetchall()
-            conn.close()
+            self._release(conn)
             result = []
             for r in rows:
                 d = dict(r)

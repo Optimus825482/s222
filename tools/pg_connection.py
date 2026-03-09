@@ -1,11 +1,16 @@
 """
 PostgreSQL connection pool — psycopg2 ThreadedConnectionPool.
 Single module for all DB access across memory, rag, teachability, skills.
+
+Pool sizing: maxconn=30 supports 5-6 concurrent agents + performance_collector
++ heartbeat + analytics + observability without exhaustion.
+Retry logic: 3 attempts with exponential backoff on pool exhaustion.
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import contextmanager
 from typing import Generator
 
@@ -21,37 +26,75 @@ _pool: psycopg2.pool.ThreadedConnectionPool | None = None
 
 # ── Pool Management ──────────────────────────────────────────────
 
+_MAX_CONN = 30
+_MIN_CONN = 2
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY = 0.3  # seconds
+
+
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
-    if _pool is None:
+    if _pool is None or _pool.closed:
         _pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=1,
-            maxconn=10,
+            minconn=_MIN_CONN,
+            maxconn=_MAX_CONN,
             dsn=DATABASE_URL,
             cursor_factory=psycopg2.extras.RealDictCursor,
         )
-        logger.info("PostgreSQL connection pool initialized")
+        logger.info("PostgreSQL connection pool initialized (max=%d)", _MAX_CONN)
     return _pool
 
 
 def get_conn() -> psycopg2.extensions.connection:
-    """Get a connection from the pool."""
-    try:
-        return _get_pool().getconn()
-    except psycopg2.pool.PoolError as e:
-        logger.error(f"Connection pool exhausted: {e}")
-        raise
-    except psycopg2.OperationalError as e:
-        logger.error(f"PostgreSQL connection failed: {e}")
-        raise
+    """Get a connection from the pool with retry on exhaustion."""
+    last_err: Exception | None = None
+    for attempt in range(_RETRY_ATTEMPTS):
+        try:
+            conn = _get_pool().getconn()
+            # Validate connection is alive (stale connection guard)
+            if conn.closed:
+                logger.warning("Got closed connection from pool, discarding")
+                try:
+                    _get_pool().putconn(conn, close=True)
+                except Exception:
+                    pass
+                continue
+            try:
+                conn.isolation_level  # lightweight check
+            except psycopg2.OperationalError:
+                logger.warning("Stale connection detected, discarding")
+                try:
+                    _get_pool().putconn(conn, close=True)
+                except Exception:
+                    pass
+                continue
+            return conn
+        except psycopg2.pool.PoolError as e:
+            last_err = e
+            if attempt < _RETRY_ATTEMPTS - 1:
+                delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    "Connection pool exhausted (attempt %d/%d), retrying in %.1fs",
+                    attempt + 1, _RETRY_ATTEMPTS, delay,
+                )
+                time.sleep(delay)
+            else:
+                logger.error("Connection pool exhausted after %d attempts", _RETRY_ATTEMPTS)
+        except psycopg2.OperationalError as e:
+            logger.error("PostgreSQL connection failed: %s", e)
+            raise
+    raise last_err or psycopg2.pool.PoolError("connection pool exhausted")
 
 
 def release_conn(conn: psycopg2.extensions.connection) -> None:
-    """Return a connection to the pool."""
+    """Return a connection to the pool. Closes broken connections."""
     try:
-        _get_pool().putconn(conn)
+        if conn.closed:
+            _get_pool().putconn(conn, close=True)
+        else:
+            _get_pool().putconn(conn)
     except Exception as e:
-        logger.warning(f"Failed to release connection: {e}")
+        logger.warning("Failed to release connection: %s", e)
 
 
 @contextmanager
@@ -61,7 +104,10 @@ def db_conn() -> Generator[psycopg2.extensions.connection, None, None]:
     try:
         yield conn
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
     finally:
         release_conn(conn)

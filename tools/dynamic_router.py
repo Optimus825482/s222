@@ -28,8 +28,13 @@ class DynamicRouter:
         self.exploration_rate = 0.1
 
     def _get_conn(self):
-        from tools.pg_connection import get_pg_connection
-        return get_pg_connection()
+        from tools.pg_connection import get_conn
+        return get_conn()
+
+    def _release(self, conn):
+        from tools.pg_connection import release_conn
+        release_conn(conn)
+
 
     def _ensure_table(self):
         if self._initialized:
@@ -51,7 +56,7 @@ class DynamicRouter:
                     )
                 """)
             conn.commit()
-            conn.close()
+            self._release(conn)
             self._initialized = True
         except Exception as e:
             logger.warning(f"dynamic_router table check failed: {e}")
@@ -144,7 +149,7 @@ class DynamicRouter:
                             if weight < 0.05:
                                 self._publish_low_weight(agent, tt, weight)
 
-            conn.close()
+            self._release(conn)
             self._last_recalc = time.time()
         except Exception as e:
             logger.error(f"recalculate_weights failed: {e}")

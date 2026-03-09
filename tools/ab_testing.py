@@ -21,8 +21,12 @@ class ABTestManager:
         self._initialized = False
 
     def _get_conn(self):
-        from tools.pg_connection import get_pg_connection
-        return get_pg_connection()
+        from tools.pg_connection import get_conn
+        return get_conn()
+
+    def _release(self, conn):
+        from tools.pg_connection import release_conn
+        release_conn(conn)
 
     def _ensure_table(self):
         if self._initialized:
@@ -59,7 +63,7 @@ class ABTestManager:
                 """)
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_abr_exp ON ab_experiment_results(experiment_id)")
             conn.commit()
-            conn.close()
+            self._release(conn)
             self._initialized = True
         except Exception as e:
             logger.warning(f"ab_experiments table init failed: {e}")
@@ -108,7 +112,7 @@ class ABTestManager:
                 "created_at": result["created_at"].isoformat() if result["created_at"] else None,
             }
         finally:
-            conn.close()
+            self._release(conn)
 
     def assign_variant(self, experiment_id: str, task_id: str) -> str:
         """Deterministic variant assignment via hash(experiment_id + task_id) % 100."""
@@ -126,7 +130,7 @@ class ABTestManager:
                 return "control"  # Default fallback
             split = float(row["traffic_split"])
         finally:
-            conn.close()
+            self._release(conn)
 
         hash_val = int(hashlib.md5(f"{experiment_id}:{task_id}".encode()).hexdigest(), 16)
         return "control" if (hash_val % 100) < (split * 100) else "variant"
@@ -152,7 +156,7 @@ class ABTestManager:
                 )
             conn.commit()
         finally:
-            conn.close()
+            self._release(conn)
 
         # Auto-check significance
         try:
@@ -179,9 +183,9 @@ class ABTestManager:
                     (experiment_id,),
                 )
                 variant_scores = [float(r["score"]) for r in cur.fetchall()]
-            conn.close()
+            self._release(conn)
         except Exception:
-            conn.close()
+            self._release(conn)
             return None
 
         if len(control_scores) < 30 or len(variant_scores) < 30:
@@ -240,7 +244,7 @@ class ABTestManager:
             conn.commit()
             logger.info(f"A/B experiment concluded: {experiment_id} winner={winner} p={p_value}")
         finally:
-            conn.close()
+            self._release(conn)
 
         # Publish event (fire-and-forget)
         try:
@@ -284,7 +288,7 @@ class ABTestManager:
                 row = cur.fetchone()
             return dict(row) if row else None
         finally:
-            conn.close()
+            self._release(conn)
 
     def list_experiments(self, status: str | None = None) -> list[dict]:
         """List experiments with optional status filter."""
@@ -299,7 +303,7 @@ class ABTestManager:
                 rows = cur.fetchall()
             return [self._row_to_dict(dict(r)) for r in rows]
         finally:
-            conn.close()
+            self._release(conn)
 
     @staticmethod
     def _row_to_dict(row: dict) -> dict:

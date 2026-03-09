@@ -52,24 +52,24 @@ async def lifespan(app: FastAPI):
 
     # Run migration 005: agent_metrics_log + skills schema extension
     try:
-        from tools.pg_connection import get_pg_connection
+        from tools.pg_connection import get_conn, release_conn
         import pathlib
         _mig_path = pathlib.Path(__file__).parent / "migrations" / "005_performance_metrics.sql"
         if _mig_path.exists():
             _mig_sql = _mig_path.read_text(encoding="utf-8")
-            _mig_conn = get_pg_connection()
+            _mig_conn = get_conn()
             with _mig_conn.cursor() as cur:
                 cur.execute(_mig_sql)
             _mig_conn.commit()
-            _mig_conn.close()
+            release_conn(_mig_conn)
             print("[Backend] Migration 005 (agent_metrics_log) applied")
     except Exception as e:
         print(f"[Backend] Migration 005 failed (non-critical): {e}")
 
     # Create analytics tables
     try:
-        from tools.pg_connection import get_pg_connection
-        conn = get_pg_connection()
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS tool_usage (
@@ -102,7 +102,7 @@ async def lifespan(app: FastAPI):
                 ON user_behavior(user_id, timestamp DESC)
             """)
         conn.commit()
-        conn.close()
+        release_conn(conn)
         print("[Backend] Analytics tables initialized")
     except Exception as e:
         print(f"[Backend] Analytics tables init failed: {e}")

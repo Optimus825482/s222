@@ -123,8 +123,8 @@ def dashboard_overview():
     """System overview: total metrics, experiments, strategies."""
     overview = {}
     try:
-        from tools.pg_connection import get_pg_connection
-        conn = get_pg_connection()
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) as cnt FROM performance_metrics")
             overview["total_metrics"] = cur.fetchone()["cnt"]
@@ -138,7 +138,7 @@ def dashboard_overview():
             overview["active_strategies"] = cur.fetchone()["cnt"]
             cur.execute("SELECT COUNT(*) as cnt FROM optimization_history")
             overview["total_optimizations"] = cur.fetchone()["cnt"]
-        conn.close()
+        release_conn(conn)
     except Exception as e:
         overview["error"] = str(e)
     return overview
@@ -154,8 +154,8 @@ def agent_history(
     trunc_map = {"hour": "hour", "day": "day", "week": "week"}
     trunc = trunc_map.get(granularity, "hour")
     try:
-        from tools.pg_connection import get_pg_connection
-        conn = get_pg_connection()
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
         with conn.cursor() as cur:
             cur.execute(f"""
                 SELECT date_trunc('{trunc}', created_at) as period,
@@ -170,7 +170,7 @@ def agent_history(
                 LIMIT %s
             """, (agent_role, limit))
             rows = cur.fetchall()
-        conn.close()
+        release_conn(conn)
         return {
             "agent_role": agent_role,
             "granularity": granularity,

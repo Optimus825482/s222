@@ -19,8 +19,13 @@ class OptimizationEngine:
         self._initialized = False
 
     def _get_conn(self):
-        from tools.pg_connection import get_pg_connection
-        return get_pg_connection()
+        from tools.pg_connection import get_conn
+        return get_conn()
+
+    def _release(self, conn):
+        from tools.pg_connection import release_conn
+        release_conn(conn)
+
 
     def _ensure_table(self):
         if self._initialized:
@@ -41,7 +46,7 @@ class OptimizationEngine:
                     )
                 """)
             conn.commit()
-            conn.close()
+            self._release(conn)
             self._initialized = True
         except Exception as e:
             logger.warning(f"skill_performance table init failed: {e}")
@@ -66,7 +71,7 @@ class OptimizationEngine:
                     WHERE s.active = TRUE
                 """, (agent_role, task_type))
                 rows = cur.fetchall()
-            conn.close()
+            self._release(conn)
 
             scored: list[tuple[float, str]] = []
             for row in rows:
@@ -110,7 +115,7 @@ class OptimizationEngine:
                             last_used_at = NOW()
                     """, (skill_id, agent_role, task_type, score, score))
             conn.commit()
-            conn.close()
+            self._release(conn)
         except Exception as e:
             logger.error(f"update_skill_performance failed: {e}")
 
@@ -142,7 +147,7 @@ class OptimizationEngine:
                     LIMIT %s
                 """, (top_n,))
                 rows = cur.fetchall()
-            conn.close()
+            self._release(conn)
 
             result = []
             for i, row in enumerate(rows, 1):

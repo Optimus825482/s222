@@ -1137,7 +1137,7 @@ class OrchestratorAgent(BaseAgent):
             intent_result = await self._analyze_intent(user_input, thread)
 
             # Confidence check — if too low, ask clarification
-            if intent_result.get("clarification_needed") and intent_result.get("confidence", 1.0) < 0.7:
+            if intent_result.get("clarification_needed") and intent_result.get("confidence", 1.0) < 0.4:
                 question = intent_result.get("clarification_question", "")
                 if question:
                     self._emit("pipeline", f"❓ Netleştirme gerekli (güven: {intent_result['confidence']:.0%})")
@@ -1779,7 +1779,10 @@ class OrchestratorAgent(BaseAgent):
             "Analyze the user's message and extract structured intent.\n\n"
             "RULES:\n"
             "- Detect the TRUE goal behind the message, not just surface words.\n"
-            "- If the message is ambiguous or missing critical details, set confidence LOW and ask a clarification question.\n"
+            "- Turkish users write informally (ALL CAPS, no punctuation, slang) — this is NORMAL, not ambiguous.\n"
+            "- ONLY ask clarification if the message is truly incomprehensible or could mean completely different things.\n"
+            "- Default confidence should be 0.7+ for any message with a clear topic, even if informal.\n"
+            "- If the user mentions the app/system they're using, that IS the context — don't ask what they mean.\n"
             "- Keep the same language as the user (Turkish stays Turkish).\n"
             "- Enhanced prompt should be clearer and more actionable than the original.\n"
             f"{memory_hint}\n\n"

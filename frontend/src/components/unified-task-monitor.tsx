@@ -31,6 +31,7 @@ import {
   Clock,
   MessageSquare,
 } from "lucide-react";
+import { DetailModal } from "./detail-modal";
 
 /* ═══════════════════════════════════════════════════════════
    5-Phase Pipeline Definition
@@ -497,6 +498,7 @@ function PipelineTab({
 
 function RecentEventsCompact({ events }: { events: WSLiveEvent[] }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [modalEvent, setModalEvent] = useState<WSLiveEvent | null>(null);
   const recent = events.slice(-30);
 
   useEffect(() => {
@@ -516,7 +518,9 @@ function RecentEventsCompact({ events }: { events: WSLiveEvent[] }) {
         return (
           <div
             key={ev.logKey || `${ev.timestamp}-${i}`}
-            className="flex items-start gap-1.5 px-1 py-1 text-[10px] hover:bg-gray-50 rounded transition-colors"
+            className="flex items-start gap-1.5 px-1 py-1 text-[10px] hover:bg-gray-50 rounded transition-colors cursor-pointer select-none"
+            onDoubleClick={() => setModalEvent(ev)}
+            title="Detay için çift tıkla"
           >
             <span className="shrink-0 mt-0.5">{evInfo?.icon || "📌"}</span>
             <span
@@ -539,6 +543,17 @@ function RecentEventsCompact({ events }: { events: WSLiveEvent[] }) {
         );
       })}
       <div ref={bottomRef} />
+      {modalEvent && (
+        <DetailModal
+          title={`${getAgentInfo(modalEvent.agent).icon} ${modalEvent.agent} — ${EVENT_ICONS[modalEvent.event_type]?.label || modalEvent.event_type}`}
+          content={modalEvent.content}
+          color={getAgentInfo(modalEvent.agent).color}
+          badge={
+            EVENT_ICONS[modalEvent.event_type]?.label || modalEvent.event_type
+          }
+          onClose={() => setModalEvent(null)}
+        />
+      )}
     </div>
   );
 }
@@ -642,13 +657,19 @@ function TimelineEvent({
   evInfo: { icon: string; label: string; color: string } | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const isLong = ev.content.length > 150;
 
   return (
     <div className="border border-[#e8e5da] rounded-lg bg-white hover:border-[#d6d2c2] transition-colors">
       <button
         onClick={() => isLong && setExpanded(!expanded)}
-        className="w-full flex items-start gap-2 px-3 py-2 text-left cursor-pointer"
+        onDoubleClick={(e) => {
+          e.preventDefault();
+          setShowModal(true);
+        }}
+        className="w-full flex items-start gap-2 px-3 py-2 text-left cursor-pointer select-none"
+        title="Detay için çift tıkla"
       >
         <span className="text-sm shrink-0 mt-0.5">{evInfo?.icon || "📌"}</span>
         <div className="flex-1 min-w-0">
@@ -687,6 +708,15 @@ function TimelineEvent({
           </span>
         )}
       </button>
+      {showModal && (
+        <DetailModal
+          title={`${info.icon} ${ev.agent} — ${evInfo?.label || ev.event_type}`}
+          content={ev.content}
+          color={info.color}
+          badge={evInfo?.label || ev.event_type}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   );
 }

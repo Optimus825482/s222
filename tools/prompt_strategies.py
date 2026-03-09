@@ -21,8 +21,13 @@ class PromptStrategyManager:
         self._initialized = False
 
     def _get_conn(self):
-        from tools.pg_connection import get_pg_connection
-        return get_pg_connection()
+        from tools.pg_connection import get_conn
+        return get_conn()
+
+    def _release(self, conn):
+        from tools.pg_connection import release_conn
+        release_conn(conn)
+
 
     def _ensure_table(self):
         if self._initialized:
@@ -47,7 +52,7 @@ class PromptStrategyManager:
                 """)
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_ps_role_task ON prompt_strategies(agent_role, task_type)")
             conn.commit()
-            conn.close()
+            self._release(conn)
             self._initialized = True
         except Exception as e:
             logger.warning(f"prompt_strategies table init failed: {e}")
@@ -100,7 +105,7 @@ class PromptStrategyManager:
                 "created_at": row["created_at"].isoformat() if row["created_at"] else None,
             }
         finally:
-            conn.close()
+            self._release(conn)
 
     def list_strategies(
         self,
@@ -128,7 +133,7 @@ class PromptStrategyManager:
                 rows = cur.fetchall()
             return [self._row_to_dict(dict(r)) for r in rows]
         finally:
-            conn.close()
+            self._release(conn)
 
     def activate(self, strategy_id: int) -> dict:
         """Set as active. Fails with error if active A/B experiment exists for same role+task."""
@@ -173,7 +178,7 @@ class PromptStrategyManager:
             logger.error(f"activate failed: {e}")
             raise
         finally:
-            conn.close()
+            self._release(conn)
 
     def get_active(self, agent_role: str, task_type: str) -> dict | None:
         """Get currently active strategy for role+task."""
@@ -188,7 +193,7 @@ class PromptStrategyManager:
                 row = cur.fetchone()
             return self._row_to_dict(dict(row)) if row else None
         finally:
-            conn.close()
+            self._release(conn)
 
     def get_by_id(self, strategy_id: int) -> dict | None:
         """Get strategy by ID."""
@@ -200,7 +205,7 @@ class PromptStrategyManager:
                 row = cur.fetchone()
             return self._row_to_dict(dict(row)) if row else None
         finally:
-            conn.close()
+            self._release(conn)
 
     @staticmethod
     def _row_to_dict(row: dict) -> dict:

@@ -21,7 +21,7 @@ from core.protocols import (
     MessagePriority,
     MessageType,
 )
-from tools.pg_connection import get_conn, release_conn
+from tools.pg_connection import get_conn, release_conn, db_conn
 
 logger = logging.getLogger(__name__)
 
@@ -185,22 +185,21 @@ class PerformanceCollector:
     ) -> dict[str, Any]:
         """Agent bazlı özet: avg response time, success rate, token count, task count."""
         interval = PERIOD_MAP.get(period, "24 hours")
-        conn = None
         try:
-            conn = get_conn()
-            with conn.cursor() as cur:
-                cur.execute(
-                    """SELECT
-                         COALESCE(AVG(response_time_ms), 0)       AS avg_response_time,
-                         COALESCE(AVG(success::int) * 100, 0)     AS success_rate,
-                         COALESCE(SUM(total_tokens), 0)           AS total_tokens,
-                         COUNT(*)                                  AS task_count
-                       FROM agent_metrics_log
-                       WHERE agent_role = %s
-                         AND recorded_at >= now() - %s::interval""",
-                    (agent_role, interval),
-                )
-                row = cur.fetchone()
+            with db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """SELECT
+                             COALESCE(AVG(response_time_ms), 0)       AS avg_response_time,
+                             COALESCE(AVG(success::int) * 100, 0)     AS success_rate,
+                             COALESCE(SUM(total_tokens), 0)           AS total_tokens,
+                             COUNT(*)                                  AS task_count
+                           FROM agent_metrics_log
+                           WHERE agent_role = %s
+                             AND recorded_at >= now() - %s::interval""",
+                        (agent_role, interval),
+                    )
+                    row = cur.fetchone()
             return {
                 "agent_role": agent_role,
                 "period": period,
@@ -220,25 +219,21 @@ class PerformanceCollector:
                 "task_count": 0,
                 "error": str(e),
             }
-        finally:
-            if conn:
-                release_conn(conn)
 
     # ── System Summary ───────────────────────────────────────────
 
     def get_system_summary(self) -> dict[str, Any]:
         """Sistem geneli özet: toplam token, görev, uptime, tahmini maliyet."""
-        conn = None
         try:
-            conn = get_conn()
-            with conn.cursor() as cur:
-                cur.execute(
-                    """SELECT
-                         COALESCE(SUM(total_tokens), 0) AS total_tokens,
-                         COUNT(*)                        AS total_tasks
-                       FROM agent_metrics_log"""
-                )
-                row = cur.fetchone()
+            with db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """SELECT
+                             COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                             COUNT(*)                        AS total_tasks
+                           FROM agent_metrics_log"""
+                    )
+                    row = cur.fetchone()
             total_tokens = int(row["total_tokens"])
             total_tasks = int(row["total_tasks"])
             uptime = time.time() - self._start_time
@@ -258,9 +253,6 @@ class PerformanceCollector:
                 "cost_estimate_usd": 0,
                 "error": str(e),
             }
-        finally:
-            if conn:
-                release_conn(conn)
 
     # ── Event Publishing ─────────────────────────────────────────
 

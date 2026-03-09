@@ -303,9 +303,14 @@ export function ChatArea({ thread, isProcessing, status }: Props) {
   );
 
   // Auto-scroll on new events OR when stream text updates
+  const evtCount = thread?.events?.length ?? 0;
+  const streamLen = wsSnap.streamText.length;
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [thread?.events?.length, wsSnap.streamText]);
+    const raf = requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [evtCount, streamLen]);
 
   if (!thread || !thread.events.length) {
     return <WelcomeScreen isProcessing={isProcessing} status={status} />;
@@ -368,23 +373,25 @@ export function ChatArea({ thread, isProcessing, status }: Props) {
 
   return (
     <div
-      className="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-4 space-y-3"
+      className="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-4 flex flex-col"
       role="log"
       aria-label="Sohbet geçmişi"
       aria-live="polite"
     >
-      {chatEvents.map((event) => (
-        <ChatBubble key={event.id} event={event} thread={thread} />
-      ))}
-      {/* Live stream bubble — shows orchestrator response as it's being generated */}
-      {isProcessing && (wsSnap.streamText || wsSnap.streamThinking) && (
-        <LiveStreamBubble
-          agent={wsSnap.streamAgent}
-          text={wsSnap.streamText}
-          thinking={wsSnap.streamThinking}
-        />
-      )}
-      <div ref={bottomRef} />
+      <div className="mt-auto space-y-3">
+        {chatEvents.map((event) => (
+          <ChatBubble key={event.id} event={event} thread={thread} />
+        ))}
+        {/* Live stream bubble — shows orchestrator response as it's being generated */}
+        {isProcessing && (wsSnap.streamText || wsSnap.streamThinking) && (
+          <LiveStreamBubble
+            agent={wsSnap.streamAgent}
+            text={wsSnap.streamText}
+            thinking={wsSnap.streamThinking}
+          />
+        )}
+        <div ref={bottomRef} />
+      </div>
     </div>
   );
 }
@@ -501,7 +508,12 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
 
   const role = event.agent_role ?? "orchestrator";
   const info = getAgentInfo(role);
-  const isFinal = role === "orchestrator" && event.content.length > 100;
+  const isClarification =
+    event.content.startsWith("🤔") ||
+    event.content.includes("Intent confidence low") ||
+    event.event_type === "human_request";
+  const isFinal =
+    role === "orchestrator" && event.content.length > 100 && !isClarification;
 
   // Find matching task for metadata
   const lastTask = thread?.tasks?.length
