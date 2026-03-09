@@ -78,18 +78,10 @@ export function FederatedTab() {
         }}
       >
         {[
-          {
-            label: "Node'lar",
-            value: stats.registered_nodes,
-            color: "#3b82f6",
-          },
-          { label: "Round", value: stats.current_round, color: "#8b5cf6" },
-          { label: "Model", value: stats.model_version, color: "#10b981" },
-          {
-            label: "Toplam Round",
-            value: stats.total_rounds,
-            color: "#f59e0b",
-          },
+          { label: "Node'lar", value: stats.registered_nodes ?? 0, color: "#3b82f6" },
+          { label: "Round", value: stats.current_round ?? 0, color: "#8b5cf6" },
+          { label: "Model", value: stats.model_version ?? "—", color: "#10b981" },
+          { label: "Toplam Round", value: stats.total_rounds ?? 0, color: "#f59e0b" },
         ].map((item) => (
           <div key={item.label} style={{ ...card, textAlign: "center" }}>
             <div style={{ fontSize: 10, color: "#888" }}>{item.label}</div>

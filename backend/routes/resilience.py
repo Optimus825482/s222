@@ -23,7 +23,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 # ── Pydantic Models ──────────────────────────────────────────────

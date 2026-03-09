@@ -275,13 +275,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Multi-Agent Ops Center API", version="3.0.0", lifespan=lifespan)
 
-_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+_cors_origins = ["*"]  # Allow all origins for cross-origin requests
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Trace-Id"],
 )
 
 
