@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 2026'da Kodlamayı Yeniden Tanımlıyor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--c-bg:#0f172a;--c-surface:#1e293b;--c-accent:#8b5cf6;--c-accent2:#a78bfa;--c-text:#f1f5f9;--c-muted:#94a3b8;--c-light-bg:#f8fafc;--c-light-text:#0f172a;--c-light-muted:#64748b;--font:Inter,system-ui,-apple-system,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+.slide{position:relative;width:100%;min-height:100vh;padding:clamp(40px,6vw,80px);display:flex;flex-direction:column;font-family:var(--font);page-break-after:always;overflow:hidden}
+.sn{position:absolute;bottom:24px;right:32px;font-size:13px;font-weight:500;opacity:.4}
+
+/* ── Title Slide ── */
+.slide-title{background:linear-gradient(135deg,#4c1d95 0%,#1e1b4b 50%,var(--c-bg) 100%);color:var(--c-text);align-items:center;justify-content:center;text-align:center}
+.slide-title .bg-img{position:absolute;inset:0;opacity:.15}
+.slide-title .bg-img img{width:100%;height:100%;object-fit:cover}
+.slide-title .center-content{position:relative;z-index:1;max-width:800px}
+.slide-title h1{font-size:clamp(2.2em,5vw,3.8em);font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-bottom:.4em}
+.slide-title .subtitle{font-size:clamp(1em,2vw,1.4em);color:var(--c-accent2);font-weight:300;line-height:1.5}
+
+/* ── Content Slide ── */
+.slide-content{background:var(--c-light-bg);color:var(--c-light-text);justify-content:flex-start;gap:20px}
+.slide-content h2{font-size:clamp(1.6em,3vw,2.4em);font-weight:700;letter-spacing:-.01em;border-left:4px solid var(--c-accent);padding-left:16px;line-height:1.2}
+.slide-content .body-text{font-size:1.05em;color:var(--c-light-muted);line-height:1.7;max-width:720px}
+.slide-content ul{list-style:none;display:flex;flex-direction:column;gap:12px;flex:1}
+.slide-content li{font-size:1.05em;line-height:1.6;color:var(--c-light-text);padding-left:28px;position:relative}
+.slide-content li::before{content:"";position:absolute;left:0;top:10px;width:10px;height:10px;border-radius:50%;background:var(--c-accent)}
+.slide-content .side-img{margin-top:auto;border-radius:12px;overflow:hidden;max-height:35vh}
+.slide-content .side-img img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ── Two Column ── */
+.slide-twocol{background:var(--c-light-bg);color:var(--c-light-text);gap:24px}
+.slide-twocol h2{font-size:clamp(1.5em,3vw,2.2em);font-weight:700;letter-spacing:-.01em}
+.slide-twocol .cols{display:grid;grid-template-columns:1fr 1fr;gap:40px;flex:1;align-items:center}
+.slide-twocol .col-text p{font-size:1em;color:var(--c-light-muted);line-height:1.7;margin-bottom:16px}
+.slide-twocol .col-text ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+.slide-twocol .col-text li{font-size:.95em;padding-left:24px;position:relative;line-height:1.5}
+.slide-twocol .col-text li::before{content:"";position:absolute;left:0;top:8px;width:8px;height:8px;border-radius:2px;background:var(--c-accent);transform:rotate(45deg)}
+.slide-twocol .col-img{border-radius:16px;overflow:hidden;aspect-ratio:4/3}
+.slide-twocol .col-img img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ── Image Focus ── */
+.slide-imgfocus{background:var(--c-bg);color:var(--c-text);gap:16px}
+.slide-imgfocus h2{font-size:clamp(1.4em,2.5vw,2em);font-weight:600}
+.slide-imgfocus .hero-img{flex:1;border-radius:16px;overflow:hidden;min-height:0}
+.slide-imgfocus .hero-img img{width:100%;height:100%;object-fit:cover;display:block}
+.slide-imgfocus .caption{font-size:.9em;color:var(--c-muted);text-align:center;font-style:italic}
+
+/* ── Quote ── */
+.slide-quote{background:linear-gradient(135deg,#faf5ff,#f3e8ff,#ede9fe);color:#3b0764;align-items:center;justify-content:center;text-align:center}
+.slide-quote .quote-mark{font-size:6em;line-height:1;color:var(--c-accent2);opacity:.5;margin-bottom:-.2em}
+.slide-quote blockquote{font-size:clamp(1.3em,3vw,2em);font-weight:500;font-style:italic;line-height:1.5;max-width:700px}
+.slide-quote cite{display:block;margin-top:24px;font-size:1em;font-style:normal;color:#7c3aed;font-weight:600}
+
+/* ── Closing ── */
+.slide-closing{background:linear-gradient(135deg,var(--c-surface) 0%,var(--c-bg) 50%,#020617 100%);color:var(--c-text);align-items:center;justify-content:center;text-align:center}
+.slide-closing .bg-img{position:absolute;inset:0;opacity:.1}
+.slide-closing .bg-img img{width:100%;height:100%;object-fit:cover}
+.slide-closing .center-content{position:relative;z-index:1}
+.slide-closing h1{font-size:clamp(2em,4vw,3.2em);font-weight:800;letter-spacing:-.02em;margin-bottom:.3em}
+.slide-closing .subtitle{font-size:clamp(1em,2vw,1.3em);color:var(--c-muted);font-weight:300;line-height:1.5}
+.slide-closing .closing-points{margin-top:32px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.slide-closing .closing-points span{padding:8px 20px;border-radius:999px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);font-size:.9em;color:var(--c-accent2)}
+
+.img-placeholder{width:100%;height:100%;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:12px;display:flex;align-items:center;justify-content:center}
+
+@media print{.slide{page-break-after:always;min-height:100vh}}
+</style>
+</head><body>
+<section class="slide slide-title">
+  <div class="bg-img"><img src="https://image.pollinations.ai/prompt/Futuristic%20dark%20mode%20IDE%20interface%20with%20glowing%20cyan%20and%20purple%20neon%20accents%2C%20abstract%20flowing%20network%20graphics%20in%20background%2C%20cinematic%20lighting%2C%20high%20contrast%2C%20professional%20tech%20aesthetic.?model=flux&width=1200&height=675&nologo=true" alt="AI 2026'da Kodlamayı Yeniden Tanımlıyor" loading="lazy"/></div>
+  <div class="center-content">
+    <h1>AI 2026'da Kodlamayı Yeniden Tanımlıyor</h1>
+    <p class="subtitle">Modern kodlama, yalnız kahramanlıktan ziyade bir 'vibe' ekosistemiyle ilerliyor.</p>
+  </div><div class="sn">1 / 8</div></section>
+<section class="slide slide-content">
+  <h2>Tool Overload: Flow'u Bozan Sessiz Kriz</h2>
+  <p class="body-text">Günlük 50+ araç değişimi, derin çalışma süresini %40 düşürüyor.</p>
+  <ul><li>IDE, AI asistan, terminal, Slack, Jira arasında sürekli geçişler</li><li>Her bağlam değişimi 15 dakika odaklanma kaybı anlamına gelir</li></ul>
+  
+<div class="sn">2 / 8</div></section>
+<section class="slide slide-imgfocus">
+  <h2>Integrated AI: Kod Tabandan Anlayan Asistan</h2>
+  <div class="hero-img"><div class="img-placeholder"></div></div>
+  <p class="caption">AI artık eklenti değil, IDE'nin doğal bir parçası.</p>
+<div class="sn">3 / 8</div></section>
+<section class="slide slide-twocol">
+  <h2>DX Stack: Bağlantılı Ekosistem</h2>
+  <div class="cols">
+    <div class="col-text">
+      <p>Tek başına araçlar değil, bağlantılı bir 'DX stack' productivity leap'ı getirir.</p>
+      <ul><li>Her araç diğerini zenginleştirir</li><li>Kültür ve sürdürülebilirlik şekillenir</li></ul>
+    </div>
+    <div class="col-img"><div class="img-placeholder"></div></div>
+  </div><div class="sn">4 / 8</div></section>
+<section class="slide slide-content">
+  <h2>Vibe Stack'in Beş Temel Elemanı</h2>
+  <p class="body-text">Modern geliştiricinin 'vibe stack'i şunları içerir:</p>
+  <ul><li>AI Co-pilot: Boilerplate ve testlerden kurtarır</li><li>Collaborative IDE: Pairing ve mob'u kolaylaştırır</li><li>Low-Code Prototyping: İç tool'ları hızlandırır</li><li>DevOps as Code: Kişisel ortamı otomatikleştirir</li><li>Mental Tools: Odak sürekliliğini sağlar</li></ul>
+  
+<div class="sn">5 / 8</div></section>
+<section class="slide slide-twocol">
+  <h2>Collaborative IDE: Pairing'in Dönüşümü</h2>
+  <div class="cols">
+    <div class="col-text">
+      <p>CodeTogether ve Live Share ile pairing artık logistik kabus değil.</p>
+      <ul><li>Önce: Zoom + screen sharing + merge conflicts</li><li>Sonra: Gerçek zamanlı, çakışmasız ortak kodlama</li></ul>
+    </div>
+    <div class="col-img"><div class="img-placeholder"></div></div>
+  </div><div class="sn">6 / 8</div></section>
+<section class="slide slide-imgfocus">
+  <h2>Mental Sustainability: Odak Değil, Süreklilik</h2>
+  <div class="hero-img"><div class="img-placeholder"></div></div>
+  <p class="caption">Araçlar günü yapılandırarak derin çalışmayı sürdürülebilir kılar.</p>
+<div class="sn">7 / 8</div></section>
+<section class="slide slide-closing">
+  
+  <div class="center-content">
+    <h1>Sıradaki Sprint'te Vibe Stack'inizi Deneyin</h1>
+    <p class="subtitle">Kendi 'vibe stack' denetimi yapın ve bir agentic tool ekleyin.</p>
+    <div class="closing-points"><span>Stack'inizi AI, Collaboration, Automation açısından denetleyin</span><span>Bir otonom görev için Claude Code veya Cursor'u deneyin</span><span>Derin çalışma sürenizi ölçün ve paylaşın</span></div>
+  </div><div class="sn">8 / 8</div></section>
+</body></html>

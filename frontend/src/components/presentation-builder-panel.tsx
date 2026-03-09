@@ -64,6 +64,15 @@ const STYLE_OPTIONS = [
   { value: "corporate", label: "Kurumsal" },
 ];
 
+type ThemeKey = "geist" | "apple" | "gradient" | "neon";
+
+const THEME_OPTIONS: { value: ThemeKey; label: string; preview: string }[] = [
+  { value: "geist", label: "Geist Dark", preview: "🌑" },
+  { value: "apple", label: "Apple Keynote", preview: "🍎" },
+  { value: "gradient", label: "Gradient Wave", preview: "🌊" },
+  { value: "neon", label: "Neon Cyber", preview: "⚡" },
+];
+
 /* ─── Main Component ────────────────────────────────────────── */
 
 export default function PresentationBuilderPanel() {
@@ -73,6 +82,7 @@ export default function PresentationBuilderPanel() {
   const [prompt, setPrompt] = useState("");
   const [slideCount, setSlideCount] = useState(8);
   const [style, setStyle] = useState("professional");
+  const [theme, setTheme] = useState<ThemeKey>("geist");
   const [viewMode, setViewMode] = useState<ViewMode>("edit");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -339,6 +349,7 @@ export default function PresentationBuilderPanel() {
         case "title":
           return `<section class="slide slide-title">
   ${img ? `<div class="bg-img">${img}</div>` : ""}
+  <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <div class="center-content">
     <h1>${esc(s.title)}</h1>
     ${s.content ? `<p class="subtitle">${esc(s.content)}</p>` : ""}
@@ -346,6 +357,7 @@ export default function PresentationBuilderPanel() {
 
         case "two-column":
           return `<section class="slide slide-twocol">
+  <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <h2>${esc(s.title)}</h2>
   <div class="cols">
     <div class="col-text">
@@ -357,6 +369,7 @@ export default function PresentationBuilderPanel() {
 
         case "image-focus":
           return `<section class="slide slide-imgfocus">
+  <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <h2>${esc(s.title)}</h2>
   <div class="hero-img">${img || `<div class="img-placeholder"></div>`}</div>
   ${s.content ? `<p class="caption">${esc(s.content)}</p>` : ""}
@@ -364,6 +377,7 @@ ${num}</section>`;
 
         case "quote":
           return `<section class="slide slide-quote">
+  <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <div class="quote-mark">\u201C</div>
   <blockquote>${esc(s.content || s.title)}</blockquote>
   ${s.bullets[0] ? `<cite>\u2014 ${esc(s.bullets[0])}</cite>` : ""}
@@ -372,6 +386,7 @@ ${num}</section>`;
         case "closing":
           return `<section class="slide slide-closing">
   ${img ? `<div class="bg-img">${img}</div>` : ""}
+  <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <div class="center-content">
     <h1>${esc(s.title)}</h1>
     ${s.content ? `<p class="subtitle">${esc(s.content)}</p>` : ""}
@@ -387,6 +402,7 @@ ${num}</section>`;
 
         default: // "content"
           return `<section class="slide slide-content">
+  <div class="decor decor-tl"></div><div class="decor decor-br"></div>
   <h2>${esc(s.title)}</h2>
   ${s.content ? `<p class="body-text">${esc(s.content)}</p>` : ""}
   ${bullets}
@@ -397,69 +413,255 @@ ${num}</section>`;
 
     const slidesHtml = slides.map(renderSlide).join("\n");
 
+    /* ── Theme CSS generator ── */
+    const themeCSS: Record<ThemeKey, string> = {
+      geist: `
+:root{--c-bg:#000;--c-surface:#111;--c-accent:#fff;--c-accent2:#888;--c-text:#ededed;--c-muted:#666;--font:'Inter',system-ui,sans-serif;--mono:'Geist Mono','SF Mono','Fira Code',monospace}
+body{background:#000}
+.slide{background:#000;color:#ededed}
+.sn{color:#444}
+
+/* Decorative elements */
+.decor{position:absolute;pointer-events:none;z-index:0}
+.decor-tl{top:0;left:0;width:120px;height:120px;border-left:1px solid #222;border-top:1px solid #222}
+.decor-br{bottom:0;right:0;width:120px;height:120px;border-right:1px solid #222;border-bottom:1px solid #222}
+.slide::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(255,255,255,.02) 0%,transparent 70%);pointer-events:none}
+
+/* Title */
+.slide-title{background:linear-gradient(180deg,#000 0%,#0a0a0a 100%);align-items:center;justify-content:center;text-align:center}
+.slide-title::after{content:"";position:absolute;top:50%;left:50%;width:600px;height:600px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.03) 0%,transparent 70%);pointer-events:none}
+.slide-title h1{font-size:clamp(2.5em,5.5vw,4.2em);font-weight:800;letter-spacing:-.04em;line-height:1.1;background:linear-gradient(180deg,#fff 30%,#666);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.slide-title .subtitle{font-size:clamp(1em,2vw,1.3em);color:#666;font-weight:300;font-family:var(--mono);margin-top:16px}
+
+/* Content */
+.slide-content{background:#000;gap:28px}
+.slide-content::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#333 0%,transparent 100%)}
+.slide-content h2{font-size:clamp(1.6em,3vw,2.4em);font-weight:700;letter-spacing:-.03em;color:#fff}
+.slide-content h2::after{content:"";display:block;width:40px;height:2px;background:#444;margin-top:12px}
+.slide-content .body-text{font-size:1.05em;color:#888;line-height:1.8;max-width:680px}
+.slide-content ul{list-style:none;gap:16px}
+.slide-content li{color:#ccc;padding-left:24px;font-size:1em;line-height:1.7;border-left:2px solid #222;padding:8px 0 8px 20px}
+.slide-content li::before{display:none}
+
+/* Two Column */
+.slide-twocol{background:#000;gap:24px}
+.slide-twocol h2{font-size:clamp(1.5em,3vw,2.2em);font-weight:700;color:#fff;letter-spacing:-.02em}
+.slide-twocol .col-text p{color:#888;line-height:1.7}
+.slide-twocol .col-text li{color:#aaa;border-left:2px solid #222;padding:6px 0 6px 16px}
+.slide-twocol .col-text li::before{display:none}
+.slide-twocol .col-img{border:1px solid #222;border-radius:12px}
+
+/* Image Focus */
+.slide-imgfocus{background:#000;gap:16px}
+.slide-imgfocus h2{color:#fff;font-weight:600}
+.slide-imgfocus .hero-img{border:1px solid #1a1a1a;border-radius:12px}
+.slide-imgfocus .caption{color:#555;font-family:var(--mono);font-size:.85em}
+
+/* Quote */
+.slide-quote{background:#000;color:#ededed;align-items:center;justify-content:center;text-align:center}
+.slide-quote::before{content:"";position:absolute;inset:40px;border:1px solid #1a1a1a;border-radius:24px;pointer-events:none}
+.slide-quote .quote-mark{font-size:5em;color:#333;opacity:1}
+.slide-quote blockquote{font-size:clamp(1.3em,3vw,2em);font-weight:400;color:#ccc;font-style:italic;max-width:650px}
+.slide-quote cite{color:#555;font-family:var(--mono);font-size:.9em}
+
+/* Closing */
+.slide-closing{background:#000;align-items:center;justify-content:center;text-align:center}
+.slide-closing::after{content:"";position:absolute;bottom:0;left:0;right:0;height:200px;background:linear-gradient(0deg,rgba(255,255,255,.02),transparent);pointer-events:none}
+.slide-closing h1{font-size:clamp(2em,4.5vw,3.5em);font-weight:800;letter-spacing:-.04em;background:linear-gradient(180deg,#fff 30%,#555);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.slide-closing .subtitle{color:#666;font-weight:300}
+.slide-closing .closing-points span{background:rgba(255,255,255,.05);border:1px solid #222;color:#aaa;font-family:var(--mono);font-size:.85em}
+`,
+
+      apple: `
+:root{--c-bg:#000;--c-surface:#1d1d1f;--c-accent:#0071e3;--c-accent2:#2997ff;--c-text:#f5f5f7;--c-muted:#86868b;--font:'SF Pro Display','Inter',system-ui,sans-serif}
+body{background:#000}
+.slide{background:#000;color:#f5f5f7}
+.sn{color:#48484a}
+
+.decor{display:none}
+.slide::before{display:none}
+
+/* Title */
+.slide-title{background:#000;align-items:center;justify-content:center;text-align:center}
+.slide-title h1{font-size:clamp(3em,7vw,5.5em);font-weight:700;letter-spacing:-.04em;line-height:1.05;color:#f5f5f7}
+.slide-title .subtitle{font-size:clamp(1.1em,2.2vw,1.6em);color:#86868b;font-weight:400;margin-top:20px}
+
+/* Content — Apple uses massive white space */
+.slide-content{background:#fff;color:#1d1d1f;gap:32px;padding:clamp(60px,8vw,120px)}
+.slide-content h2{font-size:clamp(2em,4vw,3em);font-weight:700;letter-spacing:-.03em;color:#1d1d1f;border:none;padding-left:0}
+.slide-content .body-text{font-size:1.15em;color:#6e6e73;line-height:1.8;max-width:640px}
+.slide-content ul{gap:20px}
+.slide-content li{font-size:1.1em;color:#1d1d1f;padding-left:0;line-height:1.6}
+.slide-content li::before{width:6px;height:6px;background:#0071e3;top:12px}
+
+/* Two Column */
+.slide-twocol{background:#fff;color:#1d1d1f;gap:32px;padding:clamp(60px,8vw,120px)}
+.slide-twocol h2{font-size:clamp(1.8em,3.5vw,2.8em);font-weight:700;color:#1d1d1f}
+.slide-twocol .col-text p{color:#6e6e73;font-size:1.05em;line-height:1.7}
+.slide-twocol .col-text li{color:#1d1d1f}
+.slide-twocol .col-text li::before{background:#0071e3;border-radius:50%}
+.slide-twocol .col-img{border-radius:20px;overflow:hidden}
+
+/* Image Focus */
+.slide-imgfocus{background:#000;gap:20px}
+.slide-imgfocus h2{color:#f5f5f7;font-size:clamp(1.6em,3vw,2.4em);font-weight:600}
+.slide-imgfocus .hero-img{border-radius:20px}
+.slide-imgfocus .caption{color:#86868b}
+
+/* Quote — dark with blue accent */
+.slide-quote{background:#000;color:#f5f5f7;align-items:center;justify-content:center;text-align:center}
+.slide-quote .quote-mark{font-size:6em;color:#0071e3;opacity:.4}
+.slide-quote blockquote{font-size:clamp(1.5em,3.5vw,2.4em);font-weight:600;color:#f5f5f7;font-style:normal;max-width:700px;line-height:1.4}
+.slide-quote cite{color:#0071e3;font-weight:500;font-size:1em}
+
+/* Closing */
+.slide-closing{background:#000;align-items:center;justify-content:center;text-align:center}
+.slide-closing h1{font-size:clamp(2.5em,5.5vw,4.5em);font-weight:700;letter-spacing:-.04em;color:#f5f5f7}
+.slide-closing .subtitle{color:#86868b;font-size:clamp(1em,2vw,1.4em)}
+.slide-closing .closing-points span{background:rgba(0,113,227,.1);border:1px solid rgba(0,113,227,.3);color:#2997ff}
+`,
+
+      gradient: `
+:root{--c-bg:#0f0720;--c-surface:#1a0d35;--c-accent:#f472b6;--c-accent2:#818cf8;--c-text:#faf5ff;--c-muted:#a78bfa;--font:'Inter',system-ui,sans-serif}
+body{background:#0f0720}
+.slide{color:#faf5ff}
+.sn{color:rgba(255,255,255,.3)}
+
+.decor{position:absolute;pointer-events:none;z-index:0;border-radius:50%;filter:blur(80px);opacity:.15}
+.decor-tl{top:-100px;left:-100px;width:400px;height:400px;background:var(--c-accent)}
+.decor-br{bottom:-100px;right:-100px;width:350px;height:350px;background:var(--c-accent2)}
+
+/* Title */
+.slide-title{background:linear-gradient(135deg,#1e0533 0%,#0f0720 40%,#0c1445 100%);align-items:center;justify-content:center;text-align:center}
+.slide-title::before{content:"";position:absolute;top:50%;left:50%;width:800px;height:800px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(244,114,182,.08) 0%,rgba(129,140,248,.05) 40%,transparent 70%);pointer-events:none}
+.slide-title h1{font-size:clamp(2.5em,5.5vw,4em);font-weight:800;letter-spacing:-.03em;line-height:1.1;background:linear-gradient(135deg,#f472b6,#818cf8,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.slide-title .subtitle{font-size:clamp(1em,2vw,1.3em);color:#c4b5fd;font-weight:300;margin-top:16px}
+
+/* Content — gradient dark bg, NOT white */
+.slide-content{background:linear-gradient(180deg,#130a28 0%,#0f0720 100%);gap:24px}
+.slide-content::before{content:"";position:absolute;top:0;right:0;width:50%;height:100%;background:radial-gradient(ellipse at 80% 20%,rgba(244,114,182,.04) 0%,transparent 60%);pointer-events:none}
+.slide-content h2{font-size:clamp(1.6em,3vw,2.4em);font-weight:700;letter-spacing:-.02em;color:#fff;border-left:3px solid;border-image:linear-gradient(180deg,#f472b6,#818cf8) 1;padding-left:16px}
+.slide-content .body-text{font-size:1.05em;color:#c4b5fd;line-height:1.8;max-width:680px}
+.slide-content ul{gap:14px}
+.slide-content li{color:#e9d5ff;padding-left:28px;font-size:1em;line-height:1.7}
+.slide-content li::before{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,#f472b6,#818cf8);top:11px}
+
+/* Two Column */
+.slide-twocol{background:linear-gradient(135deg,#130a28 0%,#0c1445 100%);gap:24px}
+.slide-twocol h2{font-size:clamp(1.5em,3vw,2.2em);font-weight:700;color:#fff}
+.slide-twocol .col-text p{color:#c4b5fd;line-height:1.7}
+.slide-twocol .col-text li{color:#e9d5ff}
+.slide-twocol .col-text li::before{background:linear-gradient(135deg,#f472b6,#818cf8);border-radius:2px}
+.slide-twocol .col-img{border-radius:16px;border:1px solid rgba(244,114,182,.2)}
+
+/* Image Focus */
+.slide-imgfocus{background:linear-gradient(180deg,#0f0720 0%,#0c1445 100%);gap:16px}
+.slide-imgfocus h2{color:#fff;font-weight:600}
+.slide-imgfocus .hero-img{border-radius:16px;border:1px solid rgba(129,140,248,.2)}
+.slide-imgfocus .caption{color:#a78bfa}
+
+/* Quote */
+.slide-quote{background:linear-gradient(135deg,#1e0533,#0c1445);color:#faf5ff;align-items:center;justify-content:center;text-align:center}
+.slide-quote::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(244,114,182,.06) 0%,transparent 60%);pointer-events:none}
+.slide-quote .quote-mark{font-size:6em;background:linear-gradient(135deg,#f472b6,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;opacity:.6}
+.slide-quote blockquote{font-size:clamp(1.3em,3vw,2em);font-weight:500;color:#e9d5ff;font-style:italic;max-width:650px}
+.slide-quote cite{color:#f472b6;font-weight:600}
+
+/* Closing */
+.slide-closing{background:linear-gradient(135deg,#1e0533 0%,#0f0720 50%,#0c1445 100%);align-items:center;justify-content:center;text-align:center}
+.slide-closing h1{font-size:clamp(2em,4.5vw,3.5em);font-weight:800;background:linear-gradient(135deg,#f472b6,#818cf8,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.slide-closing .subtitle{color:#c4b5fd;font-weight:300}
+.slide-closing .closing-points span{background:rgba(244,114,182,.1);border:1px solid rgba(244,114,182,.3);color:#f9a8d4}
+`,
+
+      neon: `
+:root{--c-bg:#0a0a0f;--c-surface:#12121a;--c-accent:#00ff88;--c-accent2:#00d4ff;--c-text:#e0ffe0;--c-muted:#4a9;--font:'Inter',system-ui,sans-serif;--mono:'Fira Code','SF Mono',monospace}
+body{background:#0a0a0f}
+.slide{color:#e0ffe0}
+.sn{color:#1a3a2a;font-family:var(--mono)}
+
+.decor{position:absolute;pointer-events:none;z-index:0}
+.decor-tl{top:0;left:0;width:1px;height:80px;background:linear-gradient(180deg,var(--c-accent),transparent);box-shadow:0 0 15px var(--c-accent)}
+.decor-br{bottom:0;right:0;width:80px;height:1px;background:linear-gradient(90deg,transparent,var(--c-accent2));box-shadow:0 0 15px var(--c-accent2)}
+.slide::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.01) 2px,rgba(0,255,136,.01) 4px);pointer-events:none}
+
+/* Title */
+.slide-title{background:#0a0a0f;align-items:center;justify-content:center;text-align:center}
+.slide-title::after{content:"";position:absolute;top:50%;left:50%;width:500px;height:500px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(0,255,136,.06) 0%,rgba(0,212,255,.03) 40%,transparent 70%);pointer-events:none}
+.slide-title h1{font-size:clamp(2.5em,5.5vw,4em);font-weight:800;letter-spacing:-.03em;line-height:1.1;color:#fff;text-shadow:0 0 40px rgba(0,255,136,.3),0 0 80px rgba(0,255,136,.1)}
+.slide-title .subtitle{font-size:clamp(1em,2vw,1.3em);color:#00ff88;font-weight:300;font-family:var(--mono);text-shadow:0 0 20px rgba(0,255,136,.3)}
+
+/* Content */
+.slide-content{background:#0a0a0f;gap:24px}
+.slide-content::after{content:"";position:absolute;left:0;top:0;width:2px;height:100%;background:linear-gradient(180deg,#00ff88,#00d4ff,transparent);box-shadow:0 0 10px rgba(0,255,136,.3)}
+.slide-content h2{font-size:clamp(1.6em,3vw,2.4em);font-weight:700;color:#fff;letter-spacing:-.02em;border:none;padding-left:0}
+.slide-content h2::after{content:"_";color:#00ff88;animation:blink 1.2s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.slide-content .body-text{font-size:1em;color:#8aaa8a;line-height:1.8;max-width:680px;font-family:var(--mono)}
+.slide-content ul{gap:12px}
+.slide-content li{color:#b0e0b0;padding-left:28px;font-size:.95em;line-height:1.7;font-family:var(--mono)}
+.slide-content li::before{width:8px;height:8px;border-radius:0;background:#00ff88;box-shadow:0 0 8px #00ff88;top:10px}
+
+/* Two Column */
+.slide-twocol{background:#0a0a0f;gap:24px}
+.slide-twocol h2{font-size:clamp(1.5em,3vw,2.2em);font-weight:700;color:#fff}
+.slide-twocol .col-text p{color:#8aaa8a;font-family:var(--mono);line-height:1.7}
+.slide-twocol .col-text li{color:#b0e0b0;font-family:var(--mono)}
+.slide-twocol .col-text li::before{background:#00d4ff;box-shadow:0 0 6px #00d4ff;border-radius:0}
+.slide-twocol .col-img{border-radius:8px;border:1px solid #00ff8833;box-shadow:0 0 20px rgba(0,255,136,.05)}
+
+/* Image Focus */
+.slide-imgfocus{background:#0a0a0f;gap:16px}
+.slide-imgfocus h2{color:#fff;font-weight:600}
+.slide-imgfocus .hero-img{border-radius:8px;border:1px solid #00d4ff33;box-shadow:0 0 30px rgba(0,212,255,.08)}
+.slide-imgfocus .caption{color:#4a9;font-family:var(--mono);font-size:.85em}
+
+/* Quote */
+.slide-quote{background:#0a0a0f;color:#e0ffe0;align-items:center;justify-content:center;text-align:center}
+.slide-quote::after{content:"";position:absolute;inset:30px;border:1px solid #00ff8822;border-radius:16px;box-shadow:inset 0 0 40px rgba(0,255,136,.02);pointer-events:none}
+.slide-quote .quote-mark{font-size:5em;color:#00ff88;opacity:.4;text-shadow:0 0 30px rgba(0,255,136,.3)}
+.slide-quote blockquote{font-size:clamp(1.3em,3vw,2em);font-weight:400;color:#c0ffc0;font-style:italic;max-width:650px}
+.slide-quote cite{color:#00d4ff;font-family:var(--mono);font-size:.9em;text-shadow:0 0 10px rgba(0,212,255,.3)}
+
+/* Closing */
+.slide-closing{background:#0a0a0f;align-items:center;justify-content:center;text-align:center}
+.slide-closing::after{content:"";position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#00ff88,#00d4ff,transparent);box-shadow:0 0 20px rgba(0,255,136,.3)}
+.slide-closing h1{font-size:clamp(2em,4.5vw,3.5em);font-weight:800;color:#fff;text-shadow:0 0 40px rgba(0,255,136,.3)}
+.slide-closing .subtitle{color:#4a9;font-family:var(--mono)}
+.slide-closing .closing-points span{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);color:#00ff88;font-family:var(--mono);font-size:.85em;box-shadow:0 0 10px rgba(0,255,136,.1)}
+`,
+    };
+
+    const selectedCSS = themeCSS[theme] || themeCSS.geist;
+
     const html = `<!DOCTYPE html>
 <html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(slides[0]?.title || "Sunum")}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--c-bg:#0f172a;--c-surface:#1e293b;--c-accent:#8b5cf6;--c-accent2:#a78bfa;--c-text:#f1f5f9;--c-muted:#94a3b8;--c-light-bg:#f8fafc;--c-light-text:#0f172a;--c-light-muted:#64748b;--font:Inter,system-ui,-apple-system,sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
-.slide{position:relative;width:100%;min-height:100vh;padding:clamp(40px,6vw,80px);display:flex;flex-direction:column;font-family:var(--font);page-break-after:always;overflow:hidden}
-.sn{position:absolute;bottom:24px;right:32px;font-size:13px;font-weight:500;opacity:.4}
+.slide{position:relative;width:100%;min-height:100vh;padding:clamp(40px,6vw,80px);display:flex;flex-direction:column;font-family:var(--font,Inter,system-ui,sans-serif);page-break-after:always;overflow:hidden}
+.sn{position:absolute;bottom:24px;right:32px;font-size:13px;font-weight:500;opacity:.5}
 
-/* ── Title Slide ── */
-.slide-title{background:linear-gradient(135deg,#4c1d95 0%,#1e1b4b 50%,var(--c-bg) 100%);color:var(--c-text);align-items:center;justify-content:center;text-align:center}
-.slide-title .bg-img{position:absolute;inset:0;opacity:.15}
-.slide-title .bg-img img{width:100%;height:100%;object-fit:cover}
-.slide-title .center-content{position:relative;z-index:1;max-width:800px}
-.slide-title h1{font-size:clamp(2.2em,5vw,3.8em);font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-bottom:.4em}
-.slide-title .subtitle{font-size:clamp(1em,2vw,1.4em);color:var(--c-accent2);font-weight:300;line-height:1.5}
-
-/* ── Content Slide ── */
-.slide-content{background:var(--c-light-bg);color:var(--c-light-text);justify-content:flex-start;gap:20px}
-.slide-content h2{font-size:clamp(1.6em,3vw,2.4em);font-weight:700;letter-spacing:-.01em;border-left:4px solid var(--c-accent);padding-left:16px;line-height:1.2}
-.slide-content .body-text{font-size:1.05em;color:var(--c-light-muted);line-height:1.7;max-width:720px}
-.slide-content ul{list-style:none;display:flex;flex-direction:column;gap:12px;flex:1}
-.slide-content li{font-size:1.05em;line-height:1.6;color:var(--c-light-text);padding-left:28px;position:relative}
-.slide-content li::before{content:"";position:absolute;left:0;top:10px;width:10px;height:10px;border-radius:50%;background:var(--c-accent)}
-.slide-content .side-img{margin-top:auto;border-radius:12px;overflow:hidden;max-height:35vh}
-.slide-content .side-img img{width:100%;height:100%;object-fit:cover;display:block}
-
-/* ── Two Column ── */
-.slide-twocol{background:var(--c-light-bg);color:var(--c-light-text);gap:24px}
-.slide-twocol h2{font-size:clamp(1.5em,3vw,2.2em);font-weight:700;letter-spacing:-.01em}
+/* Shared structural defaults */
+.slide-title .bg-img,.slide-closing .bg-img{position:absolute;inset:0;opacity:.15}
+.slide-title .bg-img img,.slide-closing .bg-img img{width:100%;height:100%;object-fit:cover}
+.slide-title .center-content,.slide-closing .center-content{position:relative;z-index:1}
 .slide-twocol .cols{display:grid;grid-template-columns:1fr 1fr;gap:40px;flex:1;align-items:center}
-.slide-twocol .col-text p{font-size:1em;color:var(--c-light-muted);line-height:1.7;margin-bottom:16px}
-.slide-twocol .col-text ul{list-style:none;display:flex;flex-direction:column;gap:10px}
-.slide-twocol .col-text li{font-size:.95em;padding-left:24px;position:relative;line-height:1.5}
-.slide-twocol .col-text li::before{content:"";position:absolute;left:0;top:8px;width:8px;height:8px;border-radius:2px;background:var(--c-accent);transform:rotate(45deg)}
 .slide-twocol .col-img{border-radius:16px;overflow:hidden;aspect-ratio:4/3}
-.slide-twocol .col-img img{width:100%;height:100%;object-fit:cover;display:block}
-
-/* ── Image Focus ── */
-.slide-imgfocus{background:var(--c-bg);color:var(--c-text);gap:16px}
-.slide-imgfocus h2{font-size:clamp(1.4em,2.5vw,2em);font-weight:600}
+.slide-twocol .col-img img,.slide-imgfocus .hero-img img,.slide-content .side-img img{width:100%;height:100%;object-fit:cover;display:block}
 .slide-imgfocus .hero-img{flex:1;border-radius:16px;overflow:hidden;min-height:0}
-.slide-imgfocus .hero-img img{width:100%;height:100%;object-fit:cover;display:block}
-.slide-imgfocus .caption{font-size:.9em;color:var(--c-muted);text-align:center;font-style:italic}
-
-/* ── Quote ── */
-.slide-quote{background:linear-gradient(135deg,#faf5ff,#f3e8ff,#ede9fe);color:#3b0764;align-items:center;justify-content:center;text-align:center}
-.slide-quote .quote-mark{font-size:6em;line-height:1;color:var(--c-accent2);opacity:.5;margin-bottom:-.2em}
-.slide-quote blockquote{font-size:clamp(1.3em,3vw,2em);font-weight:500;font-style:italic;line-height:1.5;max-width:700px}
-.slide-quote cite{display:block;margin-top:24px;font-size:1em;font-style:normal;color:#7c3aed;font-weight:600}
-
-/* ── Closing ── */
-.slide-closing{background:linear-gradient(135deg,var(--c-surface) 0%,var(--c-bg) 50%,#020617 100%);color:var(--c-text);align-items:center;justify-content:center;text-align:center}
-.slide-closing .bg-img{position:absolute;inset:0;opacity:.1}
-.slide-closing .bg-img img{width:100%;height:100%;object-fit:cover}
-.slide-closing .center-content{position:relative;z-index:1}
-.slide-closing h1{font-size:clamp(2em,4vw,3.2em);font-weight:800;letter-spacing:-.02em;margin-bottom:.3em}
-.slide-closing .subtitle{font-size:clamp(1em,2vw,1.3em);color:var(--c-muted);font-weight:300;line-height:1.5}
+.slide-content .side-img{margin-top:auto;border-radius:12px;overflow:hidden;max-height:35vh}
+.slide-content ul{list-style:none;display:flex;flex-direction:column;gap:12px;flex:1}
+.slide-twocol .col-text ul{list-style:none;display:flex;flex-direction:column;gap:10px}
 .slide-closing .closing-points{margin-top:32px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
-.slide-closing .closing-points span{padding:8px 20px;border-radius:999px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);font-size:.9em;color:var(--c-accent2)}
-
 .img-placeholder{width:100%;height:100%;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:12px;display:flex;align-items:center;justify-content:center}
+.decor{position:absolute;pointer-events:none;opacity:.15}
+.decor-tl{top:20px;left:20px;width:80px;height:80px;border-top:2px solid currentColor;border-left:2px solid currentColor}
+.decor-br{bottom:20px;right:20px;width:80px;height:80px;border-bottom:2px solid currentColor;border-right:2px solid currentColor}
+
+/* Theme overrides */
+${selectedCSS}
 
 @media print{.slide{page-break-after:always;min-height:100vh}}
 </style>
@@ -474,7 +676,7 @@ ${slidesHtml}
     a.download = "presentation.html";
     a.click();
     URL.revokeObjectURL(url);
-  }, [slides]);
+  }, [slides, theme]);
 
   /* ─── Fullscreen Presentation Mode ───────────────────────── */
 
@@ -589,6 +791,27 @@ ${slidesHtml}
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-white/40 mb-2 block">Tema</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {THEME_OPTIONS.map((t) => (
+                    <button
+                      key={t.value}
+                      onClick={() => setTheme(t.value)}
+                      disabled={isGenerating}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                        theme === t.value
+                          ? "bg-purple-500/20 border-purple-500/50 text-white/90"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                      }`}
+                    >
+                      <span>{t.preview}</span>
+                      <span>{t.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
