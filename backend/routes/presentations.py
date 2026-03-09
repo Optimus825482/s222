@@ -216,11 +216,20 @@ async def generate_presentation(
         research_context = "No research available. Use general knowledge."
 
     # Phase 2: Generate structured slides
-    system_prompt = (
-        "You are a professional presentation designer. "
-        "Create structured slide content based on the topic and research provided. "
-        "Return ONLY valid JSON — no markdown, no explanation."
-    )
+    system_prompt = """You are a world-class presentation architect who creates compelling, visually-driven slide decks.
+
+DESIGN PRINCIPLES:
+- ONE core idea per slide — never overload
+- Titles must be punchy and specific (max 8 words), not generic ("Sonuç" → "AI 2026'da Kodlamayı Yeniden Tanımlıyor")
+- Content text is a SHORT supporting sentence (max 25 words), not a paragraph
+- Bullets are crisp insights (max 12 words each), not full sentences
+- Use VARIED layouts to create visual rhythm — never use "content" layout more than 2x in a row
+- "quote" layout: content = the quote text, bullets[0] = attribution
+- "two-column" layout: ideal for comparisons, before/after, pros/cons
+- "image-focus" layout: use when a visual tells the story better than text
+- image_prompt must be cinematic and specific — describe scene, lighting, style, mood
+
+Return ONLY valid JSON — no markdown, no explanation."""
 
     slide_generation_prompt = f"""Create a {body.slide_count}-slide presentation.
 
@@ -231,31 +240,40 @@ Style: {body.style}
 Research Context:
 {research_context}
 
-Return a JSON object with this exact structure:
+Return a JSON object:
 {{
   "slides": [
     {{
       "id": 1,
-      "title": "Slide title",
-      "content": "Main paragraph content for the slide",
-      "bullets": ["Key point 1", "Key point 2", "Key point 3"],
-      "notes": "Speaker notes for this slide",
-      "image_prompt": "Detailed English prompt for generating a relevant image via AI",
+      "title": "Short punchy title (max 8 words)",
+      "content": "One supporting sentence (max 25 words)",
+      "bullets": ["Crisp point (max 12 words)", "Another crisp point"],
+      "notes": "Speaker notes",
+      "image_prompt": "Cinematic English prompt: subject, scene, lighting, style, mood, color palette",
       "layout": "title"
     }}
   ]
 }}
 
-RULES:
+LAYOUT STRATEGY for {body.slide_count} slides:
+- Slide 1: "title" — bold opening with topic + subtitle
+- Slide 2-{body.slide_count - 1}: Mix these layouts for visual variety:
+  * "content" — standard bullet points (use max 2-3 times total)
+  * "two-column" — comparisons, data vs insight, text vs visual
+  * "image-focus" — when the image IS the message, minimal text
+  * "quote" — expert quote or key statistic as centerpiece
+- Slide {body.slide_count}: "closing" — memorable takeaway + call to action
+
+STRICT RULES:
 - Exactly {body.slide_count} slides
-- First slide MUST have layout "title"
-- Last slide MUST have layout "closing"
-- Other slides use layouts from: {LAYOUT_OPTIONS}
-- All text content in {body.language} language
-- image_prompt MUST be in English (for image generation AI)
-- Each slide should have 2-5 bullets
-- Content should be informative and {body.style} in tone
-- Speaker notes should guide the presenter"""
+- All text in {body.language} language
+- image_prompt MUST be in English, be specific and cinematic (not generic clip-art descriptions)
+- Titles: max 8 words, specific and engaging — avoid generic titles like "Giriş", "Sonuç", "Genel Bakış"
+- Content: max 25 words — this is a subtitle, NOT a paragraph
+- Bullets: 2-4 per slide, max 12 words each — punchy, not sentences
+- NEVER use the same layout 3 times in a row
+- Speaker notes should be conversational guidance for the presenter
+- Style tone: {body.style}"""
 
     raw_response = await _llm_call("speed", system_prompt, slide_generation_prompt, timeout_seconds=60)
 
@@ -305,22 +323,25 @@ async def enhance_prompt(
 ):
     """Improve a raw presentation prompt with AI suggestions."""
     system_prompt = (
-        "You are a presentation consultant. Enhance the user's raw prompt into a detailed, "
-        "well-structured presentation brief. Return ONLY valid JSON."
+        "You are a presentation strategist. Transform vague topics into focused, compelling presentation briefs. "
+        "Think about narrative arc, audience engagement, and visual storytelling. Return ONLY valid JSON."
     )
 
-    user_prompt = f"""Enhance this presentation prompt:
+    user_prompt = f"""Transform this raw idea into a detailed presentation brief:
 "{body.prompt}"
 
 Return JSON:
 {{
-  "enhanced_prompt": "A detailed, improved version of the prompt with clear scope and objectives",
+  "enhanced_prompt": "A detailed brief that includes: 1) Clear thesis/angle, 2) Target audience, 3) Key narrative arc (opening hook → evidence → insight → call to action), 4) 3-5 specific subtopics to cover, 5) Suggested visual themes",
   "suggested_slide_count": 8,
   "suggested_style": "professional"
 }}
 
-Style options: professional, creative, minimal, academic, corporate
-suggested_slide_count should be between 5 and 20 based on topic complexity."""
+RULES:
+- enhanced_prompt should be 150-300 words, structured as a creative brief
+- Don't just expand the topic — give it an ANGLE and a STORY
+- suggested_slide_count: 5-8 for focused talks, 10-15 for deep dives, 15-20 for comprehensive
+- Style options: professional, creative, minimal, academic, corporate"""
 
     raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=30)
 

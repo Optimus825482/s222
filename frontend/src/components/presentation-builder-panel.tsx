@@ -318,31 +318,154 @@ export default function PresentationBuilderPanel() {
 
   const exportAsHtml = useCallback(() => {
     if (slides.length === 0) return;
-    const slidesHtml = slides
-      .map(
-        (s, i) => `
-      <div class="slide" style="page-break-after:always;padding:60px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;font-family:system-ui,sans-serif;background:${
-        s.layout === "title" || s.layout === "closing"
-          ? "linear-gradient(135deg,#1e293b,#0f172a)"
-          : "#ffffff"
-      };color:${s.layout === "title" || s.layout === "closing" ? "#f1f5f9" : "#1e293b"}">
-        <h1 style="font-size:2.5em;margin-bottom:0.5em">${s.title}</h1>
-        ${s.content ? `<p style="font-size:1.2em;line-height:1.6;margin-bottom:1em">${s.content}</p>` : ""}
-        ${
-          s.bullets.length > 0
-            ? `<ul style="font-size:1.1em;line-height:1.8">${s.bullets.map((b) => `<li>${b}</li>`).join("")}</ul>`
-            : ""
-        }
-        ${s.imageUrl ? `<img src="${s.imageUrl}" style="max-width:80%;margin:1em auto;border-radius:12px" alt="${s.title}" />` : ""}
-        <div style="position:absolute;bottom:30px;right:40px;font-size:0.8em;opacity:0.5">${i + 1} / ${slides.length}</div>
-      </div>`,
-      )
-      .join("\n");
+
+    const esc = (t: string) =>
+      t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const renderSlide = (s: Slide, i: number): string => {
+      const num = `<div class="sn">${i + 1} / ${slides.length}</div>`;
+      const img = s.imageUrl
+        ? `<img src="${s.imageUrl}" alt="${esc(s.title)}" loading="lazy"/>`
+        : "";
+      const bullets =
+        s.bullets.filter(Boolean).length > 0
+          ? `<ul>${s.bullets
+              .filter(Boolean)
+              .map((b) => `<li>${esc(b)}</li>`)
+              .join("")}</ul>`
+          : "";
+
+      switch (s.layout) {
+        case "title":
+          return `<section class="slide slide-title">
+  ${img ? `<div class="bg-img">${img}</div>` : ""}
+  <div class="center-content">
+    <h1>${esc(s.title)}</h1>
+    ${s.content ? `<p class="subtitle">${esc(s.content)}</p>` : ""}
+  </div>${num}</section>`;
+
+        case "two-column":
+          return `<section class="slide slide-twocol">
+  <h2>${esc(s.title)}</h2>
+  <div class="cols">
+    <div class="col-text">
+      ${s.content ? `<p>${esc(s.content)}</p>` : ""}
+      ${bullets}
+    </div>
+    <div class="col-img">${img || `<div class="img-placeholder"></div>`}</div>
+  </div>${num}</section>`;
+
+        case "image-focus":
+          return `<section class="slide slide-imgfocus">
+  <h2>${esc(s.title)}</h2>
+  <div class="hero-img">${img || `<div class="img-placeholder"></div>`}</div>
+  ${s.content ? `<p class="caption">${esc(s.content)}</p>` : ""}
+${num}</section>`;
+
+        case "quote":
+          return `<section class="slide slide-quote">
+  <div class="quote-mark">\u201C</div>
+  <blockquote>${esc(s.content || s.title)}</blockquote>
+  ${s.bullets[0] ? `<cite>\u2014 ${esc(s.bullets[0])}</cite>` : ""}
+${num}</section>`;
+
+        case "closing":
+          return `<section class="slide slide-closing">
+  ${img ? `<div class="bg-img">${img}</div>` : ""}
+  <div class="center-content">
+    <h1>${esc(s.title)}</h1>
+    ${s.content ? `<p class="subtitle">${esc(s.content)}</p>` : ""}
+    ${
+      s.bullets.filter(Boolean).length > 0
+        ? `<div class="closing-points">${s.bullets
+            .filter(Boolean)
+            .map((b) => `<span>${esc(b)}</span>`)
+            .join("")}</div>`
+        : ""
+    }
+  </div>${num}</section>`;
+
+        default: // "content"
+          return `<section class="slide slide-content">
+  <h2>${esc(s.title)}</h2>
+  ${s.content ? `<p class="body-text">${esc(s.content)}</p>` : ""}
+  ${bullets}
+  ${img ? `<div class="side-img">${img}</div>` : ""}
+${num}</section>`;
+      }
+    };
+
+    const slidesHtml = slides.map(renderSlide).join("\n");
 
     const html = `<!DOCTYPE html>
-<html lang="tr"><head><meta charset="UTF-8"><title>${slides[0]?.title || "Sunum"}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}.slide{position:relative}</style>
-</head><body>${slidesHtml}</body></html>`;
+<html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(slides[0]?.title || "Sunum")}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--c-bg:#0f172a;--c-surface:#1e293b;--c-accent:#8b5cf6;--c-accent2:#a78bfa;--c-text:#f1f5f9;--c-muted:#94a3b8;--c-light-bg:#f8fafc;--c-light-text:#0f172a;--c-light-muted:#64748b;--font:Inter,system-ui,-apple-system,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+.slide{position:relative;width:100%;min-height:100vh;padding:clamp(40px,6vw,80px);display:flex;flex-direction:column;font-family:var(--font);page-break-after:always;overflow:hidden}
+.sn{position:absolute;bottom:24px;right:32px;font-size:13px;font-weight:500;opacity:.4}
+
+/* ── Title Slide ── */
+.slide-title{background:linear-gradient(135deg,#4c1d95 0%,#1e1b4b 50%,var(--c-bg) 100%);color:var(--c-text);align-items:center;justify-content:center;text-align:center}
+.slide-title .bg-img{position:absolute;inset:0;opacity:.15}
+.slide-title .bg-img img{width:100%;height:100%;object-fit:cover}
+.slide-title .center-content{position:relative;z-index:1;max-width:800px}
+.slide-title h1{font-size:clamp(2.2em,5vw,3.8em);font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-bottom:.4em}
+.slide-title .subtitle{font-size:clamp(1em,2vw,1.4em);color:var(--c-accent2);font-weight:300;line-height:1.5}
+
+/* ── Content Slide ── */
+.slide-content{background:var(--c-light-bg);color:var(--c-light-text);justify-content:flex-start;gap:20px}
+.slide-content h2{font-size:clamp(1.6em,3vw,2.4em);font-weight:700;letter-spacing:-.01em;border-left:4px solid var(--c-accent);padding-left:16px;line-height:1.2}
+.slide-content .body-text{font-size:1.05em;color:var(--c-light-muted);line-height:1.7;max-width:720px}
+.slide-content ul{list-style:none;display:flex;flex-direction:column;gap:12px;flex:1}
+.slide-content li{font-size:1.05em;line-height:1.6;color:var(--c-light-text);padding-left:28px;position:relative}
+.slide-content li::before{content:"";position:absolute;left:0;top:10px;width:10px;height:10px;border-radius:50%;background:var(--c-accent)}
+.slide-content .side-img{margin-top:auto;border-radius:12px;overflow:hidden;max-height:35vh}
+.slide-content .side-img img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ── Two Column ── */
+.slide-twocol{background:var(--c-light-bg);color:var(--c-light-text);gap:24px}
+.slide-twocol h2{font-size:clamp(1.5em,3vw,2.2em);font-weight:700;letter-spacing:-.01em}
+.slide-twocol .cols{display:grid;grid-template-columns:1fr 1fr;gap:40px;flex:1;align-items:center}
+.slide-twocol .col-text p{font-size:1em;color:var(--c-light-muted);line-height:1.7;margin-bottom:16px}
+.slide-twocol .col-text ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+.slide-twocol .col-text li{font-size:.95em;padding-left:24px;position:relative;line-height:1.5}
+.slide-twocol .col-text li::before{content:"";position:absolute;left:0;top:8px;width:8px;height:8px;border-radius:2px;background:var(--c-accent);transform:rotate(45deg)}
+.slide-twocol .col-img{border-radius:16px;overflow:hidden;aspect-ratio:4/3}
+.slide-twocol .col-img img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ── Image Focus ── */
+.slide-imgfocus{background:var(--c-bg);color:var(--c-text);gap:16px}
+.slide-imgfocus h2{font-size:clamp(1.4em,2.5vw,2em);font-weight:600}
+.slide-imgfocus .hero-img{flex:1;border-radius:16px;overflow:hidden;min-height:0}
+.slide-imgfocus .hero-img img{width:100%;height:100%;object-fit:cover;display:block}
+.slide-imgfocus .caption{font-size:.9em;color:var(--c-muted);text-align:center;font-style:italic}
+
+/* ── Quote ── */
+.slide-quote{background:linear-gradient(135deg,#faf5ff,#f3e8ff,#ede9fe);color:#3b0764;align-items:center;justify-content:center;text-align:center}
+.slide-quote .quote-mark{font-size:6em;line-height:1;color:var(--c-accent2);opacity:.5;margin-bottom:-.2em}
+.slide-quote blockquote{font-size:clamp(1.3em,3vw,2em);font-weight:500;font-style:italic;line-height:1.5;max-width:700px}
+.slide-quote cite{display:block;margin-top:24px;font-size:1em;font-style:normal;color:#7c3aed;font-weight:600}
+
+/* ── Closing ── */
+.slide-closing{background:linear-gradient(135deg,var(--c-surface) 0%,var(--c-bg) 50%,#020617 100%);color:var(--c-text);align-items:center;justify-content:center;text-align:center}
+.slide-closing .bg-img{position:absolute;inset:0;opacity:.1}
+.slide-closing .bg-img img{width:100%;height:100%;object-fit:cover}
+.slide-closing .center-content{position:relative;z-index:1}
+.slide-closing h1{font-size:clamp(2em,4vw,3.2em);font-weight:800;letter-spacing:-.02em;margin-bottom:.3em}
+.slide-closing .subtitle{font-size:clamp(1em,2vw,1.3em);color:var(--c-muted);font-weight:300;line-height:1.5}
+.slide-closing .closing-points{margin-top:32px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.slide-closing .closing-points span{padding:8px 20px;border-radius:999px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);font-size:.9em;color:var(--c-accent2)}
+
+.img-placeholder{width:100%;height:100%;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:12px;display:flex;align-items:center;justify-content:center}
+
+@media print{.slide{page-break-after:always;min-height:100vh}}
+</style>
+</head><body>
+${slidesHtml}
+</body></html>`;
 
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
