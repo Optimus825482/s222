@@ -47,10 +47,40 @@ interface CustomStep {
 /* ── Constants ─────────────────────────────────────────────────── */
 const TOOLS = [
   "web_search",
+  "web_fetch",
   "code_execute",
   "rag_query",
+  "rag_ingest",
+  "rag_list_documents",
   "save_memory",
   "recall_memory",
+  "list_memories",
+  "memory_stats",
+  "find_skill",
+  "use_skill",
+  "create_skill",
+  "research_create_skill",
+  "idea_to_project",
+  "spawn_subagent",
+  "request_approval",
+  "self_evaluate",
+  "get_agent_baseline",
+  "get_best_agent",
+  "mcp_call",
+  "mcp_list_tools",
+  "generate_image",
+  "generate_chart",
+  "generate_presentation",
+  "run_workflow",
+  "list_workflows",
+  "domain_expert",
+  "list_domain_tools",
+  "check_budget",
+  "check_error_patterns",
+  "list_teachings",
+  "decompose_task",
+  "direct_response",
+  "synthesize_results",
 ] as const;
 
 const AGENTS = [
@@ -457,7 +487,8 @@ export function WorkflowBuilderPanel() {
                 <ChevronRight className="w-3 h-3 text-slate-500 mt-0.5 shrink-0" />
                 <span>
                   <span className="text-emerald-400">Araç Çağrısı</span> —
-                  web_search, code_execute, rag_query gibi araçları çağırın
+                  web_search, code_execute, rag_query, generate_image, mcp_call
+                  gibi 35 aracı çağırın
                 </span>
               </div>
               <div className="flex items-start gap-2">
@@ -1244,7 +1275,8 @@ export function WorkflowBuilderPanel() {
                 <ul className="list-disc list-inside ml-4 mt-1 space-y-0.5">
                   <li>
                     <span className="text-cyan-300">Araç Çağrısı</span> —
-                    web_search, code_execute, rag_query vb.
+                    web_search, code_execute, rag_query, generate_image,
+                    mcp_call vb. (35 araç)
                   </li>
                   <li>
                     <span className="text-cyan-300">Ajan Çağrısı</span> —
