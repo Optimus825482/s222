@@ -65,7 +65,6 @@ function fmtMs(v: number): string {
 
 function fmtRate(v: number | undefined | null): string {
   return `${(v ?? 0).toFixed(1)}%`;
-}%`;
 }
 
 function fmtTokens(v: number): string {
@@ -76,7 +75,6 @@ function fmtTokens(v: number): string {
 
 function fmtCost(v: number | undefined | null): string {
   return `${(v ?? 0).toFixed(4)}`;
-}`;
 }
 
 function fmtUptime(seconds: number): string {
