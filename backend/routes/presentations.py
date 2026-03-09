@@ -183,11 +183,11 @@ async def _research_topic(prompt: str, language: str) -> str:
     if not research_parts:
         return "No web research results available. Generate content from general knowledge."
 
-    research_text = "\n".join(research_parts[:15])  # Cap at 15 snippets
+    research_text = "\n".join(research_parts[:9])  # Cap at 9 snippets for faster LLM response
 
     # Summarize with researcher model
     summary = await _llm_call(
-        "speed",
+        "critic",
         "You are a research assistant. Summarize the following web search results into key facts and insights for a presentation. Be concise and factual.",
         f"Topic: {prompt}\n\nSearch Results:\n{research_text}",
         timeout_seconds=45,
@@ -208,9 +208,12 @@ async def generate_presentation(
     """Generate a full presentation from a prompt using research + LLM orchestration."""
     logger.info("Generating presentation: user=%s, slides=%d", user["user_id"], body.slide_count)
 
+    # Truncate prompt to keep LLM input manageable
+    user_prompt_text = body.prompt[:2500]
+
     # Phase 1: Research
     try:
-        research_context = await _research_topic(body.prompt, body.language)
+        research_context = await _research_topic(user_prompt_text, body.language)
     except Exception as e:
         logger.warning("Research phase failed, continuing without: %s", e)
         research_context = "No research available. Use general knowledge."
@@ -275,7 +278,7 @@ STRICT RULES:
 - Speaker notes should be conversational guidance for the presenter
 - Style tone: {body.style}"""
 
-    raw_response = await _llm_call("speed", system_prompt, slide_generation_prompt, timeout_seconds=60)
+    raw_response = await _llm_call("critic", system_prompt, slide_generation_prompt, timeout_seconds=120)
 
     try:
         data = _extract_json(raw_response)
@@ -343,7 +346,7 @@ RULES:
 - suggested_slide_count: 5-8 for focused talks, 10-15 for deep dives, 15-20 for comprehensive
 - Style options: professional, creative, minimal, academic, corporate"""
 
-    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=30)
+    raw = await _llm_call("critic", system_prompt, user_prompt, timeout_seconds=45)
 
     try:
         result = _extract_json(raw)
@@ -395,7 +398,7 @@ Return JSON for a single slide:
 
 Layout options: {LAYOUT_OPTIONS}"""
 
-    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=45)
+    raw = await _llm_call("critic", system_prompt, user_prompt, timeout_seconds=60)
 
     try:
         slide_data = _extract_json(raw)
@@ -448,7 +451,7 @@ Return JSON:
   "image_prompt": "A detailed English prompt describing the image to generate"
 }}"""
 
-    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=30)
+    raw = await _llm_call("critic", system_prompt, user_prompt, timeout_seconds=45)
 
     try:
         result = _extract_json(raw)
