@@ -157,7 +157,7 @@ async def _research_topic(prompt: str, language: str) -> str:
     )
 
     try:
-        raw = await _llm_call("speed", "You generate search queries.", query_prompt, timeout_seconds=30)
+        raw = await _llm_call("critic", "You generate search queries.", query_prompt, timeout_seconds=30)
         queries: list[str] = _extract_json(raw)
         if not isinstance(queries, list) or len(queries) == 0:
             queries = [prompt]
