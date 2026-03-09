@@ -302,22 +302,44 @@ export function ChatArea({ thread, isProcessing, status }: Props) {
 
   // Build clean chat: user messages + errors + ONLY the final report per round.
   // A "round" = everything between two user_messages.
-  // Within each round, keep only the LAST long orchestrator response (the synthesis).
+  // Within each round, prefer task.final_result (full synthesis) over individual agent_response events.
   const allChat = thread.events.filter((e) => CHAT_EVENTS.has(e.event_type));
   const chatEvents: AgentEvent[] = [];
   let pendingResponses: AgentEvent[] = [];
 
+  // Map: find the final_result for each round by matching user_input to task
+  const completedTasks = thread.tasks.filter(
+    (t) => t.status === "completed" && t.final_result,
+  );
+
   const flushResponses = () => {
     if (pendingResponses.length === 0) return;
-    // Find the last orchestrator response that's substantial (>100 chars = final report)
-    const finalReport = [...pendingResponses]
-      .reverse()
-      .find((e) => e.agent_role === "orchestrator" && e.content.length > 100);
-    if (finalReport) {
-      chatEvents.push(finalReport);
+
+    // Try to find a completed task whose final_result is the full synthesis
+    // Match by checking if any completed task's final_result is longer than individual responses
+    const lastTask = completedTasks.shift();
+    if (lastTask?.final_result && lastTask.final_result.length > 50) {
+      // Create a synthetic event with the full final_result
+      const syntheticEvent: AgentEvent = {
+        id: `synth_${lastTask.id}`,
+        timestamp: lastTask.completed_at || lastTask.created_at,
+        event_type: "agent_response" as AgentEvent["event_type"],
+        agent_role: "orchestrator",
+        content: lastTask.final_result,
+        metadata: { synthetic: true, task_id: lastTask.id },
+      };
+      chatEvents.push(syntheticEvent);
     } else {
-      // Fallback: no long orchestrator response — show the very last response
-      chatEvents.push(pendingResponses[pendingResponses.length - 1]);
+      // Fallback: find the last orchestrator response that's substantial (>100 chars)
+      const finalReport = [...pendingResponses]
+        .reverse()
+        .find((e) => e.agent_role === "orchestrator" && e.content.length > 100);
+      if (finalReport) {
+        chatEvents.push(finalReport);
+      } else {
+        // Last resort: show the very last response
+        chatEvents.push(pendingResponses[pendingResponses.length - 1]);
+      }
     }
     pendingResponses = [];
   };

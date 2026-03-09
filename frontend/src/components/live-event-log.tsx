@@ -44,11 +44,13 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   pipeline: RefreshCw,
   routing: Compass,
   error: AlertTriangle,
+  final_report: CheckCircle,
 };
 
 export function LiveEventLog({ events, status }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [showFullReport, setShowFullReport] = useState(false);
 
   const keyedEvents = useMemo(
     () =>
@@ -68,6 +70,17 @@ export function LiveEventLog({ events, status }: Props) {
       ),
     [keyedEvents],
   );
+
+  // Find the final_report event (emitted by backend when pipeline completes)
+  const finalReportContent = useMemo(() => {
+    for (let i = keyedEvents.length - 1; i >= 0; i--) {
+      const ev = keyedEvents[i].event;
+      if (ev.event_type === "final_report") {
+        return ev.content;
+      }
+    }
+    return undefined;
+  }, [keyedEvents]);
 
   const statusCfg = STATUS_ICONS[status];
   const showEmptyStatus =
@@ -130,12 +143,34 @@ export function LiveEventLog({ events, status }: Props) {
           <StatusIcon className="w-3 h-3" aria-hidden="true" />
           {statusLabel}
         </span>
-        <span aria-hidden="true">
-          {expanded ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
+        <span className="inline-flex items-center gap-2">
+          {status === "complete" && finalReportContent && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFullReport(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.stopPropagation();
+                  setShowFullReport(true);
+                }
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60 transition-colors text-[10px] font-medium border border-emerald-800/30"
+            >
+              <CheckCircle className="w-3 h-3" aria-hidden="true" />
+              Tam Rapor
+            </span>
           )}
+          <span aria-hidden="true">
+            {expanded ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </span>
         </span>
       </button>
       {expanded && (
@@ -184,6 +219,16 @@ export function LiveEventLog({ events, status }: Props) {
           badge={status === "running" ? "LIVE" : undefined}
           confidenceAnalysis={confidenceForSelected}
           onClose={() => setSelectedIdx(null)}
+        />
+      )}
+
+      {showFullReport && finalReportContent && (
+        <DetailModal
+          title="Tam Rapor — Sentez Sonucu"
+          content={finalReportContent}
+          color="#10b981"
+          badge="SONUÇ"
+          onClose={() => setShowFullReport(false)}
         />
       )}
     </div>

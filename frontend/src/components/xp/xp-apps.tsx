@@ -236,6 +236,10 @@ const McpUsagePanel = dynamic(
     })),
   { ssr: false },
 );
+const PresentationBuilderPanel = dynamic(
+  () => import("@/components/presentation-builder-panel"),
+  { ssr: false },
+);
 
 // ── Panel imports from xp/panels ──
 import { XpAgentsPanel } from "./panels/xp-agents-panel";
@@ -895,6 +899,22 @@ export const APPS: DesktopApp[] = [
     render: () => (
       <div className="overflow-hidden h-full">
         <XpMarketplacePanel />
+      </div>
+    ),
+  },
+  {
+    id: "presentations",
+    title: "Sunum Oluşturucu",
+    icon: <FeatherIcon name="monitor" color="#7c3aed" />,
+    color: "#7c3aed",
+    group: "Araçlar",
+    description:
+      "AI destekli sunum oluşturucu — konu girin, araştırma yapılsın, slaytlar hazırlansın. Düzenlenebilir canvas, görsel üretimi.",
+    defaultW: 1000,
+    defaultH: 650,
+    render: () => (
+      <div className="overflow-hidden h-full">
+        <PresentationBuilderPanel />
       </div>
     ),
   },

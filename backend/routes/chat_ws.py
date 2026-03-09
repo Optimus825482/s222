@@ -209,6 +209,9 @@ async def ws_chat(ws: WebSocket):
                 monitor.error("Kullanıcı tarafından durduruldu")
             else:
                 monitor.complete(result[:80] if result else "")
+                # Emit final_report live event so live-event-log has the full result
+                if result:
+                    monitor.emit("final_report", "orchestrator", result[:20000])
 
             await _safe_ws_send(
                 {

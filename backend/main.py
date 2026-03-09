@@ -250,6 +250,7 @@ from routes.traces import router as traces_router
 from routes.agent_comm import router as agent_comm_router
 from routes.marketplace import router as marketplace_router
 from routes.self_improvement import router as self_improvement_router
+from routes.presentations import router as presentations_router
 
 app.include_router(auth_router)
 app.include_router(skills_router)
@@ -272,6 +273,7 @@ app.include_router(traces_router)
 app.include_router(agent_comm_router)
 app.include_router(marketplace_router)
 app.include_router(self_improvement_router)
+app.include_router(presentations_router)
 
 print("[Backend] All route modules loaded successfully")
-print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement")
+print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations")

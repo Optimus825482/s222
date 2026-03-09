@@ -897,7 +897,7 @@ class BaseAgent(ABC):
                     result["thinking"][:500],
                     agent_role=self.role,
                 )
-                self._emit("thinking", result["thinking"][:100])
+                self._emit("thinking", result["thinking"][:5000] if len(result["thinking"]) > 5000 else result["thinking"])
 
             # Handle tool calls
             if result["tool_calls"]:
@@ -1068,7 +1068,7 @@ class BaseAgent(ABC):
                 result["latency_ms"],
                 success=True,
             )
-            self._emit("response", content[:200])
+            self._emit("response", content[:20000] if len(content) > 20000 else content)
 
             # Adaptive Tool Selector: record agent-level success
             if _ats:
