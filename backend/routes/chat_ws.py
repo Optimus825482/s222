@@ -34,6 +34,7 @@ class WSLiveMonitor:
     def __init__(self, ws: WebSocket, events_list: list | None = None):
         self.ws = ws
         self._stop = False
+        self._closed = False
         self._events_list = events_list or []
         self._pending_tasks: set[asyncio.Task] = set()
         # Faz 14.6: Steering queue for injecting user messages into running agent
@@ -47,20 +48,43 @@ class WSLiveMonitor:
         self._stop = True
 
     async def _send(self, data: dict):
-        await self.ws.send_json(data)
+        if self._closed:
+            return
+        try:
+            await self.ws.send_json(data)
+        except (RuntimeError, WebSocketDisconnect):
+            # WebSocket already closed — suppress silently
+            self._closed = True
+
+    async def close(self):
+        """Mark closed and cancel all pending background sends."""
+        self._closed = True
+        for task in list(self._pending_tasks):
+            task.cancel()
+        self._pending_tasks.clear()
 
     def _track_task(self, coroutine: Union[asyncio.Future, Coroutine[Any, Any, Any]]) -> None:
+        if self._closed:
+            # Must close unawaited coroutine to avoid ResourceWarning
+            if asyncio.iscoroutine(coroutine):
+                coroutine.close()
+            return
+
         task = asyncio.create_task(coroutine, name="ws-send")
         self._pending_tasks.add(task)
 
         def _on_done(done_task: asyncio.Task) -> None:
             self._pending_tasks.discard(done_task)
-            try:
-                done_task.result()
-            except asyncio.CancelledError:
+            if done_task.cancelled():
                 return
-            except Exception as exc:
-                logger.error("WSLiveMonitor background send failed: %s", exc, exc_info=True)
+            exc = done_task.exception()
+            if exc is None:
+                return
+            # WS-closed errors already handled in _send — suppress
+            if isinstance(exc, (RuntimeError, WebSocketDisconnect)):
+                self._closed = True
+                return
+            logger.error("WSLiveMonitor background send failed: %s", exc, exc_info=True)
 
         task.add_done_callback(_on_done)
 
@@ -400,6 +424,14 @@ async def ws_chat(ws: WebSocket):
         pass
     except Exception:
         pass
+    finally:
+        # Cancel running agent task and drain pending WS sends
+        run_task = getattr(ws.state, "run_task", None)
+        if run_task and not run_task.done():
+            run_task.cancel()
+        monitor_obj = getattr(ws.state, "monitor", None)
+        if monitor_obj:
+            await monitor_obj.close()
 
 
 @router.websocket("/api/ws/chat")
