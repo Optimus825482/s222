@@ -198,7 +198,151 @@ export function XpTaskbar({
             }}
             onMouseLeave={handleGroupLeave}
           >
-            {/* Left: Category list (desktop flyout) / flat list (mobile) */}
+            {/* Left panel: Flyout apps OR System links */}
+            <div
+              className="hidden sm:block w-[200px] xp-start-right py-2 px-2 overflow-y-auto"
+              onMouseEnter={() => {
+                if (hoveredGroup) handleFlyoutEnter();
+              }}
+              onMouseLeave={() => {
+                if (hoveredGroup) handleFlyoutLeave();
+              }}
+            >
+              {!isMobile && hoveredGroup ? (
+                <div className="space-y-0.5">
+                  <div className="px-2 pb-1.5 text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                    {hoveredGroup === "__removed__"
+                      ? "Kaldırılanlar"
+                      : hoveredGroup}
+                  </div>
+                  {(hoveredGroup === "__removed__"
+                    ? removedApps
+                    : groups.get(hoveredGroup) || []
+                  ).map((app) => (
+                    <button
+                      key={app.id}
+                      onClick={() => {
+                        onOpenApp(app.id);
+                        setStartOpen(false);
+                        setStartCtx(null);
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setStartCtx({
+                          x: e.clientX,
+                          y: e.clientY,
+                          appId: app.id,
+                          isRemoved: hoveredGroup === "__removed__",
+                        });
+                      }}
+                      className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/20 text-white rounded-sm transition-colors text-[12px] group/fly"
+                    >
+                      <span className="w-5 h-5 flex items-center justify-center text-white/80 shrink-0 pointer-events-none">
+                        {app.icon}
+                      </span>
+                      <span className="font-medium truncate">{app.title}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  <button
+                    onClick={() => {
+                      onOpenApp("reports");
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <FolderOpen className="w-4 h-4 text-amber-300" />
+                    <span>Raporlarım</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenApp("resilience");
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <HardDrive className="w-4 h-4 text-slate-300" />
+                    <span>Sistem Durumu</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenApp("agents");
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <Network className="w-4 h-4 text-cyan-300" />
+                    <span>Ağ Bağlantıları</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenApp("analytics");
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <Settings className="w-4 h-4 text-slate-300" />
+                    <span>Denetim Masası</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenApp("search");
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <Search className="w-4 h-4 text-slate-300" />
+                    <span>Hata Arama</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onHelpOpen?.();
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <HelpCircle className="w-4 h-4 text-slate-300" />
+                    <span>Yardım</span>
+                  </button>
+                  <div className="border-t border-white/10 my-1.5" />
+                  <button
+                    onClick={() => {
+                      onOpenApp("agents");
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <Users className="w-4 h-4 text-pink-300" />
+                    <span>Agentlar</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenApp("sessions");
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <History className="w-4 h-4 text-blue-300" />
+                    <span>Oturumlar</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenApp("tools-unified");
+                      setStartOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
+                  >
+                    <Wrench className="w-4 h-4 text-purple-300" />
+                    <span>Araçlar</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Category list (desktop flyout) / flat list (mobile) */}
             <div className="flex-1 min-w-0 bg-white py-2 px-1 overflow-y-auto">
               {isMobile ? (
                 /* Mobile: accordion-style flat list */
@@ -349,161 +493,6 @@ export function XpTaskbar({
 
                   {/* Flyout rendered at body level for proper z-index */}
                 </>
-              )}
-            </div>
-
-            {/* Right panel: Flyout apps OR System links */}
-            <div
-              className="hidden sm:block w-[200px] xp-start-right py-2 px-2 overflow-y-auto"
-              onMouseEnter={() => {
-                if (hoveredGroup) handleFlyoutEnter();
-              }}
-              onMouseLeave={() => {
-                if (hoveredGroup) handleFlyoutLeave();
-              }}
-            >
-              {!isMobile && hoveredGroup ? (
-                <div className="space-y-0.5">
-                  <div className="px-2 pb-1.5 text-[10px] font-bold text-white/50 uppercase tracking-wider">
-                    {hoveredGroup === "__removed__"
-                      ? "Kaldırılanlar"
-                      : hoveredGroup}
-                  </div>
-                  {(hoveredGroup === "__removed__"
-                    ? removedApps
-                    : groups.get(hoveredGroup) || []
-                  ).map((app) => (
-                    <button
-                      key={app.id}
-                      onClick={() => {
-                        onOpenApp(app.id);
-                        setStartOpen(false);
-                        setStartCtx(null);
-                      }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setStartCtx({
-                          x: e.clientX,
-                          y: e.clientY,
-                          appId: app.id,
-                          isRemoved: hoveredGroup === "__removed__",
-                        });
-                      }}
-                      className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/20 text-white rounded-sm transition-colors text-[12px] group/fly"
-                    >
-                      <span className="w-5 h-5 flex items-center justify-center text-white/80 shrink-0 pointer-events-none">
-                        {app.icon}
-                      </span>
-                      <span className="font-medium truncate">{app.title}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-0.5">
-                  <button
-                    onClick={() => {
-                      onOpenApp("reports");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <FolderOpen className="w-4 h-4 text-amber-300" />
-                    <span>Raporlarım</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onOpenApp("resilience");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <HardDrive className="w-4 h-4 text-slate-300" />
-                    <span>Sistem Durumu</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onOpenApp("agents");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <Network className="w-4 h-4 text-cyan-300" />
-                    <span>Ağ Bağlantıları</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onOpenApp("analytics");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <Settings className="w-4 h-4 text-slate-300" />
-                    <span>Denetim Masası</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onOpenApp("search");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <Search className="w-4 h-4 text-slate-300" />
-                    <span>Hata Arama</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onHelpOpen?.();
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <HelpCircle className="w-4 h-4 text-slate-300" />
-                    <span>Yardım</span>
-                  </button>
-                  <div className="border-t border-white/10 my-1.5" />
-                  <button
-                    onClick={() => {
-                      onOpenApp("agents");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <Users className="w-4 h-4 text-pink-300" />
-                    <span>Agentlar</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onOpenApp("sessions");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <History className="w-4 h-4 text-blue-300" />
-                    <span>Oturumlar</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onOpenApp("tools-unified");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <Wrench className="w-4 h-4 text-purple-300" />
-                    <span>Araçlar</span>
-                  </button>
-                  <div className="border-t border-white/10 my-1.5" />
-                  <button
-                    onClick={() => {
-                      router.push("/");
-                      setStartOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2 py-1.5 text-left hover:bg-white/10 text-white rounded-sm transition-colors text-[12px]"
-                  >
-                    <Monitor className="w-4 h-4 text-slate-300" />
-                    <span>Klasik Görünüm</span>
-                  </button>
-                </div>
               )}
             </div>
           </div>
