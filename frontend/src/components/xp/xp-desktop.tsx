@@ -42,13 +42,30 @@ export function XpDesktop() {
   const [iconPositions, setIconPositions] = useState<
     Record<string, { x: number; y: number }>
   >({});
-  const [startMenuRemovedIds, setStartMenuRemovedIds] = useState<string[]>(() => {
+  const [startMenuRemovedIds, setStartMenuRemovedIds] = useState<string[]>(
+    () => {
+      if (typeof window === "undefined") return [];
+      try {
+        const raw = localStorage.getItem("xp-start-menu-removed");
+        if (!raw) return [];
+        const parsed = JSON.parse(raw) as unknown;
+        return Array.isArray(parsed)
+          ? parsed.filter((x) => typeof x === "string")
+          : [];
+      } catch {
+        return [];
+      }
+    },
+  );
+  const [hiddenDesktopIds, setHiddenDesktopIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
-      const raw = localStorage.getItem("xp-start-menu-removed");
+      const raw = localStorage.getItem("xp-hidden-desktop-icons");
       if (!raw) return [];
       const parsed = JSON.parse(raw) as unknown;
-      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+      return Array.isArray(parsed)
+        ? parsed.filter((x) => typeof x === "string")
+        : [];
     } catch {
       return [];
     }
@@ -103,7 +120,10 @@ export function XpDesktop() {
       const stored = localStorage.getItem("xp-icon-positions");
       if (stored) {
         try {
-          const parsed = JSON.parse(stored) as Record<string, { x: number; y: number }>;
+          const parsed = JSON.parse(stored) as Record<
+            string,
+            { x: number; y: number }
+          >;
           const merged = { ...defaults };
           for (const app of APPS) {
             if (parsed[app.id]) merged[app.id] = parsed[app.id];
@@ -318,8 +338,18 @@ export function XpDesktop() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("xp-start-menu-removed", JSON.stringify(startMenuRemovedIds));
+    localStorage.setItem(
+      "xp-start-menu-removed",
+      JSON.stringify(startMenuRemovedIds),
+    );
   }, [startMenuRemovedIds]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "xp-hidden-desktop-icons",
+      JSON.stringify(hiddenDesktopIds),
+    );
+  }, [hiddenDesktopIds]);
 
   const taskbarApps = APPS.map((a) => ({
     id: a.id,
@@ -345,6 +375,7 @@ export function XpDesktop() {
       >
         {/* Desktop Icons */}
         {APPS.map((app) => {
+          if (hiddenDesktopIds.includes(app.id)) return null;
           const pos = iconPositions[app.id];
           if (!pos) return null;
           return (
@@ -423,6 +454,11 @@ export function XpDesktop() {
             onClose={() => setIconCtxMenu(null)}
             onOpenApp={openApp}
             onShowProps={(id) => setPropsDialog(id)}
+            onRemoveFromDesktop={(id) => {
+              setHiddenDesktopIds((prev) =>
+                prev.includes(id) ? prev : [...prev, id],
+              );
+            }}
           />
         )}
       </div>
@@ -434,6 +470,12 @@ export function XpDesktop() {
           onClose={() => setPropsDialog(null)}
           onOpen={() => {
             openApp(propsApp.id);
+            setPropsDialog(null);
+          }}
+          onRemoveFromDesktop={() => {
+            setHiddenDesktopIds((prev) =>
+              prev.includes(propsApp.id) ? prev : [...prev, propsApp.id],
+            );
             setPropsDialog(null);
           }}
         />

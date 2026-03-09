@@ -214,6 +214,7 @@ interface IconCtxMenuProps {
   onClose: () => void;
   onOpenApp: (id: string) => void;
   onShowProps: (id: string) => void;
+  onRemoveFromDesktop?: (id: string) => void;
 }
 
 export function IconContextMenu({
@@ -223,13 +224,14 @@ export function IconContextMenu({
   onClose,
   onOpenApp,
   onShowProps,
+  onRemoveFromDesktop,
 }: IconCtxMenuProps) {
   return (
     <div
       className="xp-ctx-menu fixed z-[200] bg-white rounded shadow-[2px_2px_8px_rgba(0,0,0,0.3)] border border-gray-300 py-1 min-w-[180px] max-w-[90vw] text-[12px] text-gray-800"
       style={{
         left: Math.min(x, window.innerWidth - 200),
-        top: Math.min(y, window.innerHeight - 120),
+        top: Math.min(y, window.innerHeight - 150),
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -244,6 +246,18 @@ export function IconContextMenu({
         Aç
       </button>
       <div className="border-t border-gray-200 my-1" />
+      {onRemoveFromDesktop && (
+        <button
+          onClick={() => {
+            onRemoveFromDesktop(appId);
+            onClose();
+          }}
+          className="w-full text-left px-4 py-1.5 hover:bg-[#2f71cd] hover:text-white flex items-center gap-2.5 text-red-600 hover:text-white"
+        >
+          <FeatherIcon name="x-circle" color="currentColor" size={14} />
+          Masaüstünden Kaldır
+        </button>
+      )}
       <button
         onClick={() => {
           onShowProps(appId);

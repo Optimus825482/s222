@@ -6,9 +6,15 @@ interface Props {
   app: DesktopApp;
   onClose: () => void;
   onOpen: () => void;
+  onRemoveFromDesktop?: () => void;
 }
 
-export function XpPropertiesDialog({ app, onClose, onOpen }: Props) {
+export function XpPropertiesDialog({
+  app,
+  onClose,
+  onOpen,
+  onRemoveFromDesktop,
+}: Props) {
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40">
       <div className="w-full max-w-[92vw] sm:w-[380px] rounded-lg overflow-hidden shadow-2xl border border-[#0054e3]">
@@ -69,19 +75,29 @@ export function XpPropertiesDialog({ app, onClose, onOpen }: Props) {
               </span>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={onOpen}
-              className="px-4 py-1.5 text-[12px] bg-white hover:bg-gray-50 border border-gray-400 rounded text-gray-700 font-medium shadow-sm active:shadow-inner"
-            >
-              Aç
-            </button>
-            <button
-              onClick={onClose}
-              className="px-5 py-1.5 text-[12px] bg-[#ece9d8] hover:bg-[#ddd8c6] border border-gray-400 rounded text-gray-700 font-medium shadow-sm active:shadow-inner"
-            >
-              Tamam
-            </button>
+          <div className="flex justify-between gap-2">
+            {onRemoveFromDesktop && (
+              <button
+                onClick={onRemoveFromDesktop}
+                className="px-3 py-1.5 text-[12px] bg-white hover:bg-red-50 border border-red-300 rounded text-red-600 font-medium shadow-sm active:shadow-inner"
+              >
+                Masaüstünden Kaldır
+              </button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <button
+                onClick={onOpen}
+                className="px-4 py-1.5 text-[12px] bg-white hover:bg-gray-50 border border-gray-400 rounded text-gray-700 font-medium shadow-sm active:shadow-inner"
+              >
+                Aç
+              </button>
+              <button
+                onClick={onClose}
+                className="px-5 py-1.5 text-[12px] bg-[#ece9d8] hover:bg-[#ddd8c6] border border-gray-400 rounded text-gray-700 font-medium shadow-sm active:shadow-inner"
+              >
+                Tamam
+              </button>
+            </div>
           </div>
         </div>
       </div>
