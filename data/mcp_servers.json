@@ -27,8 +27,8 @@
     {
       "id": "wikipedia",
       "name": "Wikipedia",
-      "command": "uvx",
-      "args": ["wikipedia-mcp-server@latest"],
+      "command": "npx",
+      "args": ["-y", "wikipedia-mcp"],
       "env": {},
       "description": "Wikipedia search and content"
     },

@@ -263,7 +263,11 @@ def remove_server(server_id: str) -> bool:
 # ── Load from config file ────────────────────────────────────────
 
 def load_servers_from_config(config_path: str | Path | None = None) -> int:
-    """Load MCP server definitions from a JSON config file."""
+    """Load MCP server definitions from a JSON config file.
+    
+    Also deactivates servers that exist in DB but are no longer in the config,
+    ensuring removed servers (like brave-search) don't persist.
+    """
     path = Path(config_path) if config_path else MCP_CONFIG_PATH
     if not path.exists():
         return 0
@@ -290,6 +294,24 @@ def load_servers_from_config(config_path: str | Path | None = None) -> int:
             description=cfg.get("description", ""),
         )
         count += 1
+
+    # Deactivate servers not present in config file
+    config_ids = set(servers.keys())
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM mcp_servers WHERE active = TRUE")
+            db_ids = {r["id"] for r in cur.fetchall()}
+            stale_ids = db_ids - config_ids
+            if stale_ids:
+                cur.execute(
+                    "UPDATE mcp_servers SET active = FALSE WHERE id = ANY(%s)",
+                    (list(stale_ids),),
+                )
+                logger.info(f"Deactivated {len(stale_ids)} stale MCP servers: {stale_ids}")
+        conn.commit()
+    finally:
+        release_conn(conn)
 
     logger.info(f"Loaded {count} MCP servers from {path.name}")
     return count
@@ -611,14 +633,6 @@ def get_call_history(server_id: str | None = None, limit: int = 20) -> list[dict
 
 DEFAULT_MCP_SERVERS: list[dict] = [
     {
-        "id": "brave-search",
-        "name": "Brave Search",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-        "env": {"BRAVE_API_KEY": ""},
-        "description": "Brave Search API",
-    },
-    {
         "id": "fetch",
         "name": "Web Fetch",
         "command": "uvx",
@@ -638,15 +652,15 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "id": "arxiv",
         "name": "arXiv Research",
         "command": "uvx",
-        "args": ["mcp-server-arxiv"],
+        "args": ["arxiv-mcp-server"],
         "env": {},
         "description": "Academic paper search",
     },
     {
         "id": "wikipedia",
         "name": "Wikipedia",
-        "command": "uvx",
-        "args": ["mcp-server-wikipedia-search"],
+        "command": "npx",
+        "args": ["-y", "wikipedia-mcp"],
         "env": {},
         "description": "Wikipedia search and content",
     },
@@ -686,8 +700,12 @@ DEFAULT_MCP_SERVERS: list[dict] = [
         "id": "postgres",
         "name": "PostgreSQL",
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-postgres"],
-        "env": {"POSTGRES_CONNECTION_STRING": ""},
+        "args": [
+            "-y",
+            "@modelcontextprotocol/server-postgres",
+            "postgresql://agent:agent_secret_2024@postgres:5432/multiagent",
+        ],
+        "env": {},
         "description": "Direct PostgreSQL queries",
     },
     {
