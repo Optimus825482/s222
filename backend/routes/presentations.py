@@ -187,7 +187,7 @@ async def _research_topic(prompt: str, language: str) -> str:
 
     # Summarize with researcher model
     summary = await _llm_call(
-        "critic",
+        "speed",
         "You are a research assistant. Summarize the following web search results into key facts and insights for a presentation. Be concise and factual.",
         f"Topic: {prompt}\n\nSearch Results:\n{research_text}",
         timeout_seconds=45,
@@ -278,7 +278,7 @@ STRICT RULES:
 - Speaker notes should be conversational guidance for the presenter
 - Style tone: {body.style}"""
 
-    raw_response = await _llm_call("critic", system_prompt, slide_generation_prompt, timeout_seconds=120)
+    raw_response = await _llm_call("speed", system_prompt, slide_generation_prompt, timeout_seconds=120)
 
     try:
         data = _extract_json(raw_response)
@@ -346,7 +346,7 @@ RULES:
 - suggested_slide_count: 5-8 for focused talks, 10-15 for deep dives, 15-20 for comprehensive
 - Style options: professional, creative, minimal, academic, corporate"""
 
-    raw = await _llm_call("critic", system_prompt, user_prompt, timeout_seconds=45)
+    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=30)
 
     try:
         result = _extract_json(raw)
@@ -398,7 +398,7 @@ Return JSON for a single slide:
 
 Layout options: {LAYOUT_OPTIONS}"""
 
-    raw = await _llm_call("critic", system_prompt, user_prompt, timeout_seconds=60)
+    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=45)
 
     try:
         slide_data = _extract_json(raw)
@@ -451,7 +451,7 @@ Return JSON:
   "image_prompt": "A detailed English prompt describing the image to generate"
 }}"""
 
-    raw = await _llm_call("critic", system_prompt, user_prompt, timeout_seconds=45)
+    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=30)
 
     try:
         result = _extract_json(raw)
