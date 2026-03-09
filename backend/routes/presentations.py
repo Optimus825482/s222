@@ -110,28 +110,33 @@ async def _llm_call(
     system_prompt: str,
     user_prompt: str,
     max_tokens: int | None = None,
+    timeout_seconds: float = 60,
 ) -> str:
-    """Unified LLM call with error handling."""
+    """Unified LLM call with error handling and timeout."""
     client = _get_llm_client()
     model_cfg = MODELS.get(model_key)
     if not model_cfg:
         raise HTTPException(500, f"Model config not found: {model_key}")
 
     try:
-        resp = await client.chat.completions.create(
-            model=model_cfg["id"],
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=model_cfg.get("temperature", 0.7),
-            top_p=model_cfg.get("top_p", 0.9),
-            max_tokens=max_tokens or model_cfg.get("max_tokens", 4096),
-        )
+        async with asyncio.timeout(timeout_seconds):
+            resp = await client.chat.completions.create(
+                model=model_cfg["id"],
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=model_cfg.get("temperature", 0.7),
+                top_p=model_cfg.get("top_p", 0.9),
+                max_tokens=max_tokens or model_cfg.get("max_tokens", 4096),
+            )
         content = resp.choices[0].message.content
         if not content:
             raise ValueError("Empty LLM response")
         return content.strip()
+    except TimeoutError:
+        logger.error("LLM call timed out (%s) after %ss", model_key, timeout_seconds)
+        raise HTTPException(504, f"AI model timed out after {timeout_seconds}s")
     except openai.APIError as e:
         logger.error("LLM API error (%s): %s", model_key, e)
         raise HTTPException(502, f"LLM service error: {e.message}")
@@ -152,7 +157,7 @@ async def _research_topic(prompt: str, language: str) -> str:
     )
 
     try:
-        raw = await _llm_call("researcher", "You generate search queries.", query_prompt)
+        raw = await _llm_call("speed", "You generate search queries.", query_prompt, timeout_seconds=30)
         queries: list[str] = _extract_json(raw)
         if not isinstance(queries, list) or len(queries) == 0:
             queries = [prompt]
@@ -182,9 +187,10 @@ async def _research_topic(prompt: str, language: str) -> str:
 
     # Summarize with researcher model
     summary = await _llm_call(
-        "researcher",
+        "speed",
         "You are a research assistant. Summarize the following web search results into key facts and insights for a presentation. Be concise and factual.",
         f"Topic: {prompt}\n\nSearch Results:\n{research_text}",
+        timeout_seconds=45,
     )
     return summary
 
@@ -251,7 +257,7 @@ RULES:
 - Content should be informative and {body.style} in tone
 - Speaker notes should guide the presenter"""
 
-    raw_response = await _llm_call("orchestrator", system_prompt, slide_generation_prompt)
+    raw_response = await _llm_call("speed", system_prompt, slide_generation_prompt, timeout_seconds=60)
 
     try:
         data = _extract_json(raw_response)
@@ -316,7 +322,7 @@ Return JSON:
 Style options: professional, creative, minimal, academic, corporate
 suggested_slide_count should be between 5 and 20 based on topic complexity."""
 
-    raw = await _llm_call("orchestrator", system_prompt, user_prompt)
+    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=30)
 
     try:
         result = _extract_json(raw)
@@ -368,7 +374,7 @@ Return JSON for a single slide:
 
 Layout options: {LAYOUT_OPTIONS}"""
 
-    raw = await _llm_call("orchestrator", system_prompt, user_prompt)
+    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=45)
 
     try:
         slide_data = _extract_json(raw)
@@ -421,7 +427,7 @@ Return JSON:
   "image_prompt": "A detailed English prompt describing the image to generate"
 }}"""
 
-    raw = await _llm_call("orchestrator", system_prompt, user_prompt)
+    raw = await _llm_call("speed", system_prompt, user_prompt, timeout_seconds=30)
 
     try:
         result = _extract_json(raw)

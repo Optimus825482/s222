@@ -1,11 +1,18 @@
 /**
- * Pollinations.ai image URL generator.
+ * Pollinations.ai image URL generator with rate-limit-aware loading.
  * Keeps prompt ≤200 chars and URL length safe (~1800) to avoid 400 errors.
+ * Provides staggered loading to avoid 429 (Too Many Requests).
  */
 
 const POLLINATIONS_IMAGE_URL = "https://image.pollinations.ai/prompt";
 
-const ALLOWED_MODELS = ["flux", "zimage", "turbo", "imagen-4", "grok-imagine"] as const;
+const ALLOWED_MODELS = [
+  "flux",
+  "zimage",
+  "turbo",
+  "imagen-4",
+  "grok-imagine",
+] as const;
 const DEFAULT_MODEL = "flux";
 
 export interface PollinationsOptions {
@@ -23,7 +30,9 @@ function normalizeModel(model: string): string {
   return DEFAULT_MODEL;
 }
 
-function buildPollinationsParams(options: PollinationsOptions): URLSearchParams {
+function buildPollinationsParams(
+  options: PollinationsOptions,
+): URLSearchParams {
   const { width = 1200, height = 630, model, seed, nologo, enhance } = options;
   const params = new URLSearchParams();
   params.set("model", normalizeModel(model ?? DEFAULT_MODEL));
@@ -53,20 +62,13 @@ export function generateImageUrl(
   }
 
   if (cleanPrompt.length > 200) {
-    if (typeof console !== "undefined" && console.warn) {
-      console.warn(
-        `⚠️ Prompt too long (${cleanPrompt.length} chars), truncating to 200`,
-      );
-    }
+    console.warn?.(
+      `⚠️ Prompt too long (${cleanPrompt.length} chars), truncating to 200`,
+    );
     cleanPrompt = cleanPrompt.substring(0, 197) + "...";
   }
 
-  const {
-    width = 1200,
-    height = 630,
-    model = DEFAULT_MODEL,
-  } = options;
-
+  const { width = 1200, height = 630, model = DEFAULT_MODEL } = options;
   const normalizedModel = normalizeModel(model);
   const encodedPrompt = encodeURIComponent(cleanPrompt);
   const params = buildPollinationsParams({
@@ -78,14 +80,94 @@ export function generateImageUrl(
 
   const baseUrl = `${POLLINATIONS_IMAGE_URL}/${encodedPrompt}`;
   if (baseUrl.length > 1800) {
-    if (typeof console !== "undefined" && console.error) {
-      console.error(
-        `❌ URL too long even after truncation: ${baseUrl.length} chars`,
-      );
-    }
-    const fallbackPrompt = "artificial intelligence technology digital art";
-    return generateImageUrl(fallbackPrompt, options);
+    console.error?.(
+      `❌ URL too long even after truncation: ${baseUrl.length} chars`,
+    );
+    return generateImageUrl(
+      "artificial intelligence technology digital art",
+      options,
+    );
   }
 
   return `${baseUrl}?${params.toString()}`;
+}
+
+/* ─── Rate-limit-aware staggered image loading ─────────────────── */
+
+const STAGGER_DELAY_MS = 1500; // delay between each image request
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 3000;
+
+/**
+ * Preload a single image with retry + exponential backoff.
+ * Returns the URL on success, undefined on failure.
+ */
+function preloadImage(
+  url: string,
+  retries = MAX_RETRIES,
+): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    let attempt = 0;
+
+    const tryLoad = () => {
+      img.onload = () => resolve(url);
+      img.onerror = () => {
+        attempt++;
+        if (attempt <= retries) {
+          const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+          console.warn(
+            `⏳ Image retry ${attempt}/${retries} in ${delay}ms: ${url.slice(0, 80)}…`,
+          );
+          setTimeout(tryLoad, delay);
+        } else {
+          console.warn(
+            `❌ Image failed after ${retries} retries: ${url.slice(0, 80)}…`,
+          );
+          resolve(undefined);
+        }
+      };
+      img.src = url;
+    };
+
+    tryLoad();
+  });
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export interface StaggeredResult {
+  index: number;
+  url: string | undefined;
+}
+
+/**
+ * Load multiple Pollinations images with staggered timing to avoid 429.
+ * Calls `onProgress` after each image resolves so UI can update incrementally.
+ */
+export async function loadImagesStaggered(
+  prompts: (string | undefined)[],
+  options: PollinationsOptions = {},
+  onProgress?: (result: StaggeredResult) => void,
+): Promise<(string | undefined)[]> {
+  const results: (string | undefined)[] = new Array(prompts.length).fill(
+    undefined,
+  );
+
+  for (let i = 0; i < prompts.length; i++) {
+    const prompt = prompts[i];
+    if (!prompt) {
+      onProgress?.({ index: i, url: undefined });
+      continue;
+    }
+
+    if (i > 0) await sleep(STAGGER_DELAY_MS);
+
+    const url = generateImageUrl(prompt, options);
+    const loaded = await preloadImage(url);
+    results[i] = loaded;
+    onProgress?.({ index: i, url: loaded });
+  }
+
+  return results;
 }

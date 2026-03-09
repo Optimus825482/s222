@@ -23,7 +23,8 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { fetcher } from "@/lib/api";
-import { generateImageUrl } from "@/lib/pollinations";
+import { generateImageUrl, loadImagesStaggered } from "@/lib/pollinations";
+import PollinationsImage from "./pollinations-image";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
@@ -127,21 +128,28 @@ export default function PresentationBuilderPanel() {
           }),
         },
       );
-      // Generate image URLs from prompts
-      const slidesWithImages = res.slides.map((s) => ({
+      // Set slides immediately without images, then load images staggered
+      const initialSlides = res.slides.map((s) => ({
         ...s,
-        imageUrl: s.image_prompt
-          ? generateImageUrl(s.image_prompt, {
-              width: 1200,
-              height: 675,
-              model: "flux",
-              nologo: true,
-            })
-          : undefined,
+        imageUrl: undefined as string | undefined,
       }));
-      setSlides(slidesWithImages);
+      setSlides(initialSlides);
       setCurrentSlideIndex(0);
       setViewMode("edit");
+
+      // Staggered image loading to avoid Pollinations 429 rate limit
+      const prompts = res.slides.map((s) => s.image_prompt || undefined);
+      loadImagesStaggered(
+        prompts,
+        { width: 1200, height: 675, model: "flux", nologo: true },
+        ({ index, url }) => {
+          setSlides((prev) => {
+            const next = [...prev];
+            if (next[index]) next[index] = { ...next[index], imageUrl: url };
+            return next;
+          });
+        },
+      );
     } catch (e: any) {
       setError(e.message || "Sunum oluşturma başarısız");
     } finally {
@@ -806,10 +814,11 @@ export default function PresentationBuilderPanel() {
 
             {currentSlide?.imageUrl && (
               <div className="mb-3 rounded-lg overflow-hidden border border-white/10">
-                <img
+                <PollinationsImage
                   src={currentSlide.imageUrl}
                   alt="Mevcut görsel"
                   className="w-full h-32 object-cover"
+                  placeholderClassName="w-full h-32"
                 />
               </div>
             )}
@@ -904,10 +913,11 @@ function SlideCanvas({
           <div className="flex-1 flex flex-col items-center justify-center text-center">
             {slide.imageUrl && (
               <div className="absolute inset-0 opacity-20">
-                <img
+                <PollinationsImage
                   src={slide.imageUrl}
                   alt=""
                   className="w-full h-full object-cover"
+                  placeholderClassName="w-full h-full"
                 />
               </div>
             )}
@@ -982,10 +992,11 @@ function SlideCanvas({
               </div>
               <div className="flex items-center justify-center">
                 {slide.imageUrl ? (
-                  <img
+                  <PollinationsImage
                     src={slide.imageUrl}
                     alt={slide.title}
                     className="w-full h-full object-cover rounded-lg"
+                    placeholderClassName="w-full h-full rounded-lg bg-gray-100"
                   />
                 ) : (
                   <div className="w-full h-full rounded-lg bg-gray-100 flex items-center justify-center">
@@ -1005,10 +1016,11 @@ function SlideCanvas({
             </h2>
             <div className="flex-1 rounded-lg overflow-hidden">
               {slide.imageUrl ? (
-                <img
+                <PollinationsImage
                   src={slide.imageUrl}
                   alt={slide.title}
                   className="w-full h-full object-cover"
+                  placeholderClassName="w-full h-full bg-gray-100"
                 />
               ) : (
                 <div className="w-full h-full bg-gray-100 flex items-center justify-center">
@@ -1046,10 +1058,11 @@ function SlideCanvas({
           <div className="flex-1 flex flex-col items-center justify-center text-center">
             {slide.imageUrl && (
               <div className="absolute inset-0 opacity-15">
-                <img
+                <PollinationsImage
                   src={slide.imageUrl}
                   alt=""
                   className="w-full h-full object-cover"
+                  placeholderClassName="w-full h-full"
                 />
               </div>
             )}
