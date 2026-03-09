@@ -121,8 +121,43 @@ def record_trace(
     status: str = "ok",
     error_message: str | None = None,
 ) -> None:
-    """Record an execution trace step to PostgreSQL (sync, thread-safe)."""
+    """Record an execution trace step to PostgreSQL (sync, thread-safe).
+    Also feeds OpenTelemetry spans and Prometheus metrics."""
     tid = trace_id_var.get("")
+
+    # OpenTelemetry span (non-blocking, best-effort)
+    try:
+        from tools.otel_integration import start_agent_span
+        with start_agent_span(agent_role, tool_name or "step", {
+            "trace.step": step,
+            "trace.legacy_id": tid,
+            "trace.tokens": tokens,
+            "trace.cost_usd": cost_usd,
+            "trace.status": status,
+        }) as span:
+            if error_message:
+                span.add_event("error", {"message": error_message[:500]})
+    except Exception:
+        pass
+
+    # Prometheus metrics (non-blocking, best-effort)
+    try:
+        from tools.prometheus_metrics import metrics
+        metrics.record_request(
+            agent_role=agent_role,
+            task_type="trace",
+            latency_s=latency_ms / 1000,
+            tokens=tokens,
+            status=status,
+            tool_name=tool_name or "",
+            cost_usd=cost_usd,
+        )
+        if status != "ok":
+            metrics.record_error(agent_role, status)
+    except Exception:
+        pass
+
+    # PostgreSQL trace storage
     conn = get_conn()
     try:
         with conn.cursor() as cur:

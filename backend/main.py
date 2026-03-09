@@ -226,6 +226,34 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Feedback Loop start failed (non-critical): {e}")
 
+    # Initialize OpenTelemetry (optional — requires SDK)
+    try:
+        from tools.otel_integration import init_otel
+        otel_ok = init_otel()
+        if otel_ok:
+            print("[Backend] OpenTelemetry initialized")
+        else:
+            print("[Backend] OpenTelemetry SDK not available (non-critical)")
+    except Exception as e:
+        print(f"[Backend] OpenTelemetry init failed (non-critical): {e}")
+
+    # Initialize Redis client (optional — falls back to in-memory)
+    try:
+        from tools.redis_client import get_redis, redis_health
+        r = get_redis()
+        rh = redis_health()
+        print(f"[Backend] Redis: {rh.get('status', 'unknown')} (mode={rh.get('mode', 'fallback')})")
+    except Exception as e:
+        print(f"[Backend] Redis init failed (in-memory fallback): {e}")
+
+    # Initialize Knowledge Moderator tables
+    try:
+        from tools.knowledge_moderator import get_moderator
+        get_moderator()._ensure_table()
+        print("[Backend] Knowledge moderation tables initialized")
+    except Exception as e:
+        print(f"[Backend] Knowledge moderation init failed (non-critical): {e}")
+
     yield
 
     # Shutdown: stop autonomous chat scheduler
@@ -324,6 +352,8 @@ from routes.marketplace import router as marketplace_router
 from routes.self_improvement import router as self_improvement_router
 from routes.presentations import router as presentations_router
 from routes.metrics import router as metrics_router
+from routes.resilience import router as resilience_router
+from routes.federated import router as federated_router
 
 app.include_router(auth_router)
 app.include_router(skills_router)
@@ -348,6 +378,8 @@ app.include_router(marketplace_router)
 app.include_router(self_improvement_router)
 app.include_router(presentations_router)
 app.include_router(metrics_router)
+app.include_router(resilience_router)
+app.include_router(federated_router)
 
 print("[Backend] All route modules loaded successfully")
-print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations")
+print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations, resilience, federated")

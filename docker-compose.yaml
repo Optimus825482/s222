@@ -23,6 +23,33 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: multi-agent-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 60
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: .
@@ -31,6 +58,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://agent:${POSTGRES_PASSWORD:-agent_secret_2024}@postgres:5432/multiagent
+      REDIS_URL: redis://redis:6379/0
+      REDIS_MODE: ${REDIS_MODE:-standalone}
       NVIDIA_API_KEY: ${NVIDIA_API_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
@@ -60,6 +89,8 @@ services:
           memory: 512M
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       pi-gateway:
         condition: service_healthy
@@ -135,3 +166,4 @@ services:
 volumes:
   app-data:
   pgdata:
+  redis-data:

@@ -1,0 +1,133 @@
+---
+# Istio VirtualService — Canary deployment with progressive traffic shifting
+# Stages: 5% → 25% → 50% → 100%
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: multi-agent-backend
+  namespace: multi-agent
+spec:
+  hosts:
+    - multi-agent-backend
+  http:
+    - route:
+        - destination:
+            host: multi-agent-backend
+            subset: stable
+          weight: 95
+        - destination:
+            host: multi-agent-backend
+            subset: canary
+          weight: 5
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: 5xx,reset,connect-failure
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: multi-agent-backend
+  namespace: multi-agent
+spec:
+  host: multi-agent-backend
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        h2UpgradePolicy: DEFAULT
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 50
+  subsets:
+    - name: stable
+      labels:
+        version: stable
+    - name: canary
+      labels:
+        version: canary
+---
+# Argo CD Application — with progressive delivery
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: multi-agent-backend
+  namespace: multi-agent
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: multi-agent-backend
+  strategy:
+    canary:
+      canaryService: multi-agent-backend-canary
+      stableService: multi-agent-backend-stable
+      trafficRouting:
+        istio:
+          virtualServices:
+            - name: multi-agent-backend
+              routes:
+                - primary
+      steps:
+        - setWeight: 5
+        - pause: { duration: 5m }
+        - analysis:
+            templates:
+              - templateName: success-rate-check
+        - setWeight: 25
+        - pause: { duration: 5m }
+        - analysis:
+            templates:
+              - templateName: success-rate-check
+        - setWeight: 50
+        - pause: { duration: 10m }
+        - analysis:
+            templates:
+              - templateName: success-rate-check
+        - setWeight: 100
+      analysis:
+        successfulRunHistoryLimit: 3
+        unsuccessfulRunHistoryLimit: 3
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate-check
+  namespace: multi-agent
+spec:
+  metrics:
+    - name: success-rate
+      interval: 60s
+      count: 3
+      successCondition: result[0] >= 0.95
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring:9090
+          query: |
+            sum(rate(istio_requests_total{
+              destination_service_name="multi-agent-backend",
+              response_code!~"5.*"
+            }[2m])) /
+            sum(rate(istio_requests_total{
+              destination_service_name="multi-agent-backend"
+            }[2m]))
+    - name: latency-p95
+      interval: 60s
+      count: 3
+      successCondition: result[0] <= 5000
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring:9090
+          query: |
+            histogram_quantile(0.95,
+              sum(rate(istio_request_duration_milliseconds_bucket{
+                destination_service_name="multi-agent-backend"
+              }[2m])) by (le)
+            )

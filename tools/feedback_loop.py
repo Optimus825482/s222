@@ -87,6 +87,8 @@ class FeedbackLoop:
         2. If success_rate < 60% over last 20 → trigger skill re-ranking
         3. Update skill_performance records
         4. Increment Dynamic Router task counter
+        5. Check dynamic thresholds for anomaly detection
+        6. Feed Prometheus metrics
         """
         try:
             payload = msg.payload if hasattr(msg, "payload") else {}
@@ -94,12 +96,24 @@ class FeedbackLoop:
             task_type = payload.get("task_type", "")
             score = float(payload.get("score", 0))
             skill_ids = payload.get("skill_ids_used", [])
+            latency_ms = float(payload.get("latency_ms", 0))
 
             if not agent_role or not task_type:
                 return
 
             key = f"{agent_role}:{task_type}"
             self._recent_metrics[key].append(score)
+
+            # Feed Prometheus metrics
+            try:
+                from tools.prometheus_metrics import metrics
+                metrics.record_request(
+                    agent_role, task_type,
+                    latency_s=latency_ms / 1000 if latency_ms else 0,
+                    status="ok" if score >= 3.0 else "degraded",
+                )
+            except Exception:
+                pass
 
             # Update skill_performance
             if skill_ids:
@@ -109,6 +123,24 @@ class FeedbackLoop:
                     engine.update_skill_performance(skill_ids, agent_role, task_type, score)
                 except Exception as e:
                     logger.debug(f"Skill performance update failed: {e}")
+
+            # Check dynamic thresholds for anomaly detection
+            if latency_ms > 0:
+                try:
+                    from tools.dynamic_thresholds import get_threshold_engine
+                    th = get_threshold_engine().compute("latency_ms", agent_role)
+                    if latency_ms > th.get("upper", 99999):
+                        logger.warning(
+                            f"ANOMALY: {agent_role} latency {latency_ms:.0f}ms exceeds "
+                            f"dynamic threshold {th['upper']:.0f}ms (method={th['method']})"
+                        )
+                        self._log_optimization(
+                            "anomaly_detected", agent_role, task_type,
+                            f"latency={latency_ms:.0f}ms", f"threshold={th['upper']:.0f}ms",
+                            f"Dynamic threshold breach (method={th['method']}, samples={th.get('samples', 0)})",
+                        )
+                except Exception:
+                    pass
 
             # Check rolling window — trigger re-rank if success_rate < 60%
             window = list(self._recent_metrics[key])

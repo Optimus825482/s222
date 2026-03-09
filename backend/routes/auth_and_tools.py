@@ -709,8 +709,14 @@ async def api_improve_skill(
             improved = json.loads(content)
     except json.JSONDecodeError as e:
         raise HTTPException(502, detail=f"DeepSeek geçersiz JSON döndü: {e}")
+    except httpx.ReadTimeout:
+        raise HTTPException(504, detail="DeepSeek API zaman aşımına uğradı (60s). Lütfen tekrar deneyin.")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(502, detail=f"DeepSeek HTTP hatası: {e}")
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(502, detail=f"DeepSeek çağrısı başarısız: {type(e).__name__}: {e}")
 
     new_name = (improved.get("name") or name).strip() or name
     new_desc = (improved.get("description") or description).strip() or description
