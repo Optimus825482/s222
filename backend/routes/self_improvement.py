@@ -147,7 +147,7 @@ def dashboard_overview():
 @router.get("/api/dashboard/agents/{agent_role}/history")
 def agent_history(
     agent_role: str,
-    granularity: str = Query("hour", regex="^(hour|day|week)$"),
+    granularity: str = Query("hour", pattern="^(hour|day|week)$"),
     limit: int = Query(50, ge=1, le=500),
 ):
     """Time-series performance data for an agent."""

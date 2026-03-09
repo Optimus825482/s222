@@ -295,6 +295,14 @@ class ScheduleCreateRequest(BaseModel):
     variables: dict = {}
 
 
+class AIWorkflowImproveRequest(BaseModel):
+    prompt: str
+
+
+class AIWorkflowGenerateRequest(BaseModel):
+    prompt: str
+
+
 @router.get("/api/workflows/schedules")
 async def api_list_schedules(user: dict = Depends(get_current_user)):
     """List all scheduled workflows."""
@@ -595,3 +603,171 @@ async def api_eval_baseline(agent_role: str | None = None):
         return get_performance_baseline(agent_role)
     except Exception as e:
         raise HTTPException(503, "Baseline unavailable") from e
+
+
+# ── AI Workflow Assistant Endpoints ──────────────────────────────
+
+@router.post("/api/workflows/ai-improve-prompt")
+async def api_ai_improve_workflow_prompt(req: AIWorkflowImproveRequest, user: dict = Depends(get_current_user)):
+    """Improve a natural-language workflow description into a clear, structured prompt."""
+    import httpx
+    from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+
+    prompt = (req.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(400, "Prompt boş olamaz")
+    if not DEEPSEEK_API_KEY:
+        raise HTTPException(503, "DeepSeek API anahtarı yapılandırılmamış")
+
+    system = (
+        "You are a workflow design assistant. The user describes a workflow in natural language (often in Turkish). "
+        "Your job is to rewrite their description into a clear, structured workflow specification that an AI can parse. "
+        "Output ONLY the improved prompt in the SAME LANGUAGE as the input. "
+        "Make it specific: clarify steps, tools to use, agents to involve, conditions, and expected outputs. "
+        "Do not add explanations or quotes. Output nothing but the improved workflow description."
+    )
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 1000,
+        "temperature": 0.4,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                f"{DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
+            )
+            if r.status_code != 200:
+                raise HTTPException(502, f"DeepSeek hatası: {r.status_code}")
+            data = r.json()
+            choice = (data.get("choices") or [{}])[0]
+            improved = (choice.get("message") or {}).get("content") or prompt
+            improved = improved.strip().strip('"').strip("'")
+            return {"improved_prompt": improved}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"Prompt iyileştirme hatası: {str(e)}")
+
+
+@router.post("/api/workflows/ai-generate")
+async def api_ai_generate_workflow(req: AIWorkflowGenerateRequest, user: dict = Depends(get_current_user)):
+    """Generate a complete workflow definition from a natural-language prompt using DeepSeek."""
+    import httpx
+    from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+
+    prompt = (req.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(400, "Prompt boş olamaz")
+    if not DEEPSEEK_API_KEY:
+        raise HTTPException(503, "DeepSeek API anahtarı yapılandırılmamış")
+
+    # Build available tools/agents list for context
+    tools_list = ", ".join([
+        "web_search", "web_fetch", "code_execute", "rag_query", "rag_ingest",
+        "save_memory", "recall_memory", "generate_image", "generate_chart",
+        "mcp_call", "domain_expert", "decompose_task", "synthesize_results",
+    ])
+    agents_list = "thinker, speed, researcher, reasoner, critic"
+
+    system = f"""You are a workflow generator for a multi-agent system. Given a natural-language description, generate a valid JSON workflow definition.
+
+Available tools: {tools_list}
+Available agents: {agents_list}
+
+Output ONLY valid JSON with this exact structure (no markdown, no explanation):
+{{
+  "name": "Workflow Name",
+  "description": "Brief description",
+  "steps": [
+    {{
+      "step_id": "step_0",
+      "step_type": "tool_call",
+      "tool_name": "web_search",
+      "tool_args": {{"query": "example"}},
+      "on_error": "skip"
+    }},
+    {{
+      "step_id": "step_1",
+      "step_type": "agent_call",
+      "agent_role": "thinker",
+      "agent_prompt": "Analyze the results from {{{{step_0}}}}",
+      "on_error": "rollback"
+    }},
+    {{
+      "step_id": "step_2",
+      "step_type": "condition",
+      "condition": {{"field": "step_1", "operator": "contains", "value": "error", "then_step": "step_3", "else_step": "step_4"}},
+      "on_error": "abort"
+    }},
+    {{
+      "step_id": "step_3",
+      "step_type": "parallel",
+      "parallel_steps": ["step_4", "step_5"],
+      "on_error": "rollback"
+    }}
+  ],
+  "variables": {{}}
+}}
+
+Rules:
+- step_type must be one of: tool_call, agent_call, condition, parallel
+- Use {{{{step_id}}}} syntax to reference previous step outputs in prompts/args
+- Keep workflows practical: 2-8 steps
+- on_error: "skip" | "abort" | "rollback" | "retry"
+- For agent_call: agent_role must be one of: {agents_list}
+- For tool_call: tool_name must be from the available tools list
+- Output ONLY the JSON object, nothing else"""
+
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 2000,
+        "temperature": 0.3,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            r = await client.post(
+                f"{DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
+            )
+            if r.status_code != 200:
+                raise HTTPException(502, f"DeepSeek hatası: {r.status_code}")
+            data = r.json()
+            choice = (data.get("choices") or [{}])[0]
+            raw = (choice.get("message") or {}).get("content") or ""
+            raw = raw.strip()
+
+            # Strip markdown code fences if present
+            if raw.startswith("```"):
+                lines = raw.split("\n")
+                lines = [l for l in lines if not l.strip().startswith("```")]
+                raw = "\n".join(lines).strip()
+
+            import json as _json
+            try:
+                workflow_def = _json.loads(raw)
+            except _json.JSONDecodeError:
+                raise HTTPException(502, f"DeepSeek geçersiz JSON döndürdü: {raw[:200]}")
+
+            # Validate basic structure
+            if "steps" not in workflow_def or not isinstance(workflow_def["steps"], list):
+                raise HTTPException(502, "Oluşturulan workflow'da 'steps' alanı eksik")
+
+            return {
+                "workflow": workflow_def,
+                "raw_response": raw[:500],
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"Workflow oluşturma hatası: {str(e)}")

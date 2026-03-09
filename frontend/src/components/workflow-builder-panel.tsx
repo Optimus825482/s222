@@ -16,6 +16,9 @@ import {
   Timer,
   Zap,
   HelpCircle,
+  Sparkles,
+  Wand2,
+  Bot,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type {
@@ -26,7 +29,7 @@ import type {
 
 /* ── Local Types ───────────────────────────────────────────────── */
 type StepType = "tool_call" | "agent_call" | "condition" | "parallel";
-type WfTab = "guide" | "templates" | "custom" | "scheduler";
+type WfTab = "guide" | "templates" | "custom" | "scheduler" | "assistant";
 
 interface CustomStep {
   step_id: string;
@@ -141,6 +144,7 @@ const TABS: { key: WfTab; label: string; icon: typeof Workflow }[] = [
   { key: "templates", label: "Şablonlar", icon: Workflow },
   { key: "custom", label: "Özel Workflow", icon: Settings },
   { key: "scheduler", label: "Zamanlayıcı", icon: Calendar },
+  { key: "assistant", label: "Asistanla Oluştur", icon: Bot },
 ];
 
 /* ══════════════════════════════════════════════════════════════════
@@ -179,6 +183,19 @@ export function WorkflowBuilderPanel() {
 
   /* ── Error state ─────────────────────────────────────────────── */
   const [error, setError] = useState("");
+
+  /* ── AI Assistant state ──────────────────────────────────────── */
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiImproving, setAiImproving] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGenerated, setAiGenerated] = useState<{
+    name: string;
+    description: string;
+    steps: Array<Record<string, unknown>>;
+    variables: Record<string, unknown>;
+  } | null>(null);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiResult, setAiResult] = useState<WorkflowRunResult | null>(null);
 
   /* ── Load templates ──────────────────────────────────────────── */
   const loadTemplates = useCallback(async () => {
@@ -349,6 +366,56 @@ export function WorkflowBuilderPanel() {
       setError(e instanceof Error ? e.message : "Zamanlama silinemedi");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  /* ── AI Assistant actions ────────────────────────────────────── */
+  const aiImprovePrompt = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiImproving(true);
+    setError("");
+    try {
+      const res = await api.aiImproveWorkflowPrompt(aiPrompt);
+      setAiPrompt(res.improved_prompt);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Prompt geliştirilemedi");
+    } finally {
+      setAiImproving(false);
+    }
+  };
+
+  const aiGenerate = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiGenerating(true);
+    setAiGenerated(null);
+    setAiResult(null);
+    setError("");
+    try {
+      const res = await api.aiGenerateWorkflow(aiPrompt);
+      setAiGenerated(res.workflow);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Workflow oluşturulamadı");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const aiRunGenerated = async () => {
+    if (!aiGenerated) return;
+    setAiRunning(true);
+    setAiResult(null);
+    setError("");
+    try {
+      const result = await api.runWorkflow(
+        "custom",
+        aiGenerated.variables || {},
+        aiGenerated.steps,
+      );
+      setAiResult(result);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Workflow çalıştırılamadı");
+    } finally {
+      setAiRunning(false);
     }
   };
 
@@ -1203,171 +1270,199 @@ export function WorkflowBuilderPanel() {
         </div>
       )}
 
-      {/* ── Tab: Nasıl Kullanılır ────────────────────────────── */}
-      {tab === "guide" && (
-        <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
+      {/* ── Tab: Asistanla Oluştur ───────────────────────────── */}
+      {tab === "assistant" && (
+        <div className="space-y-3">
           {/* Hero */}
-          <div className={crd}>
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="w-4 h-4 text-cyan-400" />
-              <span className="text-sm font-semibold text-slate-200">
-                İş Akışları Nedir?
+          <div
+            className={`${crd} border-purple-500/20 bg-gradient-to-br from-purple-950/30 to-slate-800/50`}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span className="text-xs font-semibold text-slate-200">
+                AI ile İş Akışı Oluştur
               </span>
             </div>
-            <p className="text-slate-400">
-              İş akışları, birden fazla adımı (araç çağrısı, ajan çağrısı,
-              koşul, paralel işlem) tek bir pipeline olarak çalıştırmanızı
-              sağlar. Hazır şablonları kullanabilir, özel workflow oluşturabilir
-              veya zamanlayıcı ile otomatik tetikleyebilirsiniz.
+            <p className="text-[10px] text-slate-400">
+              Ne yapmak istediğinizi doğal dilde yazın, AI sizin için otomatik
+              workflow oluşturur. Prompt geliştirme butonu ile açıklamanızı
+              netleştirebilirsiniz.
             </p>
           </div>
 
-          {/* 1 — Şablonlar */}
-          <div className={crd}>
-            <div className="flex items-center gap-2 mb-2">
-              <Workflow className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[13px] font-semibold text-slate-200">
-                1. Şablonlar
-              </span>
-            </div>
-            <ol className="list-decimal list-inside space-y-1 text-slate-400 ml-1">
-              <li>
-                <span className="text-slate-300">Şablonlar</span> sekmesine
-                gidin ve listeden bir şablon seçin.
-              </li>
-              <li>
-                Gerekli değişkenleri doldurun (ör.{" "}
-                <code className="bg-slate-700/60 px-1 rounded text-cyan-300">
-                  topic
-                </code>
-                ,{" "}
-                <code className="bg-slate-700/60 px-1 rounded text-cyan-300">
-                  code
-                </code>
-                ).
-              </li>
-              <li>
-                <span className="text-cyan-400">▶ Çalıştır</span> butonuna basın
-                ve sonuçları bekleyin.
-              </li>
-            </ol>
-            <div className="mt-2 bg-slate-900/60 rounded p-2 text-[10px] text-slate-500 font-mono">
-              Örnek: &quot;deep_research&quot; şablonu → topic: &quot;yapay zeka
-              trendleri&quot; → Araştırma + Sentez + Rapor
+          {/* Prompt Input */}
+          <div className={`${crd} space-y-2`}>
+            <label className="text-[10px] text-slate-500 mb-1 block">
+              İş Akışı Açıklaması
+            </label>
+            <textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              rows={4}
+              placeholder="Örn: Her gün sabah 9'da yapay zeka haberlerini araştır, önemli gelişmeleri özetle ve hafızaya kaydet..."
+              className={`${inp} resize-none`}
+            />
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              {/* Improve Prompt */}
+              <button
+                onClick={aiImprovePrompt}
+                disabled={aiImproving || !aiPrompt.trim()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium bg-purple-600/40 hover:bg-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-purple-300 transition-colors border border-purple-500/30"
+                title="Promptu AI ile geliştir"
+              >
+                {aiImproving ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Geliştiriliyor…
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-3 h-3" />
+                    Promptu Geliştir
+                  </>
+                )}
+              </button>
+
+              {/* Generate Workflow */}
+              <button
+                onClick={aiGenerate}
+                disabled={aiGenerating || !aiPrompt.trim()}
+                className={btnPrimary}
+              >
+                {aiGenerating ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Oluşturuluyor…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3" />
+                    Workflow Oluştur
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* 2 — Özel Workflow */}
-          <div className={crd}>
-            <div className="flex items-center gap-2 mb-2">
-              <Settings className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[13px] font-semibold text-slate-200">
-                2. Özel Workflow Oluşturma
-              </span>
-            </div>
-            <ol className="list-decimal list-inside space-y-1 text-slate-400 ml-1">
-              <li>
-                <span className="text-slate-300">Özel Workflow</span> sekmesine
-                geçin.
-              </li>
-              <li>
-                Adım ekleyin ve türünü seçin:
-                <ul className="list-disc list-inside ml-4 mt-1 space-y-0.5">
-                  <li>
-                    <span className="text-cyan-300">Araç Çağrısı</span> —
-                    web_search, code_execute, rag_query, generate_image,
-                    mcp_call vb. (35 araç)
-                  </li>
-                  <li>
-                    <span className="text-cyan-300">Ajan Çağrısı</span> —
-                    thinker, researcher, critic vb. bir ajana prompt gönderin.
-                  </li>
-                  <li>
-                    <span className="text-cyan-300">Koşul</span> — Bir önceki
-                    adımın çıktısına göre dallanma yapın.
-                  </li>
-                  <li>
-                    <span className="text-cyan-300">Paralel</span> — Birden
-                    fazla adımı eş zamanlı çalıştırın.
-                  </li>
-                </ul>
-              </li>
-              <li>
-                Adımları sıralayın ve{" "}
-                <span className="text-cyan-400">▶ Özel Workflow Çalıştır</span>{" "}
-                butonuna basın.
-              </li>
-            </ol>
-            <div className="mt-2 bg-slate-900/60 rounded p-2 text-[10px] text-slate-500 font-mono">
-              Örnek: web_search(&quot;Next.js 15&quot;) → agent:researcher
-              (analiz et) → agent:thinker (özetle)
-            </div>
-          </div>
+          {/* Generated Workflow Preview */}
+          {aiGenerated && (
+            <div className={`${crd} space-y-3 border-cyan-500/20`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-xs font-medium text-slate-200">
+                    {aiGenerated.name}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-500 bg-slate-700/40 px-1.5 py-0.5 rounded">
+                  {aiGenerated.steps.length} adım
+                </span>
+              </div>
 
-          {/* 3 — Zamanlayıcı */}
-          <div className={crd}>
-            <div className="flex items-center gap-2 mb-2">
-              <Calendar className="w-3.5 h-3.5 text-purple-400" />
-              <span className="text-[13px] font-semibold text-slate-200">
-                3. Zamanlayıcı (Cron)
-              </span>
-            </div>
-            <ol className="list-decimal list-inside space-y-1 text-slate-400 ml-1">
-              <li>
-                <span className="text-slate-300">Zamanlayıcı</span> sekmesine
-                gidin.
-              </li>
-              <li>Bir şablon adı, cron ifadesi ve değişkenler girin.</li>
-              <li>
-                <span className="text-cyan-400">Zamanlama Ekle</span> butonuna
-                basın.
-              </li>
-              <li>Eklenen zamanlamayı açıp/kapatabilir veya silebilirsiniz.</li>
-            </ol>
-            <div className="mt-2 bg-slate-900/60 rounded p-2 text-[10px] text-slate-500 font-mono space-y-0.5">
-              <div>
-                <span className="text-slate-400">Her saat:</span>{" "}
-                <span className="text-cyan-300">0 * * * *</span>
-              </div>
-              <div>
-                <span className="text-slate-400">Her gün 09:00:</span>{" "}
-                <span className="text-cyan-300">0 9 * * *</span>
-              </div>
-              <div>
-                <span className="text-slate-400">Her 30 dk:</span>{" "}
-                <span className="text-cyan-300">*/30 * * * *</span>
-              </div>
-            </div>
-          </div>
+              {aiGenerated.description && (
+                <p className="text-[10px] text-slate-400">
+                  {aiGenerated.description}
+                </p>
+              )}
 
-          {/* 4 — İpuçları */}
-          <div className={crd}>
-            <div className="flex items-center gap-2 mb-2">
-              <HelpCircle className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-[13px] font-semibold text-slate-200">
-                İpuçları
-              </span>
+              {/* Steps Preview */}
+              <div className="space-y-1">
+                {aiGenerated.steps.map((step, idx) => (
+                  <div
+                    key={String(step.step_id || idx)}
+                    className="flex items-center gap-2 bg-slate-900/50 rounded px-2 py-1.5 border border-slate-700/30"
+                  >
+                    <span className="text-[9px] text-cyan-400 font-mono w-12 shrink-0">
+                      {String(step.step_id || `step_${idx}`)}
+                    </span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded ${
+                        step.step_type === "tool_call"
+                          ? "bg-emerald-500/15 text-emerald-400"
+                          : step.step_type === "agent_call"
+                            ? "bg-blue-500/15 text-blue-400"
+                            : step.step_type === "condition"
+                              ? "bg-amber-500/15 text-amber-400"
+                              : "bg-pink-500/15 text-pink-400"
+                      }`}
+                    >
+                      {step.step_type === "tool_call"
+                        ? "Araç"
+                        : step.step_type === "agent_call"
+                          ? "Ajan"
+                          : step.step_type === "condition"
+                            ? "Koşul"
+                            : "Paralel"}
+                    </span>
+                    <span className="text-[10px] text-slate-300 truncate">
+                      {step.step_type === "tool_call"
+                        ? String(step.tool_name || "")
+                        : step.step_type === "agent_call"
+                          ? String(step.agent_role || "")
+                          : step.step_type === "parallel"
+                            ? `[${((step.parallel_steps as string[]) || []).join(", ")}]`
+                            : "koşul"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Variables */}
+              {aiGenerated.variables &&
+                Object.keys(aiGenerated.variables).length > 0 && (
+                  <div>
+                    <span className="text-[10px] text-slate-500 block mb-1">
+                      Değişkenler:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(aiGenerated.variables).map(([k, v]) => (
+                        <span
+                          key={k}
+                          className="text-[9px] text-cyan-400/70 bg-cyan-500/10 px-1.5 py-0.5 rounded"
+                        >
+                          {k}: {String(v) || '""'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* Run / Edit Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={aiRunGenerated}
+                  disabled={aiRunning}
+                  className={btnPrimary}
+                >
+                  {aiRunning ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Çalışıyor…
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3 h-3" />
+                      Test Et
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setAiGenerated(null);
+                    setAiResult(null);
+                  }}
+                  className={btnDanger}
+                >
+                  <Trash2 className="w-2.5 h-2.5" />
+                  Temizle
+                </button>
+              </div>
+
+              {aiResult && <RunResultBadge result={aiResult} />}
             </div>
-            <ul className="list-disc list-inside space-y-1 text-slate-400 ml-1">
-              <li>
-                Hata durumunda tüm adımlar otomatik{" "}
-                <span className="text-orange-300">rollback</span> yapılır.
-              </li>
-              <li>
-                <span className="text-slate-300">Workflow Geçmişi</span>{" "}
-                penceresinden önceki çalıştırmaları inceleyebilir ve tekrar
-                çalıştırabilirsiniz.
-              </li>
-              <li>
-                Ajan çağrısında prompt ne kadar net olursa sonuç o kadar iyi
-                olur.
-              </li>
-              <li>
-                Paralel adımlar bağımsız işler için idealdir — birbirine bağımlı
-                adımları sıralı tutun.
-              </li>
-            </ul>
-          </div>
+          )}
         </div>
       )}
     </div>

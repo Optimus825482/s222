@@ -785,6 +785,28 @@ export const api = {
       body: JSON.stringify({ enabled }),
     }),
 
+  aiImproveWorkflowPrompt: (prompt: string) =>
+    fetcher<{ improved_prompt: string }>("/api/workflows/ai-improve-prompt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ prompt }),
+    }),
+
+  aiGenerateWorkflow: (prompt: string) =>
+    fetcher<{
+      workflow: {
+        name: string;
+        description: string;
+        steps: Array<Record<string, unknown>>;
+        variables: Record<string, unknown>;
+      };
+      raw_response: string;
+    }>("/api/workflows/ai-generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ prompt }),
+    }),
+
   // ── Chart API ──
   generateChart: (
     chartType: string,
