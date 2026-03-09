@@ -54,6 +54,7 @@ ROLE_ALLOWLIST: dict[str, set[str]] = {
         # Orchestrator-specific tools
         "decompose_task", "direct_response", "research_create_skill",
         "generate_presentation",
+        "check_error_patterns", "check_budget",
     },
     "thinker": {
         "web_search", "web_fetch", "save_memory", "recall_memory",

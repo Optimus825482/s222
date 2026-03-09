@@ -1241,7 +1241,7 @@ class BaseAgent(ABC):
         if fn_name == "list_memories":
             from tools.memory import list_memories
 
-            memories = list_memories(
+            memories = await list_memories(
                 category=fn_args.get("category"),
                 layer=fn_args.get("layer"),
                 limit=fn_args.get("limit", 20),
@@ -1259,7 +1259,7 @@ class BaseAgent(ABC):
         if fn_name == "memory_stats":
             from tools.memory import get_memory_stats
 
-            stats = get_memory_stats()
+            stats = await get_memory_stats()
             return json.dumps(stats, ensure_ascii=False, indent=2)
 
         if fn_name == "memory_advanced_search":
