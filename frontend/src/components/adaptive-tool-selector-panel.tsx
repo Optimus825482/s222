@@ -36,13 +36,16 @@ export function AdaptiveToolSelectorPanel() {
   const [preferences, setPreferences] = useState<ToolPreference[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const toArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? v : []);
+
   const loadUsage = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetcher<ToolUsage[]>("/api/adaptive-tools/usage");
-      setUsage(data);
+      const data = await fetcher<unknown>("/api/adaptive-tools/usage");
+      setUsage(toArray<ToolUsage>(data));
     } catch (err) {
       console.error("[AdaptiveTools] usage error:", err);
+      setUsage([]);
     } finally {
       setLoading(false);
     }
@@ -51,12 +54,13 @@ export function AdaptiveToolSelectorPanel() {
   const loadRecommendations = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetcher<ToolRecommendation[]>(
+      const data = await fetcher<unknown>(
         "/api/adaptive-tools/recommendations",
       );
-      setRecommendations(data);
+      setRecommendations(toArray<ToolRecommendation>(data));
     } catch (err) {
       console.error("[AdaptiveTools] recommendations error:", err);
+      setRecommendations([]);
     } finally {
       setLoading(false);
     }
@@ -65,12 +69,11 @@ export function AdaptiveToolSelectorPanel() {
   const loadPreferences = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetcher<ToolPreference[]>(
-        "/api/adaptive-tools/preferences",
-      );
-      setPreferences(data);
+      const data = await fetcher<unknown>("/api/adaptive-tools/preferences");
+      setPreferences(toArray<ToolPreference>(data));
     } catch (err) {
       console.error("[AdaptiveTools] preferences error:", err);
+      setPreferences([]);
     } finally {
       setLoading(false);
     }
