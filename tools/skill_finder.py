@@ -352,6 +352,96 @@ SKILL_REGISTRY: list[dict[str, Any]] = [
             "5. Keep entries concise and actionable"
         ),
     },
+    # ── Security & auditing ────────────────────────────────────────
+    {
+        "id": "security-audit",
+        "name": "Security Audit",
+        "category": "security",
+        "description": "OWASP Top 10 vulnerability scanning, secret detection, and severity reporting",
+        "keywords": ["security", "owasp", "vulnerability", "audit", "secret", "güvenlik", "zafiyet"],
+        "knowledge": (
+            "SECURITY AUDIT PROTOCOL:\n"
+            "1. Scan for OWASP Top 10 vulnerabilities (injection, XSS, CSRF, etc.)\n"
+            "2. Detect hardcoded secrets, API keys, passwords in codebase\n"
+            "3. Check dependency vulnerabilities (CVE database)\n"
+            "4. Analyze authentication and authorization flows\n"
+            "5. Review input validation and output encoding\n"
+            "6. Report findings with severity (critical/high/medium/low)\n"
+            "7. Provide remediation steps for each finding"
+        ),
+    },
+    # ── Data engineering ───────────────────────────────────────────
+    {
+        "id": "data-pipeline",
+        "name": "Data Pipeline",
+        "category": "data",
+        "description": "ETL pipeline design, schema validation, and multi-format data processing",
+        "keywords": ["etl", "pipeline", "data", "transform", "schema", "veri", "dönüşüm"],
+        "knowledge": (
+            "DATA PIPELINE PROTOCOL:\n"
+            "1. Define source schema and target schema\n"
+            "2. Validate input data against schema (JSON Schema / Pydantic)\n"
+            "3. Design extraction → transformation → loading steps\n"
+            "4. Handle format conversion (CSV, JSON, Parquet, XML)\n"
+            "5. Implement error handling and dead-letter queues\n"
+            "6. Add data quality checks at each stage\n"
+            "7. Monitor pipeline health with metrics and alerts"
+        ),
+    },
+    # ── API architecture ───────────────────────────────────────────
+    {
+        "id": "api-design",
+        "name": "API Design",
+        "category": "architecture",
+        "description": "OpenAPI 3.0 specification generation, endpoint analysis, and REST best practices",
+        "keywords": ["api", "openapi", "rest", "endpoint", "swagger", "specification"],
+        "knowledge": (
+            "API DESIGN PROTOCOL:\n"
+            "1. Define resources and their relationships\n"
+            "2. Design RESTful endpoints (proper HTTP methods, status codes)\n"
+            "3. Generate OpenAPI 3.0 specification\n"
+            "4. Define request/response schemas with validation\n"
+            "5. Plan authentication and rate limiting\n"
+            "6. Version API endpoints appropriately\n"
+            "7. Document with examples and error responses"
+        ),
+    },
+    # ── Testing & automation ───────────────────────────────────────
+    {
+        "id": "test-automation",
+        "name": "Test Automation",
+        "category": "testing",
+        "description": "Pytest test generation with async support, fixtures, and coverage analysis",
+        "keywords": ["test", "pytest", "unittest", "coverage", "fixture", "async", "mock"],
+        "knowledge": (
+            "TEST AUTOMATION PROTOCOL:\n"
+            "1. Identify testable units (functions, classes, endpoints)\n"
+            "2. Generate pytest tests with proper fixtures\n"
+            "3. Support async test functions (pytest-asyncio)\n"
+            "4. Create mock objects for external dependencies\n"
+            "5. Aim for edge case coverage (empty, null, boundary)\n"
+            "6. Generate parametrized tests for multiple inputs\n"
+            "7. Report coverage gaps and suggest additional tests"
+        ),
+    },
+    # ── Performance & optimization ─────────────────────────────────
+    {
+        "id": "performance-profiling",
+        "name": "Performance Profiling",
+        "category": "optimization",
+        "description": "Big-O complexity analysis, N+1 query detection, and database index recommendations",
+        "keywords": ["performance", "profiling", "optimization", "n+1", "index", "big-o", "performans"],
+        "knowledge": (
+            "PERFORMANCE PROFILING PROTOCOL:\n"
+            "1. Analyze algorithmic complexity (Big-O notation)\n"
+            "2. Detect N+1 query patterns in ORM usage\n"
+            "3. Identify missing database indexes\n"
+            "4. Profile memory allocation and garbage collection\n"
+            "5. Measure and optimize API response times\n"
+            "6. Recommend caching strategies (Redis, in-memory)\n"
+            "7. Suggest batch processing for bulk operations"
+        ),
+    },
 ]
 
 

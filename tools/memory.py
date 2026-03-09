@@ -758,3 +758,250 @@ def _keyword_recall(
         return results
     finally:
         release_conn(conn)
+
+# ── Advanced Recall ──────────────────────────────────────────────
+
+
+async def advanced_recall(
+    query: str,
+    tags: list[str] | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    similarity_threshold: float = 0.3,
+    memory_type: str | None = None,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Semantic recall with optional tag, date-range, and memory-layer filters."""
+    if not query:
+        raise ValueError("Query cannot be empty")
+
+    embedding = await _get_embedding_async(query)
+
+    conn = get_conn()
+    try:
+        if embedding:
+            emb_str = str(embedding)
+            conditions: list[str] = [
+                f"1 - (embedding <=> %s::vector) >= %s",
+            ]
+            params: list[Any] = [emb_str, similarity_threshold]
+
+            if tags:
+                conditions.append("tags::jsonb ?& %s")
+                params.append(tags)
+            if date_from:
+                conditions.append("created_at >= %s::timestamptz")
+                params.append(date_from)
+            if date_to:
+                conditions.append("created_at <= %s::timestamptz")
+                params.append(date_to)
+            if memory_type:
+                conditions.append("memory_layer = %s")
+                params.append(memory_type)
+
+            where = " AND ".join(conditions)
+            params.append(limit)
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""SELECT id AS memory_id, content, tags,
+                               1 - (embedding <=> %s::vector) AS similarity_score,
+                               created_at
+                        FROM memories
+                        WHERE {where}
+                        ORDER BY similarity_score DESC
+                        LIMIT %s""",
+                    [emb_str] + params,
+                )
+                rows = cur.fetchall()
+
+            return [
+                {
+                    "memory_id": _as_row_dict(r).get("memory_id"),
+                    "content": _as_row_dict(r).get("content"),
+                    "tags": json.loads(_as_row_dict(r).get("tags", "[]"))
+                    if isinstance(_as_row_dict(r).get("tags"), str)
+                    else _as_row_dict(r).get("tags", []),
+                    "similarity_score": round(float(_as_row_dict(r).get("similarity_score", 0)), 4),
+                    "created_at": str(_as_row_dict(r).get("created_at", "")),
+                }
+                for r in rows
+            ]
+        else:
+            # Fallback: keyword search
+            results = _keyword_recall(query, None, limit)
+            return [
+                {
+                    "memory_id": r.get("id"),
+                    "content": r.get("content"),
+                    "tags": r.get("tags", []),
+                    "similarity_score": 0.0,
+                    "created_at": str(r.get("created_at", "")),
+                }
+                for r in results
+            ]
+    finally:
+        release_conn(conn)
+
+
+# ── Tag Management ───────────────────────────────────────────────
+
+
+async def add_tags(memory_id: int, tags: list[str]) -> dict[str, Any]:
+    """Merge new tags into an existing memory (no duplicates)."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, tags FROM memories WHERE id = %s", (memory_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                raise ValueError("Memory not found")
+
+            d = _as_row_dict(row)
+            existing = json.loads(d["tags"]) if isinstance(d["tags"], str) else (d["tags"] or [])
+            merged = list(dict.fromkeys(existing + tags))  # preserve order, no dupes
+
+            cur.execute(
+                "UPDATE memories SET tags = %s, updated_at = now() WHERE id = %s RETURNING id, tags, updated_at",
+                (json.dumps(merged, ensure_ascii=False), memory_id),
+            )
+            updated = _as_row_dict(cur.fetchone())
+        conn.commit()
+
+        return {
+            "memory_id": updated.get("id"),
+            "tags": merged,
+            "updated_at": str(updated.get("updated_at", "")),
+        }
+    finally:
+        release_conn(conn)
+
+
+async def remove_tags(memory_id: int, tags: list[str]) -> dict[str, Any]:
+    """Remove specified tags from an existing memory."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, tags FROM memories WHERE id = %s", (memory_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                raise ValueError("Memory not found")
+
+            d = _as_row_dict(row)
+            existing = json.loads(d["tags"]) if isinstance(d["tags"], str) else (d["tags"] or [])
+            remaining = [t for t in existing if t not in tags]
+
+            cur.execute(
+                "UPDATE memories SET tags = %s, updated_at = now() WHERE id = %s RETURNING id, tags, updated_at",
+                (json.dumps(remaining, ensure_ascii=False), memory_id),
+            )
+            updated = _as_row_dict(cur.fetchone())
+        conn.commit()
+
+        return {
+            "memory_id": updated.get("id"),
+            "tags": remaining,
+            "updated_at": str(updated.get("updated_at", "")),
+        }
+    finally:
+        release_conn(conn)
+
+
+async def list_all_tags() -> list[dict[str, Any]]:
+    """Return every unique tag with its usage count, sorted by count DESC."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT tag, COUNT(*) AS count
+                   FROM (
+                       SELECT jsonb_array_elements_text(tags::jsonb) AS tag
+                       FROM memories
+                   ) sub
+                   GROUP BY tag
+                   ORDER BY count DESC"""
+            )
+            rows = cur.fetchall()
+
+        return [
+            {"tag": _as_row_dict(r).get("tag"), "count": _as_row_dict(r).get("count", 0)}
+            for r in rows
+        ]
+    finally:
+        release_conn(conn)
+
+
+# ── Deduplication-Aware Save ─────────────────────────────────────
+
+
+async def save_memory_with_dedup(
+    content: str,
+    category: str = "general",
+    tags: list[str] | None = None,
+    source_agent: str | None = None,
+    dedup: bool = True,
+) -> dict[str, Any]:
+    """Save memory with automatic deduplication via cosine similarity.
+
+    Thresholds:
+        >= 0.85  → skip (duplicate)
+        0.70-0.85 → update existing
+        < 0.70   → insert new
+    """
+    tags = tags or []
+
+    if not dedup:
+        result = _insert_memory(content, category, "episodic", tags, source_agent)
+        return {"action": "inserted", "memory_id": result["id"]}
+
+    embedding = await _get_embedding_async(content)
+    if not embedding:
+        result = _insert_memory(content, category, "episodic", tags, source_agent)
+        return {"action": "inserted", "memory_id": result["id"]}
+
+    emb_str = str(embedding)
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT id, content,
+                          1 - (embedding <=> %s::vector) AS similarity
+                   FROM memories
+                   WHERE embedding IS NOT NULL
+                   ORDER BY embedding <=> %s::vector
+                   LIMIT 1""",
+                (emb_str, emb_str),
+            )
+            row = cur.fetchone()
+
+        if row:
+            d = _as_row_dict(row)
+            sim = float(d.get("similarity", 0))
+            existing_id = d.get("id")
+
+            if sim >= 0.85:
+                return {"action": "skipped", "memory_id": existing_id}
+
+            if sim >= 0.70:
+                tags_json = json.dumps(tags, ensure_ascii=False)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """UPDATE memories
+                           SET content = %s, category = %s, tags = %s,
+                               source_agent = %s, embedding = %s::vector,
+                               updated_at = now()
+                           WHERE id = %s""",
+                        (content, category, tags_json, source_agent, emb_str, existing_id),
+                    )
+                conn.commit()
+                return {"action": "updated", "memory_id": existing_id}
+
+        # similarity < 0.70 or no existing memories
+        result = _insert_memory(content, category, "episodic", tags, source_agent)
+        return {"action": "inserted", "memory_id": result["id"]}
+    finally:
+        release_conn(conn)

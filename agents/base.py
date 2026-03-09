@@ -131,6 +131,7 @@ class BaseAgent(ABC):
         self._bus = None
         self._handoff_manager = None
         self._task_delegation = None
+        self._perf_collector = None
 
     @abstractmethod
     def system_prompt(self) -> str:
@@ -392,6 +393,18 @@ class BaseAgent(ABC):
                     pass  # keep original error
 
         if response is None:
+            # Record failed metrics
+            try:
+                if self.perf_collector:
+                    self.perf_collector.record(
+                        agent_role=self.role.value if hasattr(self.role, 'value') else str(self.role),
+                        response_time_ms=(time.monotonic() - t0) * 1000,
+                        success=False,
+                        model_name=model_id,
+                        error_message=str(last_error)[:500] if last_error else "Unknown error",
+                    )
+            except Exception:
+                pass
             raise last_error or RuntimeError("LLM call failed with no response")
 
         latency_ms = (time.monotonic() - t0) * 1000
@@ -425,6 +438,21 @@ class BaseAgent(ABC):
                     ))
                 # Strip tool_call tags from content since we parsed them
                 clean_content = _TOOL_CALL_RE.sub("", clean_content).strip()
+
+        # Record performance metrics
+        try:
+            if self.perf_collector:
+                self.perf_collector.record(
+                    agent_role=self.role.value if hasattr(self.role, 'value') else str(self.role),
+                    response_time_ms=latency_ms,
+                    input_tokens=usage.prompt_tokens if usage else 0,
+                    output_tokens=usage.completion_tokens if usage else 0,
+                    total_tokens=usage.total_tokens if usage else 0,
+                    success=True,
+                    model_name=model_id,
+                )
+        except Exception:
+            pass  # Never break LLM flow for metrics
 
         return {
             "content": clean_content,
@@ -655,6 +683,16 @@ class BaseAgent(ABC):
             from core.task_delegation import get_task_delegation_manager
             self._task_delegation = get_task_delegation_manager()
         return self._task_delegation
+
+    @property
+    def perf_collector(self):
+        if self._perf_collector is None:
+            try:
+                from tools.performance_collector import PerformanceCollector
+                self._perf_collector = PerformanceCollector()
+            except Exception:
+                pass
+        return self._perf_collector
 
     async def send_to_agent(
         self, target: str, msg_type, payload: dict, correlation_id: str | None = None,
@@ -1223,6 +1261,40 @@ class BaseAgent(ABC):
 
             stats = get_memory_stats()
             return json.dumps(stats, ensure_ascii=False, indent=2)
+
+        if fn_name == "memory_advanced_search":
+            from tools.memory import advanced_recall
+            results = await advanced_recall(
+                query=fn_args["query"],
+                tags=fn_args.get("tags"),
+                date_from=fn_args.get("date_from"),
+                date_to=fn_args.get("date_to"),
+                similarity_threshold=fn_args.get("similarity_threshold", 0.6),
+                memory_type=fn_args.get("memory_type"),
+                limit=fn_args.get("limit", 10),
+            )
+            return json.dumps(results, ensure_ascii=False, default=str, indent=2)
+
+        if fn_name == "memory_add_tags":
+            from tools.memory import add_tags
+            result = add_tags(
+                memory_id=fn_args["memory_id"],
+                tags=fn_args["tags"],
+            )
+            return json.dumps(result, ensure_ascii=False)
+
+        if fn_name == "memory_remove_tags":
+            from tools.memory import remove_tags
+            result = remove_tags(
+                memory_id=fn_args["memory_id"],
+                tags=fn_args["tags"],
+            )
+            return json.dumps(result, ensure_ascii=False)
+
+        if fn_name == "memory_list_tags":
+            from tools.memory import list_all_tags
+            tags = list_all_tags()
+            return json.dumps(tags, ensure_ascii=False, indent=2)
 
         if fn_name == "find_skill":
             # Try dynamic registry first, fallback to static

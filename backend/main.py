@@ -50,6 +50,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] execution_traces init failed (non-critical): {e}")
 
+    # Run migration 005: agent_metrics_log + skills schema extension
+    try:
+        from tools.pg_connection import get_pg_connection
+        import pathlib
+        _mig_path = pathlib.Path(__file__).parent / "migrations" / "005_performance_metrics.sql"
+        if _mig_path.exists():
+            _mig_sql = _mig_path.read_text(encoding="utf-8")
+            _mig_conn = get_pg_connection()
+            with _mig_conn.cursor() as cur:
+                cur.execute(_mig_sql)
+            _mig_conn.commit()
+            _mig_conn.close()
+            print("[Backend] Migration 005 (agent_metrics_log) applied")
+    except Exception as e:
+        print(f"[Backend] Migration 005 failed (non-critical): {e}")
+
     # Create analytics tables
     try:
         from tools.pg_connection import get_pg_connection
@@ -159,6 +175,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Autonomous chat auto-start failed (non-critical): {e}")
 
+    # Cleanup expired working memory entries
+    try:
+        from tools.memory import cleanup_expired_working_memory
+        cleaned = cleanup_expired_working_memory()
+        if cleaned:
+            print(f"[Backend] Cleaned {cleaned} expired working memory entries")
+    except Exception as e:
+        print(f"[Backend] Working memory cleanup failed (non-critical): {e}")
+
     # Faz 16: Start Self-Improvement Feedback Loop
     try:
         from tools.feedback_loop import get_feedback_loop
@@ -264,6 +289,7 @@ from routes.agent_comm import router as agent_comm_router
 from routes.marketplace import router as marketplace_router
 from routes.self_improvement import router as self_improvement_router
 from routes.presentations import router as presentations_router
+from routes.metrics import router as metrics_router
 
 app.include_router(auth_router)
 app.include_router(skills_router)
@@ -287,6 +313,7 @@ app.include_router(agent_comm_router)
 app.include_router(marketplace_router)
 app.include_router(self_improvement_router)
 app.include_router(presentations_router)
+app.include_router(metrics_router)
 
 print("[Backend] All route modules loaded successfully")
 print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations")

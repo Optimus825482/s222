@@ -73,6 +73,8 @@ def create_skill(
     category: str = "custom",
     keywords: list[str] | None = None,
     source: str = "user",
+    input_schema: dict | None = None,
+    output_schema: dict | None = None,
 ) -> dict[str, Any]:
     """Create or replace a skill — saves to DB + writes Kiro SKILL.md to disk."""
     clean_id = skill_id.lower().replace(" ", "-").strip()
@@ -82,8 +84,8 @@ def create_skill(
     try:
         with conn.cursor() as cur:
             cur.execute(
-                """INSERT INTO skills (id, name, category, description, keywords, knowledge, source)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """INSERT INTO skills (id, name, category, description, keywords, knowledge, source, input_schema, output_schema)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                    ON CONFLICT (id) DO UPDATE SET
                        name = EXCLUDED.name,
                        category = EXCLUDED.category,
@@ -91,9 +93,13 @@ def create_skill(
                        keywords = EXCLUDED.keywords,
                        knowledge = EXCLUDED.knowledge,
                        source = EXCLUDED.source,
+                       input_schema = EXCLUDED.input_schema,
+                       output_schema = EXCLUDED.output_schema,
                        updated_at = now()""",
                 (clean_id, name, category, description,
-                 json.dumps(keywords or []), knowledge, source),
+                 json.dumps(keywords or []), knowledge, source,
+                 json.dumps(input_schema) if input_schema else None,
+                 json.dumps(output_schema) if output_schema else None),
             )
         conn.commit()
         logger.info(f"Skill created: [{clean_id}] {name}")

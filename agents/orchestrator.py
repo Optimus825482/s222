@@ -100,6 +100,36 @@ class OrchestratorAgent(BaseAgent):
     role = AgentRole.ORCHESTRATOR
     model_key = "orchestrator"
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._setup_subscriptions()
+
+    def _setup_subscriptions(self):
+        """Subscribe to relevant EventBus channels."""
+        try:
+            bus = self.bus
+            if bus:
+                bus.subscribe(
+                    agent_role=self.role.value,
+                    channel="task.*",
+                    handler=self._on_task_message,
+                )
+                bus.subscribe(
+                    agent_role=self.role.value,
+                    channel="metrics.*",
+                    handler=self._on_metrics_message,
+                )
+        except Exception:
+            pass  # EventBus not ready yet
+
+    async def _on_task_message(self, msg):
+        """Handle incoming task messages."""
+        pass
+
+    async def _on_metrics_message(self, msg):
+        """Handle metrics messages."""
+        pass
+
     def system_prompt(self) -> str:
         return (
             "You are the Orchestrator of a multi-agent deep research system. "

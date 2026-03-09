@@ -87,6 +87,10 @@ const CostTrackerPanel = dynamic(
   () => import("@/components/cost-tracker-panel"),
   { ssr: false },
 );
+const PerformanceDashboard = dynamic(
+  () => import("@/components/performance-dashboard"),
+  { ssr: false },
+);
 const AutoOptimizerPanel = dynamic(
   () => import("@/components/auto-optimizer-panel"),
   { ssr: false },
@@ -558,6 +562,21 @@ export const APPS: DesktopApp[] = [
     render: () => (
       <div className="p-4 overflow-auto h-full">
         <AutoOptimizerPanel />
+      </div>
+    ),
+  },
+  {
+    id: "performance",
+    title: "Performans",
+    icon: <FeatherIcon name="activity" color="#06b6d4" />,
+    color: "#06b6d4",
+    group: "Analitik",
+    description: "Agent performans metriklerini izleyin.",
+    defaultW: 750,
+    defaultH: 520,
+    render: () => (
+      <div className="p-4 overflow-auto h-full">
+        <PerformanceDashboard />
       </div>
     ),
   },

@@ -171,11 +171,17 @@ class DelegatedTask(BaseModel):
     priority: MessagePriority = MessagePriority.NORMAL
 
     # Execution
-    status: str = "pending"                    # pending, running, completed, failed, cancelled
+    status: str = "pending"                    # pending, running, completed, failed, cancelled, timed_out
     result: str | None = None
     error: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+
+    # Retry & queue
+    retry_count: int = 0
+    max_retries: int = 3
+    queued_at: datetime = Field(default_factory=_now)
+    assigned_at: datetime | None = None
 
     # Timeout
     timeout_seconds: int = 120                 # 2 dakika default

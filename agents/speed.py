@@ -12,6 +12,36 @@ class SpeedAgent(BaseAgent):
     role = AgentRole.SPEED
     model_key = "speed"
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._setup_subscriptions()
+
+    def _setup_subscriptions(self):
+        """Subscribe to relevant EventBus channels."""
+        try:
+            bus = self.bus
+            if bus:
+                bus.subscribe(
+                    agent_role=self.role.value,
+                    channel="task.speed",
+                    handler=self._on_task_message,
+                )
+                bus.subscribe(
+                    agent_role=self.role.value,
+                    channel="broadcast",
+                    handler=self._on_broadcast,
+                )
+        except Exception:
+            pass  # EventBus not ready yet
+
+    async def _on_task_message(self, msg):
+        """Handle incoming task messages."""
+        pass
+
+    async def _on_broadcast(self, msg):
+        """Handle broadcast messages."""
+        pass
+
     def system_prompt(self) -> str:
         return (
             "You are a Speed specialist. Your strength is fast, accurate, direct responses.\n\n"

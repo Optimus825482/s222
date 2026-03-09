@@ -17,7 +17,9 @@ veya Future pattern ile sonucu asenkron olarak alır.
 from __future__ import annotations
 
 import asyncio
+import heapq
 import logging
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -85,6 +87,8 @@ class TaskDelegationManager:
         self._executors: dict[str, Any] = {}
         # Progress callbacks: task_id → callback
         self._progress_callbacks: dict[str, Any] = {}
+        # Priority queue: (priority, timestamp, task_id)
+        self._priority_queue: list[tuple[int, float, str]] = []
 
     def register_executor(
         self,
@@ -108,24 +112,31 @@ class TaskDelegationManager:
         delegate: str,
         description: str,
         input_data: dict[str, Any] | None = None,
-        priority: MessagePriority = MessagePriority.NORMAL,
-        timeout_seconds: int = 120,
+        priority: int = 3,
+        timeout_seconds: float | None = None,
     ) -> str:
         """
         Fire-and-forget görev delegasyonu.
         Returns task_id — sonucu sonra sorgulayabilirsin.
+
+        priority: 1=highest, 5=lowest (default 3)
+        timeout_seconds: per-task timeout, None = no timeout
         """
         task = DelegatedTask(
             delegator=delegator,
             delegate=delegate,
             description=description,
             input_data=input_data or {},
-            priority=priority,
-            timeout_seconds=timeout_seconds,
+            priority=MessagePriority.NORMAL,
+            timeout_seconds=int(timeout_seconds) if timeout_seconds else 120,
+            queued_at=_now(),
         )
 
         self._tasks[task.id] = task
         self._agent_queues[delegate].append(task.id)
+
+        # Push to priority queue
+        heapq.heappush(self._priority_queue, (priority, time.time(), task.id))
 
         # Send via event bus
         envelope = MessageEnvelope(
@@ -138,15 +149,15 @@ class TaskDelegationManager:
                 "task_id": task.id,
                 "description": description,
                 "input_data": input_data or {},
-                "timeout_seconds": timeout_seconds,
+                "timeout_seconds": task.timeout_seconds,
             },
-            priority=priority,
+            priority=MessagePriority.NORMAL,
             delivery=DeliveryGuarantee.AT_LEAST_ONCE,
             correlation_id=task.id,
         )
 
         await self._bus.publish(envelope)
-        logger.info(f"Task delegated: {task.id} ({delegator} → {delegate})")
+        logger.info(f"Task delegated: {task.id} ({delegator} → {delegate}) priority={priority}")
         return task.id
 
     async def delegate_and_wait(
@@ -194,13 +205,25 @@ class TaskDelegationManager:
         tasks: list[tuple[str, str]],  # [(delegate, description), ...]
         input_data: dict[str, Any] | None = None,
         timeout: float = 120.0,
+        allow_partial: bool = True,
+        context: dict[str, Any] | None = None,
     ) -> dict[str, str | None]:
         """
         Fan-out pattern: birden fazla agent'a paralel görev at, hepsini bekle.
+
+        allow_partial=True (default): başarısız görevleri logla, başarılıları döndür.
+        allow_partial=False: herhangi biri başarısız olursa exception fırlat.
+        context: delegator bağlamı, her görevin input_data'sına eklenir.
+
         Returns: {delegate_role: result_or_none}
         """
         coros = []
         delegates = []
+
+        # Merge context into input_data
+        merged_input = dict(input_data or {})
+        if context:
+            merged_input["_delegator_context"] = context
 
         for delegate, description in tasks:
             delegates.append(delegate)
@@ -209,17 +232,31 @@ class TaskDelegationManager:
                     delegator=delegator,
                     delegate=delegate,
                     description=description,
-                    input_data=input_data,
+                    input_data=merged_input,
                     timeout=timeout,
                 )
             )
 
         results = await asyncio.gather(*coros, return_exceptions=True)
 
-        return {
-            delegate: (str(r) if not isinstance(r, Exception) else None)
-            for delegate, r in zip(delegates, results)
-        }
+        output: dict[str, str | None] = {}
+        failed: list[str] = []
+
+        for delegate, r in zip(delegates, results):
+            if isinstance(r, Exception):
+                logger.error(f"Fan-out task failed for {delegate}: {r}")
+                failed.append(delegate)
+                output[delegate] = None
+            else:
+                output[delegate] = str(r) if r is not None else None
+
+        if not allow_partial and failed:
+            raise RuntimeError(
+                f"Fan-out failed for agents: {', '.join(failed)}. "
+                f"Partial results not allowed."
+            )
+
+        return output
 
     async def _on_task_message(self, msg: MessageEnvelope) -> None:
         """EventBus'tan gelen görev mesajlarını işle."""
@@ -241,10 +278,18 @@ class TaskDelegationManager:
         # Execute
         task.status = "running"
         task.started_at = _now()
+        task.assigned_at = _now()
 
         try:
             executor = self._executors[target]
-            result = await executor(task)
+
+            # Wrap with timeout if set
+            if task.timeout_seconds:
+                result = await asyncio.wait_for(
+                    executor(task), timeout=float(task.timeout_seconds)
+                )
+            else:
+                result = await executor(task)
 
             task.status = "completed"
             task.result = result
@@ -269,6 +314,85 @@ class TaskDelegationManager:
                 future.set_result(result)
 
             logger.info(f"Task completed: {task_id} by {target}")
+
+        except asyncio.TimeoutError:
+            task.retry_count += 1
+            task.completed_at = _now()
+
+            if task.retry_count < task.max_retries:
+                # Re-queue for retry
+                task.status = "pending"
+                task.started_at = None
+                task.assigned_at = None
+                task.completed_at = None
+                self._agent_queues[target].append(task.id)
+                heapq.heappush(self._priority_queue, (3, time.time(), task.id))
+
+                # Re-publish task message
+                envelope = MessageEnvelope(
+                    source_agent=task.delegator,
+                    target_agent=target,
+                    channel=f"tasks:{target}",
+                    channel_type=ChannelType.UNICAST,
+                    message_type=MessageType.TASK_REQUEST,
+                    payload={
+                        "task_id": task_id,
+                        "description": task.description,
+                        "input_data": task.input_data,
+                        "timeout_seconds": task.timeout_seconds,
+                    },
+                    priority=MessagePriority.NORMAL,
+                    delivery=DeliveryGuarantee.AT_LEAST_ONCE,
+                    correlation_id=task_id,
+                )
+                await self._bus.publish(envelope)
+                logger.warning(
+                    f"Task timed out, retrying ({task.retry_count}/{task.max_retries}): {task_id}"
+                )
+            else:
+                task.status = "timed_out"
+                task.error = f"Timed out after {task.retry_count} retries"
+
+                await self._bus.send_to_agent(
+                    source=target,
+                    target=task.delegator,
+                    msg_type=MessageType.ERROR,
+                    payload={
+                        "task_id": task_id,
+                        "error": task.error,
+                        "status": "timed_out",
+                    },
+                    correlation_id=task_id,
+                )
+
+                future = self._futures.get(task_id)
+                if future and not future.done():
+                    future.set_exception(
+                        TimeoutError(f"Task {task_id} timed out after {task.retry_count} retries")
+                    )
+
+                logger.error(f"Task timed out permanently: {task_id}")
+
+        except asyncio.CancelledError:
+            task.status = "cancelled"
+            task.completed_at = _now()
+
+            # Publish cancel event
+            await self._bus.publish(MessageEnvelope(
+                source_agent=target,
+                target_agent=task.delegator,
+                channel="task.cancelled",
+                channel_type=ChannelType.BROADCAST,
+                message_type=MessageType.CANCEL,
+                payload={"task_id": task_id, "status": "cancelled"},
+                correlation_id=task_id,
+            ))
+
+            future = self._futures.get(task_id)
+            if future and not future.done():
+                future.cancel()
+
+            logger.info(f"Task cancelled: {task_id}")
 
         except Exception as e:
             task.status = "failed"
@@ -364,17 +488,40 @@ class TaskDelegationManager:
 
     def get_stats(self) -> dict[str, Any]:
         status_counts: dict[str, int] = defaultdict(int)
+        wait_times: list[float] = []
+        completion_times: list[float] = []
+        active_count = 0
+
         for t in self._tasks.values():
             status_counts[t.status] += 1
 
+            if t.status in ("running", "pending"):
+                active_count += 1
+
+            # avg_wait_time: queued_at → started_at for completed tasks
+            if t.started_at and t.queued_at:
+                wait_times.append((t.started_at - t.queued_at).total_seconds())
+
+            # avg_completion_time: started_at → completed_at
+            if t.completed_at and t.started_at:
+                completion_times.append((t.completed_at - t.started_at).total_seconds())
+
         return {
             "total_tasks": len(self._tasks),
+            "active_tasks": active_count,
             "by_status": dict(status_counts),
             "registered_executors": list(self._executors.keys()),
             "agent_queue_sizes": {
                 role: len(ids) for role, ids in self._agent_queues.items()
             },
             "pending_futures": len(self._futures),
+            "priority_queue_size": len(self._priority_queue),
+            "avg_wait_time": (
+                sum(wait_times) / len(wait_times) if wait_times else 0.0
+            ),
+            "avg_completion_time": (
+                sum(completion_times) / len(completion_times) if completion_times else 0.0
+            ),
         }
 
 
