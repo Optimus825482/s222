@@ -1404,12 +1404,31 @@ class BaseAgent(ABC):
             return f"[MCP Error] {result.get('error', 'unknown')}"
 
         if fn_name == "mcp_list_tools":
-            from tools.mcp_client import format_mcp_tools_for_agent
+            from tools.mcp_client import format_mcp_tools_for_agent, list_servers, list_discovered_tools, discover_tools as _discover
             server_id = fn_args.get("server_id")
             formatted = format_mcp_tools_for_agent(server_id)
             if formatted:
                 return formatted
-            return "No MCP tools discovered yet. Register servers first."
+            # No tools cached — try on-demand discovery
+            servers = list_servers(active_only=True)
+            if not servers:
+                return "No MCP servers registered. Use the MCP panel to add servers."
+            discovered = 0
+            for srv in servers:
+                try:
+                    tools = await _discover(srv["id"])
+                    discovered += len(tools)
+                except Exception:
+                    pass
+            if discovered:
+                formatted = format_mcp_tools_for_agent(server_id)
+                if formatted:
+                    return formatted
+            return (
+                f"{len(servers)} MCP servers registered but tool discovery returned 0 tools. "
+                "Servers may not be installed locally (npx/uvx required). "
+                "Available servers: " + ", ".join(s["name"] for s in servers)
+            )
 
         if fn_name == "generate_image":
             import urllib.parse

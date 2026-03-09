@@ -1,0 +1,92 @@
+{
+  "servers": [
+    {
+      "id": "brave-search",
+      "name": "Brave Search",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": { "BRAVE_API_KEY": "" },
+      "description": "Brave Search API"
+    },
+    {
+      "id": "fetch",
+      "name": "Web Fetch",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": {},
+      "description": "URL content fetching"
+    },
+    {
+      "id": "puppeteer",
+      "name": "Puppeteer (Browser)",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+      "env": {},
+      "description": "Headless browser for JS-rendered pages"
+    },
+    {
+      "id": "arxiv",
+      "name": "arXiv Research",
+      "command": "uvx",
+      "args": ["mcp-server-arxiv"],
+      "env": {},
+      "description": "Academic paper search"
+    },
+    {
+      "id": "wikipedia",
+      "name": "Wikipedia",
+      "command": "uvx",
+      "args": ["mcp-server-wikipedia-search"],
+      "env": {},
+      "description": "Wikipedia search and content"
+    },
+    {
+      "id": "yahoo-finance",
+      "name": "Yahoo Finance",
+      "command": "uvx",
+      "args": ["mcp-yahoo-finance"],
+      "env": {},
+      "description": "Stock prices and financial data"
+    },
+    {
+      "id": "time-mcp",
+      "name": "Time & Timezone",
+      "command": "uvx",
+      "args": ["mcp-server-time"],
+      "env": {},
+      "description": "Real-time clock and timezone conversions"
+    },
+    {
+      "id": "filesystem",
+      "name": "Filesystem",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./data"],
+      "env": {},
+      "description": "Local filesystem read/write for data/ directory"
+    },
+    {
+      "id": "sequential-thinking",
+      "name": "Sequential Thinking",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "env": {},
+      "description": "Step-by-step reasoning chain"
+    },
+    {
+      "id": "postgres",
+      "name": "PostgreSQL",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": { "POSTGRES_CONNECTION_STRING": "" },
+      "description": "Direct PostgreSQL queries"
+    },
+    {
+      "id": "sqlite",
+      "name": "SQLite",
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "./data/memory.db"],
+      "env": {},
+      "description": "SQLite database queries"
+    }
+  ]
+}

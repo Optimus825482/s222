@@ -91,14 +91,27 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Analytics tables init failed: {e}")
 
-    # Seed default MCP servers for orchestration
+    # Seed default MCP servers for orchestration + discover tools
     try:
-        from tools.mcp_client import seed_default_servers
+        from tools.mcp_client import seed_default_servers, list_servers, discover_tools
         seeded = seed_default_servers()
         if seeded:
             print(f"[Backend] Seeded {seeded} default MCP servers")
+        # Auto-discover tools from all active servers (background, non-blocking)
+        servers = list_servers(active_only=True)
+        discovered_total = 0
+        for srv in servers:
+            try:
+                tools = await discover_tools(srv["id"])
+                discovered_total += len(tools)
+            except Exception:
+                pass  # Individual server failures are non-critical
+        if discovered_total:
+            print(f"[Backend] Discovered {discovered_total} MCP tools from {len(servers)} servers")
+        else:
+            print(f"[Backend] MCP tool discovery: 0 tools (servers may not be installed locally)")
     except Exception as e:
-        print(f"[Backend] MCP seed failed (non-critical): {e}")
+        print(f"[Backend] MCP seed/discovery failed (non-critical): {e}")
 
     # Workflow cron scheduler (APScheduler + SQLite)
     try:
