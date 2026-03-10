@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetcher } from "@/lib/api";
 import { FeatherIcon } from "@/components/xp/xp-feather-icon";
 
 export default function YoutubeSummarizerPanel() {
@@ -21,15 +22,20 @@ export default function YoutubeSummarizerPanel() {
     setResult(null);
 
     try {
-      const res = await fetch("/api/youtube/summarize", {
+      const data = await fetcher<{
+        title?: string;
+        duration?: string;
+        author?: string;
+        transcript?: string;
+        summary?: string;
+        error?: string;
+      }>("/api/youtube/summarize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      const data = await res.json();
       setResult(data);
     } catch (err) {
-      setResult({ error: "İstek başarısız oldu" });
+      setResult({ error: (err as Error).message || "İstek başarısız oldu" });
     } finally {
       setLoading(false);
     }
@@ -43,8 +49,12 @@ export default function YoutubeSummarizerPanel() {
           <FeatherIcon name="play" color="white" />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-gray-800">YouTube Özetleyici</h2>
-          <p className="text-xs text-gray-600">Video transkripsiyonu ve AI özeti</p>
+          <h2 className="text-lg font-bold text-gray-800">
+            YouTube Özetleyici
+          </h2>
+          <p className="text-xs text-gray-600">
+            Video transkripsiyonu ve AI özeti
+          </p>
         </div>
       </div>
 
@@ -83,7 +93,9 @@ export default function YoutubeSummarizerPanel() {
               {/* Video Info */}
               {result.title && (
                 <div className="p-3 bg-white border border-gray-300 rounded">
-                  <h3 className="font-bold text-gray-800 mb-2">{result.title}</h3>
+                  <h3 className="font-bold text-gray-800 mb-2">
+                    {result.title}
+                  </h3>
                   <div className="flex gap-4 text-sm text-gray-600">
                     {result.author && <span>👤 {result.author}</span>}
                     {result.duration && <span>⏱️ {result.duration}</span>}
@@ -125,7 +137,9 @@ export default function YoutubeSummarizerPanel() {
           <div className="text-center">
             <div className="text-4xl mb-2">🎬</div>
             <p>Bir YouTube URL'si girin</p>
-            <p className="text-xs mt-1">Video transkripsiyonu ve AI özeti alın</p>
+            <p className="text-xs mt-1">
+              Video transkripsiyonu ve AI özeti alın
+            </p>
           </div>
         </div>
       )}
