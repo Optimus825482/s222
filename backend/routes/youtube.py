@@ -57,8 +57,8 @@ class YouTubeSummarizeResponse(BaseModel):
     duration_seconds: Optional[int] = Field(default=None, description="Video duration in seconds")
     channel: Optional[str] = Field(default=None, description="Channel name")
     transcript: str = Field(default="", description="Full transcript text")
-    transcript_language: str = Field(default="", description="Detected/used transcript language")
-    transcript_source: str = Field(default="", description="Source of transcript (subtitles/whisper)")
+    transcript_language: Optional[str] = Field(default=None, description="Detected/used transcript language")
+    transcript_source: Optional[str] = Field(default=None, description="Source of transcript (subtitles/whisper)")
     summary: str = Field(default="", description="AI-generated summary")
     error: Optional[str] = Field(default=None, description="Error message if extraction failed")
 
@@ -69,8 +69,8 @@ class YouTubeTranscriptResponse(BaseModel):
     video_id: str = Field(default="", description="YouTube video ID")
     title: Optional[str] = Field(default=None, description="Video title")
     transcript: str = Field(default="", description="Full transcript text")
-    transcript_language: str = Field(default="", description="Detected/used transcript language")
-    transcript_source: str = Field(default="", description="Source of transcript (subtitles/whisper)")
+    transcript_language: Optional[str] = Field(default=None, description="Detected/used transcript language")
+    transcript_source: Optional[str] = Field(default=None, description="Source of transcript (subtitles/whisper)")
     segments: list[dict] = Field(default_factory=list, description="Transcript segments with timestamps")
     error: Optional[str] = Field(default=None, description="Error message if extraction failed")
 
@@ -364,8 +364,8 @@ async def get_youtube_transcript(
             video_id=video_id,
             title=video_info.get("title"),
             transcript=formatted_transcript,
-            transcript_language=transcript_result.get("language", request.language),
-            transcript_source=transcript_result.get("source", ""),
+            transcript_language=transcript_result.get("language") or request.language,
+            transcript_source=transcript_result.get("source") or "",
             segments=segments[:1000] if segments else [],  # Limit segments
             error=None
         )
@@ -457,8 +457,8 @@ async def summarize_youtube_video(
             duration_seconds=video_info.get("duration_seconds"),
             channel=video_info.get("uploader"),
             transcript=formatted_transcript,
-            transcript_language=result.get("transcript_language", request.language),
-            transcript_source=result.get("transcript_source", ""),
+            transcript_language=result.get("transcript_language") or request.language,
+            transcript_source=result.get("transcript_source") or "",
             summary=summary[:MAX_SUMMARY_LENGTH],
             error=error_msg
         )
