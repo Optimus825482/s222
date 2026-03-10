@@ -172,9 +172,9 @@ def get_circuit_breaker(agent_role: str) -> CircuitBreakerState:
     return _circuit_breakers[agent_role]
 
 
-def is_circuit_open(agent_role: str, config: CircuitBreakerConfig) -> bool:
+def is_circuit_open(agent_role: str, config: CircuitBreakerConfig | None) -> bool:
     """Check if circuit breaker is open for an agent."""
-    if not config.enabled:
+    if config is None or not config.enabled:
         return False
     
     cb = get_circuit_breaker(agent_role)
@@ -194,9 +194,9 @@ def is_circuit_open(agent_role: str, config: CircuitBreakerConfig) -> bool:
     return True
 
 
-def record_success(agent_role: str, config: CircuitBreakerConfig) -> None:
+def record_success(agent_role: str, config: CircuitBreakerConfig | None) -> None:
     """Record a successful call, potentially closing the circuit."""
-    if not config.enabled:
+    if config is None or not config.enabled:
         return
     
     cb = get_circuit_breaker(agent_role)
@@ -205,9 +205,9 @@ def record_success(agent_role: str, config: CircuitBreakerConfig) -> None:
     cb.half_open_successes = 0
 
 
-def record_failure(agent_role: str, config: CircuitBreakerConfig) -> None:
+def record_failure(agent_role: str, config: CircuitBreakerConfig | None) -> None:
     """Record a failed call, potentially opening the circuit."""
-    if not config.enabled:
+    if config is None or not config.enabled:
         return
     
     cb = get_circuit_breaker(agent_role)
