@@ -24,5 +24,3 @@ numpy>=1.26.0
 jsonschema>=4.20.0
 beautifulsoup4>=4.12.0
 exa-py>=1.0.0
-yt-dlp>=2024.1.0
-youtube-transcript-api>=0.6.1
