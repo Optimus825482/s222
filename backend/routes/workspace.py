@@ -4,11 +4,18 @@ Workspace & Agent Events API routes — pi-mom inspired features.
 
 from __future__ import annotations
 
+import os
+import sys
+
+_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Any
 
-from backend.deps import get_current_user
+from deps import get_current_user
 
 router = APIRouter(tags=["workspace"])
 
