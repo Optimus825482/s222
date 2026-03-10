@@ -13,7 +13,7 @@ Components:
 
 from .model_updater import ModelUpdater, TrainingConfig, ModelDelta
 from .aggregator import FederatedAggregator, AggregationStrategy
-from .protocol import FederatedProtocol, NodeInfo, MessageType
+from .protocol import FederatedProtocol, AggregatorProtocol, NodeInfo, MessageType
 from .crypto import DeltaEncryptor, SecureChannel
 
 __all__ = [
@@ -23,6 +23,7 @@ __all__ = [
     "FederatedAggregator",
     "AggregationStrategy",
     "FederatedProtocol",
+    "AggregatorProtocol",
     "NodeInfo",
     "MessageType",
     "DeltaEncryptor",
