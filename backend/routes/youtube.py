@@ -94,6 +94,7 @@ class YouTubeStatusResponse(BaseModel):
     """Response model for YouTube service status."""
     yt_dlp_available: bool
     whisper_available: bool
+    transcript_api_available: bool = False
     features: dict
     whisper_models: list[str]
     supported_urls: list[str]
@@ -192,13 +193,15 @@ async def get_youtube_status(user: dict = Depends(get_current_user)):
     - Supported features
     """
     try:
-        from tools.youtube_summarizer import YT_DLP_AVAILABLE, WHISPER_AVAILABLE
+        from tools.youtube_summarizer import YT_DLP_AVAILABLE, WHISPER_AVAILABLE, TRANSCRIPT_API_AVAILABLE
         
         return YouTubeStatusResponse(
             yt_dlp_available=YT_DLP_AVAILABLE,
             whisper_available=WHISPER_AVAILABLE,
+            transcript_api_available=TRANSCRIPT_API_AVAILABLE,
             features={
-                "video_info": YT_DLP_AVAILABLE,
+                "transcript_api": TRANSCRIPT_API_AVAILABLE,
+                "video_info": True,
                 "subtitle_extraction": YT_DLP_AVAILABLE,
                 "whisper_transcription": WHISPER_AVAILABLE,
             },
