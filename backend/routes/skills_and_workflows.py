@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import sys
 from pathlib import Path
 _parent = str(Path(__file__).parent.parent)
@@ -397,6 +397,8 @@ async def api_domain_tools(domain_id: str):
     except Exception as e:
         raise HTTPException(503, f"Domain skills error: {e}")
 
+
+# ── Domain Expert Endpoints ──────────────────────────────────────────
 
 class DomainExpertRequest(BaseModel):
     domain: str

@@ -70,6 +70,45 @@ FIND_SKILL_TOOL = {
     },
 }
 
+YOUTUBE_SUMMARIZER_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "summarize_video",
+        "description": (
+            "Extract video info, transcript, and summary from a YouTube video. "
+            "Returns title, description, metadata, and transcript (from captions or Whisper transcription). "
+            "Use for researching YouTube content, extracting information from videos."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "YouTube video URL (supports various formats: youtube.com, youtu.be, etc.)",
+                },
+                "language": {
+                    "type": "string",
+                    "description": "Preferred language code for subtitles (default: 'en')",
+                },
+                "use_whisper_fallback": {
+                    "type": "boolean",
+                    "description": "Use Whisper transcription if no subtitles available (default: true)",
+                },
+                "whisper_model": {
+                    "type": "string",
+                    "enum": ["tiny", "base", "small", "medium", "large"],
+                    "description": "Whisper model size for fallback transcription (default: 'base')",
+                },
+                "max_transcript_chars": {
+                    "type": "integer",
+                    "description": "Maximum characters to include in transcript (default: 10000)",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+}
+
 SAVE_MEMORY_TOOL = {
     "type": "function",
     "function": {
@@ -886,6 +925,637 @@ GENERATE_CHART_TOOL = {
     },
 }
 
+# ── OCR Tool ──────────────────────────────────────────────────────
+
+OCR_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "ocr_extract",
+        "description": (
+            "Extract text from images (PNG, JPG, WEBP) and PDFs using OCR. "
+            "Uses Tesseract/pytesseract for image OCR and pdfplumber for PDF text extraction. "
+            "Use when the user provides an image or PDF and wants to extract, read, or analyze its text content. "
+            "Supports multiple languages (eng, tur, deu, fra, spa, etc.). "
+            "Returns extracted text with character count, word count, and confidence score."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "Path to the image or PDF file on disk",
+                },
+                "file_bytes": {
+                    "type": "string",
+                    "description": "Base64-encoded file content (alternative to file_path)",
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "Original filename (required if using file_bytes)",
+                },
+                "lang": {
+                    "type": "string",
+                    "description": "Language code for OCR: eng (English), tur (Turkish), deu (German), fra (French), spa (Spanish), etc.",
+                },
+                "pages": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Specific PDF pages to extract (1-indexed, e.g., [1, 2, 5])",
+                },
+                "extract_tables": {
+                    "type": "boolean",
+                    "description": "Extract tables from PDFs as structured data (default: false)",
+                },
+                "save_output": {
+                    "type": "boolean",
+                    "description": "Save extracted text to a file (default: false)",
+                },
+            },
+        },
+    },
+}
+
+OCR_STATUS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "ocr_status",
+        "description": (
+            "Check OCR service status and capabilities. "
+            "Returns information about installed dependencies, supported formats, and available languages. "
+            "Use before ocr_extract to verify OCR is available."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+}
+
+# ── Webhook System Tools ──────────────────────────────────────────
+
+WEBHOOK_SUBSCRIBE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_subscribe",
+        "description": (
+            "Create a webhook subscription to receive events at an external URL. "
+            "The system will POST event data to the specified URL when matching events occur. "
+            "Supports signature verification (HMAC-SHA256), custom headers, and event filtering. "
+            "Use to integrate with external systems (CI/CD, monitoring, Slack, custom backends)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Subscription name (e.g., 'CI Pipeline Notifier', 'Slack Integration')",
+                },
+                "url": {
+                    "type": "string",
+                    "description": "Webhook URL to receive POST requests (must be HTTPS in production)",
+                },
+                "events": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Event types to subscribe to (e.g., ['agent.task.complete', 'workflow.completed'])",
+                },
+                "secret": {
+                    "type": "string",
+                    "description": "Optional secret for HMAC-SHA256 signature (auto-generated if omitted)",
+                },
+                "filters": {
+                    "type": "object",
+                    "description": "Optional filters: only trigger when payload matches these key-value pairs",
+                },
+                "headers": {
+                    "type": "object",
+                    "description": "Optional custom headers to include in webhook requests",
+                    "additionalProperties": {"type": "string"},
+                },
+            },
+            "required": ["name", "url", "events"],
+        },
+    },
+}
+
+WEBHOOK_UNSUBSCRIBE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_unsubscribe",
+        "description": (
+            "Delete a webhook subscription. "
+            "No more events will be sent to the subscribed URL."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subscription_id": {
+                    "type": "string",
+                    "description": "Subscription ID to delete",
+                },
+            },
+            "required": ["subscription_id"],
+        },
+    },
+}
+
+WEBHOOK_LIST_SUBSCRIPTIONS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_list_subscriptions",
+        "description": (
+            "List all webhook subscriptions with optional filters. "
+            "Use to see what webhooks are configured and their status."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["active", "paused", "disabled"],
+                    "description": "Filter by subscription status",
+                },
+                "event_type": {
+                    "type": "string",
+                    "description": "Filter by event type (subscriptions that include this event)",
+                },
+            },
+        },
+    },
+}
+
+WEBHOOK_TRIGGER_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_trigger",
+        "description": (
+            "Manually trigger a webhook event to all matching subscriptions. "
+            "Use for testing webhooks or triggering external integrations. "
+            "The event will be dispatched to all active subscriptions that subscribe to this event type."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "event_type": {
+                    "type": "string",
+                    "description": "Event type to trigger (e.g., 'agent.task.complete', 'custom.event')",
+                },
+                "data": {
+                    "type": "object",
+                    "description": "Event data payload to send",
+                },
+                "source": {
+                    "type": "string",
+                    "description": "Source identifier (default: 'agent')",
+                },
+            },
+            "required": ["event_type", "data"],
+        },
+    },
+}
+
+WEBHOOK_SEND_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_send",
+        "description": (
+            "Send a one-time webhook POST request to an external URL. "
+            "Includes HMAC-SHA256 signature for verification by the receiver. "
+            "Use for ad-hoc integrations without creating a subscription."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Target webhook URL",
+                },
+                "payload": {
+                    "type": "object",
+                    "description": "JSON payload to send",
+                },
+                "secret": {
+                    "type": "string",
+                    "description": "Secret for HMAC signature (required for verification)",
+                },
+                "headers": {
+                    "type": "object",
+                    "description": "Additional headers to include",
+                    "additionalProperties": {"type": "string"},
+                },
+            },
+            "required": ["url", "payload", "secret"],
+        },
+    },
+}
+
+WEBHOOK_RECEIVE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_receive",
+        "description": (
+            "Receive and log an incoming webhook with optional signature verification. "
+            "Use when external systems send webhooks to this platform. "
+            "Returns verification status and logs the webhook for processing."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "description": "Source identifier (e.g., 'github', 'stripe', 'custom')",
+                },
+                "payload": {
+                    "type": "object",
+                    "description": "Webhook payload received",
+                },
+                "headers": {
+                    "type": "object",
+                    "description": "Request headers from the webhook",
+                    "additionalProperties": {"type": "string"},
+                },
+                "signature": {
+                    "type": "string",
+                    "description": "Signature header value (e.g., X-Hub-Signature-256)",
+                },
+                "expected_secret": {
+                    "type": "string",
+                    "description": "Secret to verify signature (if signature is provided)",
+                },
+                "event_type": {
+                    "type": "string",
+                    "description": "Event type extracted from payload (optional)",
+                },
+            },
+            "required": ["source", "payload"],
+        },
+    },
+}
+
+WEBHOOK_DELIVERY_HISTORY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_delivery_history",
+        "description": (
+            "Get webhook delivery history with optional filters. "
+            "Use to debug webhook issues, check delivery status, or retry failed deliveries."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subscription_id": {
+                    "type": "string",
+                    "description": "Filter by subscription ID",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["pending", "delivered", "failed", "retrying"],
+                    "description": "Filter by delivery status",
+                },
+                "event_type": {
+                    "type": "string",
+                    "description": "Filter by event type",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum results to return (default 50)",
+                },
+            },
+        },
+    },
+}
+
+WEBHOOK_RETRY_DELIVERY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_retry_delivery",
+        "description": (
+            "Retry a failed webhook delivery. "
+            "Use when a webhook delivery failed and you want to attempt redelivery."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "delivery_id": {
+                    "type": "string",
+                    "description": "Delivery ID to retry",
+                },
+            },
+            "required": ["delivery_id"],
+        },
+    },
+}
+
+WEBHOOK_STATS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_stats",
+        "description": (
+            "Get webhook system statistics. "
+            "Returns counts of subscriptions, deliveries, incoming webhooks, and success rates."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+}
+
+WEBHOOK_PAUSE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_pause",
+        "description": (
+            "Pause a webhook subscription (stop sending webhooks temporarily). "
+            "Use when the target endpoint is down or during maintenance."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subscription_id": {
+                    "type": "string",
+                    "description": "Subscription ID to pause",
+                },
+            },
+            "required": ["subscription_id"],
+        },
+    },
+}
+
+WEBHOOK_RESUME_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "webhook_resume",
+        "description": (
+            "Resume a paused webhook subscription. "
+            "Webhooks will be sent to the subscription URL again."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subscription_id": {
+                    "type": "string",
+                    "description": "Subscription ID to resume",
+                },
+            },
+            "required": ["subscription_id"],
+        },
+    },
+}
+
+# Webhook tools combined
+WEBHOOK_TOOLS = [
+    WEBHOOK_SUBSCRIBE_TOOL,
+    WEBHOOK_UNSUBSCRIBE_TOOL,
+    WEBHOOK_LIST_SUBSCRIPTIONS_TOOL,
+    WEBHOOK_TRIGGER_TOOL,
+    WEBHOOK_SEND_TOOL,
+    WEBHOOK_RECEIVE_TOOL,
+    WEBHOOK_DELIVERY_HISTORY_TOOL,
+    WEBHOOK_RETRY_DELIVERY_TOOL,
+    WEBHOOK_STATS_TOOL,
+    WEBHOOK_PAUSE_TOOL,
+    WEBHOOK_RESUME_TOOL,
+]
+
+# ── Email Sender Tools ─────────────────────────────────────────────
+
+EMAIL_SEND_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "email_send",
+        "description": (
+            "Send an email via SMTP. Supports HTML and plain text, CC/BCC, attachments, "
+            "and custom headers. Works with Gmail, Outlook, Yahoo, and custom SMTP servers. "
+            "Use for sending notifications, reports, alerts, or any email communication. "
+            "For Gmail/Outlook, use App Passwords instead of regular passwords."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "smtp_host": {
+                    "type": "string",
+                    "description": "SMTP server hostname (e.g., 'smtp.gmail.com', 'smtp.office365.com')",
+                },
+                "smtp_port": {
+                    "type": "integer",
+                    "description": "SMTP port (default: 587 for TLS, 465 for SSL)",
+                },
+                "smtp_user": {
+                    "type": "string",
+                    "description": "SMTP username (usually email address)",
+                },
+                "smtp_password": {
+                    "type": "string",
+                    "description": "SMTP password or App Password for Gmail/Outlook",
+                },
+                "use_tls": {
+                    "type": "boolean",
+                    "description": "Use STARTTLS (default: true)",
+                },
+                "use_ssl": {
+                    "type": "boolean",
+                    "description": "Use SMTP over SSL (default: false, use for port 465)",
+                },
+                "to": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Recipient email address(es)",
+                },
+                "subject": {
+                    "type": "string",
+                    "description": "Email subject line",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Plain text body (optional if html_body provided)",
+                },
+                "html_body": {
+                    "type": "string",
+                    "description": "HTML body for rich formatting (optional)",
+                },
+                "cc": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "CC recipient(s) (optional)",
+                },
+                "bcc": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "BCC recipient(s) (optional)",
+                },
+                "reply_to": {
+                    "type": "string",
+                    "description": "Reply-to email address (optional)",
+                },
+                "from_name": {
+                    "type": "string",
+                    "description": "Display name for sender (optional)",
+                },
+                "attachments": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "filename": {"type": "string", "description": "Attachment filename"},
+                            "file_path": {"type": "string", "description": "Path to file on disk"},
+                            "content_base64": {"type": "string", "description": "Base64-encoded file content"},
+                            "content_type": {"type": "string", "description": "MIME type (auto-detected from filename)"},
+                        },
+                    },
+                    "description": "File attachments (optional)",
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["low", "normal", "high"],
+                    "description": "Email priority (default: normal)",
+                },
+            },
+            "required": ["smtp_host", "smtp_user", "smtp_password", "to", "subject"],
+        },
+    },
+}
+
+EMAIL_SEND_TEMPLATE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "email_send_template",
+        "description": (
+            "Send an email using a pre-defined template. Templates support variable substitution. "
+            "Built-in templates: 'welcome', 'password_reset', 'notification', 'weekly_report', 'simple'. "
+            "Use for common email patterns like welcome emails, password resets, notifications. "
+            "Templates automatically handle HTML and plain text versions."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "smtp_host": {
+                    "type": "string",
+                    "description": "SMTP server hostname",
+                },
+                "smtp_port": {
+                    "type": "integer",
+                    "description": "SMTP port (default: 587)",
+                },
+                "smtp_user": {
+                    "type": "string",
+                    "description": "SMTP username",
+                },
+                "smtp_password": {
+                    "type": "string",
+                    "description": "SMTP password or App Password",
+                },
+                "use_tls": {
+                    "type": "boolean",
+                    "description": "Use STARTTLS (default: true)",
+                },
+                "use_ssl": {
+                    "type": "boolean",
+                    "description": "Use SMTP over SSL (default: false)",
+                },
+                "template_name": {
+                    "type": "string",
+                    "description": "Template name: welcome, password_reset, notification, weekly_report, simple",
+                    "enum": ["welcome", "password_reset", "notification", "weekly_report", "simple"],
+                },
+                "to": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Recipient email address(es)",
+                },
+                "variables": {
+                    "type": "object",
+                    "description": "Template variables to substitute (e.g., {'user_name': 'John', 'company_name': 'Acme'})",
+                },
+                "cc": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "CC recipient(s) (optional)",
+                },
+                "bcc": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "BCC recipient(s) (optional)",
+                },
+                "from_name": {
+                    "type": "string",
+                    "description": "Display name for sender (optional)",
+                },
+                "attachments": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "filename": {"type": "string"},
+                            "file_path": {"type": "string"},
+                            "content_base64": {"type": "string"},
+                        },
+                    },
+                    "description": "File attachments (optional)",
+                },
+            },
+            "required": ["smtp_host", "smtp_user", "smtp_password", "template_name", "to", "variables"],
+        },
+    },
+}
+
+EMAIL_LIST_TEMPLATES_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "email_list_templates",
+        "description": (
+            "List available email templates and their variables. "
+            "Use to discover which templates exist and what variables they require."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+}
+
+EMAIL_TEST_SMTP_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "email_test_smtp",
+        "description": (
+            "Test SMTP connection without sending an email. "
+            "Use to verify SMTP credentials before sending important emails. "
+            "Returns connection status and server info."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "smtp_host": {
+                    "type": "string",
+                    "description": "SMTP server hostname",
+                },
+                "smtp_port": {
+                    "type": "integer",
+                    "description": "SMTP port (default: 587)",
+                },
+                "smtp_user": {
+                    "type": "string",
+                    "description": "SMTP username",
+                },
+                "smtp_password": {
+                    "type": "string",
+                    "description": "SMTP password or App Password",
+                },
+                "use_tls": {
+                    "type": "boolean",
+                    "description": "Use STARTTLS (default: true)",
+                },
+                "use_ssl": {
+                    "type": "boolean",
+                    "description": "Use SMTP over SSL (default: false)",
+                },
+            },
+            "required": ["smtp_host", "smtp_user", "smtp_password"],
+        },
+    },
+}
+
 # ── Workflow Engine Tools ─────────────────────────────────────────
 
 RUN_WORKFLOW_TOOL = {
@@ -1040,6 +1710,242 @@ CHECK_ERROR_PATTERNS_TOOL = {
     },
 }
 
+# ── Self-Managing Workspace Tools (pi-mom inspired) ──────────────
+
+WORKSPACE_CREATE_SKILL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_create_skill",
+        "description": (
+            "Create an executable skill (script + docs) in your agent workspace. "
+            "Unlike create_skill which stores knowledge, this creates RUNNABLE scripts "
+            "that you can execute later. Inspired by pi-mom's self-managing tools. "
+            "Example: create a data-analyzer skill with a Python script that processes CSV files."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "skill_name": {
+                    "type": "string",
+                    "description": "Kebab-case skill name (e.g. 'data-analyzer', 'log-parser')",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "What this skill does",
+                },
+                "usage_instructions": {
+                    "type": "string",
+                    "description": "Markdown instructions on how to use the skill",
+                },
+                "scripts": {
+                    "type": "object",
+                    "description": "Script files: {'main.py': 'code', 'helper.sh': 'code'}",
+                    "additionalProperties": {"type": "string"},
+                },
+            },
+            "required": ["skill_name", "description", "scripts"],
+        },
+    },
+}
+
+WORKSPACE_RUN_SCRIPT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_run_script",
+        "description": (
+            "Execute a script from your workspace skills. "
+            "Runs in a sandboxed subprocess with timeout protection. "
+            "Use after workspace_create_skill to run the tools you created."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "skill_name": {
+                    "type": "string",
+                    "description": "Skill name containing the script",
+                },
+                "script_name": {
+                    "type": "string",
+                    "description": "Script filename to execute (e.g. 'main.py')",
+                },
+                "args": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Command-line arguments to pass",
+                },
+                "stdin_data": {
+                    "type": "string",
+                    "description": "Data to pipe to stdin",
+                },
+            },
+            "required": ["skill_name", "script_name"],
+        },
+    },
+}
+
+WORKSPACE_LIST_SKILLS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_list_skills",
+        "description": "List all executable skills in your agent workspace.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+}
+
+WORKSPACE_SCRATCH_WRITE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_scratch_write",
+        "description": (
+            "Write a file to your scratch space for intermediate work. "
+            "Use for temp data, intermediate results, or working files."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string", "description": "Filename to write"},
+                "content": {"type": "string", "description": "File content"},
+            },
+            "required": ["filename", "content"],
+        },
+    },
+}
+
+WORKSPACE_SCRATCH_READ_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_scratch_read",
+        "description": "Read a file from your scratch space.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string", "description": "Filename to read"},
+            },
+            "required": ["filename"],
+        },
+    },
+}
+
+# Workspace tools combined
+WORKSPACE_TOOLS = [
+    WORKSPACE_CREATE_SKILL_TOOL,
+    WORKSPACE_RUN_SCRIPT_TOOL,
+    WORKSPACE_LIST_SKILLS_TOOL,
+    WORKSPACE_SCRATCH_WRITE_TOOL,
+    WORKSPACE_SCRATCH_READ_TOOL,
+]
+
+# ── Agent Event Tools (pi-mom inspired) ──────────────────────────
+
+AGENT_EVENT_CREATE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "agent_event_create",
+        "description": (
+            "Create a scheduled event that wakes up an agent. Three types: "
+            "immediate (triggers now), one-shot (triggers at specific time, auto-deletes), "
+            "periodic (triggers on cron schedule, persists). "
+            "Use for reminders, periodic checks, or triggering agent actions."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "event_type": {
+                    "type": "string",
+                    "enum": ["immediate", "one-shot", "periodic"],
+                    "description": "Event type",
+                },
+                "target_agent": {
+                    "type": "string",
+                    "enum": ["orchestrator", "thinker", "researcher", "reasoner", "speed", "critic"],
+                    "description": "Which agent to wake up",
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Message/instruction for the agent when triggered",
+                },
+                "schedule": {
+                    "type": "string",
+                    "description": "Cron expression for periodic events (e.g. '0 9 * * 1-5' for weekdays at 9am)",
+                },
+                "trigger_at": {
+                    "type": "string",
+                    "description": "ISO datetime for one-shot events (e.g. '2026-03-15T09:00:00+03:00')",
+                },
+            },
+            "required": ["event_type", "target_agent", "message"],
+        },
+    },
+}
+
+AGENT_EVENT_LIST_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "agent_event_list",
+        "description": "List active agent events with optional filters.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "target_agent": {
+                    "type": "string",
+                    "description": "Filter by target agent",
+                },
+            },
+        },
+    },
+}
+
+AGENT_EVENT_DELETE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "agent_event_delete",
+        "description": "Delete a scheduled agent event.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "event_id": {"type": "string", "description": "Event ID to delete"},
+            },
+            "required": ["event_id"],
+        },
+    },
+}
+
+# Agent event tools combined
+AGENT_EVENT_TOOLS = [
+    AGENT_EVENT_CREATE_TOOL,
+    AGENT_EVENT_LIST_TOOL,
+    AGENT_EVENT_DELETE_TOOL,
+]
+
+# ── Context Search Tool (pi-mom's grep on log.jsonl) ─────────────
+
+SEARCH_THREAD_HISTORY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_thread_history",
+        "description": (
+            "Search through full thread event history for older context. "
+            "Like grepping through conversation logs when the current context "
+            "has been compacted. Use when you need to recall something from "
+            "earlier in the conversation that may have been summarized away."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search term (case-insensitive)",
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Max results (default 10)",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+}
+
 # ── Orchestrator Tools ───────────────────────────────────────────
 
 ORCHESTRATOR_TOOLS = [
@@ -1174,6 +2080,8 @@ ORCHESTRATOR_TOOLS = [
     RESEARCH_CREATE_SKILL_TOOL,
     GENERATE_IMAGE_TOOL,
     GENERATE_CHART_TOOL,
+    OCR_TOOL,
+    OCR_STATUS_TOOL,
     RUN_WORKFLOW_TOOL,
     LIST_WORKFLOWS_TOOL,
     DOMAIN_EXPERT_TOOL,
@@ -1210,12 +2118,23 @@ ORCHESTRATOR_TOOLS = [
             },
         },
     },
+    # Email Tools
+    EMAIL_SEND_TOOL,
+    EMAIL_SEND_TEMPLATE_TOOL,
+    EMAIL_LIST_TEMPLATES_TOOL,
+    EMAIL_TEST_SMTP_TOOL,
     # Inter-Agent Communication
     SEND_AGENT_MESSAGE_TOOL,
     CHECK_AGENT_MESSAGES_TOOL,
     SHARE_KNOWLEDGE_TOOL,
     GET_SHARED_KNOWLEDGE_TOOL,
     SUGGEST_COLLABORATOR_TOOL,
+    # Self-Managing Workspace (pi-mom inspired)
+    *WORKSPACE_TOOLS,
+    # Agent Events (pi-mom inspired)
+    *AGENT_EVENT_TOOLS,
+    # Context History Search
+    SEARCH_THREAD_HISTORY_TOOL,
 ]
 
 # ── Researcher Tools ─────────────────────────────────────────────
@@ -1223,6 +2142,7 @@ ORCHESTRATOR_TOOLS = [
 RESEARCHER_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    YOUTUBE_SUMMARIZER_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
     LIST_MEMORIES_TOOL,
@@ -1235,16 +2155,26 @@ RESEARCHER_TOOLS = [
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
     GENERATE_CHART_TOOL,
+    OCR_TOOL,
+    OCR_STATUS_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Email Tools
+    EMAIL_SEND_TOOL,
+    EMAIL_SEND_TEMPLATE_TOOL,
+    EMAIL_LIST_TEMPLATES_TOOL,
+    EMAIL_TEST_SMTP_TOOL,
     # Inter-Agent Communication
     SEND_AGENT_MESSAGE_TOOL,
     CHECK_AGENT_MESSAGES_TOOL,
     SHARE_KNOWLEDGE_TOOL,
     GET_SHARED_KNOWLEDGE_TOOL,
     SUGGEST_COLLABORATOR_TOOL,
+    # Self-Managing Workspace
+    *WORKSPACE_TOOLS,
+    SEARCH_THREAD_HISTORY_TOOL,
 ]
 
 # ── Thinker Tools ────────────────────────────────────────────────
@@ -1265,16 +2195,26 @@ THINKER_TOOLS = [
     GET_AGENT_BASELINE_TOOL,
     GENERATE_IMAGE_TOOL,
     GENERATE_CHART_TOOL,
+    OCR_TOOL,
+    OCR_STATUS_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Email Tools
+    EMAIL_SEND_TOOL,
+    EMAIL_SEND_TEMPLATE_TOOL,
+    EMAIL_LIST_TEMPLATES_TOOL,
+    EMAIL_TEST_SMTP_TOOL,
     # Inter-Agent Communication
     SEND_AGENT_MESSAGE_TOOL,
     CHECK_AGENT_MESSAGES_TOOL,
     SHARE_KNOWLEDGE_TOOL,
     GET_SHARED_KNOWLEDGE_TOOL,
     SUGGEST_COLLABORATOR_TOOL,
+    # Self-Managing Workspace
+    *WORKSPACE_TOOLS,
+    SEARCH_THREAD_HISTORY_TOOL,
 ]
 
 # ── Speed Tools ──────────────────────────────────────────────────
@@ -1295,16 +2235,26 @@ SPEED_TOOLS = [
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
     GENERATE_CHART_TOOL,
+    OCR_TOOL,
+    OCR_STATUS_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Email Tools
+    EMAIL_SEND_TOOL,
+    EMAIL_SEND_TEMPLATE_TOOL,
+    EMAIL_LIST_TEMPLATES_TOOL,
+    EMAIL_TEST_SMTP_TOOL,
     # Inter-Agent Communication
     SEND_AGENT_MESSAGE_TOOL,
     CHECK_AGENT_MESSAGES_TOOL,
     SHARE_KNOWLEDGE_TOOL,
     GET_SHARED_KNOWLEDGE_TOOL,
     SUGGEST_COLLABORATOR_TOOL,
+    # Self-Managing Workspace
+    *WORKSPACE_TOOLS,
+    SEARCH_THREAD_HISTORY_TOOL,
 ]
 
 # ── Reasoner Tools ───────────────────────────────────────────────
@@ -1325,16 +2275,26 @@ REASONER_TOOLS = [
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
     GENERATE_CHART_TOOL,
+    OCR_TOOL,
+    OCR_STATUS_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Email Tools
+    EMAIL_SEND_TOOL,
+    EMAIL_SEND_TEMPLATE_TOOL,
+    EMAIL_LIST_TEMPLATES_TOOL,
+    EMAIL_TEST_SMTP_TOOL,
     # Inter-Agent Communication
     SEND_AGENT_MESSAGE_TOOL,
     CHECK_AGENT_MESSAGES_TOOL,
     SHARE_KNOWLEDGE_TOOL,
     GET_SHARED_KNOWLEDGE_TOOL,
     SUGGEST_COLLABORATOR_TOOL,
+    # Self-Managing Workspace
+    *WORKSPACE_TOOLS,
+    SEARCH_THREAD_HISTORY_TOOL,
 ]
 
 # ── Critic Tools (DeepSeek) ────────────────────────────────────────
@@ -1354,16 +2314,26 @@ CRITIC_TOOLS = [
     LIST_TEACHINGS_TOOL,
     GENERATE_IMAGE_TOOL,
     GENERATE_CHART_TOOL,
+    OCR_TOOL,
+    OCR_STATUS_TOOL,
     DOMAIN_EXPERT_TOOL,
     LIST_DOMAIN_TOOLS_TOOL,
     MCP_CALL_TOOL,
     MCP_LIST_TOOLS_TOOL,
+    # Email Tools
+    EMAIL_SEND_TOOL,
+    EMAIL_SEND_TEMPLATE_TOOL,
+    EMAIL_LIST_TEMPLATES_TOOL,
+    EMAIL_TEST_SMTP_TOOL,
     # Inter-Agent Communication
     SEND_AGENT_MESSAGE_TOOL,
     CHECK_AGENT_MESSAGES_TOOL,
     SHARE_KNOWLEDGE_TOOL,
     GET_SHARED_KNOWLEDGE_TOOL,
     SUGGEST_COLLABORATOR_TOOL,
+    # Self-Managing Workspace
+    *WORKSPACE_TOOLS,
+    SEARCH_THREAD_HISTORY_TOOL,
 ]
 
 # ── Agent → Tools Mapping ────────────────────────────────────────

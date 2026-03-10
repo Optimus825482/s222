@@ -1923,6 +1923,359 @@ class BaseAgent(ABC):
             parts.append(f"Inject into sub-tasks by adding '{result['id']}' to the skills list.")
             return "\n".join(parts)
 
+        if fn_name == "ocr_extract":
+            from tools.ocr_service import extract_text, format_ocr_result
+            # Determine source from arguments
+            file_path = fn_args.get("file_path")
+            file_bytes = fn_args.get("file_bytes")
+            filename = fn_args.get("filename")
+            language = fn_args.get("lang", "eng")
+            pages = fn_args.get("pages")
+            extract_tables = fn_args.get("extract_tables", False)
+
+            # Handle page list format
+            if pages and isinstance(pages, list):
+                pages = ",".join(str(p) for p in pages)
+
+            if not file_path and not file_bytes:
+                return self._tool_error(
+                    "ocr_missing_source",
+                    "Either file_path or file_bytes is required",
+                    "Provide a file path or base64-encoded file content.",
+                )
+
+            # Prefer file_path, fallback to file_bytes
+            if file_path:
+                source = file_path
+            else:
+                source = file_bytes
+
+            result = await extract_text(
+                source=source,
+                source_type="auto",
+                language=language,
+                pages=pages,
+                extract_tables=extract_tables,
+            )
+
+            if result.get("error"):
+                return self._tool_error(
+                    "ocr_extraction_failed",
+                    result["error"],
+                    "Verify the file exists and is a valid image or PDF. Check OCR dependencies.",
+                )
+
+            # Save output if requested
+            if fn_args.get("save_output") and result.get("text"):
+                import os
+                output_dir = os.path.join("data", "ocr_output")
+                os.makedirs(output_dir, exist_ok=True)
+                import uuid
+                output_filename = f"ocr_{uuid.uuid4().hex[:8]}.txt"
+                output_path = os.path.join(output_dir, output_filename)
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(result["text"])
+                result["saved_to"] = output_path
+
+            return format_ocr_result(result)
+
+        if fn_name == "ocr_status":
+            from tools.ocr_service import _ensure_imports, _check_tesseract_installed, LANGUAGE_MAP
+            import shutil
+
+            _ensure_imports()
+
+            status = {
+                "available": True,
+                "dependencies": {},
+                "supported_formats": {
+                    "images": [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff"],
+                    "pdfs": [".pdf"],
+                },
+                "languages": list(set(LANGUAGE_MAP.values())),
+            }
+
+            # Check PIL
+            try:
+                from PIL import Image
+                status["dependencies"]["pillow"] = "installed"
+            except ImportError:
+                status["dependencies"]["pillow"] = "not installed"
+                status["available"] = False
+
+            # Check pytesseract
+            try:
+                import pytesseract
+                status["dependencies"]["pytesseract"] = "installed"
+            except ImportError:
+                status["dependencies"]["pytesseract"] = "not installed"
+                status["available"] = False
+
+            # Check Tesseract binary
+            if _check_tesseract_installed():
+                status["dependencies"]["tesseract_binary"] = "installed"
+                # Try to get installed languages
+                try:
+                    import pytesseract
+                    langs = pytesseract.get_languages()
+                    status["installed_languages"] = langs
+                except Exception:
+                    status["installed_languages"] = ["unknown"]
+            else:
+                status["dependencies"]["tesseract_binary"] = "not installed"
+                status["available"] = False
+
+            # Check pdfplumber
+            try:
+                import pdfplumber
+                status["dependencies"]["pdfplumber"] = "installed"
+            except ImportError:
+                status["dependencies"]["pdfplumber"] = "not installed"
+                # PDF support is optional, don't mark as unavailable
+
+            # Format response
+            if status["available"]:
+                return (
+                    f"OCR Service Status: AVAILABLE\n"
+                    f"- Pillow: {status['dependencies'].get('pillow', 'unknown')}\n"
+                    f"- pytesseract: {status['dependencies'].get('pytesseract', 'unknown')}\n"
+                    f"- tesseract binary: {status['dependencies'].get('tesseract_binary', 'unknown')}\n"
+                    f"- pdfplumber: {status['dependencies'].get('pdfplumber', 'not installed')}\n"
+                    f"- Supported images: {', '.join(status['supported_formats']['images'])}\n"
+                    f"- PDF support: {'yes' if status['dependencies'].get('pdfplumber') == 'installed' else 'no'}\n"
+                    f"- Installed languages: {', '.join(status.get('installed_languages', ['eng']))}"
+                )
+            else:
+                missing = [k for k, v in status["dependencies"].items() if v == "not installed"]
+                return (
+                    f"OCR Service Status: UNAVAILABLE\n"
+                    f"Missing dependencies: {', '.join(missing)}\n"
+                    f"Install with: pip install pytesseract pdfplumber Pillow && apt-get install tesseract-ocr"
+                )
+
+        # ── YouTube Summarizer Tool ─────────────────────────────────────
+        if fn_name == "summarize_video":
+            from tools.youtube_summarizer import summarize_video as yt_summarize, format_video_summary
+            
+            result = await yt_summarize(
+                url=fn_args["url"],
+                language=fn_args.get("language", "en"),
+                use_whisper_fallback=fn_args.get("use_whisper_fallback", True),
+                whisper_model=fn_args.get("whisper_model", "base"),
+                max_transcript_chars=fn_args.get("max_transcript_chars", 10000),
+            )
+            
+            if result.get("errors"):
+                return format_video_summary(result)
+            
+            return format_video_summary(result)
+
+        # ── Email Sender Tools ───────────────────────────────────────────
+        if fn_name == "email_send":
+            from tools.email_sender import send_email, format_email_result, SMTPConfig
+            
+            # Build SMTP config from args
+            smtp_config = SMTPConfig(
+                host=fn_args["smtp_host"],
+                port=fn_args.get("smtp_port", 587),
+                username=fn_args["smtp_user"],
+                password=fn_args["smtp_password"],
+                use_tls=fn_args.get("use_tls", True),
+                use_ssl=fn_args.get("use_ssl", False),
+            )
+            
+            result = await send_email(
+                smtp_config=smtp_config,
+                to=fn_args["to"],
+                subject=fn_args["subject"],
+                body=fn_args.get("body"),
+                html_body=fn_args.get("html_body"),
+                cc=fn_args.get("cc"),
+                bcc=fn_args.get("bcc"),
+                reply_to=fn_args.get("reply_to"),
+                from_name=fn_args.get("from_name"),
+                attachments=fn_args.get("attachments"),
+                headers=fn_args.get("headers"),
+                priority=fn_args.get("priority", "normal"),
+            )
+            
+            return format_email_result(result)
+
+        if fn_name == "email_send_template":
+            from tools.email_sender import send_template_email, format_email_result, SMTPConfig
+            
+            # Build SMTP config from args
+            smtp_config = SMTPConfig(
+                host=fn_args["smtp_host"],
+                port=fn_args.get("smtp_port", 587),
+                username=fn_args["smtp_user"],
+                password=fn_args["smtp_password"],
+                use_tls=fn_args.get("use_tls", True),
+                use_ssl=fn_args.get("use_ssl", False),
+            )
+            
+            result = await send_template_email(
+                smtp_config=smtp_config,
+                template_name=fn_args["template_name"],
+                to=fn_args["to"],
+                variables=fn_args["variables"],
+                cc=fn_args.get("cc"),
+                bcc=fn_args.get("bcc"),
+                reply_to=fn_args.get("reply_to"),
+                from_name=fn_args.get("from_name"),
+                attachments=fn_args.get("attachments"),
+                priority=fn_args.get("priority", "normal"),
+            )
+            
+            return format_email_result(result)
+
+        if fn_name == "email_list_templates":
+            from tools.email_sender import list_templates, format_template_list
+            
+            templates = list_templates()
+            return format_template_list(templates)
+
+        if fn_name == "email_test_smtp":
+            from tools.email_sender import test_smtp_connection, SMTPConfig
+            
+            # Build SMTP config from args
+            smtp_config = SMTPConfig(
+                host=fn_args["smtp_host"],
+                port=fn_args.get("smtp_port", 587),
+                username=fn_args["smtp_user"],
+                password=fn_args["smtp_password"],
+                use_tls=fn_args.get("use_tls", True),
+                use_ssl=fn_args.get("use_ssl", False),
+            )
+            
+            result = await test_smtp_connection(smtp_config)
+            
+            if result.get("success"):
+                return (
+                    f"<smtp_test>\n"
+                    f"  <status>success</status>\n"
+                    f"  <message>{result.get('message', 'Connection successful')}</message>\n"
+                    f"  <server_info>{result.get('server_info', 'N/A')}</server_info>\n"
+                    f"</smtp_test>"
+                )
+            else:
+                return (
+                    f"<smtp_test>\n"
+                    f"  <status>failed</status>\n"
+                    f"  <message>{result.get('message', 'Connection failed')}</message>\n"
+                    f"  <error>{result.get('error', 'Unknown error')}</error>\n"
+                    f"</smtp_test>"
+                )
+
+        # ── Self-Managing Workspace Tools (pi-mom inspired) ────────────
+        if fn_name == "workspace_create_skill":
+            from tools.self_managing_workspace import get_workspace_manager
+            ws = get_workspace_manager().get_agent_workspace(self.role.value)
+            result = ws.create_skill(
+                skill_name=fn_args["skill_name"],
+                description=fn_args["description"],
+                usage_instructions=fn_args.get("usage_instructions", ""),
+                scripts=fn_args.get("scripts", {}),
+            )
+            return (
+                f"[Workspace] Skill '{result['skill_name']}' created at {result['path']}\n"
+                f"Scripts: {', '.join(result['scripts'])}\n"
+                f"Run with: workspace_run_script(skill_name='{result['skill_name']}', script_name='...')"
+            )
+
+        if fn_name == "workspace_run_script":
+            from tools.self_managing_workspace import get_workspace_manager
+            ws = get_workspace_manager().get_agent_workspace(self.role.value)
+            result = ws.execute_skill_script(
+                skill_name=fn_args["skill_name"],
+                script_name=fn_args["script_name"],
+                args=fn_args.get("args"),
+                stdin_data=fn_args.get("stdin_data"),
+            )
+            status = "✅" if result["success"] else "❌"
+            parts = [f"{status} Script execution ({result['execution_time_ms']:.0f}ms)"]
+            if result["stdout"]:
+                parts.append(f"STDOUT:\n{result['stdout']}")
+            if result["stderr"]:
+                parts.append(f"STDERR:\n{result['stderr']}")
+            return "\n".join(parts)
+
+        if fn_name == "workspace_list_skills":
+            from tools.self_managing_workspace import get_workspace_manager
+            ws = get_workspace_manager().get_agent_workspace(self.role.value)
+            skills = ws.list_skills()
+            if not skills:
+                return "[Workspace] No skills created yet. Use workspace_create_skill to create one."
+            lines = [f"[Workspace] {len(skills)} skills:"]
+            for s in skills:
+                lines.append(f"- {s['name']}: {s['description']} (scripts: {', '.join(s['scripts'])})")
+            return "\n".join(lines)
+
+        if fn_name == "workspace_scratch_write":
+            from tools.self_managing_workspace import get_workspace_manager
+            ws = get_workspace_manager().get_agent_workspace(self.role.value)
+            path = ws.write_scratch(fn_args["filename"], fn_args["content"])
+            return f"[Workspace] Written to scratch: {path}"
+
+        if fn_name == "workspace_scratch_read":
+            from tools.self_managing_workspace import get_workspace_manager
+            ws = get_workspace_manager().get_agent_workspace(self.role.value)
+            content = ws.read_scratch(fn_args["filename"])
+            if content is None:
+                return f"[Workspace] File not found: {fn_args['filename']}"
+            return f"[Workspace] {fn_args['filename']}:\n{content}"
+
+        # ── Agent Event Tools (pi-mom inspired) ──────────────────────
+        if fn_name == "agent_event_create":
+            from tools.agent_events import create_event, AgentEventType
+            from datetime import datetime, timezone
+            evt_type = AgentEventType(fn_args["event_type"])
+            trigger_at = None
+            if fn_args.get("trigger_at"):
+                trigger_at = datetime.fromisoformat(fn_args["trigger_at"])
+            event = create_event(
+                event_type=evt_type,
+                target_agent=fn_args["target_agent"],
+                message=fn_args["message"],
+                schedule=fn_args.get("schedule"),
+                trigger_at=trigger_at,
+                created_by=self.role.value,
+            )
+            return f"[Event] Created {event.event_type.value} event '{event.id}' for {event.target_agent}"
+
+        if fn_name == "agent_event_list":
+            from tools.agent_events import list_events
+            events = list_events(target_agent=fn_args.get("target_agent"))
+            if not events:
+                return "[Events] No active events."
+            lines = [f"[Events] {len(events)} active:"]
+            for e in events:
+                lines.append(f"- [{e['id']}] {e['event_type']} → {e['target_agent']}: {e['message'][:80]}")
+            return "\n".join(lines)
+
+        if fn_name == "agent_event_delete":
+            from tools.agent_events import delete_event
+            ok = delete_event(fn_args["event_id"])
+            return f"[Event] {'Deleted' if ok else 'Not found'}: {fn_args['event_id']}"
+
+        # ── Context History Search (pi-mom's grep on log.jsonl) ──────
+        if fn_name == "search_thread_history":
+            from tools.context_compaction import search_thread_history
+            events = [e.model_dump() for e in thread.events] if thread.events else []
+            results = search_thread_history(
+                events=events,
+                query=fn_args["query"],
+                max_results=fn_args.get("max_results", 10),
+            )
+            if not results:
+                return f"[History] No matches for '{fn_args['query']}'"
+            lines = [f"[History] {len(results)} matches for '{fn_args['query']}':"]
+            for r in results:
+                lines.append(
+                    f"- [{r['event_type']}|{r.get('agent_role', '?')}] {r['content'][:200]}"
+                )
+            return "\n".join(lines)
+
         # Delegate to subclass
         return await self._handle_custom_tool(fn_name, fn_args, thread)
 

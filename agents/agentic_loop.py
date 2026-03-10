@@ -179,6 +179,12 @@ def get_default_transformer() -> ContextTransformer:
     ct = ContextTransformer()
     ct.add_transform(trim_redundant_tool_results)
     ct.add_transform(inject_context_summary)
+    # pi-mom inspired: aggressive old tool result trimming
+    try:
+        from tools.context_compaction import trim_old_tool_results
+        ct.add_transform(trim_old_tool_results)
+    except ImportError:
+        pass
     return ct
 
 

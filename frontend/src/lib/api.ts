@@ -1616,6 +1616,102 @@ export const domainApi = {
     ),
 };
 
+// ── Workspace & Agent Events API ─────────────────────────────────
+
+export const workspaceApi = {
+  getStats: () =>
+    fetcher<{
+      agents: Record<
+        string,
+        { skill_count: number; last_active: string | null }
+      >;
+      total_skills: number;
+    }>("/api/workspace/stats"),
+
+  getAllSkills: () =>
+    fetcher<
+      Record<
+        string,
+        { name: string; description: string; scripts: string[]; path: string }[]
+      >
+    >("/api/workspace/skills"),
+
+  getAgentSkills: (role: string) =>
+    fetcher<
+      { name: string; description: string; scripts: string[]; path: string }[]
+    >(`/api/workspace/${encodeURIComponent(role)}/skills`),
+
+  createSkill: (data: {
+    agent_role: string;
+    skill_name: string;
+    description: string;
+    usage_instructions?: string;
+    scripts?: Record<string, string>;
+  }) =>
+    fetcher("/api/workspace/skills", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  runScript: (data: {
+    agent_role: string;
+    skill_name: string;
+    script_name: string;
+    args?: string[];
+    stdin_data?: string;
+  }) =>
+    fetcher<{
+      success: boolean;
+      stdout: string;
+      stderr: string;
+      execution_time_ms: number;
+    }>("/api/workspace/run", { method: "POST", body: JSON.stringify(data) }),
+
+  getMemory: (role: string) =>
+    fetcher<{ agent_role: string; memory: string }>(
+      `/api/workspace/${encodeURIComponent(role)}/memory`,
+    ),
+
+  // Events
+  createEvent: (data: {
+    event_type: string;
+    target_agent: string;
+    message: string;
+    schedule?: string;
+    trigger_at?: string;
+    metadata?: Record<string, unknown>;
+  }) => fetcher("/api/events", { method: "POST", body: JSON.stringify(data) }),
+
+  listEvents: (targetAgent?: string) =>
+    fetcher<
+      {
+        id: string;
+        event_type: string;
+        target_agent: string;
+        message: string;
+        schedule: string | null;
+        trigger_at: string | null;
+        created_by: string | null;
+        created_at: string;
+      }[]
+    >(
+      `/api/events${targetAgent ? `?target_agent=${encodeURIComponent(targetAgent)}` : ""}`,
+    ),
+
+  deleteEvent: (eventId: string) =>
+    fetcher<{ deleted: string }>(`/api/events/${encodeURIComponent(eventId)}`, {
+      method: "DELETE",
+    }),
+
+  getEventStats: () =>
+    fetcher<{
+      total_active: number;
+      immediate_queued: number;
+      by_agent: Record<string, number>;
+      by_type: Record<string, number>;
+    }>("/api/events/stats"),
+};
+
 export function authHeaders(): Record<string, string> {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};

@@ -2,6 +2,8 @@
 Heartbeat System — Proaktif agent davranışı (Faz 11.2).
 Cron-tabanlı zamanlanmış görevler, sabah brifingi, agent sağlık kontrolü,
 maliyet izleme, anomali algılama. Multi-parallel orchestration ile uyumlu.
+
+Extended with scheduled_tasks integration for dynamic task scheduling.
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Awaitable
+from typing import Any, Callable, Awaitable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -343,3 +345,152 @@ def get_heartbeat_scheduler() -> HeartbeatScheduler:
 
 def get_heartbeat_events(limit: int = 50) -> list[dict]:
     return list(reversed(_heartbeat_events[-limit:]))
+
+
+# ── Scheduled Tasks Integration ─────────────────────────────────
+
+async def register_heartbeat_as_scheduled_task(
+    task_name: str,
+    cron_expr: str,
+    user_id: str | None = None,
+) -> dict:
+    """
+    Register an existing heartbeat task as a scheduled task.
+    This allows dynamic cron-based scheduling via API.
+
+    Args:
+        task_name: Name of the heartbeat task (e.g., 'daily_briefing')
+        cron_expr: Standard 5-field cron expression
+        user_id: Optional user ID for ownership
+
+    Returns:
+        The created scheduled task as dict
+    """
+    from tools.scheduled_tasks import (
+        get_scheduled_task_scheduler,
+        TaskType,
+        register_handler,
+    )
+
+    # Verify heartbeat task exists
+    scheduler = get_heartbeat_scheduler()
+    if task_name not in scheduler.tasks:
+        raise ValueError(f"Heartbeat task '{task_name}' not found")
+
+    task = scheduler.tasks[task_name]
+
+    # Create a wrapper handler for scheduled_tasks
+    async def heartbeat_wrapper(**kwargs) -> dict:
+        return await task.handler()
+
+    # Register handler with unique name
+    handler_name = f"heartbeat_{task_name}"
+    register_handler(handler_name, heartbeat_wrapper)
+
+    # Create scheduled task (async)
+    sts = get_scheduled_task_scheduler()
+    scheduled = await sts.create_task(
+        name=f"Heartbeat: {task_name}",
+        task_type=TaskType.HEARTBEAT,
+        cron_expr=cron_expr,
+        handler_ref=task_name,  # Reference to heartbeat task name
+        user_id=user_id,
+        tags=["heartbeat", "auto"],
+    )
+
+    return sts._task_to_dict(scheduled)
+
+
+async def sync_heartbeat_to_scheduled_tasks() -> int:
+    """
+    Sync all heartbeat tasks to scheduled_tasks system.
+    Creates corresponding scheduled tasks for enabled heartbeat tasks.
+
+    Returns number of synced tasks.
+    """
+    from tools.scheduled_tasks import (
+        get_scheduled_task_scheduler,
+        TaskType,
+        register_handler,
+    )
+
+    hb = get_heartbeat_scheduler()
+    sts = get_scheduled_task_scheduler()
+
+    # Ensure scheduler is started
+    await sts.start()
+
+    synced = 0
+    for name, task in hb.tasks.items():
+        if not task.enabled:
+            continue
+
+        # Register handler with closure capturing the task
+        handler_name = f"heartbeat_{name}"
+        task_ref = task  # Capture in closure
+
+        async def make_wrapper(t: HeartbeatTask) -> Callable[..., Awaitable[dict]]:
+            async def wrapper(**kwargs) -> dict:
+                return await t.handler()
+            return wrapper
+
+        register_handler(handler_name, await make_wrapper(task_ref))
+
+        # Default cron based on frequency
+        cron_map = {
+            HeartbeatFrequency.MINUTELY: "* * * * *",      # Every minute
+            HeartbeatFrequency.HOURLY: "0 * * * *",        # Hourly at :00
+            HeartbeatFrequency.DAILY: "0 6 * * *",         # Daily at 6 AM UTC
+            HeartbeatFrequency.WEEKLY: "0 6 * * 1",        # Monday 6 AM UTC
+        }
+        default_cron = cron_map.get(task.frequency, "0 * * * *")
+
+        # Check if scheduled task already exists
+        existing = await sts.get_task(f"heartbeat-{name}")
+        if existing:
+            continue
+
+        try:
+            await sts.create_task(
+                name=f"Heartbeat: {name}",
+                task_type=TaskType.HEARTBEAT,
+                cron_expr=default_cron,
+                handler_ref=name,
+                enabled=task.enabled,
+                task_id=f"heartbeat-{name}",
+                tags=["heartbeat", "auto"],
+            )
+            synced += 1
+        except Exception as e:
+            logger.warning("[Heartbeat] Failed to sync task '%s': %s", name, e)
+
+    logger.info("[Heartbeat] Synced %d tasks to scheduled_tasks", synced)
+    return synced
+
+
+async def get_combined_task_status() -> dict:
+    """
+    Get combined status of heartbeat and scheduled tasks.
+    Useful for dashboard views.
+    """
+    from tools.scheduled_tasks import get_scheduled_task_scheduler
+
+    hb = get_heartbeat_scheduler()
+    sts = get_scheduled_task_scheduler()
+
+    heartbeat_tasks = hb.list_tasks()
+    scheduled_tasks = await sts.list_tasks_dicts_async()
+
+    return {
+        "heartbeat": {
+            "count": len(heartbeat_tasks),
+            "enabled": sum(1 for t in heartbeat_tasks if t["enabled"]),
+            "tasks": heartbeat_tasks,
+        },
+        "scheduled": {
+            "count": len(scheduled_tasks),
+            "enabled": sum(1 for t in scheduled_tasks if t.get("enabled")),
+            "tasks": scheduled_tasks,
+        },
+        "recent_events": get_heartbeat_events(limit=20),
+    }

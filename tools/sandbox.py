@@ -55,31 +55,48 @@ ROLE_ALLOWLIST: dict[str, set[str]] = {
         "decompose_task", "direct_response", "research_create_skill",
         "generate_presentation",
         "check_error_patterns", "check_budget",
+        # Self-Managing Workspace (pi-mom inspired)
+        "workspace_create_skill", "workspace_run_script", "workspace_list_skills",
+        "workspace_scratch_write", "workspace_scratch_read",
+        # Agent Events (pi-mom inspired)
+        "agent_event_create", "agent_event_list", "agent_event_delete",
+        # Context History Search
+        "search_thread_history",
     },
     "thinker": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
         "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
+        "workspace_create_skill", "workspace_run_script", "workspace_list_skills",
+        "workspace_scratch_write", "workspace_scratch_read", "search_thread_history",
     },
     "speed": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
         "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
+        "workspace_create_skill", "workspace_run_script", "workspace_list_skills",
+        "workspace_scratch_write", "workspace_scratch_read", "search_thread_history",
     },
     "researcher": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "rag_ingest",
         "code_execute", "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
+        "workspace_create_skill", "workspace_run_script", "workspace_list_skills",
+        "workspace_scratch_write", "workspace_scratch_read", "search_thread_history",
     },
     "reasoner": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
         "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
+        "workspace_create_skill", "workspace_run_script", "workspace_list_skills",
+        "workspace_scratch_write", "workspace_scratch_read", "search_thread_history",
     },
     "critic": {
         "web_search", "web_fetch", "save_memory", "recall_memory",
         "find_skill", "use_skill", "rag_query", "code_execute",
         "self_evaluate", "mcp_call", "mcp_list_tools", "generate_image", "generate_chart",
+        "workspace_create_skill", "workspace_run_script", "workspace_list_skills",
+        "workspace_scratch_write", "workspace_scratch_read", "search_thread_history",
     },
 }
 

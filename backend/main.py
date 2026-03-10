@@ -225,6 +225,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Heartbeat scheduler failed (non-critical): {e}")
 
+    # Scheduled Tasks scheduler (APScheduler-based cron tasks)
+    try:
+        from tools.scheduled_tasks import init_scheduled_tasks
+        await init_scheduled_tasks()
+        print("[Backend] Scheduled tasks scheduler initialized")
+    except Exception as e:
+        print(f"[Backend] Scheduled tasks init failed (non-critical): {e}")
+
     # Autonomous chat background scheduler (messaging module)
     try:
         from routes.messaging import start_auto_chat_scheduler
@@ -291,6 +299,13 @@ async def lifespan(app: FastAPI):
     try:
         from tools.heartbeat import get_heartbeat_scheduler
         await get_heartbeat_scheduler().stop()
+    except Exception:
+        pass
+
+    # Shutdown: stop scheduled tasks
+    try:
+        from tools.scheduled_tasks import shutdown_scheduled_tasks
+        await shutdown_scheduled_tasks()
     except Exception:
         pass
 
@@ -381,6 +396,9 @@ from routes.metrics import router as metrics_router
 from routes.resilience import router as resilience_router
 from routes.federated import router as federated_router
 from routes.inter_agent import router as inter_agent_router
+from routes.ocr import router as ocr_router
+from routes.youtube import router as youtube_router
+from routes.workspace import router as workspace_router
 
 app.include_router(auth_router)
 app.include_router(skills_router)
@@ -408,6 +426,9 @@ app.include_router(metrics_router)
 app.include_router(resilience_router)
 app.include_router(federated_router)
 app.include_router(inter_agent_router)
+app.include_router(ocr_router)
+app.include_router(youtube_router)
+app.include_router(workspace_router)
 
 print("[Backend] All route modules loaded successfully")
-print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations, resilience, federated, inter_agent")
+print(f"[Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations, resilience, federated, inter_agent, ocr, youtube, workspace")

@@ -133,6 +133,19 @@ const InterAgentMonitorPanel = dynamic(
   { ssr: false },
 );
 
+const YoutubeSummarizerPanel = dynamic(
+  () => import("@/components/youtube-summarizer-panel"),
+  { ssr: false },
+);
+
+const OcrPanel = dynamic(() => import("@/components/ocr-panel"), {
+  ssr: false,
+});
+
+const WorkspacePanel = dynamic(() => import("@/components/workspace-panel"), {
+  ssr: false,
+});
+
 // ── Panel imports from xp/panels ──
 import { XpAgentsPanel } from "./panels/xp-agents-panel";
 import { XpSessionsPanel } from "./panels/xp-sessions-panel";
@@ -531,6 +544,42 @@ export const APPS: DesktopApp[] = [
     defaultW: 800,
     defaultH: 600,
     render: () => <XpUnifiedMarketplace />,
+  },
+  {
+    id: "youtube-summarizer",
+    title: "YouTube Özetleyici",
+    icon: <FeatherIcon name="play" color="#ef4444" />,
+    color: "#ef4444",
+    group: "Araçlar",
+    description:
+      "YouTube videolarını özetleyin — video bilgisi, transkripsiyon ve AI özeti.",
+    defaultW: 700,
+    defaultH: 550,
+    render: () => <YoutubeSummarizerPanel />,
+  },
+  {
+    id: "ocr",
+    title: "OCR & Metin Çıkarma",
+    icon: <FeatherIcon name="file-text" color="#10b981" />,
+    color: "#10b981",
+    group: "Araçlar",
+    description:
+      "Görsellerden ve PDF'lerden metin çıkarın — Tesseract OCR desteği.",
+    defaultW: 650,
+    defaultH: 500,
+    render: () => <OcrPanel />,
+  },
+  {
+    id: "workspace",
+    title: "Agent Workspace",
+    icon: <FeatherIcon name="terminal" color="#14b8a6" />,
+    color: "#14b8a6",
+    group: "Araçlar",
+    description:
+      "Agent workspace yönetimi — skill oluşturma, script çalıştırma, olay sistemi ve bellek.",
+    defaultW: 700,
+    defaultH: 550,
+    render: () => <WorkspacePanel />,
   },
   {
     id: "presentations",

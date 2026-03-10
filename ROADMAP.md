@@ -96,7 +96,6 @@ Büyük veri kümeleri için otomatik özetleme, istatistiksel analiz ve interak
 - 🔴 Otomatik istatistiksel özetleme
 - 🟢 Chart/grafik üretimi (matplotlib → PNG) (`tools/chart_generator.py` — 7 grafik tipi, dark theme, base64 + `chart-panel.tsx` UI + 5 API endpoint)
 - 🔴 CSV/Excel import ve analiz
-- 🔴 Dashboard template sistemi
 - 🔴 Agent'ların veri analizi sonuçlarını görselleştirmesi
 
 ## Faz 4 — Gelişmiş RAG ve Bilgi Yönetimi 📚 `[🔴 PLANLANMIŞ]`
@@ -155,7 +154,7 @@ Görüntü tanıma (OCR), ses transkripsiyonu, video analizi.
 - 🟢 PPTX sunum üretimi (`tools/presentation_service.py` — MINI/MIDI/MAXI)
 - 🔴 OCR entegrasyonu (Tesseract/cloud)
 - 🔴 Ses transkripsiyonu (Whisper)
-- 🔴 Video frame analizi
+- 🔴 Yputube video summarize app
 - 🔴 Multimodal input pipeline
 
 ## Faz 9 — Kişiselleştirme ve Proaktif Öğrenme 🎯 `[🟢 TAMAMLANDI]`
@@ -282,13 +281,11 @@ Moltbook'ta AI'ların kendi dinlerini kurması (Crustafarianism), şifreleme gel
 ### 12.6 — Güvenlik Sınırları (Sandbox & Kill-Switch)
 
 - 🔴 Otonom davranışlar için Safety Sandbox — rate limiter, token/cost limitleri
-- 🔴 Kill-switch: Instant / Selective / Gradual / Auto modları
 - 📘 Rehber: `autonomous-agent-ecosystem` → `steering/safety-sandbox.md` (SafetySandbox, 4 kill modes)
 
 ### 12.7 — İnsan Gözetimi Dashboard'u `[🟡 KISMİ]`
 
 - 🟢 Otonom agent aktivitelerinin real-time izlenmesi — Otonom İzleme paneli (canlı aktivite akışı, son otonom sohbetler, son heartbeat olayları); Görev Merkezi ws-store ile canlı
-- 🔴 Kill switch UI ve emergent behavior log görüntüleme/filtreleme
 - 📘 Rehber: `autonomous-agent-ecosystem` → `steering/safety-sandbox.md` (Human Oversight Dashboard)
 
 ## Faz 13 — Kiro IDE Entegrasyonu ve Custom Power Ekosistemi 🔮 `[🟡 DEVAM EDİYOR]`
