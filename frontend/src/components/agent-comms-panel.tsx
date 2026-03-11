@@ -65,6 +65,16 @@ function ago(ts: string) {
         : `${Math.floor(m / 1440)}g`;
 }
 
+function fmtNum(value: unknown, fallback = "0") {
+  const n =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : NaN;
+  return Number.isFinite(n) ? n.toLocaleString("tr-TR") : fallback;
+}
+
 function Sk({ n = 4 }: { n?: number }) {
   return (
     <div
@@ -162,7 +172,7 @@ function BehaviorTab() {
     mxA = Math.max(...acts.map(([, v]) => v), 1);
   return (
     <div className="space-y-4">
-      <St l="Toplam Davranış Olayı" v={d.total_events.toLocaleString()} />
+      <St l="Toplam Davranış Olayı" v={fmtNum(d.total_events)} />
       <div className={crd}>
         <h4 className="text-xs font-medium text-slate-200 mb-3">
           Aksiyon Dağılımı
@@ -932,7 +942,7 @@ function MeetingsTab() {
                           ? `${(m.duration_ms / 1000).toFixed(1)}s`
                           : "—"}
                       </span>
-                      <span>🪙 {m.total_tokens.toLocaleString()} token</span>
+                      <span>🪙 {fmtNum(m.total_tokens)} token</span>
                       <span>
                         👥 {m.participants.map((p) => ai(p).icon).join(" ")}
                       </span>

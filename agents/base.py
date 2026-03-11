@@ -122,8 +122,11 @@ class BaseAgent(ABC):
         # PI AI Gateway client (optional, for multi-provider routing)
         self.gateway_client: AsyncOpenAI | None = None
         if PI_GATEWAY_ENABLED:
+            gateway_base_url = PI_GATEWAY_URL.rstrip("/")
+            if not gateway_base_url.endswith("/v1"):
+                gateway_base_url = f"{gateway_base_url}/v1"
             self.gateway_client = AsyncOpenAI(
-                base_url=PI_GATEWAY_URL,
+                base_url=gateway_base_url,
                 api_key="pi-gateway",  # gateway handles auth per provider
                 timeout=_timeout,
             )

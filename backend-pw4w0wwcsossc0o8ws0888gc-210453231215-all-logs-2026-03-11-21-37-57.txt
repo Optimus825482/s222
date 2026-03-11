@@ -1,0 +1,389 @@
+
+2026-03-11T21:07:32.926826949Z INFO:     Started server process [1]
+2026-03-11T21:07:32.926870118Z INFO:     Waiting for application startup.
+2026-03-11T21:07:32.927079517Z {"timestamp": "2026-03-11 21:07:32,926", "level": "INFO", "module": "observability", "message": "Structured logging initialized", "trace_id": ""}
+2026-03-11T21:07:32.935275600Z {"timestamp": "2026-03-11 21:07:32,935", "level": "INFO", "module": "pg_connection", "message": "Database schema initialized", "trace_id": ""}
+2026-03-11T21:07:32.936442903Z {"timestamp": "2026-03-11 21:07:32,936", "level": "INFO", "module": "observability", "message": "execution_traces table initialized", "trace_id": ""}
+2026-03-11T21:07:32.937617147Z [Backend] benchmark_suite loaded OK (monitoring)
+2026-03-11T21:07:32.937630786Z [Backend] error_patterns loaded OK (monitoring)
+2026-03-11T21:07:32.937637016Z [Backend] cost_tracker loaded OK (monitoring)
+2026-03-11T21:07:32.937642476Z [Backend] auto_optimizer loaded OK (monitoring)
+2026-03-11T21:07:32.937647896Z [Backend] adaptive_tool_selector loaded OK (monitoring)
+2026-03-11T21:07:32.937653116Z [Backend] workflow_optimizer loaded OK (monitoring)
+2026-03-11T21:07:32.937658376Z [Backend] All route modules loaded successfully
+2026-03-11T21:07:32.937664796Z [Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations, resilience, federated, inter_agent, ocr, youtube, workspace
+2026-03-11T21:07:32.937672406Z [Backend] PostgreSQL initialized successfully
+2026-03-11T21:07:32.937677546Z [Backend] execution_traces table initialized
+2026-03-11T21:07:32.937682706Z [Backend] Migration 005 (agent_metrics_log) applied
+2026-03-11T21:07:32.940864157Z [Backend] Migration 006 (SQLite→PG) applied
+2026-03-11T21:07:34.840595175Z {"timestamp": "2026-03-11 21:07:34,840", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for brave-search, trying direct tools/list", "trace_id": ""}
+2026-03-11T21:07:35.508685404Z {"timestamp": "2026-03-11 21:07:35,508", "level": "WARNING", "module": "mcp_client", "message": "No tools response from MCP server: brave-search", "trace_id": ""}
+2026-03-11T21:07:37.795498200Z {"timestamp": "2026-03-11 21:07:37,794", "level": "INFO", "module": "mcp_client", "message": "Discovered 1 tools from MCP server: fetch", "trace_id": ""}
+2026-03-11T21:07:47.813933664Z {"timestamp": "2026-03-11 21:07:47,812", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for puppeteer, trying direct tools/list", "trace_id": ""}
+2026-03-11T21:07:49.141987146Z {"timestamp": "2026-03-11 21:07:49,141", "level": "INFO", "module": "mcp_client", "message": "Discovered 7 tools from MCP server: puppeteer", "trace_id": ""}
+2026-03-11T21:07:49.408890328Z {"timestamp": "2026-03-11 21:07:49,408", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for arxiv, trying direct tools/list", "trace_id": ""}
+2026-03-11T21:07:49.485975333Z {"timestamp": "2026-03-11 21:07:49,485", "level": "WARNING", "module": "mcp_client", "message": "No tools response from MCP server: arxiv", "trace_id": ""}
+2026-03-11T21:07:49.745297598Z {"timestamp": "2026-03-11 21:07:49,742", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for wikipedia, trying direct tools/list", "trace_id": ""}
+2026-03-11T21:07:49.831635600Z {"timestamp": "2026-03-11 21:07:49,831", "level": "WARNING", "module": "mcp_client", "message": "No tools response from MCP server: wikipedia", "trace_id": ""}
+2026-03-11T21:07:53.883908724Z {"timestamp": "2026-03-11 21:07:53,883", "level": "INFO", "module": "mcp_client", "message": "Discovered 10 tools from MCP server: yahoo-finance", "trace_id": ""}
+2026-03-11T21:07:55.314935242Z {"timestamp": "2026-03-11 21:07:55,314", "level": "INFO", "module": "mcp_client", "message": "Discovered 2 tools from MCP server: time-mcp", "trace_id": ""}
+2026-03-11T21:08:00.246750312Z {"timestamp": "2026-03-11 21:08:00,246", "level": "INFO", "module": "mcp_client", "message": "Discovered 14 tools from MCP server: filesystem", "trace_id": ""}
+2026-03-11T21:08:02.950865278Z {"timestamp": "2026-03-11 21:08:02,950", "level": "INFO", "module": "mcp_client", "message": "Discovered 1 tools from MCP server: sequential-thinking", "trace_id": ""}
+2026-03-11T21:08:04.751205346Z {"timestamp": "2026-03-11 21:08:04,750", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for postgres, trying direct tools/list", "trace_id": ""}
+2026-03-11T21:08:05.474446155Z {"timestamp": "2026-03-11 21:08:05,473", "level": "WARNING", "module": "mcp_client", "message": "No tools response from MCP server: postgres", "trace_id": ""}
+2026-03-11T21:08:07.125918691Z {"timestamp": "2026-03-11 21:08:07,125", "level": "INFO", "module": "mcp_client", "message": "Discovered 6 tools from MCP server: sqlite", "trace_id": ""}
+2026-03-11T21:08:07.198648152Z {"timestamp": "2026-03-11 21:08:07,198", "level": "INFO", "module": "base", "message": "Scheduler started", "trace_id": ""}
+2026-03-11T21:08:07.198670012Z {"timestamp": "2026-03-11 21:08:07,198", "level": "INFO", "module": "workflow_scheduler", "message": "[Scheduler] APScheduler started", "trace_id": ""}
+2026-03-11T21:08:07.199594696Z {"timestamp": "2026-03-11 21:08:07,199", "level": "INFO", "module": "workflow_scheduler", "message": "[Scheduler] Loaded 0 active schedule(s)", "trace_id": ""}
+2026-03-11T21:08:07.292329492Z {"timestamp": "2026-03-11 21:08:07,292", "level": "INFO", "module": "_client", "message": "HTTP Request: POST http://pi-gateway:3100/v1/tools/register \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:08:07.292610330Z {"timestamp": "2026-03-11 21:08:07,292", "level": "INFO", "module": "tool_schema_registry", "message": "Registered 57 tool schemas with gateway (0 errors)", "trace_id": ""}
+2026-03-11T21:08:07.297743030Z {"timestamp": "2026-03-11 21:08:07,297", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] Scheduler started with 5 tasks", "trace_id": ""}
+2026-03-11T21:08:07.303895664Z {"timestamp": "2026-03-11 21:08:07,303", "level": "INFO", "module": "base", "message": "Scheduler started", "trace_id": ""}
+2026-03-11T21:08:07.303920184Z {"timestamp": "2026-03-11 21:08:07,303", "level": "INFO", "module": "scheduled_tasks", "message": "[ScheduledTasks] APScheduler started", "trace_id": ""}
+2026-03-11T21:08:07.327449339Z {"timestamp": "2026-03-11 21:08:07,327", "level": "INFO", "module": "scheduled_tasks", "message": "[ScheduledTasks] Loaded 0 tasks from DB", "trace_id": ""}
+2026-03-11T21:08:07.327588758Z {"timestamp": "2026-03-11 21:08:07,327", "level": "INFO", "module": "scheduled_tasks", "message": "[ScheduledTasks] System initialized", "trace_id": ""}
+2026-03-11T21:08:07.346798087Z {"timestamp": "2026-03-11 21:08:07,346", "level": "INFO", "module": "event_bus", "message": "Subscribed: feedback_loop → channel 'metrics'", "trace_id": ""}
+2026-03-11T21:08:07.346813107Z {"timestamp": "2026-03-11 21:08:07,346", "level": "INFO", "module": "event_bus", "message": "Subscribed: feedback_loop → channel 'experiments'", "trace_id": ""}
+2026-03-11T21:08:07.346817147Z {"timestamp": "2026-03-11 21:08:07,346", "level": "INFO", "module": "feedback_loop", "message": "FeedbackLoop started — subscribed to metrics + experiments channels", "trace_id": ""}
+2026-03-11T21:08:07.348300908Z {"timestamp": "2026-03-11 21:08:07,348", "level": "INFO", "module": "otel_integration", "message": "OpenTelemetry SDK not installed — tracing disabled", "trace_id": ""}
+2026-03-11T21:08:07.432488443Z {"timestamp": "2026-03-11 21:08:07,432", "level": "INFO", "module": "redis_client", "message": "Redis connected (mode=standalone)", "trace_id": ""}
+2026-03-11T21:08:07.443382821Z {"timestamp": "2026-03-11 21:08:07,443", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] daily_briefing ok (run_count=1)", "trace_id": ""}
+2026-03-11T21:08:07.447196569Z {"timestamp": "2026-03-11 21:08:07,446", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=1)", "trace_id": ""}
+2026-03-11T21:08:07.448357522Z {"timestamp": "2026-03-11 21:08:07,448", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] cost_monitor ok (run_count=1)", "trace_id": ""}
+2026-03-11T21:08:07.448666870Z {"timestamp": "2026-03-11 21:08:07,448", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] anomaly_detector ok (run_count=1)", "trace_id": ""}
+2026-03-11T21:08:07.453558512Z {"timestamp": "2026-03-11 21:08:07,453", "level": "INFO", "module": "auto_optimizer", "message": "Recommendation created: [performance/high] High latency: speed (30841ms avg)", "trace_id": ""}
+2026-03-11T21:08:07.457115001Z {"timestamp": "2026-03-11 21:08:07,456", "level": "INFO", "module": "auto_optimizer", "message": "Recommendation created: [performance/medium] Below benchmark baseline: orchestrator (score=2.31/5)", "trace_id": ""}
+2026-03-11T21:08:07.457338030Z {"timestamp": "2026-03-11 21:08:07,457", "level": "INFO", "module": "auto_optimizer", "message": "Auto-optimizer generated 2 new recommendations", "trace_id": ""}
+2026-03-11T21:08:07.459003651Z {"timestamp": "2026-03-11 21:08:07,458", "level": "INFO", "module": "auto_optimizer", "message": "Auto-applied 0 recommendations, skipped 58", "trace_id": ""}
+2026-03-11T21:08:07.459024671Z {"timestamp": "2026-03-11 21:08:07,458", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] evolution_analysis ok (run_count=1)", "trace_id": ""}
+2026-03-11T21:08:07.459240399Z INFO:     Application startup complete.
+2026-03-11T21:08:07.459600607Z INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-03-11T21:08:11.943707246Z [Backend] Analytics tables initialized
+2026-03-11T21:08:11.943744916Z [Backend] Discovered 41 MCP tools from 11 servers
+2026-03-11T21:08:11.943752096Z [Backend] Workflow scheduler initialized
+2026-03-11T21:08:11.943757706Z [Backend] Tool schema registration: ok
+2026-03-11T21:08:11.943763056Z [Backend] Heartbeat scheduler started (with evolution task)
+2026-03-11T21:08:11.943768396Z [Backend] Scheduled tasks scheduler initialized
+2026-03-11T21:08:11.943773486Z [Backend] Autonomous chat auto-start enabled
+2026-03-11T21:08:11.943778456Z [Backend] Self-Improvement Feedback Loop started
+2026-03-11T21:08:11.943783596Z [Backend] OpenTelemetry SDK not available (non-critical)
+2026-03-11T21:08:11.943789186Z [Backend] Redis: healthy (mode=standalone)
+2026-03-11T21:08:11.943794195Z [Backend] Knowledge moderation tables initialized
+2026-03-11T21:08:11.943799155Z [AutoChat] Background scheduler started
+2026-03-11T21:08:11.943804235Z INFO:     127.0.0.1:55832 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:08:32.055770727Z INFO:     127.0.0.1:50108 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:08:35.921053152Z INFO:     10.0.8.5:51776 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773855057.60cd759f8fbf9af7957a544155e14213de7758c358461e8316dd19432a8ff92c" [accepted]
+2026-03-11T21:08:35.921559419Z INFO:     connection open
+2026-03-11T21:08:52.199352516Z [AutoChat] Auto-triggered: critic ⇄ thinker — yeni stratejiler
+2026-03-11T21:08:52.199373496Z INFO:     127.0.0.1:38548 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:09:07.447679062Z {"timestamp": "2026-03-11 21:09:07,447", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=2)", "trace_id": ""}
+2026-03-11T21:09:12.373530650Z INFO:     127.0.0.1:47304 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:09:32.507805965Z INFO:     127.0.0.1:52614 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:09:52.651143232Z INFO:     127.0.0.1:46832 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:10:02.820350127Z INFO:     connection closed
+2026-03-11T21:10:07.450656880Z {"timestamp": "2026-03-11 21:10:07,450", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=3)", "trace_id": ""}
+2026-03-11T21:10:12.780048107Z INFO:     127.0.0.1:37636 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:10:32.093099927Z INFO:     10.0.8.5:39984 - "OPTIONS /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:10:32.208336762Z INFO:     10.0.8.5:39984 - "GET /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:10:32.903991156Z INFO:     127.0.0.1:56250 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:10:34.544808784Z INFO:     10.0.8.5:39984 - "OPTIONS /api/threads/19c731a889074f84b710a60a56a08285?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:10:34.644967495Z INFO:     10.0.8.5:39984 - "GET /api/threads/19c731a889074f84b710a60a56a08285?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:10:34.721927480Z INFO:     10.0.8.5:39986 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773855057.60cd759f8fbf9af7957a544155e14213de7758c358461e8316dd19432a8ff92c" [accepted]
+2026-03-11T21:10:34.722290939Z INFO:     connection open
+2026-03-11T21:10:53.034533323Z INFO:     127.0.0.1:53250 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:11:07.450769973Z {"timestamp": "2026-03-11 21:11:07,450", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=4)", "trace_id": ""}
+2026-03-11T21:11:13.175002007Z INFO:     127.0.0.1:37576 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:11:33.330116884Z INFO:     127.0.0.1:40182 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:11:53.475009408Z INFO:     127.0.0.1:36848 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:12:07.451647649Z {"timestamp": "2026-03-11 21:12:07,451", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=5)", "trace_id": ""}
+2026-03-11T21:12:09.768869495Z {"timestamp": "2026-03-11 21:12:09,768", "level": "INFO", "module": "chat_ws", "message": "ws.run.telemetry {\"event\": \"run.start\", \"phase\": \"start\", \"run_id\": \"8d19c5acade542889aa1f03636e4071a\", \"thread_id\": \"82018b354eea41ad96954cb2b29e9dda\", \"user_id_masked\": \"y***t\", \"sequence\": 1, \"pipeline_type\": \"auto\", \"agent\": \"orchestrator\", \"status\": \"started\", \"latency_ms\": 0.06, \"token_usage\": {\"total_tokens\": null, \"prompt_tokens\": null, \"completion_tokens\": null}, \"correlation_id\": \"8d19c5acade542889aa1f03636e4071a\", \"ts\": \"2026-03-11T21:12:09.768498+00:00\"}", "trace_id": ""}
+2026-03-11T21:12:09.769097664Z {"timestamp": "2026-03-11 21:12:09,768", "level": "INFO", "module": "chat_ws", "message": "ws.run.telemetry {\"event\": \"run.progress\", \"phase\": \"progress\", \"run_id\": \"8d19c5acade542889aa1f03636e4071a\", \"thread_id\": \"82018b354eea41ad96954cb2b29e9dda\", \"user_id_masked\": \"y***t\", \"sequence\": 1, \"pipeline_type\": \"auto\", \"agent\": \"orchestrator\", \"status\": \"running\", \"latency_ms\": 0.49, \"token_usage\": {\"total_tokens\": null, \"prompt_tokens\": null, \"completion_tokens\": null}, \"correlation_id\": \"8d19c5acade542889aa1f03636e4071a\", \"ts\": \"2026-03-11T21:12:09.768917+00:00\"}", "trace_id": ""}
+2026-03-11T21:12:09.798146707Z {"timestamp": "2026-03-11 21:12:09,797", "level": "INFO", "module": "event_bus", "message": "Subscribed: orchestrator → channel 'task.*'", "trace_id": ""}
+2026-03-11T21:12:09.798175196Z {"timestamp": "2026-03-11 21:12:09,798", "level": "INFO", "module": "event_bus", "message": "Subscribed: orchestrator → channel 'metrics.*'", "trace_id": ""}
+2026-03-11T21:12:10.166126100Z {"timestamp": "2026-03-11 21:12:10,165", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:12:10.185415989Z INFO:     10.0.8.5:45062 - "OPTIONS /api/analytics/user-behavior?action=task_submit&context=OSILOSKOP+KULLANIMI+ILE+ILGILI+HICBIR+BILGISI+OLMAYAN+BIRININ+0+DAN+UZMAN+SSEVIYEYE+KADAR+ADIM+ADIM+ANLATAN+OSILOSKOP+KULLANIM+%C3%96%C4%9ERENIMI+DOKUMANI+HAZIRLAYIN&metadata=%7B%22pipeline%22%3A%22auto%22%2C%22attachments%22%3A0%7D HTTP/1.1" 200 OK
+2026-03-11T21:12:10.589193417Z INFO:     10.0.8.5:45062 - "POST /api/analytics/user-behavior?action=task_submit&context=OSILOSKOP+KULLANIMI+ILE+ILGILI+HICBIR+BILGISI+OLMAYAN+BIRININ+0+DAN+UZMAN+SSEVIYEYE+KADAR+ADIM+ADIM+ANLATAN+OSILOSKOP+KULLANIM+%C3%96%C4%9ERENIMI+DOKUMANI+HAZIRLAYIN&metadata=%7B%22pipeline%22%3A%22auto%22%2C%22attachments%22%3A0%7D HTTP/1.1" 200 OK
+2026-03-11T21:12:10.902030039Z {"timestamp": "2026-03-11 21:12:10,901", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:12:13.604324641Z INFO:     127.0.0.1:35616 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:12:17.218284235Z {"timestamp": "2026-03-11 21:12:17,217", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:12:17.723254978Z {"timestamp": "2026-03-11 21:12:17,722", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:12:30.406485229Z {"timestamp": "2026-03-11 21:12:30,406", "level": "INFO", "module": "orchestrator", "message": "run.state.transition", "trace_id": ""}
+2026-03-11T21:12:30.924588617Z {"timestamp": "2026-03-11 21:12:30,924", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:12:33.756121678Z INFO:     127.0.0.1:57888 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:12:52.091953018Z {"timestamp": "2026-03-11 21:12:52,091", "level": "WARNING", "module": "sandbox", "message": "SANDBOX BLOCKED: orchestrator → send_agent_message: not in role allowlist", "trace_id": ""}
+2026-03-11T21:12:52.096306772Z {"timestamp": "2026-03-11 21:12:52,095", "level": "WARNING", "module": "sandbox", "message": "SANDBOX BLOCKED: orchestrator → send_agent_message: not in role allowlist", "trace_id": ""}
+2026-03-11T21:12:52.102396347Z {"timestamp": "2026-03-11 21:12:52,099", "level": "WARNING", "module": "sandbox", "message": "SANDBOX BLOCKED: orchestrator → send_agent_message: not in role allowlist", "trace_id": ""}
+2026-03-11T21:12:52.103853478Z {"timestamp": "2026-03-11 21:12:52,103", "level": "WARNING", "module": "sandbox", "message": "SANDBOX BLOCKED: orchestrator → send_agent_message: not in role allowlist", "trace_id": ""}
+2026-03-11T21:12:52.644955342Z {"timestamp": "2026-03-11 21:12:52,644", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:12:53.915200354Z INFO:     127.0.0.1:46742 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:12:56.436362338Z {"timestamp": "2026-03-11 21:12:56,435", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:12:56.437329583Z {"timestamp": "2026-03-11 21:12:56,437", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop nedir çalışma prensibi analog dijital farkları tem", "trace_id": ""}
+2026-03-11T21:12:56.951902609Z {"timestamp": "2026-03-11 21:12:56,943", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:00.394293569Z {"timestamp": "2026-03-11 21:13:00,392", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:00.394318639Z {"timestamp": "2026-03-11 21:13:00,392", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop kontrolleri düğmeleri ekran okuma volt/div time/di", "trace_id": ""}
+2026-03-11T21:13:00.919949682Z {"timestamp": "2026-03-11 21:13:00,919", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:04.437108701Z {"timestamp": "2026-03-11 21:13:04,436", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:04.438205614Z {"timestamp": "2026-03-11 21:13:04,437", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop ölçüm teknikleri frekans periyot genlik rise time ", "trace_id": ""}
+2026-03-11T21:13:05.061333734Z {"timestamp": "2026-03-11 21:13:05,060", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:07.451969031Z {"timestamp": "2026-03-11 21:13:07,451", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=6)", "trace_id": ""}
+2026-03-11T21:13:09.033157475Z {"timestamp": "2026-03-11 21:13:09,032", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:09.033707151Z {"timestamp": "2026-03-11 21:13:09,033", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop güvenlik kuralları prob kompanzasyonu laboratuvar ", "trace_id": ""}
+2026-03-11T21:13:09.575833509Z {"timestamp": "2026-03-11 21:13:09,575", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:12.388217319Z {"timestamp": "2026-03-11 21:13:12,387", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://www.elektromarketim.com/blog/osiloskop-calisma-prensibi-nedir-nerede-kullanilir \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:13.093941891Z {"timestamp": "2026-03-11 21:13:13,093", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:14.056683218Z INFO:     127.0.0.1:39566 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:13:15.655512901Z {"timestamp": "2026-03-11 21:13:15,654", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://diyot.net/osiloskop/ \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:16.390480463Z {"timestamp": "2026-03-11 21:13:16,390", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:23.174991222Z {"timestamp": "2026-03-11 21:13:23,174", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://hubf.eskisehir.edu.tr/Uploads/hubf/files/HYO224%20-%201_%20Osiloskop.pdf \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:25.197443145Z {"timestamp": "2026-03-11 21:13:25,197", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:30.545409641Z {"timestamp": "2026-03-11 21:13:30,545", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:30.546451485Z {"timestamp": "2026-03-11 21:13:30,546", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop prob kompanzasyonu nasıl yapılır 1x 10x prob farkı", "trace_id": ""}
+2026-03-11T21:13:31.074390255Z {"timestamp": "2026-03-11 21:13:31,074", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:34.210501201Z INFO:     127.0.0.1:52036 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:13:40.693330600Z {"timestamp": "2026-03-11 21:13:40,692", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://eee.sakarya.edu.tr/sites/eee.sakarya.edu.tr/file/Osiloskop_Kullanimi.pdf \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:46.477386866Z {"timestamp": "2026-03-11 21:13:46,477", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:52.098266791Z {"timestamp": "2026-03-11 21:13:52,096", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:52.098376740Z {"timestamp": "2026-03-11 21:13:52,097", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop ölçüm teknikleri frekans periyot genlik ölçme yönt", "trace_id": ""}
+2026-03-11T21:13:52.760744203Z {"timestamp": "2026-03-11 21:13:52,760", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:54.392514242Z [AutoChat] Auto-triggered: thinker ⇄ speed — sistem performansı
+2026-03-11T21:13:54.392539472Z INFO:     127.0.0.1:35416 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:13:57.338366239Z {"timestamp": "2026-03-11 21:13:57,337", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://diyot.net/osiloskop-olcme-teknikleri/ \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:13:58.062197555Z {"timestamp": "2026-03-11 21:13:58,061", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:03.381906170Z {"timestamp": "2026-03-11 21:14:03,381", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:03.382174260Z {"timestamp": "2026-03-11 21:14:03,382", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop tetikleme teknikleri edge trigger pulse trigger vi", "trace_id": ""}
+2026-03-11T21:14:03.913677927Z {"timestamp": "2026-03-11 21:14:03,913", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:07.452262516Z {"timestamp": "2026-03-11 21:14:07,452", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=7)", "trace_id": ""}
+2026-03-11T21:14:09.182408627Z {"timestamp": "2026-03-11 21:14:09,181", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:09.183551010Z {"timestamp": "2026-03-11 21:14:09,183", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop hata ayıklama teknikleri sorun giderme ekran görün", "trace_id": ""}
+2026-03-11T21:14:09.255413075Z {"timestamp": "2026-03-11 21:14:09,252", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'task.thinker'", "trace_id": ""}
+2026-03-11T21:14:09.255439884Z {"timestamp": "2026-03-11 21:14:09,252", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:14:09.263275530Z {"timestamp": "2026-03-11 21:14:09,263", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'task.speed'", "trace_id": ""}
+2026-03-11T21:14:09.263310219Z {"timestamp": "2026-03-11 21:14:09,263", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:14:09.272823874Z {"timestamp": "2026-03-11 21:14:09,272", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'task.researcher'", "trace_id": ""}
+2026-03-11T21:14:09.272879334Z {"timestamp": "2026-03-11 21:14:09,272", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:14:09.282444809Z {"timestamp": "2026-03-11 21:14:09,282", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'task.reasoner'", "trace_id": ""}
+2026-03-11T21:14:09.282481159Z {"timestamp": "2026-03-11 21:14:09,282", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:14:09.282682507Z {"timestamp": "2026-03-11 21:14:09,282", "level": "INFO", "module": "engine", "message": "run.state.transition", "trace_id": ""}
+2026-03-11T21:14:09.287701228Z {"timestamp": "2026-03-11 21:14:09,287", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'agent:thinker'", "trace_id": ""}
+2026-03-11T21:14:09.287786088Z {"timestamp": "2026-03-11 21:14:09,287", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'handoff:thinker'", "trace_id": ""}
+2026-03-11T21:14:09.287860897Z {"timestamp": "2026-03-11 21:14:09,287", "level": "INFO", "module": "handoff", "message": "Handoff handler registered: thinker", "trace_id": ""}
+2026-03-11T21:14:09.287942706Z {"timestamp": "2026-03-11 21:14:09,287", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'tasks:thinker'", "trace_id": ""}
+2026-03-11T21:14:09.288011847Z {"timestamp": "2026-03-11 21:14:09,287", "level": "INFO", "module": "task_delegation", "message": "Task executor registered: thinker", "trace_id": ""}
+2026-03-11T21:14:09.288079667Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'agent:speed'", "trace_id": ""}
+2026-03-11T21:14:09.288152786Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'handoff:speed'", "trace_id": ""}
+2026-03-11T21:14:09.288194776Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "handoff", "message": "Handoff handler registered: speed", "trace_id": ""}
+2026-03-11T21:14:09.288272895Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'tasks:speed'", "trace_id": ""}
+2026-03-11T21:14:09.288337855Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "task_delegation", "message": "Task executor registered: speed", "trace_id": ""}
+2026-03-11T21:14:09.288407524Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'agent:researcher'", "trace_id": ""}
+2026-03-11T21:14:09.288461834Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'handoff:researcher'", "trace_id": ""}
+2026-03-11T21:14:09.288537104Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "handoff", "message": "Handoff handler registered: researcher", "trace_id": ""}
+2026-03-11T21:14:09.288568303Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'tasks:researcher'", "trace_id": ""}
+2026-03-11T21:14:09.288629603Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "task_delegation", "message": "Task executor registered: researcher", "trace_id": ""}
+2026-03-11T21:14:09.288696382Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'agent:reasoner'", "trace_id": ""}
+2026-03-11T21:14:09.288759142Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'handoff:reasoner'", "trace_id": ""}
+2026-03-11T21:14:09.288810702Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "handoff", "message": "Handoff handler registered: reasoner", "trace_id": ""}
+2026-03-11T21:14:09.288886891Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'tasks:reasoner'", "trace_id": ""}
+2026-03-11T21:14:09.288938211Z {"timestamp": "2026-03-11 21:14:09,288", "level": "INFO", "module": "task_delegation", "message": "Task executor registered: reasoner", "trace_id": ""}
+2026-03-11T21:14:09.289423649Z {"timestamp": "2026-03-11 21:14:09,289", "level": "INFO", "module": "engine", "message": "run.state.transition", "trace_id": ""}
+2026-03-11T21:14:09.289791756Z {"timestamp": "2026-03-11 21:14:09,289", "level": "INFO", "module": "engine", "message": "run.state.transition", "trace_id": ""}
+2026-03-11T21:14:12.041115115Z {"timestamp": "2026-03-11 21:14:12,040", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:13.149654699Z {"timestamp": "2026-03-11 21:14:13,149", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:13.248489657Z {"timestamp": "2026-03-11 21:14:13,248", "level": "INFO", "module": "search", "message": "Tavily returned 10 results for: osiloskop advanced measurement techniques frequency period a", "trace_id": ""}
+2026-03-11T21:14:14.563839465Z INFO:     127.0.0.1:58874 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:14:19.999188600Z {"timestamp": "2026-03-11 21:14:19,998", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:20.806605233Z {"timestamp": "2026-03-11 21:14:20,806", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://diyot.net/osiloskop-olcme-teknikleri/ \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:30.177371100Z {"timestamp": "2026-03-11 21:14:30,175", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:30.965271195Z {"timestamp": "2026-03-11 21:14:30,964", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:32.715821477Z {"timestamp": "2026-03-11 21:14:32,715", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:14:32.716725241Z {"timestamp": "2026-03-11 21:14:32,716", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop tetikleme teknikleri edge pulse width video serial", "trace_id": ""}
+2026-03-11T21:14:34.743155468Z INFO:     127.0.0.1:43152 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:14:39.309272856Z {"timestamp": "2026-03-11 21:14:39,308", "level": "INFO", "module": "engine", "message": "run.state.transition", "trace_id": ""}
+2026-03-11T21:14:39.309416646Z {"timestamp": "2026-03-11 21:14:39,309", "level": "INFO", "module": "engine", "message": "run.state.transition", "trace_id": ""}
+2026-03-11T21:14:39.326760555Z {"timestamp": "2026-03-11 21:14:39,326", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'task.synthesizer'", "trace_id": ""}
+2026-03-11T21:14:39.326793945Z {"timestamp": "2026-03-11 21:14:39,326", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:14:54.884384476Z INFO:     127.0.0.1:52646 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:15:07.452709232Z {"timestamp": "2026-03-11 21:15:07,452", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=8)", "trace_id": ""}
+2026-03-11T21:15:10.485701250Z {"timestamp": "2026-03-11 21:15:10,485", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:15:15.044143047Z INFO:     127.0.0.1:39946 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:15:35.209296829Z INFO:     127.0.0.1:33834 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:15:36.123630283Z INFO:     10.0.8.5:50962 - "OPTIONS /api/agents/autonomous-chat/conversations?limit=8 HTTP/1.1" 200 OK
+2026-03-11T21:15:36.124230469Z INFO:     10.0.8.5:50978 - "OPTIONS /api/agents/health HTTP/1.1" 200 OK
+2026-03-11T21:15:36.124767876Z INFO:     10.0.8.5:50994 - "OPTIONS /api/monitoring/system-stats HTTP/1.1" 200 OK
+2026-03-11T21:15:36.125455872Z INFO:     10.0.8.5:50998 - "OPTIONS /api/monitoring/anomalies HTTP/1.1" 200 OK
+2026-03-11T21:15:36.125972719Z INFO:     10.0.8.5:51002 - "OPTIONS /api/heartbeat/tasks HTTP/1.1" 200 OK
+2026-03-11T21:15:36.126470926Z INFO:     10.0.8.5:51012 - "OPTIONS /api/heartbeat/events?limit=15 HTTP/1.1" 200 OK
+2026-03-11T21:15:36.304575417Z INFO:     10.0.8.5:51012 - "GET /api/agents/health HTTP/1.1" 200 OK
+2026-03-11T21:15:36.304681777Z INFO:     10.0.8.5:51002 - "GET /api/agents/autonomous-chat/conversations?limit=8 HTTP/1.1" 200 OK
+2026-03-11T21:15:36.304944605Z INFO:     10.0.8.5:50998 - "GET /api/heartbeat/tasks HTTP/1.1" 200 OK
+2026-03-11T21:15:36.305842770Z INFO:     10.0.8.5:50978 - "GET /api/monitoring/anomalies HTTP/1.1" 200 OK
+2026-03-11T21:15:36.305982569Z INFO:     10.0.8.5:50994 - "GET /api/monitoring/system-stats HTTP/1.1" 200 OK
+2026-03-11T21:15:36.306190428Z INFO:     10.0.8.5:50962 - "GET /api/heartbeat/events?limit=15 HTTP/1.1" 200 OK
+2026-03-11T21:15:47.088917948Z {"timestamp": "2026-03-11 21:15:47,088", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:15:55.363529906Z INFO:     127.0.0.1:33890 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:16:07.453310073Z {"timestamp": "2026-03-11 21:16:07,452", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=9)", "trace_id": ""}
+2026-03-11T21:16:15.496176167Z INFO:     127.0.0.1:34654 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:16:35.636712427Z INFO:     127.0.0.1:37360 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:16:39.192626625Z {"timestamp": "2026-03-11 21:16:39,192", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:16:55.776661261Z INFO:     127.0.0.1:45430 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:17:06.908698053Z {"timestamp": "2026-03-11 21:17:06,908", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:17:07.453865032Z {"timestamp": "2026-03-11 21:17:07,453", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=10)", "trace_id": ""}
+2026-03-11T21:17:15.887594207Z INFO:     127.0.0.1:42448 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:17:36.032754718Z INFO:     127.0.0.1:57222 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:17:41.123504154Z {"timestamp": "2026-03-11 21:17:41,123", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:17:56.195540970Z INFO:     127.0.0.1:56254 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:18:07.455006756Z {"timestamp": "2026-03-11 21:18:07,454", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=11)", "trace_id": ""}
+2026-03-11T21:18:16.363213020Z INFO:     127.0.0.1:51934 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:18:35.458550815Z {"timestamp": "2026-03-11 21:18:35,458", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:18:36.541009814Z INFO:     127.0.0.1:33270 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:18:50.024145268Z {"timestamp": "2026-03-11 21:18:50,023", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:18:56.674355647Z [AutoChat] Auto-triggered: thinker ⇄ orchestrator — sistem performansı
+2026-03-11T21:18:56.674392217Z INFO:     127.0.0.1:39138 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:19:07.455809368Z {"timestamp": "2026-03-11 21:19:07,455", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=12)", "trace_id": ""}
+2026-03-11T21:19:16.778081469Z INFO:     127.0.0.1:39762 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:19:36.890641677Z INFO:     127.0.0.1:47278 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:19:49.114202479Z {"timestamp": "2026-03-11 21:19:49,113", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:19:49.355384355Z {"timestamp": "2026-03-11 21:19:49,355", "level": "INFO", "module": "reflexion", "message": "Reflexion: Improved response (iteration 1)", "trace_id": ""}
+2026-03-11T21:19:49.702579677Z {"timestamp": "2026-03-11 21:19:49,702", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:19:49.757761397Z {"timestamp": "2026-03-11 21:19:49,757", "level": "INFO", "module": "memory", "message": "Memory saved [episodic/pgvector]: Reflexion insight — Question type: ## Original Use", "trace_id": ""}
+2026-03-11T21:19:49.777212615Z {"timestamp": "2026-03-11 21:19:49,776", "level": "INFO", "module": "event_bus", "message": "Subscribed: critic → channel 'task.critic'", "trace_id": ""}
+2026-03-11T21:19:49.777397303Z {"timestamp": "2026-03-11 21:19:49,776", "level": "INFO", "module": "event_bus", "message": "Subscribed: critic → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:19:53.908917541Z {"timestamp": "2026-03-11 21:19:53,908", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:19:57.065750157Z INFO:     127.0.0.1:39134 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:19:57.615640586Z {"timestamp": "2026-03-11 21:19:57,615", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:20:03.255974831Z {"timestamp": "2026-03-11 21:20:03,255", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:20:06.188614913Z {"timestamp": "2026-03-11 21:20:06,188", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:20:07.456170190Z {"timestamp": "2026-03-11 21:20:07,455", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=13)", "trace_id": ""}
+2026-03-11T21:20:09.759639082Z {"timestamp": "2026-03-11 21:20:09,759", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:20:13.944189112Z {"timestamp": "2026-03-11 21:20:13,943", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:20:17.219663310Z INFO:     127.0.0.1:49108 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:20:18.301989648Z {"timestamp": "2026-03-11 21:20:18,300", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:20:37.390762622Z INFO:     127.0.0.1:47780 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:20:57.561389202Z INFO:     127.0.0.1:54458 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:21:07.456723015Z {"timestamp": "2026-03-11 21:21:07,456", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=14)", "trace_id": ""}
+2026-03-11T21:21:17.714504789Z INFO:     127.0.0.1:51402 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:21:18.305102422Z {"timestamp": "2026-03-11 21:21:18,304", "level": "INFO", "module": "_base_client", "message": "Retrying request to /chat/completions in 0.399969 seconds", "trace_id": ""}
+2026-03-11T21:21:37.875761164Z INFO:     127.0.0.1:45768 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:21:57.978311385Z INFO:     127.0.0.1:47152 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:22:07.457591629Z {"timestamp": "2026-03-11 21:22:07,457", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=15)", "trace_id": ""}
+2026-03-11T21:22:18.130921302Z INFO:     127.0.0.1:58002 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:22:18.795928624Z {"timestamp": "2026-03-11 21:22:18,795", "level": "INFO", "module": "_base_client", "message": "Retrying request to /chat/completions in 0.837898 seconds", "trace_id": ""}
+2026-03-11T21:22:38.295855555Z INFO:     127.0.0.1:49356 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:22:58.455559254Z INFO:     127.0.0.1:54452 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:23:07.458375492Z {"timestamp": "2026-03-11 21:23:07,457", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=16)", "trace_id": ""}
+2026-03-11T21:23:18.615303181Z INFO:     127.0.0.1:39342 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:23:19.735158800Z {"timestamp": "2026-03-11 21:23:19,734", "level": "INFO", "module": "_client", "message": "HTTP Request: POST http://pi-gateway:3100/chat/completions \"HTTP/1.1 404 Not Found\"", "trace_id": ""}
+2026-03-11T21:23:19.738549710Z {"timestamp": "2026-03-11 21:23:19,738", "level": "ERROR", "module": "reflexion", "message": "Reflexion error: 404 Not Found", "trace_id": ""}
+2026-03-11T21:23:20.070569809Z {"timestamp": "2026-03-11 21:23:20,070", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:23:20.096200890Z {"timestamp": "2026-03-11 21:23:20,095", "level": "INFO", "module": "memory", "message": "Memory saved [episodic/pgvector]: Task: Sıfırdan başlayarak osiloskop kullanımında u", "trace_id": ""}
+2026-03-11T21:23:20.104591662Z {"timestamp": "2026-03-11 21:23:20,104", "level": "INFO", "module": "chat_ws", "message": "ws.run.telemetry {\"event\": \"run.final_report\", \"phase\": \"complete\", \"run_id\": \"8d19c5acade542889aa1f03636e4071a\", \"thread_id\": \"82018b354eea41ad96954cb2b29e9dda\", \"user_id_masked\": \"y***t\", \"sequence\": 133, \"pipeline_type\": \"deep_research\", \"agent\": \"orchestrator\", \"status\": \"final_report_delivered\", \"latency_ms\": 670335.96, \"token_usage\": {\"total_tokens\": 0, \"prompt_tokens\": null, \"completion_tokens\": null}, \"correlation_id\": \"8d19c5acade542889aa1f03636e4071a\", \"ts\": \"2026-03-11T21:23:20.104400+00:00\"}", "trace_id": ""}
+2026-03-11T21:23:20.108629768Z {"timestamp": "2026-03-11 21:23:20,108", "level": "INFO", "module": "chat_ws", "message": "ws.run.telemetry {\"event\": \"run.result\", \"phase\": \"complete\", \"run_id\": \"8d19c5acade542889aa1f03636e4071a\", \"thread_id\": \"82018b354eea41ad96954cb2b29e9dda\", \"user_id_masked\": \"y***t\", \"sequence\": 134, \"pipeline_type\": \"deep_research\", \"agent\": \"orchestrator\", \"status\": \"completed\", \"latency_ms\": 670340.03, \"token_usage\": {\"total_tokens\": 0, \"prompt_tokens\": null, \"completion_tokens\": null}, \"correlation_id\": \"8d19c5acade542889aa1f03636e4071a\", \"ts\": \"2026-03-11T21:23:20.108461+00:00\"}", "trace_id": ""}
+2026-03-11T21:23:20.109048546Z {"timestamp": "2026-03-11 21:23:20,108", "level": "INFO", "module": "chat_ws", "message": "ws.run.telemetry {\"event\": \"run.post_task_meeting\", \"phase\": \"complete\", \"run_id\": \"8d19c5acade542889aa1f03636e4071a\", \"thread_id\": \"82018b354eea41ad96954cb2b29e9dda\", \"user_id_masked\": \"y***t\", \"sequence\": 135, \"pipeline_type\": \"deep_research\", \"agent\": \"orchestrator\", \"status\": \"post_task_meeting_delivered\", \"latency_ms\": 670340.5, \"token_usage\": {\"total_tokens\": 0, \"prompt_tokens\": null, \"completion_tokens\": null}, \"correlation_id\": \"8d19c5acade542889aa1f03636e4071a\", \"ts\": \"2026-03-11T21:23:20.108925+00:00\"}", "trace_id": ""}
+2026-03-11T21:23:21.330644485Z INFO:     10.0.8.5:52756 - "OPTIONS /api/analytics/user-behavior?action=task_complete&context=decompose_task%28%7B%22pipeline_type%22%3A+%22deep_research%22%2C+%22reasoning%22%3A+%22Osiloskop+kullan%C4%B1m%C4%B1+hakk%C4%B1nda+kapsaml%C4%B1+bir+%C3%B6%C4%9Frenim+dok%C3%BCman%C4%B1+haz%C4%B1rlamak+i%C3%A7in+farkl%C4%B1+uzmanl%C4%B1k+alanlar%C4%B1na+ihtiya%C3%A7+var%3A+temel+teori%2C+pratik+k&metadata=%7B%22pipeline%22%3A%22deep_research%22%2C%22tokens%22%3Anull%2C%22latency_ms%22%3A30018.83971411735%7D HTTP/1.1" 200 OK
+2026-03-11T21:23:21.560689524Z INFO:     10.0.8.5:52756 - "POST /api/analytics/user-behavior?action=task_complete&context=decompose_task%28%7B%22pipeline_type%22%3A+%22deep_research%22%2C+%22reasoning%22%3A+%22Osiloskop+kullan%C4%B1m%C4%B1+hakk%C4%B1nda+kapsaml%C4%B1+bir+%C3%B6%C4%9Frenim+dok%C3%BCman%C4%B1+haz%C4%B1rlamak+i%C3%A7in+farkl%C4%B1+uzmanl%C4%B1k+alanlar%C4%B1na+ihtiya%C3%A7+var%3A+temel+teori%2C+pratik+k&metadata=%7B%22pipeline%22%3A%22deep_research%22%2C%22tokens%22%3Anull%2C%22latency_ms%22%3A30018.83971411735%7D HTTP/1.1" 200 OK
+2026-03-11T21:23:38.768111653Z [AutoChat] Auto-triggered: orchestrator ⇄ thinker — yeni stratejiler
+2026-03-11T21:23:38.768137783Z INFO:     127.0.0.1:59852 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:23:58.934887069Z INFO:     127.0.0.1:56374 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:24:07.458891072Z {"timestamp": "2026-03-11 21:24:07,458", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=17)", "trace_id": ""}
+2026-03-11T21:24:19.083082652Z INFO:     127.0.0.1:53964 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:24:39.229751550Z INFO:     127.0.0.1:59736 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:24:59.377474999Z INFO:     127.0.0.1:40966 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:25:07.459857985Z {"timestamp": "2026-03-11 21:25:07,459", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=18)", "trace_id": ""}
+2026-03-11T21:25:19.520356365Z INFO:     127.0.0.1:55524 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:25:39.671265550Z INFO:     127.0.0.1:50934 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:25:59.819622155Z INFO:     127.0.0.1:57124 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:26:07.460198494Z {"timestamp": "2026-03-11 21:26:07,459", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=19)", "trace_id": ""}
+2026-03-11T21:26:19.968599851Z INFO:     127.0.0.1:48274 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:26:21.271035676Z INFO:     10.0.8.5:52932 - "OPTIONS /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:26:21.716281025Z INFO:     10.0.8.5:52932 - "GET /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:26:25.409536029Z INFO:     10.0.8.5:52932 - "OPTIONS /api/threads/82018b354eea41ad96954cb2b29e9dda?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:26:25.516309676Z INFO:     10.0.8.5:52932 - "GET /api/threads/82018b354eea41ad96954cb2b29e9dda?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:26:25.849821613Z INFO:     connection closed
+2026-03-11T21:26:40.114458394Z INFO:     127.0.0.1:52928 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:26:55.584442900Z INFO:     10.0.8.5:41844 - "OPTIONS /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:26:55.706785074Z INFO:     10.0.8.5:41844 - "GET /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:26:56.774538580Z INFO:     10.0.8.5:41844 - "OPTIONS /api/threads/82018b354eea41ad96954cb2b29e9dda?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:26:56.892220462Z INFO:     10.0.8.5:41844 - "GET /api/threads/82018b354eea41ad96954cb2b29e9dda?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:27:00.259656429Z INFO:     127.0.0.1:45166 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:27:02.670201236Z INFO:     10.0.8.5:50952 - "OPTIONS /api/auth/login HTTP/1.1" 200 OK
+2026-03-11T21:27:03.047706327Z INFO:     10.0.8.5:50952 - "POST /api/auth/login HTTP/1.1" 200 OK
+2026-03-11T21:27:03.373398496Z INFO:     10.0.8.5:50952 - "OPTIONS /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T21:27:03.482133693Z INFO:     10.0.8.5:50952 - "GET /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T21:27:07.460459015Z {"timestamp": "2026-03-11 21:27:07,460", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=20)", "trace_id": ""}
+2026-03-11T21:27:07.711494787Z INFO:     10.0.8.5:50952 - "OPTIONS /api/threads?limit=50&user_id=erkan HTTP/1.1" 200 OK
+2026-03-11T21:27:07.883986702Z INFO:     10.0.8.5:50952 - "GET /api/threads?limit=50&user_id=erkan HTTP/1.1" 200 OK
+2026-03-11T21:27:16.090542723Z INFO:     10.0.8.5:46836 - "OPTIONS /api/auth/login HTTP/1.1" 200 OK
+2026-03-11T21:27:16.453113650Z INFO:     10.0.8.5:46836 - "POST /api/auth/login HTTP/1.1" 200 OK
+2026-03-11T21:27:16.620637781Z INFO:     10.0.8.5:46836 - "OPTIONS /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T21:27:16.733297707Z INFO:     10.0.8.5:46836 - "GET /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T21:27:18.350272043Z INFO:     10.0.8.5:46836 - "OPTIONS /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:27:18.462255581Z INFO:     10.0.8.5:46836 - "GET /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:27:20.402489904Z INFO:     127.0.0.1:42026 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:27:20.689513939Z INFO:     10.0.8.5:37170 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773869236.f2522d1d8311689af3e50d8bd283cbf3f449837bee99d1ae1cafe725d94aa777" [accepted]
+2026-03-11T21:27:20.690106497Z INFO:     connection open
+2026-03-11T21:27:40.568989823Z INFO:     127.0.0.1:47330 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:28:00.743827496Z INFO:     127.0.0.1:48820 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:28:07.461566177Z {"timestamp": "2026-03-11 21:28:07,461", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=21)", "trace_id": ""}
+2026-03-11T21:28:20.906347035Z INFO:     127.0.0.1:41974 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:28:41.053847534Z [AutoChat] Auto-triggered: speed ⇄ reasoner — teknoloji trendleri
+2026-03-11T21:28:41.053878214Z INFO:     127.0.0.1:60578 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:29:01.181107255Z INFO:     127.0.0.1:50840 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:29:07.462099281Z {"timestamp": "2026-03-11 21:29:07,461", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=22)", "trace_id": ""}
+2026-03-11T21:29:21.311721985Z INFO:     127.0.0.1:52126 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:29:41.428422842Z INFO:     127.0.0.1:43108 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:30:01.538609902Z INFO:     127.0.0.1:50762 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:30:07.462194587Z {"timestamp": "2026-03-11 21:30:07,461", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=23)", "trace_id": ""}
+2026-03-11T21:30:21.703708673Z INFO:     127.0.0.1:53226 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:30:41.864439874Z INFO:     127.0.0.1:46662 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:31:01.983477347Z INFO:     127.0.0.1:53016 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:31:07.462103929Z {"timestamp": "2026-03-11 21:31:07,461", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=24)", "trace_id": ""}
+2026-03-11T21:31:22.186938848Z INFO:     127.0.0.1:51626 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:31:42.389493816Z INFO:     127.0.0.1:45962 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:31:49.327852477Z INFO:     10.0.8.5:44700 - "OPTIONS /api/threads/82018b354eea41ad96954cb2b29e9dda/branch?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:31:49.785958376Z INFO:     10.0.8.5:44700 - "POST /api/threads/82018b354eea41ad96954cb2b29e9dda/branch?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:31:50.265810923Z INFO:     10.0.8.5:44700 - "OPTIONS /api/threads/d3c06c7d1ce44092bef3fd59e90c71d4/compact?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:31:50.373960082Z INFO:     10.0.8.5:44700 - "POST /api/threads/d3c06c7d1ce44092bef3fd59e90c71d4/compact?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T21:32:02.553920547Z INFO:     127.0.0.1:57364 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:32:07.462375649Z {"timestamp": "2026-03-11 21:32:07,461", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=25)", "trace_id": ""}
+2026-03-11T21:32:22.716687118Z INFO:     127.0.0.1:55494 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:32:42.879898943Z INFO:     127.0.0.1:42464 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:33:03.046122964Z INFO:     127.0.0.1:33668 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:33:07.462763833Z {"timestamp": "2026-03-11 21:33:07,462", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=26)", "trace_id": ""}
+2026-03-11T21:33:23.165469421Z INFO:     127.0.0.1:52636 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:33:23.518363736Z {"timestamp": "2026-03-11 21:33:23,516", "level": "INFO", "module": "chat_ws", "message": "ws.run.telemetry {\"event\": \"run.start\", \"phase\": \"start\", \"run_id\": \"6259a7fe5b1c4359b3367d1807df498b\", \"thread_id\": \"d3c06c7d1ce44092bef3fd59e90c71d4\", \"user_id_masked\": \"y***t\", \"sequence\": 1, \"pipeline_type\": \"deep_research\", \"agent\": \"orchestrator\", \"status\": \"started\", \"latency_ms\": 0.05, \"token_usage\": {\"total_tokens\": 0, \"prompt_tokens\": null, \"completion_tokens\": null}, \"correlation_id\": \"6259a7fe5b1c4359b3367d1807df498b\", \"ts\": \"2026-03-11T21:33:23.515937+00:00\"}", "trace_id": ""}
+2026-03-11T21:33:23.518407436Z {"timestamp": "2026-03-11 21:33:23,516", "level": "INFO", "module": "chat_ws", "message": "ws.run.telemetry {\"event\": \"run.progress\", \"phase\": \"progress\", \"run_id\": \"6259a7fe5b1c4359b3367d1807df498b\", \"thread_id\": \"d3c06c7d1ce44092bef3fd59e90c71d4\", \"user_id_masked\": \"y***t\", \"sequence\": 1, \"pipeline_type\": \"deep_research\", \"agent\": \"orchestrator\", \"status\": \"running\", \"latency_ms\": 0.57, \"token_usage\": {\"total_tokens\": 0, \"prompt_tokens\": null, \"completion_tokens\": null}, \"correlation_id\": \"6259a7fe5b1c4359b3367d1807df498b\", \"ts\": \"2026-03-11T21:33:23.516443+00:00\"}", "trace_id": ""}
+2026-03-11T21:33:23.540851038Z {"timestamp": "2026-03-11 21:33:23,540", "level": "INFO", "module": "event_bus", "message": "Subscribed: orchestrator → channel 'task.*'", "trace_id": ""}
+2026-03-11T21:33:23.540883307Z {"timestamp": "2026-03-11 21:33:23,540", "level": "INFO", "module": "event_bus", "message": "Subscribed: orchestrator → channel 'metrics.*'", "trace_id": ""}
+2026-03-11T21:33:23.716824332Z INFO:     10.0.8.5:36814 - "OPTIONS /api/analytics/user-behavior?action=task_submit&context=TE%C5%9EEKK%C3%9CR+EDER%C4%B0M+OSILOSKOP+KULLANIMINI+BIRAZ+DAHA+DETAYLI+OLARAK+ANLATAN+BIR+BELGE+OLU%C5%9ETURMANI+ISTIYORUM&metadata=%7B%22pipeline%22%3A%22auto%22%2C%22attachments%22%3A0%7D HTTP/1.1" 200 OK
+2026-03-11T21:33:23.835896283Z INFO:     10.0.8.5:36814 - "POST /api/analytics/user-behavior?action=task_submit&context=TE%C5%9EEKK%C3%9CR+EDER%C4%B0M+OSILOSKOP+KULLANIMINI+BIRAZ+DAHA+DETAYLI+OLARAK+ANLATAN+BIR+BELGE+OLU%C5%9ETURMANI+ISTIYORUM&metadata=%7B%22pipeline%22%3A%22auto%22%2C%22attachments%22%3A0%7D HTTP/1.1" 200 OK
+2026-03-11T21:33:23.882191538Z {"timestamp": "2026-03-11 21:33:23,881", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:33:24.243934519Z {"timestamp": "2026-03-11 21:33:24,243", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:33:28.478581913Z {"timestamp": "2026-03-11 21:33:28,478", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'task.thinker'", "trace_id": ""}
+2026-03-11T21:33:28.478635393Z {"timestamp": "2026-03-11 21:33:28,478", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:33:28.488461115Z {"timestamp": "2026-03-11 21:33:28,488", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'task.speed'", "trace_id": ""}
+2026-03-11T21:33:28.488491985Z {"timestamp": "2026-03-11 21:33:28,488", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:33:28.499430312Z {"timestamp": "2026-03-11 21:33:28,499", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'task.researcher'", "trace_id": ""}
+2026-03-11T21:33:28.499463472Z {"timestamp": "2026-03-11 21:33:28,499", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:33:28.511215674Z {"timestamp": "2026-03-11 21:33:28,510", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'task.reasoner'", "trace_id": ""}
+2026-03-11T21:33:28.511289114Z {"timestamp": "2026-03-11 21:33:28,511", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'broadcast'", "trace_id": ""}
+2026-03-11T21:33:43.307901375Z [AutoChat] Auto-triggered: thinker ⇄ reasoner — görev optimizasyonu
+2026-03-11T21:33:43.307952975Z INFO:     127.0.0.1:46476 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:33:48.160712906Z {"timestamp": "2026-03-11 21:33:48,160", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:34:03.440368067Z INFO:     127.0.0.1:50384 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:34:05.427334023Z {"timestamp": "2026-03-11 21:34:05,426", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:34:07.462933455Z {"timestamp": "2026-03-11 21:34:07,462", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=27)", "trace_id": ""}
+2026-03-11T21:34:22.518571207Z {"timestamp": "2026-03-11 21:34:22,518", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:34:23.590283735Z INFO:     127.0.0.1:56302 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:34:43.748917010Z INFO:     127.0.0.1:36738 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:35:03.893796023Z INFO:     127.0.0.1:39182 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:35:07.463686166Z {"timestamp": "2026-03-11 21:35:07,463", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=28)", "trace_id": ""}
+2026-03-11T21:35:24.028804366Z INFO:     127.0.0.1:40358 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:35:44.185525236Z INFO:     127.0.0.1:60054 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:36:04.360966433Z INFO:     127.0.0.1:47504 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:36:07.464875692Z {"timestamp": "2026-03-11 21:36:07,464", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=29)", "trace_id": ""}
+2026-03-11T21:36:24.501668909Z INFO:     127.0.0.1:59176 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:36:40.614918232Z {"timestamp": "2026-03-11 21:36:40,614", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T21:36:44.658917257Z INFO:     127.0.0.1:60514 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:37:04.797081165Z INFO:     127.0.0.1:59976 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:37:07.465145283Z {"timestamp": "2026-03-11 21:37:07,464", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=30)", "trace_id": ""}
+2026-03-11T21:37:24.958775068Z INFO:     127.0.0.1:53352 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T21:37:45.107221467Z INFO:     127.0.0.1:58852 - "GET /api/health HTTP/1.1" 200 OK
