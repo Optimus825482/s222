@@ -987,43 +987,44 @@ function ProjectDetailView({
   title,
   content,
   onBack,
-    <div className = "flex h-full flex-col bg-white text-[#1a1a1a]" >
+}: {
+  title: string;
+  content: string;
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col bg-white text-[#1a1a1a]">
       <div className="flex items-center gap-2 border-b border-[#d6d2c2] bg-[#f8f6ee] px-3 py-2">
-      style={{ backgroundColor: "#fff", color: "#1a1a1a" }}
-    >
-          className="rounded p-1 text-[#333]"
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded border border-[#d6d2c2] bg-[#f8f6ee] p-1 text-[#333] transition-colors hover:bg-[#ece9d8]"
           title="Geri"
           aria-label="Proje listesine geri dön"
-        style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}
-      >
-        <button
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
         <FolderOpen className="h-4 w-4 text-[#b45309]" />
         <span className="truncate text-[13px] font-semibold text-[#003399]">
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <FolderOpen className="w-4 h-4" style={{ color: "#b45309" }} />
-        <span
-          className="text-[13px] font-semibold truncate"
-          style={{ color: "#003399" }}
-        >
           {title}
         </span>
         <button
+          type="button"
           onClick={() =>
             downloadMarkdown(
               `${title.replace(/[^a-zA-Z0-9]/g, "_")}.md`,
               content,
             )
           }
-          className="ml-auto rounded p-1.5 text-[#666]"
+          className="ml-auto rounded border border-transparent p-1.5 text-[#666] transition-colors hover:border-[#d6d2c2] hover:bg-[#ece9d8] hover:text-[#333]"
           title="İndir (.md)"
           aria-label="Markdown olarak indir"
         >
-          <Download className="w-4 h-4" />
+          <Download className="h-4 w-4" />
         </button>
       </div>
       <div className="flex-1 overflow-auto p-4">
-        <pre className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#333] font-sans">
+        <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-[#333]">
           {content}
         </pre>
       </div>
