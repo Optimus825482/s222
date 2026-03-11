@@ -119,37 +119,9 @@ YOUTUBE_TRANSCRIPT_TOOL = {
     "function": {
         "name": "fetch_transcript",
         "description": (
-            "Fetch the transcript/subtitles of a YouTube video. "
-            "Returns raw transcript text with timestamps. "
-            "Optionally translates to a target language. "
-            "Use when you need the spoken content of a YouTube video for research, analysis, or summarization."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "YouTube video URL",
-                },
-                "target_language": {
-                    "type": "string",
-                    "description": "Translate transcript to this language (e.g. 'tr', 'de', 'fr'). Omit to keep original language.",
-                },
-            },
-            "required": ["url"],
-        },
-    },
-}
-
-YOUTUBE_TRANSCRIPT_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "fetch_transcript",
-        "description": (
             "Fetch the transcript/subtitles from a YouTube video. "
             "Returns the full text and timestamped segments. "
-            "Supports multi-language: tries target language first, falls back to English, then any available. "
-            "Can auto-translate to a target language (e.g. 'tr' for Turkish). "
+            "Fetches whatever language is available, then optionally auto-translates. "
             "Use when you need the raw text content of a YouTube video for analysis, research, or reference."
         ),
         "parameters": {
@@ -158,10 +130,6 @@ YOUTUBE_TRANSCRIPT_TOOL = {
                 "url": {
                     "type": "string",
                     "description": "YouTube video URL",
-                },
-                "language": {
-                    "type": "string",
-                    "description": "Preferred subtitle language code (default: 'en')",
                 },
                 "target_language": {
                     "type": "string",

@@ -2106,11 +2106,9 @@ class BaseAgent(ABC):
             from tools.youtube_summarizer import (
                 get_transcript,
                 get_video_info,
-                extract_video_id,
             )
 
             url = fn_args["url"]
-            language = fn_args.get("language", "en")
             target_language = fn_args.get("target_language")
             max_chars = fn_args.get("max_chars", 15000)
 
@@ -2118,7 +2116,7 @@ class BaseAgent(ABC):
 
             video_result, transcript_result = await _aio.gather(
                 get_video_info(url),
-                get_transcript(url, language=language, target_language=target_language),
+                get_transcript(url, language="en", target_language=target_language),
                 return_exceptions=True,
             )
 
@@ -2132,17 +2130,14 @@ class BaseAgent(ABC):
             ):
                 return "<error>Unexpected transcript provider response</error>"
 
-            video_payload = video_result
-            transcript_payload = transcript_result
+            if not transcript_result.get("success"):
+                return f"<error>{transcript_result.get('error', 'Transcript unavailable')}</error>"
 
-            if not transcript_payload.get("success"):
-                return f"<error>{transcript_payload.get('error', 'Transcript unavailable')}</error>"
-
-            info = video_payload.get("video_info", {}) or {}
-            t_data = transcript_payload.get("transcript", {}) or {}
+            info = video_result.get("video_info", {}) or {}
+            t_data = transcript_result.get("transcript", {}) or {}
             full_text = t_data.get("full_text", "") if isinstance(t_data, dict) else ""
-            lang = transcript_payload.get("language", language)
-            source = transcript_payload.get("source", "unknown")
+            lang = transcript_result.get("language", "en")
+            source = transcript_result.get("source", "unknown")
 
             # Truncate if needed
             if len(full_text) > max_chars:
