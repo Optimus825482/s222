@@ -71,6 +71,13 @@ _AUTO_CHAT_CONFIG: dict[str, dict[str, Any]] = {
 }
 
 
+def _build_ws_delivery_event_id(run_id: str, event_type: str) -> str:
+    """Build deterministic idempotency key for WS delivery events."""
+    safe_run_id = (run_id or "unknown_run").strip() or "unknown_run"
+    safe_event_type = (event_type or "unknown_event").strip() or "unknown_event"
+    return f"{safe_run_id}:{safe_event_type}"
+
+
 def _get_user_entries(
     store: dict[str, list[dict[str, Any]]], user_id: str
 ) -> list[dict[str, Any]]:

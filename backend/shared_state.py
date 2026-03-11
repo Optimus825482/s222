@@ -35,6 +35,20 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _mask_user_id(user_id: str | None) -> str | None:
+    """Mask user id for logs (PII-safe): ab***yz."""
+    if not user_id:
+        return None
+    clean = str(user_id).strip()
+    if not clean:
+        return None
+    if len(clean) <= 2:
+        return "**"
+    if len(clean) <= 6:
+        return f"{clean[0]}***{clean[-1]}"
+    return f"{clean[:2]}***{clean[-2:]}"
+
+
 def _adapt_window_size() -> None:
     """
     Dynamically resize audit window based on event rate.

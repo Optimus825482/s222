@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -66,18 +67,88 @@ def build_improvement_prompt(
 
 
 def parse_evaluation(eval_text: str) -> dict[str, Any] | None:
-    """Parse self-evaluation JSON from agent response."""
-    try:
-        # Try to find JSON in the response
-        import re
-        json_match = re.search(r'\{[^{}]*"scores"[^{}]*\{[^{}]*\}[^{}]*\}', eval_text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group())
+    """Parse self-evaluation JSON from agent response.
 
-        # Try parsing the whole thing
-        return json.loads(eval_text)
-    except (json.JSONDecodeError, AttributeError):
+    Handles raw JSON, markdown code fences, and prose-wrapped JSON snippets.
+    """
+    if not isinstance(eval_text, str) or not eval_text.strip():
         return None
+
+    text = eval_text.strip()
+
+    # 1) Direct JSON parse first
+    try:
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else None
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # 2) Markdown code fence blocks (```json ... ``` or ``` ... ```)
+    fence_blocks = re.findall(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.DOTALL | re.IGNORECASE)
+    for block in fence_blocks:
+        try:
+            parsed = json.loads(block)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    # 3) Balanced JSON object extraction (best-effort)
+    starts = [m.start() for m in re.finditer(r"\{", text)]
+    for start in starts:
+        depth = 0
+        for idx in range(start, len(text)):
+            char = text[idx]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start : idx + 1]
+                    try:
+                        parsed = json.loads(candidate)
+                        if isinstance(parsed, dict) and "scores" in parsed:
+                            return parsed
+                    except (json.JSONDecodeError, TypeError):
+                        break
+
+    return None
+
+
+def _fallback_evaluation(reason: str) -> dict[str, Any]:
+    """Safe fallback evaluation to prevent reflexion flow from crashing."""
+    return {
+        "scores": {
+            "accuracy": 5,
+            "completeness": 5,
+            "clarity": 5,
+            "actionability": 5,
+            "depth": 5,
+        },
+        "total": 25,
+        "weaknesses": [f"evaluation_parse_failed:{reason}"],
+        "improvements": [],
+        "fallback_used": True,
+    }
+
+
+def _is_valid_evaluation(evaluation: Any) -> bool:
+    """Minimal structural validation for parsed reflexion payload."""
+    if not isinstance(evaluation, dict):
+        return False
+    scores = evaluation.get("scores")
+    if not isinstance(scores, dict) or not scores:
+        return False
+    numeric_scores = [v for v in scores.values() if isinstance(v, (int, float))]
+    return bool(numeric_scores)
+
+
+def _extract_llm_content(result: Any) -> str:
+    """Extract content from BaseAgent.call_llm() result safely."""
+    if isinstance(result, dict):
+        content = result.get("content")
+        return content if isinstance(content, str) else str(content or "")
+    return str(result or "")
 
 
 def should_improve(evaluation: dict[str, Any], threshold: float = 3.5) -> bool:
@@ -159,8 +230,8 @@ def save_reflection_insight(question: str, evaluation: dict, improved: bool) -> 
             tags=["reflexion", "self-improvement"] + weaknesses[:2],
             source_agent="reflexion",
         )
-    except Exception:
-        pass  # Silent — never break execution
+    except Exception as e:
+        logger.warning(f"Failed to save reflexion insight: {e}")
 
 
 async def evaluate_and_improve(
@@ -173,7 +244,7 @@ async def evaluate_and_improve(
     """Evaluate response and optionally improve it.
     
     Args:
-        agent: The agent instance (has _call_llm method)
+        agent: The agent instance (has call_llm method)
         question: Original question/input
         response: Agent's response to evaluate
         threshold: Score threshold for improvement (1-5 scale)
@@ -201,47 +272,57 @@ async def evaluate_and_improve(
         
         try:
             # Call LLM for evaluation
-            eval_response = await agent._call_llm([{"role": "user", "content": eval_prompt}])
+            eval_result = await agent.call_llm([{"role": "user", "content": eval_prompt}])
+            eval_response = _extract_llm_content(eval_result)
             evaluation = parse_evaluation(eval_response)
-            
-            if not evaluation:
-                logger.warning("Failed to parse evaluation JSON")
+
+            if not _is_valid_evaluation(evaluation):
+                logger.warning(
+                    "Reflexion evaluation parse/validation failed; using safe fallback",
+                    extra={
+                        "agent_role": getattr(agent.role, "value", str(agent.role)),
+                        "eval_excerpt": eval_response[:200],
+                    },
+                )
+                evaluation = _fallback_evaluation("invalid_or_incomplete_payload")
                 break
-            
+
             # Check if improvement needed
             if not should_improve(evaluation, threshold):
                 logger.info(f"Reflexion: Response passed (avg score >= {threshold})")
                 break
-            
+
             if not config.REFLEXION_AUTO_IMPROVE:
-                logger.info(f"Reflexion: Score below threshold but auto-improve disabled")
+                logger.info("Reflexion: Score below threshold but auto-improve disabled")
                 break
-            
+
             # Build improvement prompt
             weaknesses = evaluation.get("weaknesses", [])
             improvements = evaluation.get("improvements", [])
-            
+
             improve_prompt = build_improvement_prompt(
                 question=question,
                 response=current_response,
                 weaknesses=weaknesses,
                 improvements=improvements,
             )
-            
+
             # Get improved response
-            current_response = await agent._call_llm([{"role": "user", "content": improve_prompt}])
+            improve_result = await agent.call_llm([{"role": "user", "content": improve_prompt}])
+            current_response = _extract_llm_content(improve_result)
             iteration += 1
-            
+
             logger.info(f"Reflexion: Improved response (iteration {iteration})")
-            
+
             # Save insight
             save_reflection_insight(question, evaluation, improved=True)
-            
+
             # Save result for UI
             save_reflection_result(agent.role.value, question, evaluation, improved=True)
-            
+
         except Exception as e:
             logger.error(f"Reflexion error: {e}")
+            evaluation = evaluation or _fallback_evaluation("runtime_error")
             break
     
     # Save final evaluation result for UI (even if no improvement)

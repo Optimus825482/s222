@@ -10,6 +10,7 @@ Retry logic: 3 attempts with exponential backoff on pool exhaustion.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from contextlib import contextmanager
 from typing import Any, Generator, Mapping, TypeAlias
@@ -34,17 +35,60 @@ _MIN_CONN = 2
 _RETRY_ATTEMPTS = 3
 _RETRY_BASE_DELAY = 0.3  # seconds
 
+_DISABLED_ENV = {"1", "true", "yes", "on"}
+_DISABLE_POSTGRES = os.getenv("DISABLE_POSTGRES", "").strip().lower() in _DISABLED_ENV
+_CONNECT_TIMEOUT_SEC = int(os.getenv("PG_CONNECT_TIMEOUT", "2"))
+
+_pg_available_cache: bool | None = None
+
+
+def _can_attempt_postgres() -> bool:
+    """Return whether Postgres should be used in this process."""
+    global _pg_available_cache
+
+    if _DISABLE_POSTGRES:
+        if _pg_available_cache is not False:
+            logger.info("PostgreSQL disabled via DISABLE_POSTGRES=1")
+        _pg_available_cache = False
+        return False
+
+    if _pg_available_cache is False:
+        return False
+
+    return True
+
+
+def _mark_postgres_unavailable(reason: str) -> None:
+    global _pg_available_cache, _pool
+    _pg_available_cache = False
+    logger.warning("PostgreSQL marked unavailable for this process: %s", reason)
+    try:
+        if _pool is not None and not _pool.closed:
+            _pool.closeall()
+    except Exception:
+        pass
+    _pool = None
+
 
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
-    global _pool
+    global _pool, _pg_available_cache
+    if not _can_attempt_postgres():
+        raise psycopg2.OperationalError("postgres disabled/unavailable")
+
     if _pool is None or _pool.closed:
-        _pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=_MIN_CONN,
-            maxconn=_MAX_CONN,
-            dsn=DATABASE_URL,
-            cursor_factory=psycopg2.extras.RealDictCursor,
-        )
-        logger.info("PostgreSQL connection pool initialized (max=%d)", _MAX_CONN)
+        try:
+            _pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=_MIN_CONN,
+                maxconn=_MAX_CONN,
+                dsn=DATABASE_URL,
+                cursor_factory=psycopg2.extras.RealDictCursor,
+                connect_timeout=_CONNECT_TIMEOUT_SEC,
+            )
+            _pg_available_cache = True
+            logger.info("PostgreSQL connection pool initialized (max=%d)", _MAX_CONN)
+        except psycopg2.OperationalError as e:
+            _mark_postgres_unavailable(str(e))
+            raise
     return _pool
 
 
@@ -84,6 +128,7 @@ def get_conn() -> psycopg2.extensions.connection:
             else:
                 logger.error("Connection pool exhausted after %d attempts", _RETRY_ATTEMPTS)
         except psycopg2.OperationalError as e:
+            _mark_postgres_unavailable(str(e))
             logger.error("PostgreSQL connection failed: %s", e)
             raise
     raise last_err or psycopg2.pool.PoolError("connection pool exhausted")
@@ -234,6 +279,18 @@ def init_database() -> None:
 
 
 # ── SQLite Migration ─────────────────────────────────────────────
+
+def postgres_available() -> bool:
+    """Best-effort check for Postgres availability in current process."""
+    if not _can_attempt_postgres():
+        return False
+    try:
+        conn = get_conn()
+    except Exception:
+        return False
+    release_conn(conn)
+    return True
+
 
 def migrate_from_sqlite() -> dict[str, int]:
     """

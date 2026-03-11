@@ -1,13 +1,16 @@
+# Backend runtime dependency ownership.
+# Keep all packages required by backend/main.py, backend/routes/*,
+# and backend-imported tool modules here.
+# Pinning strategy: use lower-bound pins (>=) and lock exact versions in deployment artifacts if needed.
+
 bcrypt>=4.0.0
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
-websockets>=13.0
 openai>=1.50.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.9
 httpx>=0.27.0
-qdrant-client>=1.7.0
 openpyxl>=3.1.0
 reportlab>=4.0.0
 python-pptx>=1.0.0
@@ -26,3 +29,17 @@ beautifulsoup4>=4.12.0
 exa-py>=1.0.0
 youtube-transcript-api>=1.0.0
 deep-translator>=1.11.0
+pytesseract>=0.3.10
+pdfplumber>=0.10.0
+yt-dlp>=2024.1.0
+
+# Explicit backend feature deps discovered by import audit:
+# - aiohttp: required for Scheduled Tasks HTTP task execution path (tools/scheduled_tasks.py)
+# - cryptography: required for secure federated crypto (tools/federated/crypto.py);
+#   module has insecure fallback when missing, but production backend should install it.
+aiohttp>=3.9.0
+cryptography>=42.0.0
+
+# Removed after import audit:
+# - qdrant-client: no runtime imports remain after Shared Workspace migrated to PostgreSQL.
+# - websockets: not directly imported; provided transitively by uvicorn[standard].

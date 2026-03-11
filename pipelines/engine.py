@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from typing import Any
 
@@ -30,6 +31,100 @@ from config import get_iterative_eval_runtime_config
 from core.models import (
     AgentRole, EventType, PipelineType, SubTask, Task, TaskStatus, Thread,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _status_meta(status: TaskStatus | str) -> dict[str, str]:
+    canonical = TaskStatus.normalize(status)
+    return {
+        "run_state": canonical,
+        "run_state_alias": TaskStatus.legacy_alias(status),
+    }
+
+
+def _transition_meta(previous: TaskStatus | str, current: TaskStatus | str) -> dict[str, str]:
+    prev_canonical = TaskStatus.normalize(previous)
+    curr_canonical = TaskStatus.normalize(current)
+    return {
+        **_status_meta(current),
+        "run_state_prev": prev_canonical,
+        "run_state_prev_alias": TaskStatus.legacy_alias(previous),
+        "run_state_transition": f"{prev_canonical}->{curr_canonical}",
+    }
+
+
+def _set_task_state(
+    thread: Thread,
+    task: Task,
+    next_status: TaskStatus | str,
+    event_type: EventType,
+    content: str,
+    *,
+    live_monitor: Any | None = None,
+    agent_role: AgentRole | None = None,
+    strict: bool = False,
+    **meta: Any,
+) -> None:
+    prev_status = task.status
+    prev_canonical = TaskStatus.normalize(prev_status)
+    next_canonical = TaskStatus.normalize(next_status)
+    transition_allowed = TaskStatus.can_transition(prev_canonical, next_canonical)
+    if not transition_allowed:
+        logger.warning(
+            "run.state.invalid_transition",
+            extra={
+                "event": "run.state.invalid_transition",
+                "thread_id": thread.id,
+                "task_id": task.id,
+                "from_state": prev_canonical,
+                "to_state": next_canonical,
+                "legacy_from": TaskStatus.legacy_alias(prev_status),
+                "legacy_to": TaskStatus.legacy_alias(next_status),
+            },
+        )
+        if strict and prev_canonical != next_canonical:
+            raise ValueError(
+                f"Invalid run state transition {prev_canonical}->{next_canonical} for task {task.id}"
+            )
+    task.status = TaskStatus.canonical(next_status)
+    thread.add_event(
+        event_type,
+        content,
+        agent_role=agent_role,
+        **_transition_meta(prev_status, task.status),
+        **meta,
+    )
+    logger.info(
+        "run.state.transition",
+        extra={
+            "event": "run.state.transition",
+            "thread_id": thread.id,
+            "task_id": task.id,
+            "from_state": prev_canonical,
+            "to_state": TaskStatus.normalize(task.status),
+            "legacy_from": TaskStatus.legacy_alias(prev_status),
+            "legacy_to": TaskStatus.legacy_alias(task.status),
+            "transition": f"{prev_canonical}->{TaskStatus.normalize(task.status)}",
+        },
+    )
+    if live_monitor:
+        try:
+            live_monitor.emit(
+                "run_state",
+                "orchestrator",
+                content,
+                run_state=TaskStatus.normalize(task.status),
+                run_state_alias=TaskStatus.legacy_alias(task.status),
+                run_state_prev=prev_canonical,
+                run_state_prev_alias=TaskStatus.legacy_alias(prev_status),
+                run_state_transition=f"{prev_canonical}->{TaskStatus.normalize(task.status)}",
+                thread_id=thread.id,
+                task_id=task.id,
+            )
+        except Exception:
+            pass
+
 from tools.skill_finder import get_skill_knowledge
 from tools.circuit_breaker import get_circuit_breaker
 from tools.cache import get_cached_response, cache_response
@@ -141,6 +236,17 @@ class PipelineEngine:
 
     async def execute(self, task: Task, thread: Thread) -> str:
         """Route to appropriate pipeline strategy."""
+        _set_task_state(
+            thread,
+            task,
+            TaskStatus.QUEUED,
+            EventType.ROUTING_DECISION,
+            "Run queued for pipeline dispatch",
+            agent_role=AgentRole.ORCHESTRATOR,
+            live_monitor=self._live_monitor,
+            strict=True,
+        )
+
         # Initialize bus subscriptions once
         if not self._bus_initialized:
             self._init_bus_subscriptions()
@@ -163,24 +269,56 @@ class PipelineEngine:
         except Exception:
             pass  # Bus errors never break pipeline
 
+        _set_task_state(
+            thread,
+            task,
+            TaskStatus.ROUTING,
+            EventType.ROUTING_DECISION,
+            f"Routing pipeline={task.pipeline_type.value} with {len(task.sub_tasks)} sub-tasks",
+            agent_role=AgentRole.ORCHESTRATOR,
+            live_monitor=self._live_monitor,
+        )
+
         # Check cache for identical queries
         try:
             cached = await get_cached_response(task.user_input, task.pipeline_type.value)
             if cached:
-                task.status = TaskStatus.COMPLETED
-                task.final_result = cached["response"]
-                thread.add_event(
-                    EventType.PIPELINE_COMPLETE,
-                    f"Cache hit (confidence: {cached.get('confidence', 0):.0%})",
+                _set_task_state(
+                    thread,
+                    task,
+                    TaskStatus.RUNNING,
+                    EventType.PIPELINE_START,
+                    "Cache hit path entered",
+                    live_monitor=self._live_monitor,
                 )
+                _set_task_state(
+                    thread,
+                    task,
+                    TaskStatus.SYNTHESIZING,
+                    EventType.PIPELINE_STEP,
+                    f"Cache hit (confidence: {cached.get('confidence', 0):.0%}) — synthesizing cached response",
+                    live_monitor=self._live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    task,
+                    TaskStatus.COMPLETED,
+                    EventType.PIPELINE_COMPLETE,
+                    "Cache response delivered",
+                    live_monitor=self._live_monitor,
+                )
+                task.final_result = cached["response"]
                 return cached["response"]
         except Exception:
             pass  # Cache miss or error — proceed normally
 
-        task.status = TaskStatus.RUNNING
-        thread.add_event(
+        _set_task_state(
+            thread,
+            task,
+            TaskStatus.RUNNING,
             EventType.PIPELINE_START,
             f"Starting {task.pipeline_type.value} pipeline with {len(task.sub_tasks)} sub-tasks",
+            live_monitor=self._live_monitor,
         )
 
         t0 = time.monotonic()
@@ -206,12 +344,43 @@ class PipelineEngine:
                 case _:
                     result = await self._parallel(task, thread) if len(task.sub_tasks) >= 2 else await self._sequential(task, thread)
 
-            task.status = TaskStatus.COMPLETED
             task.total_latency_ms = (time.monotonic() - t0) * 1000
+            if isinstance(result, str) and result.strip().startswith("[Stopped]"):
+                _set_task_state(
+                    thread,
+                    task,
+                    TaskStatus.STOPPED,
+                    EventType.PIPELINE_STEP,
+                    "Pipeline execution stopped by user",
+                    live_monitor=self._live_monitor,
+                )
+            else:
+                _set_task_state(
+                    thread,
+                    task,
+                    TaskStatus.SYNTHESIZING,
+                    EventType.PIPELINE_STEP,
+                    "Pipeline execution finished, synthesizing outputs",
+                    live_monitor=self._live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    task,
+                    TaskStatus.COMPLETED,
+                    EventType.PIPELINE_COMPLETE,
+                    "Pipeline synthesis completed",
+                    live_monitor=self._live_monitor,
+                )
         except Exception as e:
-            task.status = TaskStatus.FAILED
             result = f"[Pipeline Error] {e}"
-            thread.add_event(EventType.ERROR, result)
+            _set_task_state(
+                thread,
+                task,
+                TaskStatus.FAILED,
+                EventType.ERROR,
+                result,
+                live_monitor=self._live_monitor,
+            )
 
         # Cache successful results
         if task.status == TaskStatus.COMPLETED:
@@ -227,6 +396,7 @@ class PipelineEngine:
             EventType.PIPELINE_COMPLETE,
             f"Pipeline {task.pipeline_type.value} completed: {task.status.value}",
             latency_ms=task.total_latency_ms,
+            **_status_meta(task.status),
         )
 
         # Publish pipeline complete event to bus
@@ -254,7 +424,7 @@ class PipelineEngine:
         """Execute a single sub-task with its assigned agent, injecting skills if assigned."""
         # Check stop
         if self._live_monitor and self._live_monitor.should_stop():
-            subtask.status = TaskStatus.FAILED
+            subtask.status = TaskStatus.STOPPED
             return "[Stopped]"
 
         subtask.status = TaskStatus.RUNNING

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
 
-from tools.pg_connection import get_conn, release_conn
+from tools.pg_connection import get_conn, release_conn, postgres_available
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,10 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
 
 def _ensure_tables() -> None:
     """Create MCP tables in PostgreSQL if they don't exist."""
+    if not postgres_available():
+        logger.warning("MCP DB bootstrap skipped: PostgreSQL unavailable")
+        return
+
     conn = get_conn()
     try:
         with conn.cursor() as cur:

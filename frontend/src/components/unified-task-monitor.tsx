@@ -149,6 +149,137 @@ function extractActiveAgents(events: WSLiveEvent[]): ActiveAgent[] {
   return Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
 }
 
+interface ColonyProgressSnapshot {
+  percent: number | null;
+  completedTasks: number | null;
+  totalTasks: number | null;
+  scouts: number | null;
+  phase: "scouting" | "working" | "done" | "unknown";
+  cost: string | null;
+  lastMessage: string;
+  timestamp: number;
+  isComplete: boolean;
+}
+
+function extractColonyProgress(events: WSLiveEvent[]): ColonyProgressSnapshot | null {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const ev = events[i];
+    const content = ev.content || "";
+    const extra = (ev.extra ?? {}) as Record<string, unknown>;
+
+    // 1) Prefer structured extra fields when available
+    const percentExtra =
+      typeof extra.progress_pct === "number"
+        ? extra.progress_pct
+        : typeof extra.progress === "number"
+          ? extra.progress
+          : null;
+
+    const doneExtra =
+      typeof extra.tasks_done === "number" ? extra.tasks_done : null;
+    const totalExtra =
+      typeof extra.tasks_total === "number" ? extra.tasks_total : null;
+
+    if (
+      ev.event_type === "colony_signal" ||
+      /COLONY_SIGNAL|scouts exploring|tasks done|TASK_DONE/i.test(content)
+    ) {
+      if (percentExtra !== null || doneExtra !== null || totalExtra !== null) {
+        const isCompleteSignal =
+          /COLONY_SIGNAL:COMPLETE/i.test(content) ||
+          String(extra.status ?? "").toLowerCase() === "done" ||
+          String(extra.phase ?? "").toLowerCase() === "done";
+
+        return {
+          percent: isCompleteSignal ? 100 : percentExtra,
+          completedTasks: doneExtra,
+          totalTasks: totalExtra,
+          scouts:
+            typeof extra.scouts === "number" ? (extra.scouts as number) : null,
+          phase:
+            typeof extra.phase === "string"
+              ? (extra.phase as ColonyProgressSnapshot["phase"])
+              : isCompleteSignal
+                ? "done"
+                : "unknown",
+          cost:
+            typeof extra.cost === "string"
+              ? (extra.cost as string)
+              : typeof extra.cost_usd === "number"
+                ? `$${(extra.cost_usd as number).toFixed(4)}`
+                : null,
+          lastMessage: content,
+          timestamp: ev.timestamp,
+          isComplete: isCompleteSignal,
+        };
+      }
+
+      // 2) Fallback: parse text signals
+      const scouting = content.match(
+        /(\d+)\s+scouts exploring.*?\((\d+)%\s*,\s*\$([0-9.]+)\)/i,
+      );
+      if (scouting) {
+        return {
+          percent: Number(scouting[2]),
+          completedTasks: null,
+          totalTasks: null,
+          scouts: Number(scouting[1]),
+          phase: "scouting",
+          cost: `$${scouting[3]}`,
+          lastMessage: content,
+          timestamp: ev.timestamp,
+          isComplete: false,
+        };
+      }
+
+      const working = content.match(/(\d+)\/(\d+)\s+tasks done\s*\((\d+)%/i);
+      if (working) {
+        return {
+          percent: Number(working[3]),
+          completedTasks: Number(working[1]),
+          totalTasks: Number(working[2]),
+          scouts: null,
+          phase: "working",
+          cost: null,
+          lastMessage: content,
+          timestamp: ev.timestamp,
+          isComplete: false,
+        };
+      }
+
+      if (/COLONY_SIGNAL:COMPLETE/i.test(content)) {
+        return {
+          percent: 100,
+          completedTasks: null,
+          totalTasks: null,
+          scouts: null,
+          phase: "done",
+          cost: null,
+          lastMessage: content,
+          timestamp: ev.timestamp,
+          isComplete: true,
+        };
+      }
+
+      if (/TASK_DONE/i.test(content)) {
+        return {
+          percent: null,
+          completedTasks: null,
+          totalTasks: null,
+          scouts: null,
+          phase: "done",
+          cost: null,
+          lastMessage: content,
+          timestamp: ev.timestamp,
+          isComplete: false,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 /* ═══════════════════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════════════════ */
@@ -302,6 +433,49 @@ function PipelineTab({
   const isRunning = status === "running";
   const isDone = status === "complete";
   const thinkingRef = useRef<HTMLPreElement>(null);
+  const colonyProgress = useMemo(() => extractColonyProgress(events), [events]);
+  const [animatedColonyPercent, setAnimatedColonyPercent] = useState(0);
+
+  const targetColonyPercent = useMemo(() => {
+    if (!colonyProgress) return null;
+
+    if (colonyProgress.isComplete) return 100;
+
+    if (typeof colonyProgress.percent === "number") {
+      return Math.max(0, Math.min(100, colonyProgress.percent));
+    }
+
+    if (
+      colonyProgress.completedTasks !== null &&
+      colonyProgress.totalTasks !== null &&
+      colonyProgress.totalTasks > 0
+    ) {
+      return Math.max(
+        0,
+        Math.min(100, (colonyProgress.completedTasks / colonyProgress.totalTasks) * 100),
+      );
+    }
+
+    return null;
+  }, [colonyProgress]);
+
+  useEffect(() => {
+    if (targetColonyPercent === null) return;
+
+    const timer = window.setInterval(() => {
+      setAnimatedColonyPercent((prev) => {
+        const diff = targetColonyPercent - prev;
+
+        if (Math.abs(diff) < 0.2) return targetColonyPercent;
+
+        const step = Math.sign(diff) * Math.max(0.5, Math.abs(diff) * 0.18);
+        const next = prev + step;
+        return Math.max(0, Math.min(100, next));
+      });
+    }, 40);
+
+    return () => window.clearInterval(timer);
+  }, [targetColonyPercent]);
 
   // Auto-scroll thinking
   useEffect(() => {
@@ -422,6 +596,80 @@ function PipelineTab({
             />
             <span className="text-[9px] text-gray-400">aktif</span>
           </div>
+        </div>
+      )}
+
+      {/* ── Colony Progress (Orchestrator Live Runtime) ── */}
+      {colonyProgress && (
+        <div className="shrink-0 bg-[#f8f7f4] border border-[#d6d2c2] rounded-lg p-3">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="text-[11px] font-semibold text-gray-700 flex items-center gap-1.5">
+              <span>🐜 Colony İlerleme</span>
+              {colonyProgress.isComplete && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-300">
+                  tamamlandı
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] text-gray-600 font-medium tabular-nums">
+              {targetColonyPercent !== null
+                ? `%${Math.round(animatedColonyPercent)}`
+                : "Takip ediliyor"}
+            </div>
+          </div>
+
+          <div
+            className="h-2 w-full rounded bg-gray-200 overflow-hidden"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={targetColonyPercent ?? undefined}
+            aria-label="Colony ilerleme yüzdesi"
+          >
+            <div
+              className={`h-full transition-[width,background-color] duration-500 ease-out ${
+                colonyProgress.phase === "scouting"
+                  ? "bg-blue-500"
+                  : colonyProgress.phase === "working"
+                    ? "bg-amber-500"
+                    : colonyProgress.phase === "done"
+                      ? "bg-emerald-500"
+                      : "bg-gray-400"
+              }`}
+              style={{ width: `${Math.max(0, Math.min(100, animatedColonyPercent))}%` }}
+            />
+          </div>
+
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500">
+            {colonyProgress.completedTasks !== null && colonyProgress.totalTasks !== null && (
+              <span>
+                Görev: {colonyProgress.completedTasks}/{colonyProgress.totalTasks}
+              </span>
+            )}
+            {colonyProgress.scouts !== null && <span>Scout: {colonyProgress.scouts}</span>}
+            {colonyProgress.phase !== "unknown" && (
+              <span
+                className={
+                  colonyProgress.phase === "scouting"
+                    ? "text-blue-600"
+                    : colonyProgress.phase === "working"
+                      ? "text-amber-600"
+                      : colonyProgress.phase === "done"
+                        ? "text-emerald-600"
+                        : ""
+                }
+              >
+                Faz: {colonyProgress.phase}
+              </span>
+            )}
+            {colonyProgress.cost && <span>Maliyet: {colonyProgress.cost}</span>}
+          </div>
+
+          {colonyProgress.lastMessage && (
+            <p className="mt-1 text-[9px] text-gray-400 truncate">
+              {colonyProgress.lastMessage}
+            </p>
+          )}
         </div>
       )}
 

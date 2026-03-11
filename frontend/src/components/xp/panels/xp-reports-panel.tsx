@@ -29,7 +29,7 @@ import {
   Wrench,
   ShieldCheck,
 } from "lucide-react";
-import { DetailModal } from "./detail-modal";
+import { XpDetailModal } from "./xp-detail-modal";
 import ArtifactsPanel, { hasRenderableArtifacts } from "@/components/artifacts-panel";
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -695,7 +695,7 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
 
           {/* Confidence analysis modal */}
           {showConfidence && task.confidence_footer && (
-            <DetailModal
+            <XpDetailModal
               title="Güven Analizi"
               content={task.confidence_footer}
               color="#3b82f6"
@@ -969,7 +969,7 @@ function ThreadDetailView({
 
       {/* Thread-level confidence analysis modal */}
       {showThreadConfidence && hasConfidence && (
-        <DetailModal
+        <XpDetailModal
           title="Güven Analizi — Tüm Görevler"
           content={allConfidenceFooters}
           color="#3b82f6"

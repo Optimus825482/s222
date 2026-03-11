@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 
-interface DetailModalProps {
+interface XpDetailModalProps {
   title: string;
   content: string;
   color: string;
@@ -10,13 +10,17 @@ interface DetailModalProps {
   onClose: () => void;
 }
 
-export function DetailModal({
+/**
+ * XP-specific detail modal.
+ * Canonical location for XP panel detail previews.
+ */
+export function XpDetailModal({
   title,
   content,
   color,
   badge,
   onClose,
-}: DetailModalProps) {
+}: XpDetailModalProps) {
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"

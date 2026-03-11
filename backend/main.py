@@ -34,45 +34,55 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Structured logging init failed: {e}")
 
-    # Initialize PostgreSQL on startup
+    pg_available = False
     try:
-        from tools.pg_connection import init_database
-        init_database()
-        print("[Backend] PostgreSQL initialized successfully")
+        from tools.pg_connection import init_database, postgres_available
+        pg_available = postgres_available()
+        if pg_available:
+            init_database()
+            print("[Backend] PostgreSQL initialized successfully")
+        else:
+            print("[Backend] PostgreSQL unavailable; running in degraded DB-less mode")
     except Exception as e:
         print(f"[Backend] PostgreSQL init failed (SQLite fallback): {e}")
 
     # Create execution_traces table
     try:
-        from tools.observability import init_traces_table
-        init_traces_table()
-        print("[Backend] execution_traces table initialized")
+        if pg_available:
+            from tools.observability import init_traces_table
+            init_traces_table()
+            print("[Backend] execution_traces table initialized")
+        else:
+            print("[Backend] execution_traces init skipped (PostgreSQL unavailable)")
     except Exception as e:
         print(f"[Backend] execution_traces init failed (non-critical): {e}")
 
     # Run migration 005: agent_metrics_log + skills schema extension
-    try:
-        from tools.pg_connection import get_conn, release_conn
-        import pathlib
-        _mig_path = pathlib.Path(__file__).parent / "migrations" / "005_performance_metrics.sql"
-        if _mig_path.exists():
-            _mig_sql = _mig_path.read_text(encoding="utf-8")
-            _mig_conn = get_conn()
-            try:
-                with _mig_conn.cursor() as cur:
-                    for stmt in _mig_sql.split(";"):
-                        stmt = stmt.strip()
-                        if stmt and not stmt.startswith("--"):
-                            cur.execute(stmt)
-                _mig_conn.commit()
-                print("[Backend] Migration 005 (agent_metrics_log) applied", flush=True)
-            except Exception as e:
-                _mig_conn.rollback()
-                print(f"[Backend] Migration 005 failed: {e}", flush=True)
-            finally:
-                release_conn(_mig_conn)
-    except Exception as e:
-        print(f"[Backend] Migration 005 load failed: {e}", flush=True)
+    if pg_available:
+        try:
+            from tools.pg_connection import get_conn, release_conn
+            import pathlib
+            _mig_path = pathlib.Path(__file__).parent / "migrations" / "005_performance_metrics.sql"
+            if _mig_path.exists():
+                _mig_sql = _mig_path.read_text(encoding="utf-8")
+                _mig_conn = get_conn()
+                try:
+                    with _mig_conn.cursor() as cur:
+                        for stmt in _mig_sql.split(";"):
+                            stmt = stmt.strip()
+                            if stmt and not stmt.startswith("--"):
+                                cur.execute(stmt)
+                    _mig_conn.commit()
+                    print("[Backend] Migration 005 (agent_metrics_log) applied", flush=True)
+                except Exception as e:
+                    _mig_conn.rollback()
+                    print(f"[Backend] Migration 005 failed: {e}", flush=True)
+                finally:
+                    release_conn(_mig_conn)
+        except Exception as e:
+            print(f"[Backend] Migration 005 load failed: {e}", flush=True)
+    else:
+        print("[Backend] Migration 005 skipped (PostgreSQL unavailable)", flush=True)
 
     # Run migration 006: SQLite → PostgreSQL (schedules, benchmarks, evaluations, etc.)
     # Execute statement-by-statement to avoid psycopg2 multi-statement issues

@@ -26,7 +26,6 @@ out/
 
 # Temp/check scripts
 _check*.py
-backend/main_monolith_backup.py
 
 # OS
 .DS_Store

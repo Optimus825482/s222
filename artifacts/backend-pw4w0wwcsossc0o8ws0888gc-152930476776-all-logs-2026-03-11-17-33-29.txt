@@ -1,0 +1,747 @@
+
+2026-03-11T15:31:16.673572919Z INFO:     Started server process [1]
+2026-03-11T15:31:16.673611129Z INFO:     Waiting for application startup.
+2026-03-11T15:31:16.674328215Z {"timestamp": "2026-03-11 15:31:16,673", "level": "INFO", "module": "observability", "message": "Structured logging initialized", "trace_id": ""}
+2026-03-11T15:31:16.681274085Z {"timestamp": "2026-03-11 15:31:16,681", "level": "INFO", "module": "pg_connection", "message": "Database schema initialized", "trace_id": ""}
+2026-03-11T15:31:16.682243999Z {"timestamp": "2026-03-11 15:31:16,681", "level": "INFO", "module": "observability", "message": "execution_traces table initialized", "trace_id": ""}
+2026-03-11T15:31:16.683613752Z [Backend] benchmark_suite loaded OK (monitoring)
+2026-03-11T15:31:16.683622922Z [Backend] error_patterns loaded OK (monitoring)
+2026-03-11T15:31:16.683625752Z [Backend] cost_tracker loaded OK (monitoring)
+2026-03-11T15:31:16.683628082Z [Backend] auto_optimizer loaded OK (monitoring)
+2026-03-11T15:31:16.683630252Z [Backend] adaptive_tool_selector loaded OK (monitoring)
+2026-03-11T15:31:16.683632452Z [Backend] workflow_optimizer loaded OK (monitoring)
+2026-03-11T15:31:16.683634512Z [Backend] All route modules loaded successfully
+2026-03-11T15:31:16.683636612Z [Backend] Modules: auth_and_tools, skills_and_workflows, analytics, messaging, monitoring, collaboration, memory_and_export, system, identity, social, heartbeat, chat_ws, learning_hub, gateway, documents, mcp_management, rag_pipeline, traces, agent_comm, marketplace, self_improvement, presentations, resilience, federated, inter_agent, ocr, youtube, workspace
+2026-03-11T15:31:16.683639362Z [Backend] PostgreSQL initialized successfully
+2026-03-11T15:31:16.683641382Z [Backend] execution_traces table initialized
+2026-03-11T15:31:16.683643402Z [Backend] Migration 005 (agent_metrics_log) applied
+2026-03-11T15:31:16.687122871Z [Backend] Migration 006 (SQLite→PG) applied
+2026-03-11T15:31:19.352710113Z {"timestamp": "2026-03-11 15:31:19,352", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for brave-search, trying direct tools/list", "trace_id": ""}
+2026-03-11T15:31:20.078804051Z {"timestamp": "2026-03-11 15:31:20,078", "level": "WARNING", "module": "mcp_client", "message": "No tools response from MCP server: brave-search", "trace_id": ""}
+2026-03-11T15:31:22.581069809Z {"timestamp": "2026-03-11 15:31:22,580", "level": "INFO", "module": "mcp_client", "message": "Discovered 1 tools from MCP server: fetch", "trace_id": ""}
+2026-03-11T15:31:32.595067245Z {"timestamp": "2026-03-11 15:31:32,594", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for puppeteer, trying direct tools/list", "trace_id": ""}
+2026-03-11T15:31:33.897834765Z {"timestamp": "2026-03-11 15:31:33,897", "level": "INFO", "module": "mcp_client", "message": "Discovered 7 tools from MCP server: puppeteer", "trace_id": ""}
+2026-03-11T15:31:34.148597894Z {"timestamp": "2026-03-11 15:31:34,148", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for arxiv, trying direct tools/list", "trace_id": ""}
+2026-03-11T15:31:34.238936751Z {"timestamp": "2026-03-11 15:31:34,238", "level": "WARNING", "module": "mcp_client", "message": "No tools response from MCP server: arxiv", "trace_id": ""}
+2026-03-11T15:31:34.490752214Z {"timestamp": "2026-03-11 15:31:34,490", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for wikipedia, trying direct tools/list", "trace_id": ""}
+2026-03-11T15:31:34.605938257Z {"timestamp": "2026-03-11 15:31:34,605", "level": "WARNING", "module": "mcp_client", "message": "No tools response from MCP server: wikipedia", "trace_id": ""}
+2026-03-11T15:31:38.809588472Z {"timestamp": "2026-03-11 15:31:38,809", "level": "INFO", "module": "mcp_client", "message": "Discovered 10 tools from MCP server: yahoo-finance", "trace_id": ""}
+2026-03-11T15:31:40.332903307Z {"timestamp": "2026-03-11 15:31:40,332", "level": "INFO", "module": "mcp_client", "message": "Discovered 2 tools from MCP server: time-mcp", "trace_id": ""}
+2026-03-11T15:31:44.980550852Z {"timestamp": "2026-03-11 15:31:44,980", "level": "INFO", "module": "mcp_client", "message": "Discovered 14 tools from MCP server: filesystem", "trace_id": ""}
+2026-03-11T15:31:47.497642747Z {"timestamp": "2026-03-11 15:31:47,497", "level": "INFO", "module": "mcp_client", "message": "Discovered 1 tools from MCP server: sequential-thinking", "trace_id": ""}
+2026-03-11T15:31:49.358142832Z {"timestamp": "2026-03-11 15:31:49,357", "level": "WARNING", "module": "mcp_client", "message": "MCP handshake failed for postgres, trying direct tools/list", "trace_id": ""}
+2026-03-11T15:31:50.146582650Z {"timestamp": "2026-03-11 15:31:50,146", "level": "WARNING", "module": "mcp_client", "message": "No tools response from MCP server: postgres", "trace_id": ""}
+2026-03-11T15:31:51.910983550Z {"timestamp": "2026-03-11 15:31:51,910", "level": "INFO", "module": "mcp_client", "message": "Discovered 6 tools from MCP server: sqlite", "trace_id": ""}
+2026-03-11T15:31:51.947328271Z {"timestamp": "2026-03-11 15:31:51,946", "level": "INFO", "module": "base", "message": "Scheduler started", "trace_id": ""}
+2026-03-11T15:31:51.947359020Z {"timestamp": "2026-03-11 15:31:51,946", "level": "INFO", "module": "workflow_scheduler", "message": "[Scheduler] APScheduler started", "trace_id": ""}
+2026-03-11T15:31:51.948658723Z {"timestamp": "2026-03-11 15:31:51,948", "level": "INFO", "module": "workflow_scheduler", "message": "[Scheduler] Loaded 0 active schedule(s)", "trace_id": ""}
+2026-03-11T15:31:52.067467555Z {"timestamp": "2026-03-11 15:31:52,067", "level": "INFO", "module": "_client", "message": "HTTP Request: POST http://pi-gateway:3100/v1/tools/register \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T15:31:52.067741943Z {"timestamp": "2026-03-11 15:31:52,067", "level": "INFO", "module": "tool_schema_registry", "message": "Registered 57 tool schemas with gateway (0 errors)", "trace_id": ""}
+2026-03-11T15:31:52.073943837Z {"timestamp": "2026-03-11 15:31:52,073", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] Scheduler started with 5 tasks", "trace_id": ""}
+2026-03-11T15:31:52.082606337Z {"timestamp": "2026-03-11 15:31:52,082", "level": "INFO", "module": "base", "message": "Scheduler started", "trace_id": ""}
+2026-03-11T15:31:52.082635557Z {"timestamp": "2026-03-11 15:31:52,082", "level": "INFO", "module": "scheduled_tasks", "message": "[ScheduledTasks] APScheduler started", "trace_id": ""}
+2026-03-11T15:31:52.111589970Z {"timestamp": "2026-03-11 15:31:52,111", "level": "INFO", "module": "event_bus", "message": "Subscribed: feedback_loop → channel 'metrics'", "trace_id": ""}
+2026-03-11T15:31:52.111607800Z {"timestamp": "2026-03-11 15:31:52,111", "level": "INFO", "module": "event_bus", "message": "Subscribed: feedback_loop → channel 'experiments'", "trace_id": ""}
+2026-03-11T15:31:52.111611670Z {"timestamp": "2026-03-11 15:31:52,111", "level": "INFO", "module": "feedback_loop", "message": "FeedbackLoop started — subscribed to metrics + experiments channels", "trace_id": ""}
+2026-03-11T15:31:52.113725777Z {"timestamp": "2026-03-11 15:31:52,113", "level": "INFO", "module": "otel_integration", "message": "OpenTelemetry SDK not installed — tracing disabled", "trace_id": ""}
+2026-03-11T15:31:52.175323801Z {"timestamp": "2026-03-11 15:31:52,175", "level": "INFO", "module": "redis_client", "message": "Redis connected (mode=standalone)", "trace_id": ""}
+2026-03-11T15:31:52.197159665Z {"timestamp": "2026-03-11 15:31:52,196", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] daily_briefing ok (run_count=1)", "trace_id": ""}
+2026-03-11T15:31:52.200925913Z {"timestamp": "2026-03-11 15:31:52,200", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=1)", "trace_id": ""}
+2026-03-11T15:31:52.204227684Z {"timestamp": "2026-03-11 15:31:52,203", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] cost_monitor ok (run_count=1)", "trace_id": ""}
+2026-03-11T15:31:52.204322733Z {"timestamp": "2026-03-11 15:31:52,204", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] anomaly_detector ok (run_count=1)", "trace_id": ""}
+2026-03-11T15:31:52.216770941Z {"timestamp": "2026-03-11 15:31:52,216", "level": "INFO", "module": "auto_optimizer", "message": "Recommendation created: [performance/high] High latency: speed (30841ms avg)", "trace_id": ""}
+2026-03-11T15:31:52.229628037Z {"timestamp": "2026-03-11 15:31:52,229", "level": "INFO", "module": "auto_optimizer", "message": "Recommendation created: [performance/medium] Below benchmark baseline: orchestrator (score=2.31/5)", "trace_id": ""}
+2026-03-11T15:31:52.229876295Z {"timestamp": "2026-03-11 15:31:52,229", "level": "INFO", "module": "auto_optimizer", "message": "Auto-optimizer generated 2 new recommendations", "trace_id": ""}
+2026-03-11T15:31:52.232730269Z {"timestamp": "2026-03-11 15:31:52,232", "level": "INFO", "module": "auto_optimizer", "message": "Auto-applied 0 recommendations, skipped 44", "trace_id": ""}
+2026-03-11T15:31:52.232869258Z {"timestamp": "2026-03-11 15:31:52,232", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] evolution_analysis ok (run_count=1)", "trace_id": ""}
+2026-03-11T15:31:52.233160776Z INFO:     Application startup complete.
+2026-03-11T15:31:52.233851662Z INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-03-11T15:31:55.556205128Z [Backend] Analytics tables initialized
+2026-03-11T15:31:55.556228208Z [Backend] Discovered 41 MCP tools from 11 servers
+2026-03-11T15:31:55.556257838Z [Backend] Workflow scheduler initialized
+2026-03-11T15:31:55.556267428Z [Backend] Tool schema registration: ok
+2026-03-11T15:31:55.556272958Z [Backend] Heartbeat scheduler started (with evolution task)
+2026-03-11T15:31:55.556278828Z [Backend] Scheduled tasks init failed (non-critical): relation "scheduled_tasks" does not exist
+2026-03-11T15:31:55.556285268Z LINE 1: SELECT * FROM scheduled_tasks WHERE enabled = TRUE
+2026-03-11T15:31:55.556291568Z                       ^
+2026-03-11T15:31:55.556297248Z 
+2026-03-11T15:31:55.556302958Z [Backend] Autonomous chat auto-start enabled
+2026-03-11T15:31:55.556308688Z [Backend] Self-Improvement Feedback Loop started
+2026-03-11T15:31:55.556314628Z [Backend] OpenTelemetry SDK not available (non-critical)
+2026-03-11T15:31:55.556320268Z [Backend] Redis: healthy (mode=standalone)
+2026-03-11T15:31:55.556325868Z [Backend] Knowledge moderation tables initialized
+2026-03-11T15:31:55.556331537Z [AutoChat] Background scheduler started
+2026-03-11T15:31:55.556337417Z INFO:     127.0.0.1:55048 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:32:15.707190511Z INFO:     127.0.0.1:47084 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:32:35.836998923Z [AutoChat] Auto-triggered: thinker ⇄ orchestrator — görev optimizasyonu
+2026-03-11T15:32:35.837247802Z INFO:     127.0.0.1:32962 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:32:52.201433812Z {"timestamp": "2026-03-11 15:32:52,201", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=2)", "trace_id": ""}
+2026-03-11T15:32:55.997684606Z INFO:     127.0.0.1:42538 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:33:16.160750092Z INFO:     127.0.0.1:44666 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:33:36.303140975Z INFO:     127.0.0.1:50154 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:33:52.202073073Z {"timestamp": "2026-03-11 15:33:52,201", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=3)", "trace_id": ""}
+2026-03-11T15:33:56.444695644Z INFO:     127.0.0.1:40506 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:34:16.581311628Z INFO:     127.0.0.1:37232 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:34:36.702946733Z INFO:     127.0.0.1:54278 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:34:52.202844752Z {"timestamp": "2026-03-11 15:34:52,202", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=4)", "trace_id": ""}
+2026-03-11T15:34:56.850952128Z INFO:     127.0.0.1:52610 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:35:16.995329758Z INFO:     127.0.0.1:48916 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:35:37.149196613Z INFO:     127.0.0.1:60928 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:35:52.203016654Z {"timestamp": "2026-03-11 15:35:52,202", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=5)", "trace_id": ""}
+2026-03-11T15:35:57.252951818Z INFO:     127.0.0.1:48696 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:36:17.411197730Z INFO:     127.0.0.1:50124 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:36:37.538000276Z INFO:     127.0.0.1:59918 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:36:48.908322341Z INFO:     10.0.8.5:58156 - "OPTIONS /api/youtube/summarize HTTP/1.1" 200 OK
+2026-03-11T15:36:49.309304364Z {"timestamp": "2026-03-11 15:36:49,308", "level": "INFO", "module": "youtube_summarizer", "message": "Trying youtube_transcript_api (primary) for mN2VUw5Fb3E...", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:49.343773816Z {"timestamp": "2026-03-11 15:36:49,343", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://noembed.com/embed?url=https://www.youtube.com/watch?v=mN2VUw5Fb3E \"HTTP/1.1 200 OK\"", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:50.056854207Z {"timestamp": "2026-03-11 15:36:50,056", "level": "WARNING", "module": "youtube_summarizer", "message": "yt_transcript_api: list() failed: \nCould not retrieve a transcript for the video https://www.youtube.com/watch?v=mN2VUw5Fb3E! This is most likely caused by:\n\nYouTube is blocking requests from your IP. This usually is due to one of the following reasons:\n- You have done too many requests and your IP has been blocked by YouTube\n- You are doing requests from an IP belonging to a cloud provider (like AWS, Google Cloud Platform, Azure, etc.). Unfortunately, most IPs from cloud providers are blocked by YouTube.\n\nThere are two things you can do to work around this:\n1. Use proxies to hide your IP address, as explained in the \"Working around IP bans\" section of the README (https://github.com/jdepoix/youtube-transcript-api?tab=readme-ov-file#working-around-ip-bans-requestblocked-or-ipblocked-exception).\n2. (NOT RECOMMENDED) If you authenticate your requests using cookies, you will be able to continue doing requests for a while. However, YouTube will eventually permanently ban the account that you have used to authenticate with! So only do this if you don't mind your account being banned!\n\nIf you are sure that the described cause is not responsible for this error and that a transcript should be retrievable, please create an issue at https://github.com/jdepoix/youtube-transcript-api/issues. Please add which version of youtube_transcript_api you are using and provide the information needed to replicate the error. Also make sure that there are no open issues which already describe your problem!, trying direct fetch...", "trace_id": ""}
+2026-03-11T15:36:50.707943805Z {"timestamp": "2026-03-11 15:36:50,707", "level": "ERROR", "module": "youtube_summarizer", "message": "yt_transcript_api: fetch() also failed: \nCould not retrieve a transcript for the video https://www.youtube.com/watch?v=mN2VUw5Fb3E! This is most likely caused by:\n\nYouTube is blocking requests from your IP. This usually is due to one of the following reasons:\n- You have done too many requests and your IP has been blocked by YouTube\n- You are doing requests from an IP belonging to a cloud provider (like AWS, Google Cloud Platform, Azure, etc.). Unfortunately, most IPs from cloud providers are blocked by YouTube.\n\nThere are two things you can do to work around this:\n1. Use proxies to hide your IP address, as explained in the \"Working around IP bans\" section of the README (https://github.com/jdepoix/youtube-transcript-api?tab=readme-ov-file#working-around-ip-bans-requestblocked-or-ipblocked-exception).\n2. (NOT RECOMMENDED) If you authenticate your requests using cookies, you will be able to continue doing requests for a while. However, YouTube will eventually permanently ban the account that you have used to authenticate with! So only do this if you don't mind your account being banned!\n\nIf you are sure that the described cause is not responsible for this error and that a transcript should be retrievable, please create an issue at https://github.com/jdepoix/youtube-transcript-api/issues. Please add which version of youtube_transcript_api you are using and provide the information needed to replicate the error. Also make sure that there are no open issues which already describe your problem!", "trace_id": ""}
+2026-03-11T15:36:50.710500250Z {"timestamp": "2026-03-11 15:36:50,710", "level": "WARNING", "module": "youtube_summarizer", "message": "youtube_transcript_api failed: yt_transcript_api: \nCould not retrieve a transcript for the video https://www.youtube.com/watch?v=mN2VUw5Fb3E! This is most likely caused by:\n\nYouTube is blocking requests from your IP. This usually is due to one of the following reasons:\n- You have done too many requests and your IP has been blocked by YouTube\n- You are doing requests from an IP belonging to a cloud provider (like AWS, Google Cloud Platform, Azure, etc.). Unfortunately, most IPs from cloud providers are blocked by YouTube.\n\nThere are two things you can do to work around this:\n1. Use proxies to hide your IP address, as explained in the \"Working around IP bans\" section of the README (https://github.com/jdepoix/youtube-transcript-api?tab=readme-ov-file#working-around-ip-bans-requestblocked-or-ipblocked-exception).\n2. (NOT RECOMMENDED) If you authenticate your requests using cookies, you will be able to continue doing requests for a while. However, YouTube will eventually permanently ban the account that you have used to authenticate with! So only do this if you don't mind your account being banned!\n\nIf you are sure that the described cause is not responsible for this error and that a transcript should be retrievable, please create an issue at https://github.com/jdepoix/youtube-transcript-api/issues. Please add which version of youtube_transcript_api you are using and provide the information needed to replicate the error. Also make sure that there are no open issues which already describe your problem!", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:50.710537230Z {"timestamp": "2026-03-11 15:36:50,710", "level": "INFO", "module": "youtube_summarizer", "message": "Trying InnerTube (fallback) for mN2VUw5Fb3E...", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:50.789085327Z {"timestamp": "2026-03-11 15:36:50,788", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8 \"HTTP/1.1 200 OK\"", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:50.792549237Z {"timestamp": "2026-03-11 15:36:50,792", "level": "WARNING", "module": "youtube_summarizer", "message": "InnerTube: no caption tracks found", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:50.792630206Z {"timestamp": "2026-03-11 15:36:50,792", "level": "INFO", "module": "youtube_summarizer", "message": "Trying web scrape (fallback 3) for mN2VUw5Fb3E...", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:50.868679947Z {"timestamp": "2026-03-11 15:36:50,868", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://www.youtube.com/watch?v=mN2VUw5Fb3E \"HTTP/1.1 200 OK\"", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:51.467444498Z {"timestamp": "2026-03-11 15:36:51,467", "level": "WARNING", "module": "youtube_summarizer", "message": "Web scrape failed: web_scrape: no captionTracks found in page HTML", "trace_id": "d9d54278fc6a40c4"}
+2026-03-11T15:36:51.469219318Z INFO:     10.0.8.5:58156 - "POST /api/youtube/summarize HTTP/1.1" 200 OK
+2026-03-11T15:36:52.204101134Z {"timestamp": "2026-03-11 15:36:52,203", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=6)", "trace_id": ""}
+2026-03-11T15:36:57.650074709Z INFO:     127.0.0.1:60684 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:37:17.825824874Z INFO:     127.0.0.1:43850 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:37:37.980428132Z [AutoChat] Auto-triggered: critic ⇄ thinker — yeni stratejiler
+2026-03-11T15:37:37.980439652Z INFO:     127.0.0.1:55948 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:37:41.431024774Z INFO:     10.0.8.5:40894 - "GET / HTTP/1.1" 404 Not Found
+2026-03-11T15:37:52.204070134Z {"timestamp": "2026-03-11 15:37:52,203", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=7)", "trace_id": ""}
+2026-03-11T15:37:58.114759083Z INFO:     127.0.0.1:36764 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:38:18.263026695Z INFO:     127.0.0.1:45676 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:38:38.423317703Z INFO:     127.0.0.1:55006 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:38:52.204129581Z {"timestamp": "2026-03-11 15:38:52,203", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=8)", "trace_id": ""}
+2026-03-11T15:38:58.576223397Z INFO:     127.0.0.1:54446 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:39:18.737925196Z INFO:     127.0.0.1:45588 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:39:38.887494071Z INFO:     127.0.0.1:34954 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:39:52.204155954Z {"timestamp": "2026-03-11 15:39:52,203", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=9)", "trace_id": ""}
+2026-03-11T15:39:59.047385945Z INFO:     127.0.0.1:37894 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:40:19.200109005Z INFO:     127.0.0.1:35868 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:40:39.349073204Z INFO:     127.0.0.1:43600 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:40:52.204807789Z {"timestamp": "2026-03-11 15:40:52,204", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=10)", "trace_id": ""}
+2026-03-11T15:40:59.501760807Z INFO:     127.0.0.1:40332 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:41:19.661138339Z INFO:     127.0.0.1:49664 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:41:39.784615476Z INFO:     127.0.0.1:34266 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:41:52.205631385Z {"timestamp": "2026-03-11 15:41:52,205", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=11)", "trace_id": ""}
+2026-03-11T15:41:59.931205578Z INFO:     127.0.0.1:53220 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:42:20.094886284Z INFO:     127.0.0.1:48524 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:42:40.253981821Z [AutoChat] Auto-triggered: thinker ⇄ critic — sistem performansı
+2026-03-11T15:42:40.254004711Z INFO:     127.0.0.1:35598 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:42:52.205972093Z {"timestamp": "2026-03-11 15:42:52,205", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=12)", "trace_id": ""}
+2026-03-11T15:43:00.401182542Z INFO:     127.0.0.1:36990 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:43:20.527917296Z INFO:     127.0.0.1:41326 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:43:40.683153298Z INFO:     127.0.0.1:53928 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:43:52.206860256Z {"timestamp": "2026-03-11 15:43:52,206", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=13)", "trace_id": ""}
+2026-03-11T15:44:00.826122117Z INFO:     127.0.0.1:46552 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:44:20.977045824Z INFO:     127.0.0.1:55188 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:44:41.122446000Z INFO:     127.0.0.1:47342 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:44:52.207413020Z {"timestamp": "2026-03-11 15:44:52,207", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=14)", "trace_id": ""}
+2026-03-11T15:45:01.251348292Z INFO:     127.0.0.1:48188 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:45:21.393300910Z INFO:     127.0.0.1:42668 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:45:41.541444116Z INFO:     127.0.0.1:35866 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:45:52.208415226Z {"timestamp": "2026-03-11 15:45:52,208", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=15)", "trace_id": ""}
+2026-03-11T15:46:01.718828349Z INFO:     127.0.0.1:41336 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:46:21.880011911Z INFO:     127.0.0.1:37338 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:46:41.989160483Z INFO:     127.0.0.1:43092 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:46:52.209154048Z {"timestamp": "2026-03-11 15:46:52,208", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=16)", "trace_id": ""}
+2026-03-11T15:47:02.121042822Z INFO:     127.0.0.1:41184 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:47:22.286208866Z [AutoChat] Auto-triggered: reasoner ⇄ critic — işbirliği fırsatları
+2026-03-11T15:47:22.286292325Z INFO:     127.0.0.1:56866 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:47:42.439842875Z INFO:     127.0.0.1:38754 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:47:52.210636708Z {"timestamp": "2026-03-11 15:47:52,210", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=17)", "trace_id": ""}
+2026-03-11T15:48:02.559319014Z INFO:     127.0.0.1:52466 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:48:22.714442632Z INFO:     127.0.0.1:55712 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:48:42.868709865Z INFO:     127.0.0.1:55514 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:48:52.213030563Z {"timestamp": "2026-03-11 15:48:52,210", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=18)", "trace_id": ""}
+2026-03-11T15:49:03.033899663Z INFO:     127.0.0.1:36630 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:49:23.184496879Z INFO:     127.0.0.1:51182 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:49:43.299092100Z INFO:     127.0.0.1:37004 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:49:52.212947877Z {"timestamp": "2026-03-11 15:49:52,212", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=19)", "trace_id": ""}
+2026-03-11T15:50:03.462245675Z INFO:     127.0.0.1:56242 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:50:23.588270986Z INFO:     127.0.0.1:35496 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:50:43.740045869Z INFO:     127.0.0.1:34834 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:50:52.213576029Z {"timestamp": "2026-03-11 15:50:52,213", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=20)", "trace_id": ""}
+2026-03-11T15:51:03.866341996Z INFO:     127.0.0.1:51384 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:51:23.973753113Z INFO:     127.0.0.1:33418 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:51:44.110373604Z INFO:     127.0.0.1:50986 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:51:52.215023442Z {"timestamp": "2026-03-11 15:51:52,214", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=21)", "trace_id": ""}
+2026-03-11T15:52:04.251734635Z INFO:     127.0.0.1:43430 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:52:24.369118399Z [AutoChat] Auto-triggered: critic ⇄ orchestrator — yeni stratejiler
+2026-03-11T15:52:24.369146239Z INFO:     127.0.0.1:45778 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:52:44.513864971Z INFO:     127.0.0.1:46552 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:52:52.214958485Z {"timestamp": "2026-03-11 15:52:52,214", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=22)", "trace_id": ""}
+2026-03-11T15:53:04.668403729Z INFO:     127.0.0.1:38196 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:53:24.804227964Z INFO:     127.0.0.1:48898 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:53:44.919711549Z INFO:     127.0.0.1:48196 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:53:52.215762835Z {"timestamp": "2026-03-11 15:53:52,215", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=23)", "trace_id": ""}
+2026-03-11T15:54:05.069899764Z INFO:     127.0.0.1:45654 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:54:25.218198373Z INFO:     127.0.0.1:54966 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:54:45.336905064Z INFO:     127.0.0.1:57434 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:54:52.216493577Z {"timestamp": "2026-03-11 15:54:52,216", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=24)", "trace_id": ""}
+2026-03-11T15:55:05.471962882Z INFO:     127.0.0.1:44512 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:55:25.611352844Z INFO:     127.0.0.1:51844 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:55:45.728114098Z INFO:     127.0.0.1:56680 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:55:52.217834376Z {"timestamp": "2026-03-11 15:55:52,217", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=25)", "trace_id": ""}
+2026-03-11T15:56:05.880691096Z INFO:     127.0.0.1:34756 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:56:26.032693686Z INFO:     127.0.0.1:44842 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:56:46.187069093Z INFO:     127.0.0.1:60596 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:56:52.218043712Z {"timestamp": "2026-03-11 15:56:52,217", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=26)", "trace_id": ""}
+2026-03-11T15:57:06.332898215Z INFO:     127.0.0.1:38060 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:57:26.460445749Z [AutoChat] Auto-triggered: orchestrator ⇄ thinker — işbirliği fırsatları
+2026-03-11T15:57:26.460465809Z INFO:     127.0.0.1:48694 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:57:46.593590198Z INFO:     127.0.0.1:43394 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:57:52.218727245Z {"timestamp": "2026-03-11 15:57:52,218", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=27)", "trace_id": ""}
+2026-03-11T15:58:06.756700496Z INFO:     127.0.0.1:58066 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:58:26.922162568Z INFO:     127.0.0.1:55184 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:58:47.083454524Z INFO:     127.0.0.1:48802 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:58:52.219769899Z {"timestamp": "2026-03-11 15:58:52,219", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=28)", "trace_id": ""}
+2026-03-11T15:59:07.240337375Z INFO:     127.0.0.1:38052 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:59:27.355821038Z INFO:     127.0.0.1:56564 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:59:47.522346071Z INFO:     127.0.0.1:58230 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T15:59:52.220030281Z {"timestamp": "2026-03-11 15:59:52,219", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=29)", "trace_id": ""}
+2026-03-11T16:00:07.683657833Z INFO:     127.0.0.1:53204 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:00:27.845204172Z INFO:     127.0.0.1:45622 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:00:47.954011233Z INFO:     127.0.0.1:57830 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:00:52.220697310Z {"timestamp": "2026-03-11 16:00:52,220", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=30)", "trace_id": ""}
+2026-03-11T16:01:08.066355289Z INFO:     127.0.0.1:56726 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:01:28.205414819Z INFO:     127.0.0.1:42636 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:01:48.386350218Z INFO:     127.0.0.1:49936 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:01:52.221403016Z {"timestamp": "2026-03-11 16:01:52,220", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=31)", "trace_id": ""}
+2026-03-11T16:02:08.511133935Z INFO:     127.0.0.1:55078 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:02:28.668591599Z [AutoChat] Auto-triggered: thinker ⇄ orchestrator — yeni stratejiler
+2026-03-11T16:02:28.668608449Z INFO:     127.0.0.1:44082 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:02:48.845130184Z INFO:     127.0.0.1:39800 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:02:52.222695374Z {"timestamp": "2026-03-11 16:02:52,222", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=32)", "trace_id": ""}
+2026-03-11T16:03:08.944371297Z INFO:     127.0.0.1:58106 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:03:29.106356631Z INFO:     127.0.0.1:56006 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:03:49.256942531Z INFO:     127.0.0.1:35052 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:03:52.223635652Z {"timestamp": "2026-03-11 16:03:52,222", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=33)", "trace_id": ""}
+2026-03-11T16:04:09.389094436Z INFO:     127.0.0.1:56312 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:04:29.563850247Z INFO:     127.0.0.1:35972 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:04:49.724940580Z INFO:     127.0.0.1:47436 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:04:52.223284951Z {"timestamp": "2026-03-11 16:04:52,223", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=34)", "trace_id": ""}
+2026-03-11T16:05:09.877059493Z INFO:     127.0.0.1:35476 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:05:30.044691648Z INFO:     127.0.0.1:41152 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:05:50.201607101Z INFO:     127.0.0.1:39660 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:05:52.224205405Z {"timestamp": "2026-03-11 16:05:52,223", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=35)", "trace_id": ""}
+2026-03-11T16:06:10.354916295Z INFO:     127.0.0.1:43138 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:06:30.498301957Z INFO:     127.0.0.1:39192 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:06:50.655754259Z INFO:     127.0.0.1:36250 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:06:52.225760970Z {"timestamp": "2026-03-11 16:06:52,225", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=36)", "trace_id": ""}
+2026-03-11T16:07:10.825573543Z INFO:     127.0.0.1:32998 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:07:30.980128915Z [AutoChat] Auto-triggered: speed ⇄ orchestrator — işbirliği fırsatları
+2026-03-11T16:07:30.980146155Z INFO:     127.0.0.1:57874 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:07:51.098664290Z INFO:     127.0.0.1:37574 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:07:52.226327339Z {"timestamp": "2026-03-11 16:07:52,226", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=37)", "trace_id": ""}
+2026-03-11T16:08:11.229396105Z INFO:     127.0.0.1:53314 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:08:31.383933612Z INFO:     127.0.0.1:33848 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:08:51.528977037Z INFO:     127.0.0.1:51900 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:08:52.226410777Z {"timestamp": "2026-03-11 16:08:52,226", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=38)", "trace_id": ""}
+2026-03-11T16:09:11.677780858Z INFO:     127.0.0.1:39986 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:09:31.816971745Z INFO:     127.0.0.1:45430 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:09:51.961650136Z INFO:     127.0.0.1:38894 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:09:52.227372881Z {"timestamp": "2026-03-11 16:09:52,227", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=39)", "trace_id": ""}
+2026-03-11T16:10:12.071053642Z INFO:     127.0.0.1:47742 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:10:32.222479666Z INFO:     127.0.0.1:57938 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:10:52.227830618Z {"timestamp": "2026-03-11 16:10:52,227", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=40)", "trace_id": ""}
+2026-03-11T16:10:52.374749183Z INFO:     127.0.0.1:55822 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:11:12.506457234Z INFO:     127.0.0.1:55700 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:11:32.658153594Z INFO:     127.0.0.1:39608 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:11:52.227929505Z {"timestamp": "2026-03-11 16:11:52,227", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=41)", "trace_id": ""}
+2026-03-11T16:11:52.787057643Z INFO:     127.0.0.1:51130 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:12:12.930667695Z INFO:     127.0.0.1:46290 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:12:33.088863940Z [AutoChat] Auto-triggered: orchestrator ⇄ reasoner — yeni stratejiler
+2026-03-11T16:12:33.088899280Z INFO:     127.0.0.1:35446 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:12:52.228555319Z {"timestamp": "2026-03-11 16:12:52,228", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=42)", "trace_id": ""}
+2026-03-11T16:12:53.222684035Z INFO:     127.0.0.1:33706 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:13:13.362631630Z INFO:     127.0.0.1:38298 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:13:33.476016779Z INFO:     127.0.0.1:53340 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:13:52.229986943Z {"timestamp": "2026-03-11 16:13:52,229", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=43)", "trace_id": ""}
+2026-03-11T16:13:53.636830296Z INFO:     127.0.0.1:53202 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:14:13.782938438Z INFO:     127.0.0.1:48316 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:14:33.952627691Z INFO:     127.0.0.1:35816 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:14:52.229948866Z {"timestamp": "2026-03-11 16:14:52,229", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=44)", "trace_id": ""}
+2026-03-11T16:14:54.100364311Z INFO:     127.0.0.1:57494 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:15:14.268364719Z INFO:     127.0.0.1:37010 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:15:34.433351129Z INFO:     127.0.0.1:45178 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:15:52.229983336Z {"timestamp": "2026-03-11 16:15:52,229", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=45)", "trace_id": ""}
+2026-03-11T16:15:54.580931891Z INFO:     127.0.0.1:52720 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:16:14.744570920Z INFO:     127.0.0.1:37752 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:16:34.914168808Z INFO:     127.0.0.1:57102 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:16:52.230001154Z {"timestamp": "2026-03-11 16:16:52,229", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=46)", "trace_id": ""}
+2026-03-11T16:16:55.073517927Z INFO:     127.0.0.1:51562 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:17:15.243847842Z INFO:     127.0.0.1:48110 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:17:35.363591849Z [AutoChat] Auto-triggered: researcher ⇄ thinker — sistem performansı
+2026-03-11T16:17:35.363629778Z INFO:     127.0.0.1:34386 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:17:52.229902757Z {"timestamp": "2026-03-11 16:17:52,229", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=47)", "trace_id": ""}
+2026-03-11T16:17:55.506132611Z INFO:     127.0.0.1:56552 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:18:15.637573294Z INFO:     127.0.0.1:36316 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:18:35.780358969Z INFO:     127.0.0.1:54692 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:18:52.230114174Z {"timestamp": "2026-03-11 16:18:52,229", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=48)", "trace_id": ""}
+2026-03-11T16:18:55.880688530Z INFO:     127.0.0.1:48442 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:19:16.041916471Z INFO:     127.0.0.1:60562 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:19:36.150582490Z INFO:     127.0.0.1:37424 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:19:52.230885613Z {"timestamp": "2026-03-11 16:19:52,230", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=49)", "trace_id": ""}
+2026-03-11T16:19:56.303791839Z INFO:     127.0.0.1:45902 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:20:12.448014334Z INFO:     10.0.8.5:59768 - "OPTIONS /api/images/improve-prompt HTTP/1.1" 200 OK
+2026-03-11T16:20:12.856373085Z {"timestamp": "2026-03-11 16:20:12,855", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": "d051e6b01eb64e19"}
+2026-03-11T16:20:16.106163716Z INFO:     10.0.8.5:59768 - "POST /api/images/improve-prompt HTTP/1.1" 200 OK
+2026-03-11T16:20:16.462488404Z INFO:     127.0.0.1:46268 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:20:25.569853847Z INFO:     10.0.8.5:47276 - "OPTIONS /api/images/generate HTTP/1.1" 200 OK
+2026-03-11T16:20:25.974999458Z {"timestamp": "2026-03-11 16:20:25,974", "level": "WARNING", "module": "memory_and_export", "message": "Prompt too long (276 chars), truncating to 200", "trace_id": "34c153494c1d4547"}
+2026-03-11T16:20:27.607231174Z {"timestamp": "2026-03-11 16:20:27,606", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://gen.pollinations.ai/image/Design%20a%20modern%2C%20minimalist%20logo%20for%20a%20YouTube%20video%20summarizer%20app%2C%20featuring%20a%20stylized%20play%20button%20integrated%20with%20a%20speech%20bubble%20or%20text%20lines%2C%20using%20a%20vibrant%20color%20gradient%20of%20blue%20and%20purpl...?model=flux&width=1024&height=1024&nologo=true&enhance=true \"HTTP/1.1 200 OK\"", "trace_id": "34c153494c1d4547"}
+2026-03-11T16:20:27.614408569Z INFO:     10.0.8.5:47276 - "POST /api/images/generate HTTP/1.1" 200 OK
+2026-03-11T16:20:27.910556877Z INFO:     10.0.8.5:47276 - "OPTIONS /api/images HTTP/1.1" 200 OK
+2026-03-11T16:20:28.255013080Z INFO:     10.0.8.5:47276 - "GET /api/images HTTP/1.1" 200 OK
+2026-03-11T16:20:35.824667659Z {"timestamp": "2026-03-11 16:20:35,824", "level": "WARNING", "module": "memory_and_export", "message": "Prompt too long (276 chars), truncating to 200", "trace_id": "7a3e7f7fb7104234"}
+2026-03-11T16:20:36.585607653Z INFO:     127.0.0.1:52826 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:20:48.112348345Z {"timestamp": "2026-03-11 16:20:48,111", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://gen.pollinations.ai/image/Design%20a%20modern%2C%20minimalist%20logo%20for%20a%20YouTube%20video%20summarizer%20app%2C%20featuring%20a%20stylized%20play%20button%20integrated%20with%20a%20speech%20bubble%20or%20text%20lines%2C%20using%20a%20vibrant%20color%20gradient%20of%20blue%20and%20purpl...?model=grok-imagine&width=1024&height=1024&nologo=true&enhance=true \"HTTP/1.1 200 OK\"", "trace_id": "7a3e7f7fb7104234"}
+2026-03-11T16:20:48.117711001Z INFO:     10.0.8.5:51338 - "POST /api/images/generate HTTP/1.1" 200 OK
+2026-03-11T16:20:48.532851230Z INFO:     10.0.8.5:51338 - "GET /api/images HTTP/1.1" 200 OK
+2026-03-11T16:20:52.230796040Z {"timestamp": "2026-03-11 16:20:52,230", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=50)", "trace_id": ""}
+2026-03-11T16:20:56.701428203Z INFO:     127.0.0.1:54830 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:21:16.817573790Z INFO:     127.0.0.1:41846 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:21:36.918508428Z INFO:     127.0.0.1:33490 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:21:52.231616523Z {"timestamp": "2026-03-11 16:21:52,231", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=51)", "trace_id": ""}
+2026-03-11T16:21:57.076879851Z INFO:     127.0.0.1:50280 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:22:17.221458513Z INFO:     127.0.0.1:36338 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:22:37.361680850Z [AutoChat] Auto-triggered: thinker ⇄ orchestrator — görev optimizasyonu
+2026-03-11T16:22:37.361697749Z INFO:     127.0.0.1:32954 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:22:52.232177100Z {"timestamp": "2026-03-11 16:22:52,231", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=52)", "trace_id": ""}
+2026-03-11T16:22:57.488512984Z INFO:     127.0.0.1:42570 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:23:17.618752052Z INFO:     127.0.0.1:37546 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:23:37.799558787Z INFO:     127.0.0.1:48464 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:23:52.233004144Z {"timestamp": "2026-03-11 16:23:52,232", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=53)", "trace_id": ""}
+2026-03-11T16:23:57.982302148Z INFO:     127.0.0.1:59308 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:24:18.119982641Z INFO:     127.0.0.1:48044 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:24:38.287072081Z INFO:     127.0.0.1:47188 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:24:52.233700295Z {"timestamp": "2026-03-11 16:24:52,233", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=54)", "trace_id": ""}
+2026-03-11T16:24:58.436466370Z INFO:     127.0.0.1:33264 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:25:18.585431279Z INFO:     127.0.0.1:53900 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:25:38.717385359Z INFO:     127.0.0.1:38640 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:25:52.234667038Z {"timestamp": "2026-03-11 16:25:52,234", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=55)", "trace_id": ""}
+2026-03-11T16:25:58.851132732Z INFO:     127.0.0.1:55672 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:26:19.018141161Z INFO:     127.0.0.1:43240 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:26:39.191069650Z INFO:     127.0.0.1:58410 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:26:52.234921940Z {"timestamp": "2026-03-11 16:26:52,234", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=56)", "trace_id": ""}
+2026-03-11T16:26:59.288073241Z INFO:     127.0.0.1:40692 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:27:19.460746821Z INFO:     127.0.0.1:56968 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:27:39.590336844Z [AutoChat] Auto-triggered: thinker ⇄ reasoner — teknoloji trendleri
+2026-03-11T16:27:39.590352964Z INFO:     127.0.0.1:37574 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:27:52.234990319Z {"timestamp": "2026-03-11 16:27:52,234", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=57)", "trace_id": ""}
+2026-03-11T16:27:59.725816350Z INFO:     127.0.0.1:47738 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:28:19.881963587Z INFO:     127.0.0.1:53240 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:28:40.073470394Z INFO:     127.0.0.1:33124 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:28:52.235670834Z {"timestamp": "2026-03-11 16:28:52,235", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=58)", "trace_id": ""}
+2026-03-11T16:29:00.236379394Z INFO:     127.0.0.1:57364 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:29:20.402525615Z INFO:     127.0.0.1:33040 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:29:40.557638631Z INFO:     127.0.0.1:60180 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:29:52.236054610Z {"timestamp": "2026-03-11 16:29:52,235", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=59)", "trace_id": ""}
+2026-03-11T16:30:00.702411335Z INFO:     127.0.0.1:52840 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:30:20.812883352Z INFO:     127.0.0.1:48820 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:30:40.965485606Z INFO:     127.0.0.1:49578 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:30:52.236608342Z {"timestamp": "2026-03-11 16:30:52,236", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=60)", "trace_id": ""}
+2026-03-11T16:31:01.131939770Z INFO:     127.0.0.1:52496 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:31:21.265811238Z INFO:     127.0.0.1:38506 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:31:41.427510951Z INFO:     127.0.0.1:35864 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:31:52.204922672Z {"timestamp": "2026-03-11 16:31:52,204", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] cost_monitor ok (run_count=2)", "trace_id": ""}
+2026-03-11T16:31:52.204952882Z {"timestamp": "2026-03-11 16:31:52,204", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] anomaly_detector ok (run_count=2)", "trace_id": ""}
+2026-03-11T16:31:52.237501478Z {"timestamp": "2026-03-11 16:31:52,237", "level": "INFO", "module": "auto_optimizer", "message": "Recommendation created: [performance/high] High latency: speed (30841ms avg)", "trace_id": ""}
+2026-03-11T16:31:52.241865641Z {"timestamp": "2026-03-11 16:31:52,241", "level": "INFO", "module": "auto_optimizer", "message": "Recommendation created: [performance/medium] Below benchmark baseline: orchestrator (score=2.31/5)", "trace_id": ""}
+2026-03-11T16:31:52.242149749Z {"timestamp": "2026-03-11 16:31:52,241", "level": "INFO", "module": "auto_optimizer", "message": "Auto-optimizer generated 2 new recommendations", "trace_id": ""}
+2026-03-11T16:31:52.243820448Z {"timestamp": "2026-03-11 16:31:52,243", "level": "INFO", "module": "auto_optimizer", "message": "Auto-applied 0 recommendations, skipped 46", "trace_id": ""}
+2026-03-11T16:31:52.243844618Z {"timestamp": "2026-03-11 16:31:52,243", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] evolution_analysis ok (run_count=2)", "trace_id": ""}
+2026-03-11T16:31:52.243972207Z {"timestamp": "2026-03-11 16:31:52,243", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=61)", "trace_id": ""}
+2026-03-11T16:32:01.559784321Z INFO:     127.0.0.1:55518 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:32:21.715178259Z INFO:     127.0.0.1:35624 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:32:41.870262777Z [AutoChat] Auto-triggered: researcher ⇄ reasoner — işbirliği fırsatları
+2026-03-11T16:32:41.870320607Z INFO:     127.0.0.1:38354 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:32:52.244034654Z {"timestamp": "2026-03-11 16:32:52,243", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=62)", "trace_id": ""}
+2026-03-11T16:33:02.008132374Z INFO:     127.0.0.1:50738 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:33:22.165109568Z INFO:     127.0.0.1:51878 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:33:42.303758004Z INFO:     127.0.0.1:60334 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:33:52.244324958Z {"timestamp": "2026-03-11 16:33:52,243", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=63)", "trace_id": ""}
+2026-03-11T16:34:02.438662783Z INFO:     127.0.0.1:36998 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:34:22.572204313Z INFO:     127.0.0.1:51538 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:34:42.694540430Z INFO:     127.0.0.1:56090 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:34:52.244468215Z {"timestamp": "2026-03-11 16:34:52,244", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=64)", "trace_id": ""}
+2026-03-11T16:35:02.848666203Z INFO:     127.0.0.1:48308 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:35:22.982194140Z INFO:     127.0.0.1:33586 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:35:43.140420928Z INFO:     127.0.0.1:41604 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:35:52.244403001Z {"timestamp": "2026-03-11 16:35:52,243", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=65)", "trace_id": ""}
+2026-03-11T16:36:03.290953178Z INFO:     127.0.0.1:45078 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:36:23.447027861Z INFO:     127.0.0.1:37596 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:36:43.562456482Z INFO:     127.0.0.1:37026 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:36:52.245091798Z {"timestamp": "2026-03-11 16:36:52,244", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=66)", "trace_id": ""}
+2026-03-11T16:37:03.742820937Z INFO:     127.0.0.1:37348 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:37:11.976870674Z INFO:     10.0.8.5:57474 - "GET /.env HTTP/1.1" 404 Not Found
+2026-03-11T16:37:11.991313294Z INFO:     10.0.8.5:57474 - "GET /.env HTTP/1.1" 404 Not Found
+2026-03-11T16:37:23.904928925Z [AutoChat] Auto-triggered: speed ⇄ critic — hata analizi
+2026-03-11T16:37:23.904953225Z INFO:     127.0.0.1:50936 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:37:44.043693023Z INFO:     127.0.0.1:33150 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:37:52.245110527Z {"timestamp": "2026-03-11 16:37:52,244", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=67)", "trace_id": ""}
+2026-03-11T16:38:04.177287827Z INFO:     127.0.0.1:45800 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:38:24.289735126Z INFO:     127.0.0.1:33128 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:38:44.426376055Z INFO:     127.0.0.1:45226 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:38:52.245310975Z {"timestamp": "2026-03-11 16:38:52,245", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=68)", "trace_id": ""}
+2026-03-11T16:39:04.581916692Z INFO:     127.0.0.1:47528 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:39:24.724073261Z INFO:     127.0.0.1:57496 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:39:44.855096168Z INFO:     127.0.0.1:59590 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:39:52.246220879Z {"timestamp": "2026-03-11 16:39:52,245", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=69)", "trace_id": ""}
+2026-03-11T16:40:05.016561648Z INFO:     127.0.0.1:40928 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:40:25.165486318Z INFO:     127.0.0.1:47376 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:40:45.279776077Z INFO:     127.0.0.1:36222 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:40:52.246337528Z {"timestamp": "2026-03-11 16:40:52,245", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=70)", "trace_id": ""}
+2026-03-11T16:41:05.395187125Z INFO:     127.0.0.1:39742 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:41:25.550703391Z INFO:     127.0.0.1:38034 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:41:45.707843708Z INFO:     127.0.0.1:42152 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:41:52.246649507Z {"timestamp": "2026-03-11 16:41:52,246", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=71)", "trace_id": ""}
+2026-03-11T16:42:05.821932121Z INFO:     127.0.0.1:35716 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:42:25.982655090Z [AutoChat] Auto-triggered: critic ⇄ thinker — görev optimizasyonu
+2026-03-11T16:42:25.982702350Z INFO:     127.0.0.1:45474 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:42:46.107943685Z INFO:     127.0.0.1:52818 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:42:52.247821521Z {"timestamp": "2026-03-11 16:42:52,247", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=72)", "trace_id": ""}
+2026-03-11T16:43:06.266125219Z INFO:     127.0.0.1:39410 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:43:26.425090667Z INFO:     127.0.0.1:59044 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:43:46.563194080Z INFO:     127.0.0.1:40652 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:43:52.248544119Z {"timestamp": "2026-03-11 16:43:52,248", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=73)", "trace_id": ""}
+2026-03-11T16:44:06.724389115Z INFO:     127.0.0.1:42414 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:44:26.880370909Z INFO:     127.0.0.1:43198 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:44:47.026009827Z INFO:     127.0.0.1:33976 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:44:52.249158418Z {"timestamp": "2026-03-11 16:44:52,248", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=74)", "trace_id": ""}
+2026-03-11T16:45:07.134006951Z INFO:     127.0.0.1:57432 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:45:27.290210657Z INFO:     127.0.0.1:57244 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:45:47.419796101Z INFO:     127.0.0.1:37826 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:45:52.249398525Z {"timestamp": "2026-03-11 16:45:52,248", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=75)", "trace_id": ""}
+2026-03-11T16:46:07.521964138Z INFO:     127.0.0.1:38332 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:46:27.631435287Z INFO:     127.0.0.1:57052 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:46:47.799920333Z INFO:     127.0.0.1:35992 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:46:52.250096112Z {"timestamp": "2026-03-11 16:46:52,249", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=76)", "trace_id": ""}
+2026-03-11T16:47:07.915167055Z INFO:     127.0.0.1:43440 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:47:28.050688807Z [AutoChat] Auto-triggered: critic ⇄ reasoner — sistem performansı
+2026-03-11T16:47:28.050704347Z INFO:     127.0.0.1:33642 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:47:48.213541171Z INFO:     127.0.0.1:37716 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:47:52.250371865Z {"timestamp": "2026-03-11 16:47:52,249", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=77)", "trace_id": ""}
+2026-03-11T16:48:08.346415263Z INFO:     127.0.0.1:54180 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:48:28.453439168Z INFO:     127.0.0.1:41646 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:48:48.587156155Z INFO:     127.0.0.1:38938 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:48:52.251479589Z {"timestamp": "2026-03-11 16:48:52,250", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=78)", "trace_id": ""}
+2026-03-11T16:49:08.703678455Z INFO:     127.0.0.1:57758 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:49:28.871866493Z INFO:     127.0.0.1:41884 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:49:39.370562059Z INFO:     10.0.8.5:53944 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773437079.80300ced8d22ed6a22f2e9ecff268a8bbc0a42717f9b252877b928c6c447a4af" [accepted]
+2026-03-11T16:49:39.372186898Z INFO:     connection open
+2026-03-11T16:49:49.046847749Z INFO:     127.0.0.1:41370 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:49:52.251300790Z {"timestamp": "2026-03-11 16:49:52,250", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=79)", "trace_id": ""}
+2026-03-11T16:50:09.179870716Z INFO:     127.0.0.1:34112 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:50:29.331959805Z INFO:     127.0.0.1:47670 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:50:49.441742049Z INFO:     127.0.0.1:59956 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:50:52.251882927Z {"timestamp": "2026-03-11 16:50:52,251", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=80)", "trace_id": ""}
+2026-03-11T16:51:09.584633907Z INFO:     127.0.0.1:36328 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:51:29.737481446Z INFO:     127.0.0.1:41134 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:51:49.904046300Z INFO:     127.0.0.1:37390 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:51:52.252213967Z {"timestamp": "2026-03-11 16:51:52,251", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=81)", "trace_id": ""}
+2026-03-11T16:52:10.010075942Z INFO:     127.0.0.1:40452 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:52:30.164691692Z [AutoChat] Auto-triggered: reasoner ⇄ speed — sistem performansı
+2026-03-11T16:52:30.164710182Z INFO:     127.0.0.1:51492 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:52:50.305701475Z INFO:     127.0.0.1:47986 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:52:52.252614421Z {"timestamp": "2026-03-11 16:52:52,251", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=82)", "trace_id": ""}
+2026-03-11T16:53:10.451980821Z INFO:     127.0.0.1:57910 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:53:30.596438003Z INFO:     127.0.0.1:56666 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:53:50.724143180Z INFO:     127.0.0.1:39204 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:53:52.252461673Z {"timestamp": "2026-03-11 16:53:52,252", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=83)", "trace_id": ""}
+2026-03-11T16:54:10.881062464Z INFO:     127.0.0.1:60630 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:54:31.036501162Z INFO:     127.0.0.1:36314 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:54:51.182353807Z INFO:     127.0.0.1:53948 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:54:52.252920454Z {"timestamp": "2026-03-11 16:54:52,252", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=84)", "trace_id": ""}
+2026-03-11T16:55:11.352155776Z INFO:     127.0.0.1:47488 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:55:31.509262008Z INFO:     127.0.0.1:56612 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:55:51.680361630Z INFO:     127.0.0.1:51712 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:55:52.252985669Z {"timestamp": "2026-03-11 16:55:52,252", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=85)", "trace_id": ""}
+2026-03-11T16:56:11.846016913Z INFO:     127.0.0.1:59580 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:56:31.999339319Z INFO:     127.0.0.1:47884 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:56:52.142999241Z INFO:     127.0.0.1:48384 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:56:52.253271850Z {"timestamp": "2026-03-11 16:56:52,252", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=86)", "trace_id": ""}
+2026-03-11T16:57:12.298513610Z INFO:     127.0.0.1:45696 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:57:31.687081945Z {"timestamp": "2026-03-11 16:57:31,686", "level": "INFO", "module": "event_bus", "message": "Subscribed: orchestrator → channel 'task.*'", "trace_id": ""}
+2026-03-11T16:57:31.687137505Z {"timestamp": "2026-03-11 16:57:31,686", "level": "INFO", "module": "event_bus", "message": "Subscribed: orchestrator → channel 'metrics.*'", "trace_id": ""}
+2026-03-11T16:57:31.872115179Z {"timestamp": "2026-03-11 16:57:31,871", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:32.401999468Z [AutoChat] Auto-triggered: critic ⇄ reasoner — hata analizi
+2026-03-11T16:57:32.402010208Z INFO:     127.0.0.1:36824 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:57:32.551945425Z {"timestamp": "2026-03-11 16:57:32,551", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:32.778048327Z INFO:     10.0.8.5:46154 - "OPTIONS /api/analytics/user-behavior?action=task_submit&context=Osiloskop+kullan%C4%B1m%C4%B1+halkk%C4%B1nda+bilmem+gerekenler+nelerdir+%3F&metadata=%7B%22pipeline%22%3A%22auto%22%2C%22attachments%22%3A0%7D HTTP/1.1" 200 OK
+2026-03-11T16:57:32.910204196Z INFO:     10.0.8.5:46154 - "POST /api/analytics/user-behavior?action=task_submit&context=Osiloskop+kullan%C4%B1m%C4%B1+halkk%C4%B1nda+bilmem+gerekenler+nelerdir+%3F&metadata=%7B%22pipeline%22%3A%22auto%22%2C%22attachments%22%3A0%7D HTTP/1.1" 200 OK
+2026-03-11T16:57:42.482077483Z {"timestamp": "2026-03-11 16:57:42,481", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'task.thinker'", "trace_id": ""}
+2026-03-11T16:57:42.482120443Z {"timestamp": "2026-03-11 16:57:42,482", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'broadcast'", "trace_id": ""}
+2026-03-11T16:57:42.492114321Z {"timestamp": "2026-03-11 16:57:42,491", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'task.speed'", "trace_id": ""}
+2026-03-11T16:57:42.492185641Z {"timestamp": "2026-03-11 16:57:42,492", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'broadcast'", "trace_id": ""}
+2026-03-11T16:57:42.503308511Z {"timestamp": "2026-03-11 16:57:42,502", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'task.researcher'", "trace_id": ""}
+2026-03-11T16:57:42.503323232Z {"timestamp": "2026-03-11 16:57:42,502", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'broadcast'", "trace_id": ""}
+2026-03-11T16:57:42.512999860Z {"timestamp": "2026-03-11 16:57:42,512", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'task.reasoner'", "trace_id": ""}
+2026-03-11T16:57:42.513015890Z {"timestamp": "2026-03-11 16:57:42,512", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'broadcast'", "trace_id": ""}
+2026-03-11T16:57:42.515579052Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'agent:thinker'", "trace_id": ""}
+2026-03-11T16:57:42.515591272Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'handoff:thinker'", "trace_id": ""}
+2026-03-11T16:57:42.515658312Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "handoff", "message": "Handoff handler registered: thinker", "trace_id": ""}
+2026-03-11T16:57:42.515666862Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: thinker → channel 'tasks:thinker'", "trace_id": ""}
+2026-03-11T16:57:42.515735222Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "task_delegation", "message": "Task executor registered: thinker", "trace_id": ""}
+2026-03-11T16:57:42.516386372Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'agent:speed'", "trace_id": ""}
+2026-03-11T16:57:42.516395452Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'handoff:speed'", "trace_id": ""}
+2026-03-11T16:57:42.516398442Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "handoff", "message": "Handoff handler registered: speed", "trace_id": ""}
+2026-03-11T16:57:42.516400792Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'tasks:speed'", "trace_id": ""}
+2026-03-11T16:57:42.516403082Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "task_delegation", "message": "Task executor registered: speed", "trace_id": ""}
+2026-03-11T16:57:42.516405512Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'agent:researcher'", "trace_id": ""}
+2026-03-11T16:57:42.516407902Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'handoff:researcher'", "trace_id": ""}
+2026-03-11T16:57:42.516410392Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "handoff", "message": "Handoff handler registered: researcher", "trace_id": ""}
+2026-03-11T16:57:42.516412852Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: researcher → channel 'tasks:researcher'", "trace_id": ""}
+2026-03-11T16:57:42.516415162Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "task_delegation", "message": "Task executor registered: researcher", "trace_id": ""}
+2026-03-11T16:57:42.516417482Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'agent:reasoner'", "trace_id": ""}
+2026-03-11T16:57:42.516419762Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'handoff:reasoner'", "trace_id": ""}
+2026-03-11T16:57:42.516422042Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "handoff", "message": "Handoff handler registered: reasoner", "trace_id": ""}
+2026-03-11T16:57:42.516424622Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "event_bus", "message": "Subscribed: reasoner → channel 'tasks:reasoner'", "trace_id": ""}
+2026-03-11T16:57:42.516426932Z {"timestamp": "2026-03-11 16:57:42,515", "level": "INFO", "module": "task_delegation", "message": "Task executor registered: reasoner", "trace_id": ""}
+2026-03-11T16:57:44.969090426Z {"timestamp": "2026-03-11 16:57:44,968", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:45.072608943Z {"timestamp": "2026-03-11 16:57:45,072", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:46.606473672Z {"timestamp": "2026-03-11 16:57:46,606", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:46.608092943Z {"timestamp": "2026-03-11 16:57:46,607", "level": "INFO", "module": "search", "message": "Tavily returned 8 results for: osiloskop kullanımı temel konular adım adım kılavuzu nedir n", "trace_id": ""}
+2026-03-11T16:57:48.448715305Z {"timestamp": "2026-03-11 16:57:48,448", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:48.450068737Z {"timestamp": "2026-03-11 16:57:48,449", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop kullanımı temel öğeler", "trace_id": ""}
+2026-03-11T16:57:51.227014036Z {"timestamp": "2026-03-11 16:57:51,226", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:52.253330178Z {"timestamp": "2026-03-11 16:57:52,253", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=87)", "trace_id": ""}
+2026-03-11T16:57:52.284322922Z {"timestamp": "2026-03-11 16:57:52,278", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:52.284350692Z {"timestamp": "2026-03-11 16:57:52,279", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop kullanımı adım adım", "trace_id": ""}
+2026-03-11T16:57:52.596203790Z INFO:     127.0.0.1:39774 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:57:56.316845785Z {"timestamp": "2026-03-11 16:57:56,316", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:57:59.764424227Z {"timestamp": "2026-03-11 16:57:59,763", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:58:04.078993958Z {"timestamp": "2026-03-11 16:58:04,078", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://hubf.eskisehir.edu.tr/Uploads/hubf/files/1-Osiloskop%20Kullan%C4%B1m%C4%B1.pdf \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:58:07.575839792Z {"timestamp": "2026-03-11 16:58:07,575", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:58:09.193638300Z {"timestamp": "2026-03-11 16:58:09,193", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.tavily.com/search \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:58:09.194592691Z {"timestamp": "2026-03-11 16:58:09,194", "level": "INFO", "module": "search", "message": "Tavily returned 5 results for: osiloskop temel kontroller ölçüm teknikleri ipuçları", "trace_id": ""}
+2026-03-11T16:58:11.407720141Z {"timestamp": "2026-03-11 16:58:11,407", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:58:11.866870031Z {"timestamp": "2026-03-11 16:58:11,866", "level": "INFO", "module": "_client", "message": "HTTP Request: GET https://www.entegredunyasi.com.tr/blog/icerik/osiloskop-kullanim-rehberi-temel-ayarlar?srsltid=AfmBOoq_ZgteTZiSsLrUNDPX8HAhH9cCAmfwYcVYIYPAlxZBXejvTTKh \"HTTP/1.1 200 Ok\"", "trace_id": ""}
+2026-03-11T16:58:12.577654998Z {"timestamp": "2026-03-11 16:58:12,573", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'task.synthesizer'", "trace_id": ""}
+2026-03-11T16:58:12.577683188Z {"timestamp": "2026-03-11 16:58:12,573", "level": "INFO", "module": "event_bus", "message": "Subscribed: speed → channel 'broadcast'", "trace_id": ""}
+2026-03-11T16:58:12.711648403Z INFO:     127.0.0.1:49792 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:58:31.271084146Z {"timestamp": "2026-03-11 16:58:31,269", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:58:32.843771096Z INFO:     127.0.0.1:37492 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:58:52.254854154Z {"timestamp": "2026-03-11 16:58:52,254", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=88)", "trace_id": ""}
+2026-03-11T16:58:53.010286300Z INFO:     127.0.0.1:54168 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:59:13.174956570Z INFO:     127.0.0.1:33284 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:59:26.186453661Z {"timestamp": "2026-03-11 16:59:26,186", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:59:26.664020671Z {"timestamp": "2026-03-11 16:59:26,663", "level": "ERROR", "module": "reflexion", "message": "Reflexion error: 'SynthesizerAgent' object has no attribute '_call_llm'", "trace_id": ""}
+2026-03-11T16:59:26.864797034Z {"timestamp": "2026-03-11 16:59:26,864", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T16:59:26.900574198Z {"timestamp": "2026-03-11 16:59:26,900", "level": "INFO", "module": "memory", "message": "Memory saved [episodic/pgvector]: Task: Osiloskop kullanımı hakkında bilmem gereken ", "trace_id": ""}
+2026-03-11T16:59:27.089778560Z INFO:     10.0.8.5:43078 - "OPTIONS /api/analytics/user-behavior?action=task_complete&context=Osiloskop+kullan%C4%B1m%C4%B1+hakk%C4%B1nda+bilmem+gereken+temel+konular%C4%B1%2C+ad%C4%B1m+ad%C4%B1m+kullan%C4%B1m+k%C4%B1lavuzu+%C5%9Feklinde+detayl%C4%B1+olarak+a%C3%A7%C4%B1kla.+Osiloskop+nedir%2C+nas%C4%B1l+%C3%A7al%C4%B1%C5%9F%C4%B1r%2C+temel+kontroller+nelerdir%2C+%C3%B6l%C3%A7%C3%BCm+teknikleri+nas%C4%B1&metadata=%7B%22pipeline%22%3A%22deep_research%22%2C%22tokens%22%3A0%2C%22latency_ms%22%3A30027.432007947937%7D HTTP/1.1" 200 OK
+2026-03-11T16:59:27.200668983Z INFO:     10.0.8.5:43078 - "POST /api/analytics/user-behavior?action=task_complete&context=Osiloskop+kullan%C4%B1m%C4%B1+hakk%C4%B1nda+bilmem+gereken+temel+konular%C4%B1%2C+ad%C4%B1m+ad%C4%B1m+kullan%C4%B1m+k%C4%B1lavuzu+%C5%9Feklinde+detayl%C4%B1+olarak+a%C3%A7%C4%B1kla.+Osiloskop+nedir%2C+nas%C4%B1l+%C3%A7al%C4%B1%C5%9F%C4%B1r%2C+temel+kontroller+nelerdir%2C+%C3%B6l%C3%A7%C3%BCm+teknikleri+nas%C4%B1&metadata=%7B%22pipeline%22%3A%22deep_research%22%2C%22tokens%22%3A0%2C%22latency_ms%22%3A30027.432007947937%7D HTTP/1.1" 200 OK
+2026-03-11T16:59:27.560900839Z INFO:     connection closed
+2026-03-11T16:59:33.339160476Z INFO:     127.0.0.1:55278 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T16:59:52.254949489Z {"timestamp": "2026-03-11 16:59:52,254", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=89)", "trace_id": ""}
+2026-03-11T16:59:53.489822764Z INFO:     127.0.0.1:44676 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:00:13.643448515Z INFO:     127.0.0.1:50750 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:00:33.816939459Z INFO:     127.0.0.1:42806 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:00:52.255123605Z {"timestamp": "2026-03-11 17:00:52,254", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=90)", "trace_id": ""}
+2026-03-11T17:00:53.966088304Z INFO:     127.0.0.1:48900 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:01:14.139596444Z INFO:     127.0.0.1:46834 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:01:34.264746065Z INFO:     127.0.0.1:56592 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:01:52.256942098Z {"timestamp": "2026-03-11 17:01:52,256", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=91)", "trace_id": ""}
+2026-03-11T17:01:54.420924713Z INFO:     127.0.0.1:36376 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:02:14.578629379Z INFO:     127.0.0.1:55362 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:02:34.714840118Z [AutoChat] Auto-triggered: orchestrator ⇄ thinker — sistem performansı
+2026-03-11T17:02:34.714850478Z INFO:     127.0.0.1:55230 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:02:52.258622275Z {"timestamp": "2026-03-11 17:02:52,257", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=92)", "trace_id": ""}
+2026-03-11T17:02:54.862880848Z INFO:     127.0.0.1:39898 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:03:15.012656517Z INFO:     127.0.0.1:40744 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:03:24.169588595Z INFO:     10.0.8.5:57614 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773437079.80300ced8d22ed6a22f2e9ecff268a8bbc0a42717f9b252877b928c6c447a4af" [accepted]
+2026-03-11T17:03:24.169646995Z INFO:     connection open
+2026-03-11T17:03:35.181961467Z INFO:     127.0.0.1:43332 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:03:52.258557225Z {"timestamp": "2026-03-11 17:03:52,258", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=93)", "trace_id": ""}
+2026-03-11T17:03:55.337408097Z INFO:     127.0.0.1:50980 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:04:15.482153090Z INFO:     127.0.0.1:44722 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:04:35.603705789Z INFO:     127.0.0.1:60522 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:04:52.259851069Z {"timestamp": "2026-03-11 17:04:52,259", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=94)", "trace_id": ""}
+2026-03-11T17:04:55.711996023Z INFO:     127.0.0.1:49388 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:05:15.864471850Z INFO:     127.0.0.1:57232 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:05:36.009567158Z INFO:     127.0.0.1:48864 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:05:52.259915140Z {"timestamp": "2026-03-11 17:05:52,259", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=95)", "trace_id": ""}
+2026-03-11T17:05:56.147580375Z INFO:     127.0.0.1:60534 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:06:16.297487609Z INFO:     127.0.0.1:53674 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:06:36.393714886Z INFO:     127.0.0.1:44460 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:06:52.259876404Z {"timestamp": "2026-03-11 17:06:52,259", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=96)", "trace_id": ""}
+2026-03-11T17:06:56.503119058Z INFO:     127.0.0.1:48414 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:07:16.680150085Z INFO:     127.0.0.1:36410 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:07:36.823386162Z [AutoChat] Auto-triggered: reasoner ⇄ speed — görev optimizasyonu
+2026-03-11T17:07:36.823409732Z INFO:     127.0.0.1:51562 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:07:52.260382506Z {"timestamp": "2026-03-11 17:07:52,260", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=97)", "trace_id": ""}
+2026-03-11T17:07:56.946290793Z INFO:     127.0.0.1:38722 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:08:17.094907145Z INFO:     127.0.0.1:48870 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:08:37.227580732Z INFO:     127.0.0.1:33996 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:08:52.260587872Z {"timestamp": "2026-03-11 17:08:52,260", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=98)", "trace_id": ""}
+2026-03-11T17:08:57.378830139Z INFO:     127.0.0.1:59126 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:09:17.499303483Z INFO:     127.0.0.1:41632 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:09:37.640382199Z INFO:     127.0.0.1:40656 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:09:52.261541677Z {"timestamp": "2026-03-11 17:09:52,261", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=99)", "trace_id": ""}
+2026-03-11T17:09:57.763089811Z INFO:     127.0.0.1:36988 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:10:17.896767869Z INFO:     127.0.0.1:38118 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:10:38.008453858Z INFO:     127.0.0.1:35630 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:10:52.262568074Z {"timestamp": "2026-03-11 17:10:52,262", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=100)", "trace_id": ""}
+2026-03-11T17:10:58.124830085Z INFO:     127.0.0.1:45240 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:11:18.236577455Z INFO:     127.0.0.1:38712 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:11:38.351303604Z INFO:     127.0.0.1:39590 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:11:52.263305856Z {"timestamp": "2026-03-11 17:11:52,262", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=101)", "trace_id": ""}
+2026-03-11T17:11:58.519162381Z INFO:     127.0.0.1:42668 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:12:18.688566346Z INFO:     127.0.0.1:59180 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:12:38.840572750Z [AutoChat] Auto-triggered: researcher ⇄ thinker — teknoloji trendleri
+2026-03-11T17:12:38.840602770Z INFO:     127.0.0.1:60588 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:12:52.263742049Z {"timestamp": "2026-03-11 17:12:52,263", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=102)", "trace_id": ""}
+2026-03-11T17:12:58.978272499Z INFO:     127.0.0.1:35290 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:13:19.088524902Z INFO:     127.0.0.1:40210 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:13:39.236193798Z INFO:     127.0.0.1:47178 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:13:52.264822531Z {"timestamp": "2026-03-11 17:13:52,264", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=103)", "trace_id": ""}
+2026-03-11T17:13:59.379783215Z INFO:     127.0.0.1:51146 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:14:19.510785694Z INFO:     127.0.0.1:60790 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:14:39.649841431Z INFO:     127.0.0.1:41180 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:14:52.265163980Z {"timestamp": "2026-03-11 17:14:52,264", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=104)", "trace_id": ""}
+2026-03-11T17:14:54.656987179Z INFO:     10.0.8.5:39608 - "OPTIONS /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T17:14:54.756205061Z INFO:     10.0.8.5:39608 - "GET /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T17:14:59.797473308Z INFO:     127.0.0.1:58564 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:15:19.928722651Z INFO:     127.0.0.1:59914 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:15:40.045649634Z INFO:     127.0.0.1:59168 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:15:52.266723630Z {"timestamp": "2026-03-11 17:15:52,266", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=105)", "trace_id": ""}
+2026-03-11T17:15:52.574688994Z {"timestamp": "2026-03-11 17:15:52,574", "level": "INFO", "module": "event_bus", "message": "Subscribed: orchestrator → channel 'task.*'", "trace_id": ""}
+2026-03-11T17:15:52.574760063Z {"timestamp": "2026-03-11 17:15:52,574", "level": "INFO", "module": "event_bus", "message": "Subscribed: orchestrator → channel 'metrics.*'", "trace_id": ""}
+2026-03-11T17:15:52.803092155Z INFO:     10.0.8.5:46546 - "OPTIONS /api/analytics/user-behavior?action=task_submit&context=Osiloskop+Kullan%C4%B1m%C4%B1+hakk%C4%B1nda+bilmem+gerekenleri+ara%C5%9Ft%C4%B1r%C4%B1r+m%C4%B1s%C4%B1n+%3F&metadata=%7B%22pipeline%22%3A%22auto%22%2C%22attachments%22%3A0%7D HTTP/1.1" 200 OK
+2026-03-11T17:15:52.881542393Z {"timestamp": "2026-03-11 17:15:52,881", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T17:15:52.921572423Z INFO:     10.0.8.5:46546 - "POST /api/analytics/user-behavior?action=task_submit&context=Osiloskop+Kullan%C4%B1m%C4%B1+hakk%C4%B1nda+bilmem+gerekenleri+ara%C5%9Ft%C4%B1r%C4%B1r+m%C4%B1s%C4%B1n+%3F&metadata=%7B%22pipeline%22%3A%22auto%22%2C%22attachments%22%3A0%7D HTTP/1.1" 200 OK
+2026-03-11T17:15:53.403654614Z {"timestamp": "2026-03-11 17:15:53,403", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T17:16:00.209941298Z INFO:     127.0.0.1:35252 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:16:01.822438620Z {"timestamp": "2026-03-11 17:16:01,821", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://integrate.api.nvidia.com/v1/embeddings \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T17:16:02.378180171Z {"timestamp": "2026-03-11 17:16:02,377", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T17:16:10.534968824Z INFO:     10.0.8.5:43088 - "OPTIONS /api/workspace/stats HTTP/1.1" 200 OK
+2026-03-11T17:16:10.643561950Z INFO:     10.0.8.5:43088 - "GET /api/workspace/stats HTTP/1.1" 200 OK
+2026-03-11T17:16:12.443390050Z INFO:     10.0.8.5:43088 - "OPTIONS /api/workspace/skills HTTP/1.1" 200 OK
+2026-03-11T17:16:12.880051441Z INFO:     10.0.8.5:43088 - "GET /api/workspace/skills HTTP/1.1" 200 OK
+2026-03-11T17:16:15.454732662Z INFO:     10.0.8.5:43088 - "OPTIONS /api/events HTTP/1.1" 200 OK
+2026-03-11T17:16:15.455901577Z INFO:     10.0.8.5:43096 - "OPTIONS /api/events/stats HTTP/1.1" 200 OK
+2026-03-11T17:16:15.941104411Z INFO:     10.0.8.5:43088 - "GET /api/events/stats HTTP/1.1" 200 OK
+2026-03-11T17:16:15.941338020Z INFO:     10.0.8.5:43096 - "GET /api/events HTTP/1.1" 200 OK
+2026-03-11T17:16:18.530615351Z {"timestamp": "2026-03-11 17:16:18,530", "level": "INFO", "module": "_client", "message": "HTTP Request: POST https://api.deepseek.com/v1/chat/completions \"HTTP/1.1 200 OK\"", "trace_id": ""}
+2026-03-11T17:16:20.347574836Z INFO:     127.0.0.1:54678 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:16:36.205062844Z INFO:     connection closed
+2026-03-11T17:16:40.475673522Z INFO:     127.0.0.1:47626 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:16:52.269309249Z {"timestamp": "2026-03-11 17:16:52,267", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=106)", "trace_id": ""}
+2026-03-11T17:17:00.612041203Z INFO:     127.0.0.1:53664 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:17:20.759635543Z INFO:     127.0.0.1:43238 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:17:40.884802537Z [AutoChat] Auto-triggered: speed ⇄ thinker — sistem performansı
+2026-03-11T17:17:40.884850397Z INFO:     127.0.0.1:42006 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:17:52.267893429Z {"timestamp": "2026-03-11 17:17:52,267", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=107)", "trace_id": ""}
+2026-03-11T17:18:01.068310254Z INFO:     127.0.0.1:35752 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:18:21.230513424Z INFO:     127.0.0.1:48182 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:18:41.364311902Z INFO:     127.0.0.1:48068 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:18:52.268856938Z {"timestamp": "2026-03-11 17:18:52,268", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=108)", "trace_id": ""}
+2026-03-11T17:19:01.471304102Z INFO:     127.0.0.1:54040 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:19:21.618192444Z INFO:     127.0.0.1:57990 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:19:41.746006175Z INFO:     127.0.0.1:57080 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:19:52.269962287Z {"timestamp": "2026-03-11 17:19:52,269", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=109)", "trace_id": ""}
+2026-03-11T17:20:01.907279162Z INFO:     127.0.0.1:42318 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:20:22.071703599Z INFO:     127.0.0.1:40234 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:20:42.200399521Z INFO:     127.0.0.1:33502 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:20:52.269865519Z {"timestamp": "2026-03-11 17:20:52,269", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=110)", "trace_id": ""}
+2026-03-11T17:21:02.342666409Z INFO:     127.0.0.1:35140 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:21:22.465895139Z INFO:     127.0.0.1:35788 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:21:42.610338273Z INFO:     127.0.0.1:43256 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:21:52.270310416Z {"timestamp": "2026-03-11 17:21:52,269", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=111)", "trace_id": ""}
+2026-03-11T17:22:02.748372777Z INFO:     127.0.0.1:48962 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:22:22.896380947Z [AutoChat] Auto-triggered: thinker ⇄ researcher — teknoloji trendleri
+2026-03-11T17:22:22.896416897Z INFO:     127.0.0.1:51812 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:22:43.050051337Z INFO:     127.0.0.1:49582 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:22:52.270312329Z {"timestamp": "2026-03-11 17:22:52,269", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=112)", "trace_id": ""}
+2026-03-11T17:23:03.187800495Z INFO:     127.0.0.1:49558 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:23:23.347098875Z INFO:     127.0.0.1:54836 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:23:43.495038363Z INFO:     127.0.0.1:41826 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:23:52.270263577Z {"timestamp": "2026-03-11 17:23:52,270", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=113)", "trace_id": ""}
+2026-03-11T17:24:03.615981194Z INFO:     127.0.0.1:35200 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:24:23.770759256Z INFO:     127.0.0.1:57482 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:24:43.944457832Z INFO:     127.0.0.1:56610 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:24:52.270920111Z {"timestamp": "2026-03-11 17:24:52,270", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=114)", "trace_id": ""}
+2026-03-11T17:25:04.059412174Z INFO:     127.0.0.1:46296 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:25:24.179518085Z INFO:     127.0.0.1:56516 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:25:44.348601491Z INFO:     127.0.0.1:58312 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:25:52.272100972Z {"timestamp": "2026-03-11 17:25:52,271", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=115)", "trace_id": ""}
+2026-03-11T17:26:04.470693581Z INFO:     127.0.0.1:43694 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:26:24.567762684Z INFO:     127.0.0.1:51176 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:26:44.758526912Z INFO:     127.0.0.1:57760 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:26:52.272301539Z {"timestamp": "2026-03-11 17:26:52,271", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=116)", "trace_id": ""}
+2026-03-11T17:27:04.906323655Z INFO:     127.0.0.1:33796 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:27:25.042924278Z [AutoChat] Auto-triggered: reasoner ⇄ orchestrator — işbirliği fırsatları
+2026-03-11T17:27:25.042933218Z INFO:     127.0.0.1:42986 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:27:45.214737320Z INFO:     127.0.0.1:53322 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:27:52.272673935Z {"timestamp": "2026-03-11 17:27:52,272", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=117)", "trace_id": ""}
+2026-03-11T17:28:05.370634979Z INFO:     127.0.0.1:41714 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:28:25.515894377Z INFO:     127.0.0.1:32856 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:28:45.629487521Z INFO:     127.0.0.1:53488 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:28:52.273129340Z {"timestamp": "2026-03-11 17:28:52,272", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=118)", "trace_id": ""}
+2026-03-11T17:29:05.741374756Z INFO:     127.0.0.1:56186 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:29:25.850751435Z INFO:     127.0.0.1:41874 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:29:46.006269321Z INFO:     127.0.0.1:52772 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:29:52.273912131Z {"timestamp": "2026-03-11 17:29:52,273", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=119)", "trace_id": ""}
+2026-03-11T17:30:05.248626477Z INFO:     10.0.8.5:57896 - "WebSocket /ws/chat?token=v1.ZXJrYW4.1773797170.3c98cc748b37464b054148ed880efbf3ed1fc77a25dda248cdd0484606309990" [accepted]
+2026-03-11T17:30:05.248671057Z INFO:     connection open
+2026-03-11T17:30:06.157384517Z INFO:     127.0.0.1:56268 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:30:18.084554838Z INFO:     connection closed
+2026-03-11T17:30:21.069986980Z INFO:     10.0.8.5:43396 - "OPTIONS /api/auth/login HTTP/1.1" 200 OK
+2026-03-11T17:30:21.409034110Z INFO:     10.0.8.5:43396 - "POST /api/auth/login HTTP/1.1" 200 OK
+2026-03-11T17:30:21.651133066Z INFO:     10.0.8.5:43396 - "OPTIONS /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T17:30:21.755965133Z INFO:     10.0.8.5:43396 - "GET /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T17:30:26.285483318Z INFO:     127.0.0.1:60816 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:30:28.879598622Z INFO:     10.0.8.5:37688 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773855021.13ce40039eace0f47ef93f3e157396163fe8460ea28088a19342538d53bab1e9" [accepted]
+2026-03-11T17:30:28.879958760Z INFO:     connection open
+2026-03-11T17:30:34.569302868Z INFO:     connection closed
+2026-03-11T17:30:41.231597350Z INFO:     10.0.8.5:35426 - "POST /api/auth/login HTTP/1.1" 200 OK
+2026-03-11T17:30:41.361999681Z INFO:     10.0.8.5:35426 - "GET /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T17:30:46.445529942Z INFO:     127.0.0.1:33108 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:30:48.498226801Z INFO:     10.0.8.5:37008 - "WebSocket /ws/chat?token=v1.ZXJrYW4.1773855041.0e728f488b769e493d63c81036abd482e52c70078a5f4103e7ecfbf4b15b017c" [accepted]
+2026-03-11T17:30:48.498424150Z INFO:     connection open
+2026-03-11T17:30:52.016608743Z INFO:     connection closed
+2026-03-11T17:30:52.273862159Z {"timestamp": "2026-03-11 17:30:52,273", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=120)", "trace_id": ""}
+2026-03-11T17:30:57.214930691Z INFO:     10.0.8.5:37014 - "POST /api/auth/login HTTP/1.1" 200 OK
+2026-03-11T17:30:57.971706028Z INFO:     10.0.8.5:37014 - "GET /api/auth/me HTTP/1.1" 200 OK
+2026-03-11T17:31:06.553785938Z INFO:     127.0.0.1:51628 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:31:09.062685184Z INFO:     10.0.8.5:45896 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773855057.60cd759f8fbf9af7957a544155e14213de7758c358461e8316dd19432a8ff92c" [accepted]
+2026-03-11T17:31:09.062957254Z INFO:     connection open
+2026-03-11T17:31:16.061392303Z INFO:     connection closed
+2026-03-11T17:31:21.439064862Z INFO:     10.0.8.5:57344 - "OPTIONS /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T17:31:21.559704045Z INFO:     10.0.8.5:57344 - "GET /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T17:31:24.013609083Z INFO:     10.0.8.5:57344 - "OPTIONS /api/threads/19c731a889074f84b710a60a56a08285?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T17:31:24.119796211Z INFO:     10.0.8.5:57344 - "GET /api/threads/19c731a889074f84b710a60a56a08285?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T17:31:24.192004394Z INFO:     10.0.8.5:57356 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773855057.60cd759f8fbf9af7957a544155e14213de7758c358461e8316dd19432a8ff92c" [accepted]
+2026-03-11T17:31:24.192329943Z INFO:     connection open
+2026-03-11T17:31:26.675036668Z INFO:     127.0.0.1:60928 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:31:46.834612070Z INFO:     127.0.0.1:54774 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:31:52.206093604Z {"timestamp": "2026-03-11 17:31:52,205", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] cost_monitor ok (run_count=3)", "trace_id": ""}
+2026-03-11T17:31:52.206159094Z {"timestamp": "2026-03-11 17:31:52,206", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] anomaly_detector ok (run_count=3)", "trace_id": ""}
+2026-03-11T17:31:52.249897175Z {"timestamp": "2026-03-11 17:31:52,249", "level": "INFO", "module": "auto_optimizer", "message": "Recommendation created: [performance/high] High latency: speed (30841ms avg)", "trace_id": ""}
+2026-03-11T17:31:52.257437972Z {"timestamp": "2026-03-11 17:31:52,257", "level": "INFO", "module": "auto_optimizer", "message": "Recommendation created: [performance/medium] Below benchmark baseline: orchestrator (score=2.31/5)", "trace_id": ""}
+2026-03-11T17:31:52.258057458Z {"timestamp": "2026-03-11 17:31:52,257", "level": "INFO", "module": "auto_optimizer", "message": "Auto-optimizer generated 2 new recommendations", "trace_id": ""}
+2026-03-11T17:31:52.260795587Z {"timestamp": "2026-03-11 17:31:52,260", "level": "INFO", "module": "auto_optimizer", "message": "Auto-applied 0 recommendations, skipped 48", "trace_id": ""}
+2026-03-11T17:31:52.260937946Z {"timestamp": "2026-03-11 17:31:52,260", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] evolution_analysis ok (run_count=3)", "trace_id": ""}
+2026-03-11T17:31:52.274495494Z {"timestamp": "2026-03-11 17:31:52,274", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=121)", "trace_id": ""}
+2026-03-11T17:32:04.699064646Z INFO:     10.0.8.5:43038 - "OPTIONS /api/skills HTTP/1.1" 200 OK
+2026-03-11T17:32:04.699087096Z INFO:     10.0.8.5:43046 - "OPTIONS /api/skills/auto HTTP/1.1" 200 OK
+2026-03-11T17:32:04.823377432Z INFO:     10.0.8.5:43046 - "GET /api/skills HTTP/1.1" 200 OK
+2026-03-11T17:32:04.823708230Z INFO:     10.0.8.5:43038 - "GET /api/skills/auto HTTP/1.1" 200 OK
+2026-03-11T17:32:07.006331037Z INFO:     127.0.0.1:60000 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:32:27.131574287Z [AutoChat] Auto-triggered: speed ⇄ thinker — teknoloji trendleri
+2026-03-11T17:32:27.131584627Z INFO:     127.0.0.1:39998 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:32:47.258162657Z INFO:     127.0.0.1:42914 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:32:49.716066135Z INFO:     10.0.8.5:47388 - "OPTIONS /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T17:32:49.832418186Z INFO:     10.0.8.5:47388 - "GET /api/threads?limit=50&user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T17:32:52.275484010Z {"timestamp": "2026-03-11 17:32:52,274", "level": "INFO", "module": "heartbeat", "message": "[Heartbeat] agent_health ok (run_count=122)", "trace_id": ""}
+2026-03-11T17:32:59.486290946Z INFO:     10.0.8.5:37032 - "OPTIONS /api/threads/19c731a889074f84b710a60a56a08285?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T17:32:59.598394287Z INFO:     10.0.8.5:37032 - "GET /api/threads/19c731a889074f84b710a60a56a08285?user_id=yigit HTTP/1.1" 200 OK
+2026-03-11T17:32:59.717032907Z INFO:     10.0.8.5:37048 - "WebSocket /ws/chat?token=v1.eWlnaXQ.1773437079.80300ced8d22ed6a22f2e9ecff268a8bbc0a42717f9b252877b928c6c447a4af" [accepted]
+2026-03-11T17:32:59.717328586Z INFO:     connection open
+2026-03-11T17:33:06.273371170Z INFO:     connection closed
+2026-03-11T17:33:07.420054155Z INFO:     127.0.0.1:35118 - "GET /api/health HTTP/1.1" 200 OK
+2026-03-11T17:33:27.580897048Z INFO:     127.0.0.1:49950 - "GET /api/health HTTP/1.1" 200 OK

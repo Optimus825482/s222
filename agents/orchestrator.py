@@ -8,6 +8,7 @@ Deep Research mode: auto-detects complex queries and fans out to ALL agents in p
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 import urllib.parse
@@ -90,6 +91,102 @@ _LIST_RAG_DOCS_PATTERNS = re.compile(
     r"(list\s+documents|rag\s+documents|dokümanları\s+listele|dökümanları\s+listele)",
     re.IGNORECASE,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+def _status_meta(status: TaskStatus | str) -> dict[str, str]:
+    canonical = TaskStatus.normalize(status)
+    return {
+        "run_state": canonical,
+        "run_state_alias": TaskStatus.legacy_alias(status),
+    }
+
+
+def _transition_meta(previous: TaskStatus | str, current: TaskStatus | str) -> dict[str, str]:
+    prev_canonical = TaskStatus.normalize(previous)
+    curr_canonical = TaskStatus.normalize(current)
+    return {
+        **_status_meta(current),
+        "run_state_prev": prev_canonical,
+        "run_state_prev_alias": TaskStatus.legacy_alias(previous),
+        "run_state_transition": f"{prev_canonical}->{curr_canonical}",
+    }
+
+
+def _set_task_state(
+    thread: Thread,
+    task: Task,
+    next_status: TaskStatus | str,
+    event_type: EventType,
+    content: str,
+    *,
+    live_monitor: Any | None = None,
+    agent_role: AgentRole | None = AgentRole.ORCHESTRATOR,
+    strict: bool = False,
+    **meta: Any,
+) -> None:
+    previous = task.status
+    prev_canonical = TaskStatus.normalize(previous)
+    next_canonical = TaskStatus.normalize(next_status)
+    transition_allowed = TaskStatus.can_transition(previous, next_status)
+    if not transition_allowed:
+        logger.warning(
+            "run.state.invalid_transition",
+            extra={
+                "event": "run.state.invalid_transition",
+                "thread_id": thread.id,
+                "task_id": task.id,
+                "from_state": prev_canonical,
+                "to_state": next_canonical,
+                "legacy_from": TaskStatus.legacy_alias(previous),
+                "legacy_to": TaskStatus.legacy_alias(next_status),
+            },
+        )
+        if strict and prev_canonical != next_canonical:
+            raise ValueError(
+                f"Invalid run state transition {prev_canonical}->{next_canonical} for task {task.id}"
+            )
+
+    task.status = TaskStatus.canonical(next_status)
+    thread.add_event(
+        event_type,
+        content,
+        agent_role=agent_role,
+        **_transition_meta(previous, task.status),
+        **meta,
+    )
+    logger.info(
+        "run.state.transition",
+        extra={
+            "event": "run.state.transition",
+            "thread_id": thread.id,
+            "task_id": task.id,
+            "from_state": prev_canonical,
+            "to_state": TaskStatus.normalize(task.status),
+            "legacy_from": TaskStatus.legacy_alias(previous),
+            "legacy_to": TaskStatus.legacy_alias(task.status),
+            "transition": f"{prev_canonical}->{TaskStatus.normalize(task.status)}",
+        },
+    )
+    if live_monitor:
+        try:
+            live_monitor.emit(
+                "run_state",
+                "orchestrator",
+                content,
+                run_state=TaskStatus.normalize(task.status),
+                run_state_alias=TaskStatus.legacy_alias(task.status),
+                run_state_prev=prev_canonical,
+                run_state_prev_alias=TaskStatus.legacy_alias(previous),
+                run_state_transition=f"{prev_canonical}->{TaskStatus.normalize(task.status)}",
+                thread_id=thread.id,
+                task_id=task.id,
+            )
+        except Exception:
+            pass
+
 
 _LIST_TEACHINGS_PATTERNS = re.compile(
     r"(list\s+teachings|teachings\s+list|öğretileri\s+listele|tercihleri\s+listele)",
@@ -1003,6 +1100,14 @@ class OrchestratorAgent(BaseAgent):
             sub_tasks=sub_tasks,
         )
         thread.tasks.append(task)
+        _set_task_state(
+            thread,
+            task,
+            TaskStatus.QUEUED,
+            EventType.ROUTING_DECISION,
+            "Run created and queued after decomposition",
+            live_monitor=self._live_monitor,
+        )
 
         reasoning = fn_args.get("reasoning", "")
         skill_count = sum(len(st.skills) for st in sub_tasks)
@@ -1170,8 +1275,39 @@ class OrchestratorAgent(BaseAgent):
                 sub_tasks=[],
                 final_result=str(result),
             )
-            direct_task.status = TaskStatus.COMPLETED
             thread.tasks.append(direct_task)
+            _set_task_state(
+                thread,
+                direct_task,
+                TaskStatus.ROUTING,
+                EventType.ROUTING_DECISION,
+                f"Deterministic direct tool route selected: {tool_name}",
+                live_monitor=live_monitor,
+            )
+            _set_task_state(
+                thread,
+                direct_task,
+                TaskStatus.RUNNING,
+                EventType.PIPELINE_START,
+                f"Executing direct tool: {tool_name}",
+                live_monitor=live_monitor,
+            )
+            _set_task_state(
+                thread,
+                direct_task,
+                TaskStatus.SYNTHESIZING,
+                EventType.PIPELINE_STEP,
+                f"Direct tool response received: {tool_name}",
+                live_monitor=live_monitor,
+            )
+            _set_task_state(
+                thread,
+                direct_task,
+                TaskStatus.COMPLETED,
+                EventType.PIPELINE_COMPLETE,
+                f"Direct tool completed: {tool_name}",
+                live_monitor=live_monitor,
+            )
             return str(result)
 
         # ── Phase 0: Determine pipeline mode ──
@@ -1198,8 +1334,39 @@ class OrchestratorAgent(BaseAgent):
                 sub_tasks=[],
                 final_result=result,
             )
-            idea_task.status = TaskStatus.COMPLETED
             thread.tasks.append(idea_task)
+            _set_task_state(
+                thread,
+                idea_task,
+                TaskStatus.ROUTING,
+                EventType.ROUTING_DECISION,
+                "Idea-to-project pipeline selected",
+                live_monitor=live_monitor,
+            )
+            _set_task_state(
+                thread,
+                idea_task,
+                TaskStatus.RUNNING,
+                EventType.PIPELINE_START,
+                "Idea-to-project execution started",
+                live_monitor=live_monitor,
+            )
+            _set_task_state(
+                thread,
+                idea_task,
+                TaskStatus.SYNTHESIZING,
+                EventType.PIPELINE_STEP,
+                "Idea-to-project outputs are being synthesized",
+                live_monitor=live_monitor,
+            )
+            _set_task_state(
+                thread,
+                idea_task,
+                TaskStatus.COMPLETED,
+                EventType.PIPELINE_COMPLETE,
+                "Idea-to-project pipeline completed",
+                live_monitor=live_monitor,
+            )
 
             self._auto_save_memory(user_input, result, user_id=user_id)
             return result
@@ -1255,8 +1422,39 @@ class OrchestratorAgent(BaseAgent):
                     sub_tasks=[],
                     final_result=result,
                 )
-                pres_task.status = TaskStatus.COMPLETED
                 thread.tasks.append(pres_task)
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.ROUTING,
+                    EventType.ROUTING_DECISION,
+                    f"Presentation route selected (mode={selected_mode})",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.RUNNING,
+                    EventType.PIPELINE_START,
+                    "Presentation generation started",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.SYNTHESIZING,
+                    EventType.PIPELINE_STEP,
+                    "Presentation artifacts are being finalized",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.COMPLETED,
+                    EventType.PIPELINE_COMPLETE,
+                    "Presentation generation completed",
+                    live_monitor=live_monitor,
+                )
 
                 self._auto_save_memory(pending_topic, result, user_id=user_id)
                 return result
@@ -1294,8 +1492,39 @@ class OrchestratorAgent(BaseAgent):
                     sub_tasks=[],
                     final_result=result,
                 )
-                pres_task.status = TaskStatus.COMPLETED
                 thread.tasks.append(pres_task)
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.ROUTING,
+                    EventType.ROUTING_DECISION,
+                    f"Presentation route selected (mode={auto_mode}, slides={requested_slides})",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.RUNNING,
+                    EventType.PIPELINE_START,
+                    "Presentation generation started",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.SYNTHESIZING,
+                    EventType.PIPELINE_STEP,
+                    "Presentation artifacts are being finalized",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.COMPLETED,
+                    EventType.PIPELINE_COMPLETE,
+                    "Presentation generation completed",
+                    live_monitor=live_monitor,
+                )
 
                 self._auto_save_memory(user_input, result, user_id=user_id)
                 return result
@@ -1345,8 +1574,39 @@ class OrchestratorAgent(BaseAgent):
                     sub_tasks=[],
                     final_result=result,
                 )
-                pres_task.status = TaskStatus.COMPLETED
                 thread.tasks.append(pres_task)
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.ROUTING,
+                    EventType.ROUTING_DECISION,
+                    "Presentation fallback route selected (mode=midi)",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.RUNNING,
+                    EventType.PIPELINE_START,
+                    "Presentation generation started",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.SYNTHESIZING,
+                    EventType.PIPELINE_STEP,
+                    "Presentation artifacts are being finalized",
+                    live_monitor=live_monitor,
+                )
+                _set_task_state(
+                    thread,
+                    pres_task,
+                    TaskStatus.COMPLETED,
+                    EventType.PIPELINE_COMPLETE,
+                    "Presentation generation completed",
+                    live_monitor=live_monitor,
+                )
 
                 self._auto_save_memory(user_input, result, user_id=user_id)
                 return result
@@ -1384,6 +1644,14 @@ class OrchestratorAgent(BaseAgent):
                 sub_tasks=sub_tasks,
             )
             thread.tasks.append(task)
+            _set_task_state(
+                thread,
+                task,
+                TaskStatus.QUEUED,
+                EventType.ROUTING_DECISION,
+                "Run created and queued for brainstorm pipeline",
+                live_monitor=live_monitor,
+            )
 
             thread.add_event(
                 EventType.ROUTING_DECISION,

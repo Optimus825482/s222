@@ -1,5 +1,7 @@
 """Test Whoogle JSON API."""
-import httpx, json, asyncio
+import httpx
+import asyncio
+import json
 
 WHOOGLE = "http://whoogle-e4s8oc4kkc8sokcsco808ccw.77.42.68.4.sslip.io"
 
@@ -20,10 +22,10 @@ async def test():
             print("Result keys:", list(results[0].keys()))
             for r in results[:6]:
                 print(f"\n  title: {str(r.get('title',''))[:80]}")
-                print(f"  href: {str(r.get('href',''))[:120]}")
-                print(f"  text: {str(r.get('text',''))[:120]}")
-                print(f"  content: {str(r.get('content',''))[:150]}")
+                print(f"  href: {str(r.get('href', ''))[:250]}")
+                print(f"  text: {str(r.get('text', ''))[:250]}")
+                print(f"  content: {str(r.get('content', ''))[:300]}")
         else:
-            print("Raw response:", json.dumps(d, indent=2)[:500])
+            print("Raw response:", json.dumps(d, indent=2)[:1000])
 
 asyncio.run(test())

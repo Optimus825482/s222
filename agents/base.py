@@ -371,6 +371,46 @@ class BaseAgent(ABC):
             "all providers failed",
         ))
 
+    @staticmethod
+    def _normalize_token_usage(usage: Any) -> dict[str, Any]:
+        """Normalize provider usage payload.
+
+        Standard:
+        - known values => integer token counts + status=known
+        - unknown values => null (None) + status=unknown + reason
+        """
+        if usage is None:
+            return {
+                "tokens_prompt": None,
+                "tokens_completion": None,
+                "tokens_total": None,
+                "token_usage_status": "unknown",
+                "token_usage_reason": "provider_usage_missing",
+            }
+
+        prompt_tokens = getattr(usage, "prompt_tokens", None)
+        completion_tokens = getattr(usage, "completion_tokens", None)
+        total_tokens = getattr(usage, "total_tokens", None)
+
+        missing_fields = []
+        if prompt_tokens is None:
+            missing_fields.append("prompt_tokens")
+        if completion_tokens is None:
+            missing_fields.append("completion_tokens")
+        if total_tokens is None:
+            missing_fields.append("total_tokens")
+
+        status = "known" if not missing_fields else "unknown"
+        reason = None if status == "known" else f"missing_fields:{','.join(missing_fields)}"
+
+        return {
+            "tokens_prompt": int(prompt_tokens) if prompt_tokens is not None else None,
+            "tokens_completion": int(completion_tokens) if completion_tokens is not None else None,
+            "tokens_total": int(total_tokens) if total_tokens is not None else None,
+            "token_usage_status": status,
+            "token_usage_reason": reason,
+        }
+
     async def call_llm(self, messages: list[dict], tools: list[dict] | None = None) -> dict[str, Any]:
         """Single LLM call with metrics tracking and provider fallback.
         Uses effective config (Faz 12.1 overrides).
@@ -507,6 +547,7 @@ class BaseAgent(ABC):
 
         choice = response.choices[0]
         usage = response.usage
+        usage_norm = self._normalize_token_usage(usage)
 
         # Extract thinking content from dedicated fields
         thinking = getattr(choice.message, "reasoning_content", None) \
@@ -541,9 +582,9 @@ class BaseAgent(ABC):
                 self.perf_collector.record(
                     agent_role=self.role.value if hasattr(self.role, 'value') else str(self.role),
                     response_time_ms=latency_ms,
-                    input_tokens=usage.prompt_tokens if usage else 0,
-                    output_tokens=usage.completion_tokens if usage else 0,
-                    total_tokens=usage.total_tokens if usage else 0,
+                    input_tokens=int(usage_norm["tokens_prompt"] or 0),
+                    output_tokens=int(usage_norm["tokens_completion"] or 0),
+                    total_tokens=int(usage_norm["tokens_total"] or 0),
                     success=True,
                     model_name=selected_model,
                     metadata=self._build_runtime_metadata(
@@ -563,9 +604,11 @@ class BaseAgent(ABC):
             "content": clean_content,
             "tool_calls": tool_calls,
             "finish_reason": choice.finish_reason,
-            "tokens_prompt": usage.prompt_tokens if usage else 0,
-            "tokens_completion": usage.completion_tokens if usage else 0,
-            "tokens_total": usage.total_tokens if usage else 0,
+            "tokens_prompt": usage_norm["tokens_prompt"],
+            "tokens_completion": usage_norm["tokens_completion"],
+            "tokens_total": usage_norm["tokens_total"],
+            "token_usage_status": usage_norm["token_usage_status"],
+            "token_usage_reason": usage_norm["token_usage_reason"],
             "latency_ms": latency_ms,
             "thinking": thinking,
             "provider": selected_provider,
@@ -604,9 +647,11 @@ class BaseAgent(ABC):
                 "thinking": result.get("thinking", ""),
                 "tool_calls": result.get("tool_calls") or [],
                 "usage": {
-                    "prompt_tokens": result.get("tokens_prompt", 0),
-                    "completion_tokens": result.get("tokens_completion", 0),
-                    "total_tokens": result.get("tokens_total", 0),
+                    "prompt_tokens": result.get("tokens_prompt"),
+                    "completion_tokens": result.get("tokens_completion"),
+                    "total_tokens": result.get("tokens_total"),
+                    "token_usage_status": result.get("token_usage_status", "unknown"),
+                    "token_usage_reason": result.get("token_usage_reason", "provider_usage_missing"),
                 },
             }
             return
@@ -779,13 +824,15 @@ class BaseAgent(ABC):
             clean_content = _strip_thinking_tags(full_text)
 
             # Extract usage from the last chunk if available
-            usage_data = {}
-            if chunk and hasattr(chunk, "usage") and chunk.usage:
-                usage_data = {
-                    "prompt_tokens": chunk.usage.prompt_tokens or 0,
-                    "completion_tokens": chunk.usage.completion_tokens or 0,
-                    "total_tokens": chunk.usage.total_tokens or 0,
-                }
+            usage_data: dict[str, Any] = {
+                "prompt_tokens": None,
+                "completion_tokens": None,
+                "total_tokens": None,
+                "token_usage_status": "unknown",
+                "token_usage_reason": "provider_usage_missing",
+            }
+            if chunk and hasattr(chunk, "usage"):
+                usage_data = self._normalize_token_usage(getattr(chunk, "usage", None))
 
             try:
                 if self.perf_collector:
@@ -851,9 +898,11 @@ class BaseAgent(ABC):
                     "thinking": result.get("thinking", ""),
                     "tool_calls": result.get("tool_calls") or [],
                     "usage": {
-                        "prompt_tokens": result.get("tokens_prompt", 0),
-                        "completion_tokens": result.get("tokens_completion", 0),
-                        "total_tokens": result.get("tokens_total", 0),
+                        "prompt_tokens": result.get("tokens_prompt"),
+                        "completion_tokens": result.get("tokens_completion"),
+                        "total_tokens": result.get("tokens_total"),
+                        "token_usage_status": result.get("token_usage_status", "unknown"),
+                        "token_usage_reason": result.get("token_usage_reason", "provider_usage_missing"),
                     },
                     "runtime": result.get("runtime", {}),
                 }
@@ -1232,6 +1281,8 @@ class BaseAgent(ABC):
         max_steps_loop = min(self.max_steps, loop_config.max_iterations)
         cumulative_tokens = 0
         cumulative_cost_usd = 0.0
+        token_usage_unknown = False
+        token_usage_reasons: set[str] = set()
         cost_per_1k = cost_per_1k_for_model(self.cfg.get("id", ""))
         follow_up_count = 0
 
@@ -1512,9 +1563,15 @@ class BaseAgent(ABC):
                         "content": str(tool_result),
                     })
                 # Track tokens and cost for this LLM call (result from last call_llm)
-                tok = result.get("tokens_total", 0) or 0
-                cumulative_tokens += tok
-                cumulative_cost_usd += (tok / 1000.0) * cost_per_1k
+                tok = result.get("tokens_total")
+                if isinstance(tok, int):
+                    cumulative_tokens += tok
+                    cumulative_cost_usd += (tok / 1000.0) * cost_per_1k
+                else:
+                    token_usage_unknown = True
+                    token_usage_reasons.add(
+                        str(result.get("token_usage_reason") or "provider_usage_missing")
+                    )
                 # Canlı ilerleme: bu döngü adımı sonrası güncelle
                 progress_pct = min(90, 10 + (step + 1) * 25)
                 _tools_label = ", ".join(_used_tools[-3:]) if _used_tools else "?"
@@ -1530,21 +1587,29 @@ class BaseAgent(ABC):
             # Final response — break the loop
             content = result["content"]
             # Track final turn tokens/cost
-            cumulative_tokens += result.get("tokens_total", 0) or 0
-            cumulative_cost_usd += (
-                (result.get("tokens_total", 0) or 0) / 1000.0
-            ) * cost_per_1k
+            final_tok = result.get("tokens_total")
+            if isinstance(final_tok, int):
+                cumulative_tokens += final_tok
+                cumulative_cost_usd += (final_tok / 1000.0) * cost_per_1k
+            else:
+                token_usage_unknown = True
+                token_usage_reasons.add(
+                    str(result.get("token_usage_reason") or "provider_usage_missing")
+                )
+            event_tokens = result.get("tokens_total")
             thread.add_event(
                 EventType.AGENT_RESPONSE,
                 content,
                 agent_role=self.role,
-                tokens=result["tokens_total"],
+                tokens=event_tokens,
+                token_usage_status=result.get("token_usage_status", "unknown"),
+                token_usage_reason=result.get("token_usage_reason"),
                 latency_ms=result["latency_ms"],
                 step=step,
             )
             thread.update_metrics(
                 self.role,
-                result["tokens_total"],
+                int(event_tokens) if isinstance(event_tokens, int) else 0,
                 result["latency_ms"],
                 success=True,
             )
@@ -1580,7 +1645,9 @@ class BaseAgent(ABC):
                                     {
                                         "agent": self.role.value,
                                         "model": self.cfg.get("id", ""),
-                                        "tokens": cumulative_tokens,
+                                        "tokens": None if token_usage_unknown else cumulative_tokens,
+                                        "token_usage_status": "unknown" if token_usage_unknown else "known",
+                                        "token_usage_reason": ",".join(sorted(token_usage_reasons)) if token_usage_unknown else None,
                                         "cost_usd": round(cumulative_cost_usd, 6),
                                         "steps": step + 1,
                                     }

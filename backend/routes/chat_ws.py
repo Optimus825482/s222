@@ -22,7 +22,7 @@ from deps import _get_user_from_token
 from config import MODELS, RUNTIME_EVENT_SCHEMA_VERSION, get_feature_flags
 from core.models import Thread, PipelineType
 from core.state import save_thread, load_thread
-from shared_state import _AGENT_ROLES, _utcnow
+from shared_state import _AGENT_ROLES, _mask_user_id, _utcnow
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -206,13 +206,18 @@ class WSLiveMonitor:
         self._track_task(self._send(payload))
 
 
-# Import _generate_post_task_meeting from messaging module
+# Import post-task meeting generator + WS delivery event id helper from messaging module
 try:
-    from routes.messaging import _generate_post_task_meeting
+    from routes.messaging import _build_ws_delivery_event_id, _generate_post_task_meeting
 except ImportError:
 
     def _generate_post_task_meeting(*args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
+
+    def _build_ws_delivery_event_id(run_id: str, event_type: str) -> str:
+        safe_run_id = (run_id or "unknown_run").strip() or "unknown_run"
+        safe_event_type = (event_type or "unknown_event").strip() or "unknown_event"
+        return f"{safe_run_id}:{safe_event_type}"
 
 
 # Rate limiter from deps
@@ -242,12 +247,144 @@ async def ws_chat(ws: WebSocket):
     await ws.accept()
     ws.state.run_task = None
     ws.state.live_events = []
+    ws.state.ws_send_failures = 0
+    ws.state.sent_event_ids = set()
 
-    async def _safe_ws_send(data: dict):
-        try:
-            await ws.send_json(data)
-        except Exception:
-            pass
+    async def _safe_ws_send(
+        data: dict,
+        *,
+        event_context: dict[str, Any] | None = None,
+        retry_attempts: int = 1,
+        retry_backoff_seconds: float = 0.2,
+        idempotency_key: str | None = None,
+    ) -> bool:
+        """Reliably send WS payload with structured logging, retry/backoff, and idempotency."""
+        ctx = {
+            "type": data.get("type"),
+            "event": data.get("event"),
+            **(event_context or {}),
+        }
+
+        if idempotency_key:
+            sent_event_ids = getattr(ws.state, "sent_event_ids", set())
+            if idempotency_key in sent_event_ids:
+                logger.info(
+                    "ws.send.skipped_duplicate",
+                    extra={
+                        "event": "ws.send.skipped_duplicate",
+                        "idempotency_key": idempotency_key,
+                        "context": ctx,
+                    },
+                )
+                return True
+
+        attempts = max(1, retry_attempts)
+        for attempt in range(1, attempts + 1):
+            try:
+                await ws.send_json(data)
+                if idempotency_key:
+                    sent_event_ids = getattr(ws.state, "sent_event_ids", set())
+                    sent_event_ids.add(idempotency_key)
+                    ws.state.sent_event_ids = sent_event_ids
+                return True
+            except Exception as exc:
+                ws.state.ws_send_failures = int(getattr(ws.state, "ws_send_failures", 0)) + 1
+                log_payload = {
+                    "event": "ws.send.failed",
+                    "attempt": attempt,
+                    "attempts_total": attempts,
+                    "ws_send_failures_total": ws.state.ws_send_failures,
+                    "idempotency_key": idempotency_key,
+                    "context": ctx,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }
+                if attempt < attempts:
+                    logger.warning("ws.send.failed.retrying", extra=log_payload)
+                    backoff = retry_backoff_seconds * (2 ** (attempt - 1))
+                    await asyncio.sleep(backoff)
+                    continue
+
+                logger.error("ws.send.failed.exhausted", extra=log_payload, exc_info=True)
+                return False
+
+        return False
+
+    def _collect_token_usage(thread: Thread | None) -> dict[str, int | None]:
+        if not thread or not thread.tasks:
+            return {
+                "total_tokens": None,
+                "prompt_tokens": None,
+                "completion_tokens": None,
+            }
+
+        total_tokens = sum(getattr(task, "total_tokens", 0) or 0 for task in thread.tasks)
+        prompt_tokens = 0
+        completion_tokens = 0
+        has_prompt_completion = False
+
+        for task in thread.tasks:
+            for sub_task in getattr(task, "sub_tasks", []):
+                meta = getattr(sub_task, "metadata", {}) or {}
+                if not isinstance(meta, dict):
+                    continue
+                p_tok = meta.get("prompt_tokens")
+                c_tok = meta.get("completion_tokens")
+                if isinstance(p_tok, int):
+                    prompt_tokens += p_tok
+                    has_prompt_completion = True
+                if isinstance(c_tok, int):
+                    completion_tokens += c_tok
+                    has_prompt_completion = True
+
+        return {
+            "total_tokens": total_tokens,
+            "prompt_tokens": prompt_tokens if has_prompt_completion else None,
+            "completion_tokens": completion_tokens if has_prompt_completion else None,
+        }
+
+    def _resolve_pipeline_type(thread: Thread | None, fallback: str | None = None) -> str:
+        if thread and thread.tasks:
+            last_task = thread.tasks[-1]
+            task_pipeline = getattr(last_task, "pipeline_type", None)
+            if isinstance(task_pipeline, PipelineType):
+                return task_pipeline.value
+            if task_pipeline:
+                return str(task_pipeline)
+        return fallback or PipelineType.AUTO.value
+
+    def _log_run_telemetry(
+        *,
+        event: str,
+        phase: str,
+        monitor: WSLiveMonitor | None,
+        correlation_id: str,
+        effective_user_id: str | None,
+        thread: Thread | None,
+        started_at: float,
+        status: str,
+        pipeline_type: str,
+        agent: str,
+        error: str | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "event": event,
+            "phase": phase,
+            "run_id": getattr(monitor, "_run_id", None),
+            "thread_id": getattr(thread, "id", None),
+            "user_id_masked": _mask_user_id(effective_user_id),
+            "sequence": getattr(monitor, "_sequence", 0),
+            "pipeline_type": pipeline_type,
+            "agent": agent,
+            "status": status,
+            "latency_ms": round(max((time.time() - started_at) * 1000.0, 0.0), 2),
+            "token_usage": _collect_token_usage(thread),
+            "correlation_id": correlation_id,
+            "ts": _utcnow().isoformat(),
+        }
+        if error:
+            payload["error"] = error
+        logger.info("ws.run.telemetry %s", json.dumps(payload, ensure_ascii=False, default=str))
 
     async def _execute_run(
         message: str,
@@ -255,8 +392,22 @@ async def ws_chat(ws: WebSocket):
         monitor: WSLiveMonitor,
         pipeline_str: str,
         effective_user_id: str | None,
+        correlation_id: str,
+        started_at: float,
     ):
         try:
+            _log_run_telemetry(
+                event="run.progress",
+                phase="progress",
+                monitor=monitor,
+                correlation_id=correlation_id,
+                effective_user_id=effective_user_id,
+                thread=thread,
+                started_at=started_at,
+                status="running",
+                pipeline_type=_resolve_pipeline_type(thread, pipeline_str),
+                agent="orchestrator",
+            )
             from agents.orchestrator import OrchestratorAgent
 
             orchestrator = OrchestratorAgent()
@@ -295,11 +446,85 @@ async def ws_chat(ws: WebSocket):
                 monitor.error("Kullanıcı tarafından durduruldu")
             else:
                 monitor.complete(result[:80] if result else "")
-                # Emit final_report live event so live-event-log has the full result
+                # Emit final_report with retry/backoff and idempotency
                 if result:
-                    monitor.emit("final_report", "orchestrator", result[:20000])
+                    final_report_event = {
+                        "type": "live_event",
+                        "event_type": "final_report",
+                        "agent": "orchestrator",
+                        "content": result[:20000],
+                        "extra": {},
+                        "timestamp": time.time(),
+                    }
+                    final_report_event.update(
+                        monitor.envelope(
+                            event="live.final_report",
+                            phase="complete",
+                            payload={
+                                "agent": "orchestrator",
+                                "content_preview": result[:500],
+                            },
+                        )
+                    )
+                    final_report_event_id = _build_ws_delivery_event_id(
+                        monitor._run_id,
+                        "final_report",
+                    )
+                    final_report_event["event_id"] = final_report_event_id
+                    ws.state.live_events.append(final_report_event)
+                    final_report_sent = await _safe_ws_send(
+                        final_report_event,
+                        event_context={
+                            "event": "live.final_report",
+                            "type": "live_event",
+                            "thread_id": thread.id,
+                            "run_id": monitor._run_id,
+                        },
+                        retry_attempts=3,
+                        retry_backoff_seconds=0.2,
+                        idempotency_key=final_report_event_id,
+                    )
+                    if not final_report_sent:
+                        logger.error(
+                            "run.final_report.delivery_failed",
+                            extra={
+                                "event": "run.final_report.delivery_failed",
+                                "thread_id": thread.id,
+                                "run_id": monitor._run_id,
+                                "idempotency_key": final_report_event_id,
+                            },
+                        )
+                    _log_run_telemetry(
+                        event="run.final_report",
+                        phase="complete",
+                        monitor=monitor,
+                        correlation_id=correlation_id,
+                        effective_user_id=effective_user_id,
+                        thread=thread,
+                        started_at=started_at,
+                        status=(
+                            "final_report_delivered"
+                            if final_report_sent
+                            else "final_report_delivery_failed"
+                        ),
+                        pipeline_type=_resolve_pipeline_type(thread, pipeline_str),
+                        agent="orchestrator",
+                    )
+                else:
+                    _log_run_telemetry(
+                        event="run.final_report",
+                        phase="complete",
+                        monitor=monitor,
+                        correlation_id=correlation_id,
+                        effective_user_id=effective_user_id,
+                        thread=thread,
+                        started_at=started_at,
+                        status="final_report_skipped_empty_result",
+                        pipeline_type=_resolve_pipeline_type(thread, pipeline_str),
+                        agent="orchestrator",
+                    )
 
-            await _safe_ws_send(
+            result_sent = await _safe_ws_send(
                 {
                     "type": "result",
                     "thread_id": thread.id,
@@ -311,6 +536,18 @@ async def ws_chat(ws: WebSocket):
                         payload={"thread_id": thread.id, "has_result": bool(result)},
                     ),
                 }
+            )
+            _log_run_telemetry(
+                event="run.result",
+                phase="complete",
+                monitor=monitor,
+                correlation_id=correlation_id,
+                effective_user_id=effective_user_id,
+                thread=thread,
+                started_at=started_at,
+                status="completed" if result_sent else "result_delivery_failed",
+                pipeline_type=_resolve_pipeline_type(thread, pipeline_str),
+                agent="orchestrator",
             )
 
             # Auto-trigger post-task retrospective meeting
@@ -326,7 +563,7 @@ async def ws_chat(ws: WebSocket):
                 )
                 if not task_agents:
                     task_agents = ["orchestrator", "thinker"]
-                total_tok = sum(t.total_tokens for t in thread.tasks)
+                total_tok = sum((t.total_tokens or 0) for t in thread.tasks)
                 total_lat = sum(t.total_latency_ms for t in thread.tasks)
                 last_task = thread.tasks[-1] if thread.tasks else None
                 summary = last_task.user_input[:120] if last_task else message[:120]
@@ -338,10 +575,15 @@ async def ws_chat(ws: WebSocket):
                     task_duration_ms=total_lat,
                     total_tokens=total_tok,
                 )
-                await _safe_ws_send(
+                post_task_event_id = _build_ws_delivery_event_id(
+                    monitor._run_id,
+                    "post_task_meeting",
+                )
+                post_task_sent = await _safe_ws_send(
                     {
                         "type": "post_task_meeting",
                         "meeting": meeting,
+                        "event_id": post_task_event_id,
                         **monitor.envelope(
                             event="run.post_task_meeting",
                             phase="complete",
@@ -350,10 +592,68 @@ async def ws_chat(ws: WebSocket):
                                 "participating_agents": task_agents,
                             },
                         ),
-                    }
+                    },
+                    event_context={
+                        "event": "run.post_task_meeting",
+                        "type": "post_task_meeting",
+                        "thread_id": thread.id,
+                        "run_id": monitor._run_id,
+                    },
+                    retry_attempts=3,
+                    retry_backoff_seconds=0.2,
+                    idempotency_key=post_task_event_id,
                 )
-            except Exception:
-                pass
+                if not post_task_sent:
+                    logger.error(
+                        "run.post_task_meeting.delivery_failed",
+                        extra={
+                            "event": "run.post_task_meeting.delivery_failed",
+                            "thread_id": thread.id,
+                            "run_id": monitor._run_id,
+                            "idempotency_key": post_task_event_id,
+                        },
+                    )
+                _log_run_telemetry(
+                    event="run.post_task_meeting",
+                    phase="complete",
+                    monitor=monitor,
+                    correlation_id=correlation_id,
+                    effective_user_id=effective_user_id,
+                    thread=thread,
+                    started_at=started_at,
+                    status=(
+                        "post_task_meeting_delivered"
+                        if post_task_sent
+                        else "post_task_meeting_delivery_failed"
+                    ),
+                    pipeline_type=_resolve_pipeline_type(thread, pipeline_str),
+                    agent="orchestrator",
+                )
+            except Exception as exc:
+                logger.warning(
+                    "run.post_task_meeting.generation_failed",
+                    extra={
+                        "event": "run.post_task_meeting.generation_failed",
+                        "thread_id": thread.id,
+                        "run_id": monitor._run_id,
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                    },
+                    exc_info=True,
+                )
+                _log_run_telemetry(
+                    event="run.post_task_meeting",
+                    phase="error",
+                    monitor=monitor,
+                    correlation_id=correlation_id,
+                    effective_user_id=effective_user_id,
+                    thread=thread,
+                    started_at=started_at,
+                    status="post_task_meeting_generation_failed",
+                    pipeline_type=_resolve_pipeline_type(thread, pipeline_str),
+                    agent="orchestrator",
+                    error=f"{type(exc).__name__}: {exc}",
+                )
         except Exception as e:
             err = f"{type(e).__name__}: {e}"
             monitor.error(err)
@@ -369,6 +669,19 @@ async def ws_chat(ws: WebSocket):
                         payload={"thread_id": thread.id, "message": err},
                     ),
                 }
+            )
+            _log_run_telemetry(
+                event="run.error",
+                phase="error",
+                monitor=monitor,
+                correlation_id=correlation_id,
+                effective_user_id=effective_user_id,
+                thread=thread,
+                started_at=started_at,
+                status="failed",
+                pipeline_type=_resolve_pipeline_type(thread, pipeline_str),
+                agent="orchestrator",
+                error=err,
             )
         finally:
             ws.state.run_task = None
@@ -500,10 +813,32 @@ async def ws_chat(ws: WebSocket):
             ws.state.live_events = []
             monitor = WSLiveMonitor(ws, ws.state.live_events)
             ws.state.monitor = monitor
+            correlation_id = data.get("correlation_id") or monitor._run_id
+            started_at = time.time()
             monitor.start(message)
+            _log_run_telemetry(
+                event="run.start",
+                phase="start",
+                monitor=monitor,
+                correlation_id=correlation_id,
+                effective_user_id=effective_user_id,
+                thread=thread,
+                started_at=started_at,
+                status="started",
+                pipeline_type=_resolve_pipeline_type(thread, pipeline_str),
+                agent="orchestrator",
+            )
 
             ws.state.run_task = asyncio.create_task(
-                _execute_run(message, thread, monitor, pipeline_str, effective_user_id),
+                _execute_run(
+                    message,
+                    thread,
+                    monitor,
+                    pipeline_str,
+                    effective_user_id,
+                    correlation_id,
+                    started_at,
+                ),
             )
 
     except WebSocketDisconnect:

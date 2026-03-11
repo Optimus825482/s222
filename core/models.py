@@ -33,12 +33,94 @@ class AgentRole(str, Enum):
 
 
 class TaskStatus(str, Enum):
-    PENDING = "pending"
+    """Deterministic run/task lifecycle states with backward-compatible aliases."""
+
+    # Canonical deterministic states
+    QUEUED = "queued"
     ROUTING = "routing"
     RUNNING = "running"
-    REVIEWING = "reviewing"
+    SYNTHESIZING = "synthesizing"
     COMPLETED = "completed"
     FAILED = "failed"
+    STOPPED = "stopped"
+
+    # Backward-compatible legacy enum values (persisted historical data)
+    PENDING = "pending"
+    REVIEWING = "reviewing"
+
+    @classmethod
+    def alias_map(cls) -> dict[str, str]:
+        """Map legacy+canonical labels to canonical deterministic states."""
+        return {
+            cls.QUEUED.value: cls.QUEUED.value,
+            cls.ROUTING.value: cls.ROUTING.value,
+            cls.RUNNING.value: cls.RUNNING.value,
+            cls.SYNTHESIZING.value: cls.SYNTHESIZING.value,
+            cls.COMPLETED.value: cls.COMPLETED.value,
+            cls.FAILED.value: cls.FAILED.value,
+            cls.STOPPED.value: cls.STOPPED.value,
+            cls.PENDING.value: cls.QUEUED.value,
+            cls.REVIEWING.value: cls.SYNTHESIZING.value,
+        }
+
+    @classmethod
+    def normalize(cls, value: "TaskStatus | str") -> str:
+        raw = value.value if isinstance(value, TaskStatus) else str(value)
+        return cls.alias_map().get(raw, raw)
+
+    @classmethod
+    def canonical(cls, value: "TaskStatus | str") -> "TaskStatus":
+        normalized = cls.normalize(value)
+        try:
+            return cls(normalized)
+        except ValueError:
+            return cls.QUEUED
+
+    @classmethod
+    def legacy_alias(cls, value: "TaskStatus | str") -> str:
+        """Return legacy label expected by older consumers."""
+        normalized = cls.normalize(value)
+        if normalized == cls.QUEUED.value:
+            return cls.PENDING.value
+        if normalized == cls.SYNTHESIZING.value:
+            return cls.REVIEWING.value
+        return normalized
+
+    @classmethod
+    def transition_graph(cls) -> dict[str, set[str]]:
+        """Canonical state machine graph (legacy labels normalized before checks)."""
+        return {
+            cls.QUEUED.value: {cls.ROUTING.value, cls.FAILED.value, cls.STOPPED.value},
+            cls.ROUTING.value: {cls.RUNNING.value, cls.FAILED.value, cls.STOPPED.value},
+            cls.RUNNING.value: {cls.SYNTHESIZING.value, cls.FAILED.value, cls.STOPPED.value},
+            cls.SYNTHESIZING.value: {cls.COMPLETED.value, cls.FAILED.value, cls.STOPPED.value},
+            cls.COMPLETED.value: set(),
+            cls.FAILED.value: set(),
+            cls.STOPPED.value: set(),
+        }
+
+    @classmethod
+    def terminal_states(cls) -> set[str]:
+        return {
+            cls.COMPLETED.value,
+            cls.FAILED.value,
+            cls.STOPPED.value,
+        }
+
+    @classmethod
+    def is_terminal(cls, value: "TaskStatus | str") -> bool:
+        return cls.normalize(value) in cls.terminal_states()
+
+    @classmethod
+    def can_transition(cls, previous: "TaskStatus | str", current: "TaskStatus | str") -> bool:
+        prev = cls.normalize(previous)
+        curr = cls.normalize(current)
+        if prev == curr:
+            return True
+        allowed = cls.transition_graph().get(prev)
+        if allowed is None:
+            return False
+        return curr in allowed
 
 
 class PipelineType(str, Enum):
@@ -112,9 +194,9 @@ class SubTask(BaseModel):
     priority: int = 1
     depends_on: list[str] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)  # Skill IDs to inject
-    status: TaskStatus = TaskStatus.PENDING
+    status: TaskStatus = TaskStatus.QUEUED
     result: str | None = None
-    token_usage: int = 0
+    token_usage: int | None = None
     latency_ms: float = 0.0
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -125,10 +207,10 @@ class Task(BaseModel):
     user_input: str
     pipeline_type: PipelineType = PipelineType.AUTO
     sub_tasks: list[SubTask] = Field(default_factory=list)
-    status: TaskStatus = TaskStatus.PENDING
+    status: TaskStatus = TaskStatus.QUEUED
     final_result: str | None = None
     confidence_footer: str | None = None
-    total_tokens: int = 0
+    total_tokens: int | None = None
     total_latency_ms: float = 0.0
     created_at: datetime = Field(default_factory=_now)
     completed_at: datetime | None = None

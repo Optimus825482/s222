@@ -8,5 +8,9 @@
     "dev:frontend": "cd frontend && node node_modules/next/dist/bin/next dev --port 3015",
     "build": "cd frontend && npm run build",
     "stop": "npx kill-port 8001 3015"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "kill-port": "^2.0.1"
   }
 }
