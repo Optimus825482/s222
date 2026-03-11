@@ -426,6 +426,19 @@ def get_iterative_eval_runtime_config() -> dict[str, float | int | str]:
 
 
 # ── Reflexion / Self-Evaluation Settings ───────────────────────────────
+
+# ── YouTube Proxy (cloud IP ban workaround) ──────────────────────
+# Generic HTTP/HTTPS proxy for YouTube transcript fetching
+# Format: http://user:pass@host:port or http://host:port
+YOUTUBE_PROXY_URL = os.getenv("YOUTUBE_PROXY_URL", "")
+
+# Webshare residential proxy (recommended for youtube_transcript_api)
+WEBSHARE_PROXY_USERNAME = os.getenv("WEBSHARE_PROXY_USERNAME", "")
+WEBSHARE_PROXY_PASSWORD = os.getenv("WEBSHARE_PROXY_PASSWORD", "")
+
+# Cookie-based auth (last resort — YouTube may ban the account)
+YOUTUBE_COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH", "")
+
 # Enable automatic self-evaluation after each agent response
 REFLEXION_ENABLED = os.getenv("REFLEXION_ENABLED", "false").lower() == "true"
 

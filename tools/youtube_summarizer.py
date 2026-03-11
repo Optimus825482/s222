@@ -1,8 +1,8 @@
 """
 YouTube Summarizer tool — extract video info, transcripts, and summaries.
 
-Uses YouTube's InnerTube API directly via httpx as primary method.
-Falls back to youtube_transcript_api for robust multi-language support.
+Uses youtube_transcript_api as primary method (with optional proxy for cloud IPs).
+Falls back to YouTube's InnerTube API directly via httpx.
 Supports automatic translation to any target language via deep_translator.
 """
 
@@ -38,6 +38,15 @@ try:
 except ImportError:
     DEEP_TRANSLATOR_AVAILABLE = False
 
+# Proxy support for youtube_transcript_api (Webshare residential proxy)
+_WEBSHARE_PROXY_CONFIG = None
+try:
+    from youtube_transcript_api.proxies import WebshareProxyConfig
+
+    _WEBSHARE_AVAILABLE = True
+except ImportError:
+    _WEBSHARE_AVAILABLE = False
+
 TRANSCRIPT_API_AVAILABLE = True  # Our InnerTube impl is always available
 
 _YT_ID_RE = re.compile(r"(?:v=|youtu\.be/|embed/|shorts/|live/)([a-zA-Z0-9_-]{11})")
@@ -48,6 +57,72 @@ _INNERTUBE_CLIENT = {
     "clientVersion": "2.20240313.05.00",
     "hl": "en",
 }
+
+
+def _get_proxy_config() -> dict[str, str]:
+    """Get proxy settings from config. Returns dict for httpx or empty dict."""
+    try:
+        from config import YOUTUBE_PROXY_URL
+        if YOUTUBE_PROXY_URL:
+            return {
+                "http://": YOUTUBE_PROXY_URL,
+                "https://": YOUTUBE_PROXY_URL,
+            }
+    except ImportError:
+        pass
+    return {}
+
+
+def _get_yt_api_instance() -> "YouTubeTranscriptApi":
+    """Create YouTubeTranscriptApi instance with proxy if configured."""
+    if not YT_TRANSCRIPT_API_AVAILABLE:
+        raise ImportError("youtube_transcript_api not installed")
+
+    # Try Webshare proxy first (residential, most reliable)
+    try:
+        from config import WEBSHARE_PROXY_USERNAME, WEBSHARE_PROXY_PASSWORD
+        if WEBSHARE_PROXY_USERNAME and WEBSHARE_PROXY_PASSWORD and _WEBSHARE_AVAILABLE:
+            logger.info("Using Webshare residential proxy for YouTube")
+            proxy_config = WebshareProxyConfig(
+                proxy_username=WEBSHARE_PROXY_USERNAME,
+                proxy_password=WEBSHARE_PROXY_PASSWORD,
+            )
+            return YouTubeTranscriptApi(proxy_config=proxy_config)
+    except (ImportError, Exception) as e:
+        logger.debug(f"Webshare proxy not configured: {e}")
+
+    # Try generic HTTP proxy via cookie/proxy workaround
+    try:
+        from config import YOUTUBE_PROXY_URL
+        if YOUTUBE_PROXY_URL:
+            logger.info(f"Using HTTP proxy for YouTube: {YOUTUBE_PROXY_URL.split('@')[-1] if '@' in YOUTUBE_PROXY_URL else YOUTUBE_PROXY_URL}")
+            # youtube_transcript_api v1.x supports generic proxy via GenericProxyConfig
+            try:
+                from youtube_transcript_api.proxies import GenericProxyConfig
+                proxy_config = GenericProxyConfig(
+                    http_url=YOUTUBE_PROXY_URL,
+                    https_url=YOUTUBE_PROXY_URL,
+                )
+                return YouTubeTranscriptApi(proxy_config=proxy_config)
+            except ImportError:
+                logger.debug("GenericProxyConfig not available in this version")
+    except (ImportError, Exception) as e:
+        logger.debug(f"HTTP proxy not configured: {e}")
+
+    # Try cookie-based auth (last resort)
+    try:
+        from config import YOUTUBE_COOKIES_PATH
+        if YOUTUBE_COOKIES_PATH:
+            from pathlib import Path
+            cookie_path = Path(YOUTUBE_COOKIES_PATH)
+            if cookie_path.exists():
+                logger.info("Using cookie-based auth for YouTube")
+                return YouTubeTranscriptApi(cookie_path=str(cookie_path))
+    except (ImportError, Exception) as e:
+        logger.debug(f"Cookie auth not configured: {e}")
+
+    # No proxy — direct connection
+    return YouTubeTranscriptApi()
 
 
 def extract_video_id(url: str) -> Optional[str]:
@@ -141,7 +216,8 @@ async def _fetch_innertube_player(video_id: str) -> dict[str, Any]:
     }
     url = f"https://www.youtube.com/youtubei/v1/player?key={_INNERTUBE_API_KEY}"
 
-    async with httpx.AsyncClient(timeout=20) as client:
+    proxy_map = _get_proxy_config()
+    async with httpx.AsyncClient(timeout=20, proxy=proxy_map.get("https://") or None) as client:
         resp = await client.post(
             url,
             json=payload,
@@ -164,7 +240,8 @@ def _extract_caption_tracks(player_data: dict) -> list[dict]:
 
 async def _download_transcript_xml(base_url: str) -> str:
     """Download transcript XML from YouTube's timedtext endpoint."""
-    async with httpx.AsyncClient(timeout=20) as client:
+    proxy_map = _get_proxy_config()
+    async with httpx.AsyncClient(timeout=20, proxy=proxy_map.get("https://") or None) as client:
         resp = await client.get(
             base_url,
             headers={
@@ -220,7 +297,7 @@ async def _get_transcript_via_yt_api(
 
     def _fetch_sync() -> ResultDict:
         try:
-            api = YouTubeTranscriptApi()
+            api = _get_yt_api_instance()
 
             # Önce mevcut transcript'leri listele
             detected_lang = "en"
@@ -327,6 +404,146 @@ async def _get_transcript_via_yt_api(
 
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _fetch_sync)
+
+
+# ── Web scraping fallback — YouTube watch page ───────────────────
+
+
+async def _get_transcript_via_web_scrape(video_id: str) -> ResultDict:
+    """
+    Fallback: YouTube watch sayfasından captionTracks JSON'ını scrape et.
+    Bu yöntem normal bir tarayıcı isteği gibi görünür ve genellikle
+    API-level IP ban'lerden etkilenmez.
+    """
+    watch_url = f"https://www.youtube.com/watch?v={video_id}"
+    proxy_map = _get_proxy_config()
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+
+        async with httpx.AsyncClient(
+            timeout=20,
+            proxy=proxy_map.get("https://") or None,
+            follow_redirects=True,
+        ) as client:
+            resp = await client.get(watch_url, headers=headers)
+            resp.raise_for_status()
+            html = resp.text
+
+        # captionTracks JSON'ını HTML'den çek
+        # YouTube sayfasında "captionTracks": [...] şeklinde gömülü
+        caption_pattern = re.compile(r'"captionTracks"\s*:\s*(\[.*?\])', re.DOTALL)
+        match = caption_pattern.search(html)
+
+        if not match:
+            # Alternatif pattern — playerCaptionsTracklistRenderer içinde
+            alt_pattern = re.compile(
+                r'"playerCaptionsTracklistRenderer"\s*:\s*\{.*?"captionTracks"\s*:\s*(\[.*?\])',
+                re.DOTALL,
+            )
+            match = alt_pattern.search(html)
+
+        if not match:
+            return {
+                "success": False,
+                "transcript": None,
+                "source": None,
+                "language": None,
+                "error": "web_scrape: no captionTracks found in page HTML",
+            }
+
+        import json
+
+        try:
+            # JSON string'i temizle — bazen escape karakterleri var
+            raw_json = match.group(1)
+            # Unicode escape'leri düzelt
+            raw_json = raw_json.encode().decode("unicode_escape", errors="replace")
+            tracks = json.loads(raw_json)
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.warning(f"web_scrape: JSON parse failed: {e}")
+            return {
+                "success": False,
+                "transcript": None,
+                "source": None,
+                "language": None,
+                "error": f"web_scrape: JSON parse error: {e}",
+            }
+
+        if not tracks:
+            return {
+                "success": False,
+                "transcript": None,
+                "source": None,
+                "language": None,
+                "error": "web_scrape: captionTracks array is empty",
+            }
+
+        # İlk track'i al (genellikle en iyi eşleşme)
+        chosen = tracks[0]
+        for t in tracks:
+            lang = t.get("languageCode", "")
+            if lang == "en":
+                chosen = t
+                break
+
+        base_url = chosen.get("baseUrl", "")
+        actual_lang = chosen.get("languageCode", "en")
+        kind = chosen.get("kind", "")
+        source = "web_scrape_auto" if kind == "asr" else "web_scrape_manual"
+
+        if not base_url:
+            return {
+                "success": False,
+                "transcript": None,
+                "source": None,
+                "language": None,
+                "error": "web_scrape: no baseUrl in caption track",
+            }
+
+        logger.info(f"web_scrape: found caption track — lang={actual_lang}, kind={kind}")
+
+        # Transcript XML'i indir
+        xml_text = await _download_transcript_xml(base_url)
+        segments = _parse_transcript_xml(xml_text)
+
+        if not segments:
+            return {
+                "success": False,
+                "transcript": None,
+                "source": None,
+                "language": None,
+                "error": "web_scrape: no segments parsed from XML",
+            }
+
+        full_text = " ".join(s["text"] for s in segments)
+        logger.info(f"web_scrape: success — {len(segments)} segments, {len(full_text)} chars, lang={actual_lang}")
+
+        return {
+            "success": True,
+            "transcript": {
+                "full_text": full_text,
+                "segments": segments,
+                "word_count": len(full_text.split()),
+            },
+            "source": source,
+            "language": actual_lang,
+            "error": None,
+        }
+
+    except Exception as e:
+        logger.error(f"web_scrape: failed: {e}", exc_info=True)
+        return {
+            "success": False,
+            "transcript": None,
+            "source": None,
+            "language": None,
+            "error": f"web_scrape: {e}",
+        }
 
 
 # ── Translation via deep_translator ──────────────────────────────
@@ -508,6 +725,15 @@ async def get_transcript(
 
         except Exception as e:
             logger.warning(f"InnerTube fallback failed: {e}")
+
+    # ── Fallback 3: Web scrape (YouTube watch page HTML'den caption URL çek) ──
+    if not result or not result.get("success"):
+        logger.info(f"Trying web scrape (fallback 3) for {video_id}...")
+        scrape_result = await _get_transcript_via_web_scrape(video_id)
+        if scrape_result.get("success"):
+            result = scrape_result
+        else:
+            logger.warning(f"Web scrape failed: {scrape_result.get('error')}")
 
     # ── Auto-translate if target_language differs ─────────────────
     if result is None:
