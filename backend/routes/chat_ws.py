@@ -846,10 +846,18 @@ async def ws_chat(ws: WebSocket):
     except Exception:
         pass
     finally:
-        # Cancel running agent task and drain pending WS sends
+        # Do not cancel active run on client disconnect.
+        # Otherwise long pipelines can be interrupted mid-flight and never reach
+        # a terminal task state (completed/failed/stopped).
         run_task = getattr(ws.state, "run_task", None)
         if run_task and not run_task.done():
-            run_task.cancel()
+            logger.info(
+                "ws.chat.disconnected_run_continues",
+                extra={
+                    "event": "ws.chat.disconnected_run_continues",
+                    "run_task": str(run_task),
+                },
+            )
         monitor_obj = getattr(ws.state, "monitor", None)
         if monitor_obj:
             await monitor_obj.close()
