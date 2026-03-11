@@ -20,11 +20,11 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Mapping, cast
 
 import httpx
 
-from tools.pg_connection import get_conn, release_conn, db_conn
+from tools.pg_connection import DBRow, db_conn, get_conn, release_conn
 
 logger = logging.getLogger(__name__)
 
@@ -442,8 +442,8 @@ def get_incoming_webhooks(
             
             cur.execute(query, params)
             rows = cur.fetchall()
-            
-            return [_row_to_incoming_dict(r) for r in rows]
+
+            return [_row_to_incoming_dict(cast(Mapping[str, Any], r)) for r in rows]
 
 
 def mark_incoming_processed(webhook_id: str, error_message: str | None = None) -> bool:
@@ -460,19 +460,27 @@ def mark_incoming_processed(webhook_id: str, error_message: str | None = None) -
             return cur.rowcount > 0
 
 
-def _row_to_incoming_dict(row: dict) -> dict[str, Any]:
+def _normalize_row(row: Mapping[str, Any] | DBRow) -> dict[str, Any]:
+    """Normalize a mapping-like DB row to a plain dict for consistent keyed access."""
+    return dict(row)
+
+
+def _row_to_incoming_dict(row: Mapping[str, Any] | DBRow) -> dict[str, Any]:
     """Convert database row to dict."""
+    row_dict = _normalize_row(row)
     return {
-        "id": row["id"],
-        "source": row["source"],
-        "event_type": row["event_type"],
-        "payload": json.loads(row["payload"]) if row["payload"] else {},
-        "headers": json.loads(row["headers"]) if row["headers"] else {},
-        "signature": row["signature"],
-        "verified": row["verified"],
-        "processed": row["processed"],
-        "error_message": row["error_message"],
-        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+        "id": row_dict["id"],
+        "source": row_dict["source"],
+        "event_type": row_dict["event_type"],
+        "payload": json.loads(row_dict["payload"]) if row_dict["payload"] else {},
+        "headers": json.loads(row_dict["headers"]) if row_dict["headers"] else {},
+        "signature": row_dict["signature"],
+        "verified": row_dict["verified"],
+        "processed": row_dict["processed"],
+        "error_message": row_dict["error_message"],
+        "created_at": row_dict["created_at"].isoformat()
+        if row_dict["created_at"]
+        else None,
     }
 
 
@@ -553,7 +561,7 @@ def get_subscription(subscription_id: str) -> WebhookSubscription | None:
             row = cur.fetchone()
             if not row:
                 return None
-            return _row_to_subscription(row)
+            return _row_to_subscription(cast(Mapping[str, Any], row))
 
 
 def list_subscriptions(
@@ -578,8 +586,8 @@ def list_subscriptions(
             
             cur.execute(query, params)
             rows = cur.fetchall()
-            
-            return [_row_to_subscription(r) for r in rows]
+
+            return [_row_to_subscription(cast(Mapping[str, Any], r)) for r in rows]
 
 
 def update_subscription(
@@ -659,22 +667,27 @@ def resume_subscription(subscription_id: str) -> WebhookSubscription | None:
     return update_subscription(subscription_id, status=SubscriptionStatus.ACTIVE)
 
 
-def _row_to_subscription(row: dict) -> WebhookSubscription:
+def _row_to_subscription(row: Mapping[str, Any] | DBRow) -> WebhookSubscription:
     """Convert database row to WebhookSubscription."""
+    row_dict = _normalize_row(row)
     return WebhookSubscription(
-        id=row["id"],
-        name=row["name"],
-        url=row["url"],
-        secret=row["secret"],
-        events=json.loads(row["events"]) if row["events"] else [],
-        filters=json.loads(row["filters"]) if row["filters"] else {},
-        headers=json.loads(row["headers"]) if row["headers"] else {},
-        status=SubscriptionStatus(row["status"]) if row["status"] else SubscriptionStatus.ACTIVE,
-        created_at=row["created_at"].isoformat() if row["created_at"] else "",
-        updated_at=row["updated_at"].isoformat() if row["updated_at"] else "",
-        last_triggered=row["last_triggered"].isoformat() if row["last_triggered"] else None,
-        delivery_count=row["delivery_count"] or 0,
-        failure_count=row["failure_count"] or 0,
+        id=row_dict["id"],
+        name=row_dict["name"],
+        url=row_dict["url"],
+        secret=row_dict["secret"],
+        events=json.loads(row_dict["events"]) if row_dict["events"] else [],
+        filters=json.loads(row_dict["filters"]) if row_dict["filters"] else {},
+        headers=json.loads(row_dict["headers"]) if row_dict["headers"] else {},
+        status=SubscriptionStatus(row_dict["status"])
+        if row_dict["status"]
+        else SubscriptionStatus.ACTIVE,
+        created_at=row_dict["created_at"].isoformat() if row_dict["created_at"] else "",
+        updated_at=row_dict["updated_at"].isoformat() if row_dict["updated_at"] else "",
+        last_triggered=row_dict["last_triggered"].isoformat()
+        if row_dict["last_triggered"]
+        else None,
+        delivery_count=row_dict["delivery_count"] or 0,
+        failure_count=row_dict["failure_count"] or 0,
     )
 
 
@@ -893,8 +906,8 @@ def get_delivery_history(
             
             cur.execute(query, params)
             rows = cur.fetchall()
-            
-            return [_row_to_delivery(r) for r in rows]
+
+            return [_row_to_delivery(cast(Mapping[str, Any], r)) for r in rows]
 
 
 def get_delivery(delivery_id: str) -> WebhookDelivery | None:
@@ -905,7 +918,7 @@ def get_delivery(delivery_id: str) -> WebhookDelivery | None:
             row = cur.fetchone()
             if not row:
                 return None
-            return _row_to_delivery(row)
+            return _row_to_delivery(cast(Mapping[str, Any], row))
 
 
 def retry_delivery(delivery_id: str) -> dict[str, Any]:
@@ -960,20 +973,25 @@ def retry_delivery(delivery_id: str) -> dict[str, Any]:
     }
 
 
-def _row_to_delivery(row: dict) -> WebhookDelivery:
+def _row_to_delivery(row: Mapping[str, Any] | DBRow) -> WebhookDelivery:
     """Convert database row to WebhookDelivery."""
+    row_dict = _normalize_row(row)
     return WebhookDelivery(
-        id=row["id"],
-        subscription_id=row["subscription_id"],
-        event_type=row["event_type"],
-        payload=json.loads(row["payload"]) if row["payload"] else {},
-        status=WebhookStatus(row["status"]) if row["status"] else WebhookStatus.PENDING,
-        response_code=row["response_code"],
-        response_body=row["response_body"],
-        error_message=row["error_message"],
-        attempt_count=row["attempt_count"] or 1,
-        delivered_at=row["delivered_at"].isoformat() if row["delivered_at"] else None,
-        created_at=row["created_at"].isoformat() if row["created_at"] else "",
+        id=row_dict["id"],
+        subscription_id=row_dict["subscription_id"],
+        event_type=row_dict["event_type"],
+        payload=json.loads(row_dict["payload"]) if row_dict["payload"] else {},
+        status=WebhookStatus(row_dict["status"])
+        if row_dict["status"]
+        else WebhookStatus.PENDING,
+        response_code=row_dict["response_code"],
+        response_body=row_dict["response_body"],
+        error_message=row_dict["error_message"],
+        attempt_count=row_dict["attempt_count"] or 1,
+        delivered_at=row_dict["delivered_at"].isoformat()
+        if row_dict["delivered_at"]
+        else None,
+        created_at=row_dict["created_at"].isoformat() if row_dict["created_at"] else "",
     )
 
 
@@ -981,38 +999,50 @@ def _row_to_delivery(row: dict) -> WebhookDelivery:
 
 def get_webhook_stats() -> dict[str, Any]:
     """Get webhook system statistics."""
+
+    def _count_from_row(row: object, key: str) -> int:
+        if not row:
+            return 0
+        if isinstance(row, Mapping):
+            value = row.get(key, 0)
+            return int(value) if value is not None else 0
+        if isinstance(row, tuple):
+            value = row[0] if row else 0
+            return int(value) if value is not None else 0
+        return 0
+
     with db_conn() as conn:
         with conn.cursor() as cur:
             # Subscription stats
             cur.execute("SELECT COUNT(*) as total FROM webhook_subscriptions")
-            total_subs = cur.fetchone()["total"]
-            
+            total_subs = _count_from_row(cur.fetchone(), "total")
+
             cur.execute("SELECT COUNT(*) as active FROM webhook_subscriptions WHERE status = 'active'")
-            active_subs = cur.fetchone()["active"]
-            
+            active_subs = _count_from_row(cur.fetchone(), "active")
+
             # Delivery stats
             cur.execute("SELECT COUNT(*) as total FROM webhook_deliveries")
-            total_deliveries = cur.fetchone()["total"]
-            
+            total_deliveries = _count_from_row(cur.fetchone(), "total")
+
             cur.execute("SELECT COUNT(*) as delivered FROM webhook_deliveries WHERE status = 'delivered'")
-            delivered = cur.fetchone()["delivered"]
-            
+            delivered = _count_from_row(cur.fetchone(), "delivered")
+
             cur.execute("SELECT COUNT(*) as failed FROM webhook_deliveries WHERE status = 'failed'")
-            failed = cur.fetchone()["failed"]
-            
+            failed = _count_from_row(cur.fetchone(), "failed")
+
             cur.execute("SELECT COUNT(*) as pending FROM webhook_deliveries WHERE status = 'pending'")
-            pending = cur.fetchone()["pending"]
-            
+            pending = _count_from_row(cur.fetchone(), "pending")
+
             # Incoming webhook stats
             cur.execute("SELECT COUNT(*) as total FROM webhook_incoming")
-            total_incoming = cur.fetchone()["total"]
-            
+            total_incoming = _count_from_row(cur.fetchone(), "total")
+
             cur.execute("SELECT COUNT(*) as verified FROM webhook_incoming WHERE verified = TRUE")
-            verified = cur.fetchone()["verified"]
-            
+            verified = _count_from_row(cur.fetchone(), "verified")
+
             cur.execute("SELECT COUNT(*) as unprocessed FROM webhook_incoming WHERE processed = FALSE")
-            unprocessed = cur.fetchone()["unprocessed"]
-            
+            unprocessed = _count_from_row(cur.fetchone(), "unprocessed")
+
             return {
                 "subscriptions": {
                     "total": total_subs,

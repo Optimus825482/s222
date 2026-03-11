@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import sys
 import time
-import uuid
+import uuid as uuid_module
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from openai import AsyncOpenAI
 
@@ -33,6 +34,7 @@ _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _THINK_OPEN_RE = re.compile(r"<think>.*", re.DOTALL | re.IGNORECASE)
 # Regex to extract <tool_call>...</tool_call> blocks from model text output
 _TOOL_CALL_RE = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL | re.IGNORECASE)
+logger = logging.getLogger(__name__)
 
 
 def _strip_thinking_tags(text: str) -> str:
@@ -73,10 +75,12 @@ def _parse_text_tool_calls(content: str) -> list[dict] | None:
             if fn_name:
                 if isinstance(fn_args, dict):
                     fn_args = json.dumps(fn_args, ensure_ascii=False)
-                parsed.append({
-                    "id": f"text_call_{uuid.uuid4().hex[:8]}",
-                    "function": {"name": fn_name, "arguments": fn_args},
-                })
+                parsed.append(
+                    {
+                        "id": f"text_call_{uuid_module.uuid4().hex[:8]}",
+                        "function": {"name": fn_name, "arguments": fn_args},
+                    }
+                )
         except (json.JSONDecodeError, AttributeError):
             continue
 
@@ -554,7 +558,10 @@ class BaseAgent(ABC):
                         idx = tc_delta.index
                         if idx not in tool_calls_acc:
                             # New tool call starting
-                            tc_id = tc_delta.id or f"stream_call_{uuid.uuid4().hex[:8]}"
+                            tc_id = (
+                                tc_delta.id
+                                or f"stream_call_{uuid_module.uuid4().hex[:8]}"
+                            )
                             tc_name = tc_delta.function.name if tc_delta.function and tc_delta.function.name else ""
                             tool_calls_acc[idx] = {
                                 "id": tc_id,
@@ -779,7 +786,7 @@ class BaseAgent(ABC):
         to_agent: str,
         content: str,
         message_type: str = "direct",
-        metadata: dict = None,
+        metadata: dict[str, Any] | None = None,
         requires_response: bool = False,
     ) -> str:
         """
@@ -810,7 +817,7 @@ class BaseAgent(ABC):
                 from_agent=self.role.value,
                 to_agent=to_agent,
                 task_description=content,
-                context=metadata,
+                context=metadata or {},
             )
         elif message_type == "task_delegation":
             return await send_task_delegation(
@@ -822,7 +829,7 @@ class BaseAgent(ABC):
             await broadcast_alert(
                 from_agent=self.role.value,
                 alert_content=content,
-                metadata=metadata,
+                metadata=metadata or {},
             )
             return "broadcast_sent"
         else:
@@ -855,25 +862,28 @@ class BaseAgent(ABC):
             messages.append(msg)
         
         return messages
-    
-    def share_knowledge(self, key: str, value: Any, tags: list[str] = None) -> None:
+
+    def share_knowledge(
+        self, key: str, value: Any, tags: list[str] | None = None
+    ) -> None:
         """
         Share knowledge with all agents.
-        
+
         Args:
             key: Knowledge key (e.g., "user_preference_theme")
             value: Knowledge value
             tags: Optional tags for categorization
         """
         from tools.inter_agent_comm import share_knowledge
+
         share_knowledge(
             key=key,
             value=value,
             source_agent=self.role.value,
-            tags=tags,
+            tags=tags or [],
         )
-    
-    def get_shared_knowledge(self, key: str = None) -> Any:
+
+    def get_shared_knowledge(self, key: str | None = None) -> Any:
         """
         Get shared knowledge.
         
@@ -973,7 +983,7 @@ class BaseAgent(ABC):
         from tools.agent_progress_tracker import get_tracker, AgentStatus
 
         tracker = get_tracker()
-        agent_id = f"{self.role.value}_{uuid.uuid4().hex[:8]}"
+        agent_id = f"{self.role.value}_{uuid_module.uuid4().hex[:8]}"
         tracker.start_task(agent_id, self.role.value, thread.id)
         tracker.update_step(
             agent_id,
@@ -1223,9 +1233,19 @@ class BaseAgent(ABC):
                     # Adaptive Tool Selector: record tool usage
                     if _ats:
                         try:
-                            _is_err = isinstance(tool_result, dict) and tool_result.get("error")
+                            error_message = (
+                                tool_result.get("error", "")
+                                if isinstance(tool_result, dict)
+                                else ""
+                            )
+                            _is_err = bool(error_message)
                             if _is_err:
-                                _ats.record_failure(self.role.value, fn_name, task_input, str(tool_result.get("error", ""))[:200])
+                                _ats.record_failure(
+                                    self.role.value,
+                                    fn_name,
+                                    task_input,
+                                    str(error_message)[:200],
+                                )
                             else:
                                 _ats.record_success(self.role.value, fn_name, task_input)
                         except Exception:
@@ -1318,14 +1338,16 @@ class BaseAgent(ABC):
                             (
                                 "agent_task_complete",
                                 task_input[:200],
-                                json.dumps({
-                                    "agent": self.role.value,
-                                    "model": self.cfg.get("id", ""),
-                                    "tokens": cumulative_tokens,
-                                    "cost_usd": round(cumulative_cost_usd, 6),
-                                    "steps": step + 1,
-                                }),
-                                thread.user_id if hasattr(thread, "user_id") else "system",
+                                json.dumps(
+                                    {
+                                        "agent": self.role.value,
+                                        "model": self.cfg.get("id", ""),
+                                        "tokens": cumulative_tokens,
+                                        "cost_usd": round(cumulative_cost_usd, 6),
+                                        "steps": step + 1,
+                                    }
+                                ),
+                                getattr(thread, "user_id", "system"),
                                 time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                             ),
                         )
@@ -1784,7 +1806,7 @@ class BaseAgent(ABC):
             # Download image to data/images/
             images_dir = os.path.join("data", "images")
             os.makedirs(images_dir, exist_ok=True)
-            filename = f"img_{uuid.uuid4().hex[:10]}.jpg"
+            filename = f"img_{uuid_module.uuid4().hex[:10]}.jpg"
             filepath = os.path.join(images_dir, filename)
             # Retry up to 3 times — Pollinations can be slow on first request
             last_error = None
@@ -1883,7 +1905,9 @@ class BaseAgent(ABC):
             analyzer = get_error_analyzer()
             hours = fn_args.get("hours", 24)
             severity = fn_args.get("severity")
-            patterns = analyzer.get_patterns(hours=hours, severity=severity)
+            patterns = analyzer.get_patterns()
+            if severity:
+                patterns = [p for p in patterns if p.get("severity") == severity]
             recommendations = analyzer.get_recommendations(hours=hours)
             if not patterns:
                 return f"No error patterns detected in the last {hours}h."
@@ -1949,6 +1973,12 @@ class BaseAgent(ABC):
                 source = file_path
             else:
                 source = file_bytes
+
+            if source is None:
+                return self._tool_error(
+                    "extract_text",
+                    "Either file_path or file_bytes is required",
+                )
 
             result = await extract_text(
                 source=source,
@@ -2060,6 +2090,7 @@ class BaseAgent(ABC):
             result = await yt_summarize(
                 url=fn_args["url"],
                 language=fn_args.get("language", "en"),
+                target_language=fn_args.get("target_language"),
                 use_whisper_fallback=fn_args.get("use_whisper_fallback", True),
                 whisper_model=fn_args.get("whisper_model", "base"),
                 max_transcript_chars=fn_args.get("max_transcript_chars", 10000),
@@ -2069,6 +2100,63 @@ class BaseAgent(ABC):
                 return format_video_summary(result)
             
             return format_video_summary(result)
+
+        # ── YouTube Transcript Tool ─────────────────────────────────────
+        if fn_name == "fetch_transcript":
+            from tools.youtube_summarizer import (
+                get_transcript,
+                get_video_info,
+                extract_video_id,
+            )
+
+            url = fn_args["url"]
+            language = fn_args.get("language", "en")
+            target_language = fn_args.get("target_language")
+            max_chars = fn_args.get("max_chars", 15000)
+
+            import asyncio as _aio
+
+            video_result, transcript_result = await _aio.gather(
+                get_video_info(url),
+                get_transcript(url, language=language, target_language=target_language),
+                return_exceptions=True,
+            )
+
+            if isinstance(video_result, BaseException):
+                video_result = {"success": False, "video_info": None}
+            if isinstance(transcript_result, BaseException):
+                return f"<error>Transcript fetch failed: {transcript_result}</error>"
+
+            if not isinstance(video_result, dict) or not isinstance(
+                transcript_result, dict
+            ):
+                return "<error>Unexpected transcript provider response</error>"
+
+            video_payload = video_result
+            transcript_payload = transcript_result
+
+            if not transcript_payload.get("success"):
+                return f"<error>{transcript_payload.get('error', 'Transcript unavailable')}</error>"
+
+            info = video_payload.get("video_info", {}) or {}
+            t_data = transcript_payload.get("transcript", {}) or {}
+            full_text = t_data.get("full_text", "") if isinstance(t_data, dict) else ""
+            lang = transcript_payload.get("language", language)
+            source = transcript_payload.get("source", "unknown")
+
+            # Truncate if needed
+            if len(full_text) > max_chars:
+                full_text = full_text[:max_chars] + "\n\n[... truncated]"
+
+            parts = [
+                "<youtube_transcript>",
+                f'  <video title="{info.get("title", "")}" channel="{info.get("uploader", "")}" />',
+                f'  <transcript language="{lang}" source="{source}" words="{t_data.get("word_count", 0)}">',
+                f"    {full_text}",
+                "  </transcript>",
+                "</youtube_transcript>",
+            ]
+            return "\n".join(parts)
 
         # ── Email Sender Tools ───────────────────────────────────────────
         if fn_name == "email_send":

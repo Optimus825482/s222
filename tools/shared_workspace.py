@@ -6,8 +6,11 @@ Faz 10.6 — Çoklu kullanıcı için ortak çalışma alanı (Qdrant → PG mig
 import hashlib
 import json
 import logging
+from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
+
+from tools.pg_connection import DBRow
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,12 @@ def _conn():
 def _release(conn):
     from tools.pg_connection import release_conn
     release_conn(conn)
+
+
+def _as_row(row: object) -> DBRow | None:
+    if isinstance(row, Mapping):
+        return row
+    return None
 
 
 def _ensure_tables():
@@ -75,7 +84,13 @@ class SharedWorkspace:
 
     # ── Workspace CRUD ───────────────────────────────────────────
 
-    def create_workspace(self, workspace_id: str, owner_id: str, name: str, metadata: Dict = None) -> Dict:
+    def create_workspace(
+        self,
+        workspace_id: str,
+        owner_id: str,
+        name: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         conn = _conn()
         try:
             with conn.cursor() as cur:
@@ -86,7 +101,8 @@ class SharedWorkspace:
                        RETURNING workspace_id, owner_id, name, members, metadata, created_at""",
                     (workspace_id, owner_id, name, [owner_id], json.dumps(metadata or {})),
                 )
-                row = cur.fetchone()
+                fetched = cur.fetchone()
+                row = _as_row(fetched)
                 conn.commit()
                 if row:
                     return {
@@ -104,7 +120,7 @@ class SharedWorkspace:
         finally:
             _release(conn)
 
-    def get_workspace(self, workspace_id: str) -> Optional[Dict]:
+    def get_workspace(self, workspace_id: str) -> dict[str, Any] | None:
         conn = _conn()
         try:
             with conn.cursor() as cur:
@@ -112,7 +128,8 @@ class SharedWorkspace:
                     "SELECT workspace_id, owner_id, name, members, metadata, created_at FROM shared_workspaces WHERE workspace_id = %s",
                     (workspace_id,),
                 )
-                row = cur.fetchone()
+                fetched = cur.fetchone()
+                row = _as_row(fetched)
                 if not row:
                     return None
                 return {
@@ -126,7 +143,7 @@ class SharedWorkspace:
         finally:
             _release(conn)
 
-    def list_workspaces(self, user_id: str) -> List[Dict]:
+    def list_workspaces(self, user_id: str) -> list[dict[str, Any]]:
         conn = _conn()
         try:
             with conn.cursor() as cur:
@@ -143,7 +160,8 @@ class SharedWorkspace:
                         "metadata": r["metadata"],
                         "created_at": str(r["created_at"]),
                     }
-                    for r in cur.fetchall()
+                    for fetched in cur.fetchall()
+                    if (r := _as_row(fetched)) is not None
                 ]
         finally:
             _release(conn)
@@ -184,8 +202,15 @@ class SharedWorkspace:
 
     # ── Item CRUD ────────────────────────────────────────────────
 
-    def add_item(self, workspace_id: str, item_type: str, content: str,
-                 vector=None, author_id: str = "", metadata: Dict = None) -> str:
+    def add_item(
+        self,
+        workspace_id: str,
+        item_type: str,
+        content: str,
+        vector=None,
+        author_id: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
         item_id = self._gen_id(workspace_id, item_type, content)
         conn = _conn()
         try:
@@ -203,8 +228,13 @@ class SharedWorkspace:
         finally:
             _release(conn)
 
-    def get_items(self, workspace_id: str, item_type: Optional[str] = None,
-                  limit: int = 50, offset: int = 0) -> List[Dict]:
+    def get_items(
+        self,
+        workspace_id: str,
+        item_type: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
         conn = _conn()
         try:
             with conn.cursor() as cur:
@@ -234,7 +264,8 @@ class SharedWorkspace:
                         "metadata": r["metadata"],
                         "created_at": str(r["created_at"]),
                     }
-                    for r in cur.fetchall()
+                    for fetched in cur.fetchall()
+                    if (r := _as_row(fetched)) is not None
                 ]
         finally:
             _release(conn)
@@ -252,7 +283,7 @@ class SharedWorkspace:
         finally:
             _release(conn)
 
-    def get_workspace_stats(self, workspace_id: str) -> Dict:
+    def get_workspace_stats(self, workspace_id: str) -> dict[str, Any]:
         conn = _conn()
         try:
             with conn.cursor() as cur:
@@ -263,21 +294,29 @@ class SharedWorkspace:
                        FROM shared_workspace_items WHERE workspace_id = %s""",
                     (workspace_id,),
                 )
-                summary = cur.fetchone()
+                summary = _as_row(cur.fetchone())
                 cur.execute(
                     """SELECT item_type, COUNT(*) AS cnt
                        FROM shared_workspace_items WHERE workspace_id = %s
                        GROUP BY item_type""",
                     (workspace_id,),
                 )
-                item_types = {r["item_type"]: r["cnt"] for r in cur.fetchall()}
+                item_types = {
+                    r["item_type"]: r["cnt"]
+                    for fetched in cur.fetchall()
+                    if (r := _as_row(fetched)) is not None
+                }
                 cur.execute(
                     """SELECT author_id, COUNT(*) AS cnt
                        FROM shared_workspace_items WHERE workspace_id = %s
                        GROUP BY author_id""",
                     (workspace_id,),
                 )
-                contributors = {r["author_id"]: r["cnt"] for r in cur.fetchall()}
+                contributors = {
+                    r["author_id"]: r["cnt"]
+                    for fetched in cur.fetchall()
+                    if (r := _as_row(fetched)) is not None
+                }
                 return {
                     "workspace_id": workspace_id,
                     "total_items": summary["total"] if summary else 0,
@@ -312,7 +351,7 @@ class SharedWorkspace:
 
 # ── Global singleton ─────────────────────────────────────────────
 
-_workspace: Optional[SharedWorkspace] = None
+_workspace: SharedWorkspace | None = None
 
 
 def get_workspace() -> SharedWorkspace:

@@ -16,14 +16,22 @@ import json
 import logging
 import re
 import time
+from collections.abc import Mapping
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from tools.pg_connection import get_conn, release_conn
+from tools.pg_connection import DBRow, get_conn, release_conn
 
 logger = logging.getLogger(__name__)
+
+
+def _as_row(row: object) -> DBRow | None:
+    if isinstance(row, Mapping):
+        return row
+    return None
+
 
 _SLOW_WORKFLOW_MS = 10000.0
 _LOW_SUCCESS_RATE_PCT = 60.0
@@ -119,10 +127,17 @@ class WorkflowPerformanceAnalyzer:
             release_conn(conn)
         if not rows:
             return {"name": name or workflow_id, "executions": [], "stats": {}}
-        stats = self._calculate_stats(rows)
-        return {"name": name or workflow_id, "executions": [dict(r) for r in rows], "stats": stats}
+        normalized_rows = [
+            dict(row) for fetched in rows if (row := _as_row(fetched)) is not None
+        ]
+        stats = self._calculate_stats(normalized_rows)
+        return {
+            "name": name or workflow_id,
+            "executions": [dict(r) for r in normalized_rows],
+            "stats": stats,
+        }
 
-    def _calculate_stats(self, rows: list) -> dict[str, Any]:
+    def _calculate_stats(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         durations = [float(r["duration_ms"]) for r in rows if r["duration_ms"]]
         errors = [r for r in rows if r["error_count"] and int(r["error_count"]) > 0]
         return {
@@ -150,9 +165,16 @@ class WorkflowPerformanceAnalyzer:
                 rows = cur.fetchall()
         finally:
             release_conn(conn)
-        return [{"name": r["workflow_name"], "template": r["template_name"],
-                 "avg_ms": round(float(r["avg_ms"]), 0),
-                 "count": r["execution_count"]} for r in rows]
+        return [
+            {
+                "name": r["workflow_name"],
+                "template": r["template_name"],
+                "avg_ms": round(float(r["avg_ms"]), 0),
+                "count": r["execution_count"],
+            }
+            for fetched in rows
+            if (r := _as_row(fetched)) is not None
+        ]
 
     def get_error_patterns(self, limit: int = 20) -> list[dict[str, Any]]:
         conn = get_conn()
@@ -169,10 +191,18 @@ class WorkflowPerformanceAnalyzer:
                 rows = cur.fetchall()
         finally:
             release_conn(conn)
-        return [{"name": r["workflow_name"], "template": r["template_name"],
-                 "total_errors": r["total_errors"],
-                 "error_rate_pct": round((r["total_errors"] / r["execution_count"]) * 100, 1)}
-                for r in rows]
+        return [
+            {
+                "name": r["workflow_name"],
+                "template": r["template_name"],
+                "total_errors": r["total_errors"],
+                "error_rate_pct": round(
+                    (r["total_errors"] / r["execution_count"]) * 100, 1
+                ),
+            }
+            for fetched in rows
+            if (r := _as_row(fetched)) is not None
+        ]
 
 
 
@@ -182,8 +212,9 @@ class PatternBasedOptimizer:
     def __init__(self):
         self.analyzer = WorkflowPerformanceAnalyzer()
 
-    def analyze_workflow(self, workflow_id: str, workflow_name: str,
-                         steps: list[dict]) -> list[dict[str, Any]]:
+    def analyze_workflow(
+        self, workflow_id: str, workflow_name: str, steps: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         suggestions = []
         stats = self.analyzer.get_workflow_stats(workflow_id)
         if stats["stats"].get("avg_duration_ms", 0) > _SLOW_WORKFLOW_MS:
@@ -204,30 +235,52 @@ class PatternBasedOptimizer:
             })
         tool_calls = [s for s in steps if s.get("step_type") == "tool_call"]
         if len(tool_calls) >= 3:
-            suggestions.append({
-                "type": "redundant-tools",
-                "severity": "medium",
-                "current": f"{len(tool_calls)} sequential tool calls",
-                "suggestion": "Combine related tool calls into a custom tool or use spawn_subagent",
-                "affected_steps": [t.get("step_id") for t in tool_calls[:3]],
-            })
+            suggestions.append(
+                {
+                    "type": "redundant-tools",
+                    "severity": "medium",
+                    "current": f"{len(tool_calls)} sequential tool calls",
+                    "suggestion": "Combine related tool calls into a custom tool or use spawn_subagent",
+                    "affected_steps": [
+                        str(t.get("step_id"))
+                        for t in tool_calls[:3]
+                        if t.get("step_id") is not None
+                    ],
+                }
+            )
         sequential_count = sum(1 for s in steps if s.get("step_type") in ("tool_call", "agent_call"))
         if sequential_count >= 4:
-            suggestions.append({
-                "type": "parallel-opportunity",
-                "severity": "medium",
-                "current": f"{sequential_count} sequential steps",
-                "suggestion": "Review if steps are independent and can run in parallel",
-                "affected_steps": [s.get("step_id") for s in steps[:4]],
-            })
+            suggestions.append(
+                {
+                    "type": "parallel-opportunity",
+                    "severity": "medium",
+                    "current": f"{sequential_count} sequential steps",
+                    "suggestion": "Review if steps are independent and can run in parallel",
+                    "affected_steps": [
+                        str(s.get("step_id"))
+                        for s in steps[:4]
+                        if s.get("step_id") is not None
+                    ],
+                }
+            )
         return suggestions
 
-    def _find_bottleneck_steps(self, steps: list) -> list[str]:
+    def _find_bottleneck_steps(self, steps: list[dict[str, Any]]) -> list[str]:
         bottleneck_types = ["agent_call", "condition", "parallel"]
-        return [s.get("step_id") for s in steps if s.get("step_type") in bottleneck_types]
+        return [
+            str(s.get("step_id"))
+            for s in steps
+            if s.get("step_type") in bottleneck_types and s.get("step_id") is not None
+        ]
 
-    def _find_error_prone_steps(self, steps: list, executions: list) -> list[str]:
-        return [s.get("step_id") for s in steps if s.get("step_type") == "agent_call"]
+    def _find_error_prone_steps(
+        self, steps: list[dict[str, Any]], executions: list[dict[str, Any]]
+    ) -> list[str]:
+        return [
+            str(s.get("step_id"))
+            for s in steps
+            if s.get("step_type") == "agent_call" and s.get("step_id") is not None
+        ]
 
     def find_global_patterns(self, limit: int = 20) -> list[dict[str, Any]]:
         patterns = []
@@ -290,7 +343,7 @@ class SuggestionEngine:
                     workflow_id=wf.workflow_id, limit=50
                 )
                 template_suggestions = self.pattern_optimizer.analyze_workflow(
-                    wf.workflow_id, wf.name, [s for s in wf.steps]
+                    wf.workflow_id, wf.name, [vars(s) for s in wf.steps]
                 )
                 for s in template_suggestions:
                     suggestions.append({
@@ -317,7 +370,9 @@ class SuggestionEngine:
         }
         return impacts.get(suggestion_type, "Unknown improvement")
 
-    def auto_apply_suggestions(self, suggestions: list[dict]) -> dict[str, Any]:
+    def auto_apply_suggestions(
+        self, suggestions: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         applied = []
         skipped = []
         for s in suggestions:
@@ -352,29 +407,34 @@ class WorkflowOptimizer:
         conn = get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) FROM workflow_executions")
-                row = cur.fetchone()
-                return row["count"] if row else 0
+                cur.execute("SELECT COUNT(*) AS count FROM workflow_executions")
+                row = _as_row(cur.fetchone())
+                return int(row["count"]) if row else 0
         finally:
             release_conn(conn)
 
     def get_workflow_stats(self, workflow_id: str) -> dict[str, Any]:
         return self.analyzer.get_workflow_stats(workflow_id)
 
-    def analyze_workflow(self, workflow_id: str, workflow_name: str,
-                         steps: list[dict]) -> list[dict[str, Any]]:
+    def analyze_workflow(
+        self, workflow_id: str, workflow_name: str, steps: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         return self.pattern_optimizer.analyze_workflow(workflow_id, workflow_name, steps)
 
     def generate_suggestions(self, template_name: str | None = None) -> list[dict[str, Any]]:
         return self.suggestion_engine.generate_suggestions(template_name)
 
-    def optimize_workflow(self, workflow_id: str, steps: list[dict],
-                          auto_apply: bool = False) -> dict[str, Any]:
-        suggestions = self.analyzer.analyze_workflow(workflow_id, "optimized", steps)
-        optimized = {
+    def optimize_workflow(
+        self, workflow_id: str, steps: list[dict[str, Any]], auto_apply: bool = False
+    ) -> dict[str, Any]:
+        suggestions = self.pattern_optimizer.analyze_workflow(
+            workflow_id, "optimized", steps
+        )
+        optimized_steps = list(steps)
+        optimized: dict[str, Any] = {
             "original_steps": steps,
             "suggestions": suggestions,
-            "optimized_steps": steps,
+            "optimized_steps": optimized_steps,
             "applied": [],
             "recommendations": [],
         }
@@ -382,12 +442,15 @@ class WorkflowOptimizer:
             for s in suggestions:
                 if s.get("severity") != "high":
                     optimized["applied"].append(s["type"])
-                    optimized["steps"] = self._apply_optimization(
-                        optimized["steps"], s["type"]
+                    optimized_steps = self._apply_optimization(
+                        optimized_steps, s["type"]
                     )
+            optimized["optimized_steps"] = optimized_steps
         return optimized
 
-    def _apply_optimization(self, steps: list[dict], opt_type: str) -> list[dict]:
+    def _apply_optimization(
+        self, steps: list[dict[str, Any]], opt_type: str
+    ) -> list[dict[str, Any]]:
         if opt_type == "parallel-opportunity":
             if len(steps) >= 2:
                 parallel_step = {

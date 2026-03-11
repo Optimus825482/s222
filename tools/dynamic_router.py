@@ -9,9 +9,16 @@ import logging
 import math
 import random
 import time
+from collections.abc import Mapping
 from typing import Any
 
 logger = logging.getLogger("dynamic_router")
+
+
+def _as_row(row: object) -> Mapping[str, Any] | None:
+    if isinstance(row, Mapping):
+        return row
+    return None
 
 
 class DynamicRouter:
@@ -88,7 +95,7 @@ class DynamicRouter:
             return random.choice(list(weights.keys()))
 
         # Exploitation: highest weight
-        return max(weights, key=weights.get)
+        return max(weights.items(), key=lambda item: item[1])[0]
 
     def recalculate_weights(self, task_type: str | None = None) -> None:
         """
@@ -106,7 +113,11 @@ class DynamicRouter:
                     task_types = [task_type]
                 else:
                     cur.execute("SELECT DISTINCT task_type FROM performance_metrics")
-                    task_types = [r["task_type"] for r in cur.fetchall()]
+                    task_types = [
+                        row["task_type"]
+                        for fetched in cur.fetchall()
+                        if (row := _as_row(fetched)) is not None
+                    ]
 
                 for tt in task_types:
                     cur.execute("""
@@ -126,7 +137,10 @@ class DynamicRouter:
                         continue
 
                     scores: dict[str, float] = {}
-                    for row in rows:
+                    for fetched in rows:
+                        row = _as_row(fetched)
+                        if row is None:
+                            continue
                         total = int(row["total"] or 0)
                         success_rate = int(row["success_count"] or 0) / max(total, 1)
                         norm_avg_score = float(row["avg_score"] or 0) / 5.0

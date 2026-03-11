@@ -63,14 +63,20 @@ class WSLiveMonitor:
             task.cancel()
         self._pending_tasks.clear()
 
-    def _track_task(self, coroutine: Union[asyncio.Future, Coroutine[Any, Any, Any]]) -> None:
+    def _track_task(
+        self, coroutine: Union[asyncio.Future[Any], Coroutine[Any, Any, Any]]
+    ) -> None:
         if self._closed:
             # Must close unawaited coroutine to avoid ResourceWarning
             if asyncio.iscoroutine(coroutine):
                 coroutine.close()
             return
 
-        task = asyncio.create_task(coroutine, name="ws-send")
+        task = asyncio.ensure_future(coroutine)
+        try:
+            task.set_name("ws-send")
+        except AttributeError:
+            pass
         self._pending_tasks.add(task)
 
         def _on_done(done_task: asyncio.Task) -> None:
@@ -149,7 +155,7 @@ try:
     from routes.messaging import _generate_post_task_meeting
 except ImportError:
 
-    def _generate_post_task_meeting(**kwargs):
+    def _generate_post_task_meeting(*args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
 

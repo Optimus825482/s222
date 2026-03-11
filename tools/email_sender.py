@@ -87,7 +87,7 @@ class EmailTemplate:
         self,
         variables: dict[str, Any],
         fallback_text: bool = True,
-    ) -> tuple[str, Optional[str]]:
+    ) -> tuple[str, Optional[str], Optional[str]]:
         """
         Render template with variable substitution.
         

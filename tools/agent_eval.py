@@ -237,7 +237,9 @@ def get_best_agent_for_task(task_type: str) -> str | None:
             LIMIT 1
         """, (task_type,))
         row = cur.fetchone()
-        return row["agent_role"] if row else None
+        row_data = dict(row or {})
+        agent_role = row_data.get("agent_role")
+        return str(agent_role) if agent_role else None
     except Exception as e:
         logger.warning(f"Failed to get best agent for task: {e}")
         return None
@@ -283,17 +285,18 @@ def get_performance_baseline(agent_role: str | None = None) -> dict[str, Any]:
                 FROM evaluations
             """)
         row = cur.fetchone()
-        if not row or not row["total_tasks"]:
+        row_data = dict(row or {})
+        if not row_data or not row_data.get("total_tasks"):
             return empty
-        total = int(row["total_tasks"])
-        success = int(row["success_count"])
+        total = int(row_data.get("total_tasks") or 0)
+        success = int(row_data.get("success_count") or 0)
         return {
             "agent_role": agent_role,
             "total_tasks": total,
             "success_count": success,
             "task_success_rate_pct": round(success / total * 100, 1) if total else 0.0,
-            "avg_score": float(row["avg_score"] or 0),
-            "avg_latency": float(row["avg_latency"] or 0),
+            "avg_score": float(row_data.get("avg_score") or 0),
+            "avg_latency": float(row_data.get("avg_latency") or 0),
         }
     except Exception as e:
         logger.warning(f"Failed to get performance baseline: {e}")

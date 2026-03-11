@@ -260,7 +260,14 @@ async def get_system_stats(user: dict = Depends(get_current_user)):
         memory_mb = 0.0
         try:
             import resource
-            memory_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # KB to MB
+
+            getrusage = getattr(resource, "getrusage", None)
+            rusage_self = getattr(resource, "RUSAGE_SELF", None)
+            if callable(getrusage) and rusage_self is not None:
+                usage = getrusage(rusage_self)
+                memory_mb = float(getattr(usage, "ru_maxrss", 0.0)) / 1024  # KB to MB
+            else:
+                raise RuntimeError("resource.getrusage unavailable")
         except Exception:
             try:
                 # Windows fallback: read from /proc or just estimate
@@ -297,7 +304,12 @@ async def get_system_stats(user: dict = Depends(get_current_user)):
         active_agents = 0
         try:
             from agents import orchestrator
-            agents_cfg = orchestrator._load_agents_config() if hasattr(orchestrator, '_load_agents_config') else {}
+
+            load_agents_config = getattr(orchestrator, "_load_agents_config", None)
+            raw_agents_cfg = (
+                load_agents_config() if callable(load_agents_config) else {}
+            )
+            agents_cfg = raw_agents_cfg if isinstance(raw_agents_cfg, dict) else {}
             active_agents = len(agents_cfg) if agents_cfg else 5
         except Exception:
             active_agents = 5

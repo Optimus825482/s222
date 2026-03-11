@@ -76,20 +76,6 @@ def _get_embedding(text: str) -> list[float] | None:
         return asyncio.run(_get_embedding_async(text))
 
 
-async def recall_memory(
-    query: str,
-    category: str | None = None,
-    max_results: int = 5,
-) -> list[dict[str, Any]]:
-    """Recall memories across all layers — pgvector semantic search with keyword fallback."""
-    embedding = await _get_embedding_async(query)
-    if embedding:
-        results = await _pgvector_recall(embedding, category, max_results)
-        if results:
-            return results
-    return _keyword_recall(query, category, max_results)
-
-
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
     """Python fallback cosine similarity (prefer pgvector in queries)."""
     dot = sum(x * y for x, y in zip(a, b))
@@ -532,6 +518,15 @@ async def correlate_memories_optimized(
         release_conn(conn)
 
 
+async def correlate_memories(
+    query: str,
+    max_results: int = 10,
+    time_window_hours: int | None = None,
+) -> dict[str, Any]:
+    """Backward-compatible wrapper for optimized memory correlation."""
+    return await correlate_memories_optimized(query, max_results, time_window_hours)
+
+
 def get_memory_timeline(
     hours: int = 24,
     group_by: str = "hour",
@@ -641,6 +636,14 @@ async def find_related_memories_optimized(
             return [_row_to_dict(_as_row_dict(r)) for r in rows]
     finally:
         release_conn(conn)
+
+
+async def find_related_memories(
+    memory_id: int,
+    max_results: int = 5,
+) -> list[dict[str, Any]]:
+    """Backward-compatible wrapper for optimized related-memory lookup."""
+    return await find_related_memories_optimized(memory_id, max_results)
 
 
 # ── Internal Search ──────────────────────────────────────────────

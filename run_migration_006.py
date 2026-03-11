@@ -50,7 +50,10 @@ def run():
                 WHERE table_schema = 'public'
                 ORDER BY table_name
             """)
-            tables = [r["table_name"] for r in cur.fetchall()]
+            tables = [
+                str(dict(row or {}).get("table_name") or "") for row in cur.fetchall()
+            ]
+            tables = [table for table in tables if table]
             print(f"\nMevcut tablolar ({len(tables)}):")
             for t in tables:
                 print(f"  ✓ {t}")

@@ -352,13 +352,17 @@ class PipelineEngine:
         # Faz 16: Record performance metric for self-improvement loop
         try:
             from tools.performance_collector import get_performance_collector
+
             get_performance_collector().record(
                 agent_role=subtask.assigned_agent.value,
-                task_type=task_type,
-                score=eval_score,
-                latency_ms=subtask.latency_ms,
-                tokens_used=subtask.token_usage,
-                skill_ids_used=subtask.skills or [],
+                response_time_ms=subtask.latency_ms,
+                total_tokens=subtask.token_usage,
+                success=True,
+                metadata={
+                    "task_type": task_type,
+                    "score": eval_score,
+                    "skill_ids_used": subtask.skills or [],
+                },
             )
         except Exception:
             pass  # Never break pipeline for metrics collection

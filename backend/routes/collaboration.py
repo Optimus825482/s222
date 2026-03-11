@@ -362,10 +362,10 @@ async def api_add_workspace_item(
 @router.get("/api/workspaces/{workspace_id}/items")
 async def api_get_workspace_items(
     workspace_id: str,
-    item_type: str = None,
+    item_type: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """Workspace item'larını al"""
     try:
@@ -969,7 +969,7 @@ class DocUpdateRequest(BaseModel):
     position: int
     text: str = ""
     length: int = 0
-    metadata: dict = None
+    metadata: dict[str, object] | None = None
 
 
 class DocCollaboratorRequest(BaseModel):

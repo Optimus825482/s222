@@ -105,6 +105,17 @@ def _normalize_teaching(t: dict) -> dict:
     }
 
 
+def _row_dict(row: Any) -> dict[str, Any]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
 # ── Request Models ───────────────────────────────────────────────
 
 class TeachingCreate(BaseModel):
@@ -218,8 +229,8 @@ async def learning_hub_dashboard(user: dict = Depends(get_current_user)):
                     "SELECT COUNT(*) as total FROM user_behavior WHERE user_id = %s",
                     (user["user_id"],),
                 )
-                row = cur.fetchone()
-                behavior_stats["total_events"] = row["total"] if row else 0
+                row = dict(cur.fetchone() or {})
+                behavior_stats["total_events"] = row.get("total", 0)
 
                 # By action breakdown
                 cur.execute(
@@ -229,7 +240,8 @@ async def learning_hub_dashboard(user: dict = Depends(get_current_user)):
                     (user["user_id"],),
                 )
                 behavior_stats["by_action"] = [
-                    {"action": r["action"], "count": r["cnt"]} for r in cur.fetchall()
+                    {"action": r.get("action"), "count": r.get("cnt")}
+                    for r in (dict(row) for row in cur.fetchall())
                 ]
 
                 # Recent 10 actions
@@ -239,15 +251,22 @@ async def learning_hub_dashboard(user: dict = Depends(get_current_user)):
                        ORDER BY timestamp DESC LIMIT 10""",
                     (user["user_id"],),
                 )
-                behavior_stats["recent_actions"] = [
-                    {
-                        "action": r["action"],
-                        "context": (r["context"] or "")[:100],
-                        "metadata": json.loads(r["metadata"]) if r["metadata"] and isinstance(r["metadata"], str) else (r["metadata"] or {}),
-                        "timestamp": r["timestamp"] if isinstance(r["timestamp"], str) else str(r["timestamp"]),
-                    }
-                    for r in cur.fetchall()
-                ]
+                behavior_stats["recent_actions"] = []
+                for raw_row in cur.fetchall():
+                    r = dict(raw_row)
+                    raw_metadata = r.get("metadata")
+                    behavior_stats["recent_actions"].append(
+                        {
+                            "action": r.get("action"),
+                            "context": (r.get("context") or "")[:100],
+                            "metadata": json.loads(raw_metadata)
+                            if raw_metadata and isinstance(raw_metadata, str)
+                            else (raw_metadata or {}),
+                            "timestamp": r.get("timestamp")
+                            if isinstance(r.get("timestamp"), str)
+                            else str(r.get("timestamp")),
+                        }
+                    )
 
                 # Insights: pipeline preference
                 cur.execute(
@@ -257,16 +276,19 @@ async def learning_hub_dashboard(user: dict = Depends(get_current_user)):
                     (user["user_id"],),
                 )
                 pipeline_counts: dict[str, int] = {}
-                for r in cur.fetchall():
+                for raw_row in cur.fetchall():
                     try:
-                        raw_meta = r["meta_text"]
+                        r = _row_dict(raw_row)
+                        raw_meta = r.get("meta_text")
                         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
                         p = meta.get("pipeline", "unknown")
                         pipeline_counts[p] = pipeline_counts.get(p, 0) + 1
                     except Exception:
                         pass
                 if pipeline_counts:
-                    fav = max(pipeline_counts, key=pipeline_counts.get)  # type: ignore[arg-type]
+                    fav = max(
+                        pipeline_counts, key=lambda pipeline: pipeline_counts[pipeline]
+                    )
                     behavior_stats["insights"].append({
                         "type": "pipeline_preference",
                         "label": f"En çok kullanılan pipeline: {fav}",
@@ -283,9 +305,10 @@ async def learning_hub_dashboard(user: dict = Depends(get_current_user)):
                 token_vals: list[int] = []
                 cost_vals: list[float] = []
                 agent_counts: dict[str, int] = {}
-                for r in cur.fetchall():
+                for raw_row in cur.fetchall():
                     try:
-                        raw_meta = r["meta_text"]
+                        r = _row_dict(raw_row)
+                        raw_meta = r.get("meta_text")
                         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
                         if meta.get("tokens"):
                             token_vals.append(int(meta["tokens"]))
@@ -323,9 +346,12 @@ async def learning_hub_dashboard(user: dict = Depends(get_current_user)):
                        GROUP BY hr ORDER BY hr""",
                     (user["user_id"],),
                 )
-                hourly = {int(r["hr"]): r["cnt"] for r in cur.fetchall()}
+                hourly = {
+                    int(r.get("hr", 0)): r.get("cnt", 0)
+                    for r in (_row_dict(row) for row in cur.fetchall())
+                }
                 if hourly:
-                    peak_hr = max(hourly, key=hourly.get)  # type: ignore[arg-type]
+                    peak_hr = max(hourly, key=lambda hour: hourly[hour])
                     behavior_stats["insights"].append({
                         "type": "peak_hours",
                         "label": f"En aktif saat: {peak_hr:02d}:00",
@@ -597,12 +623,12 @@ async def resolve_error_pattern(pattern_id: str, user: dict = Depends(get_curren
     if not ea:
         raise HTTPException(status_code=503, detail="Error analyzer not available")
     try:
-        if hasattr(ea, "resolve_pattern"):
-            result = ea.resolve_pattern(pattern_id)
-        elif hasattr(ea, "update_pattern_status"):
-            result = ea.update_pattern_status(pattern_id, "resolved")
-        else:
+        resolve_pattern = getattr(ea, "resolve_pattern", None)
+        if not callable(resolve_pattern):
             raise HTTPException(status_code=501, detail="Resolve not supported")
+        result = resolve_pattern(pattern_id)
+        if not result or (isinstance(result, dict) and result.get("error")):
+            raise HTTPException(status_code=404, detail="Pattern not found")
         return {"resolved": True, "pattern_id": pattern_id, "result": result}
     except HTTPException:
         raise
@@ -737,21 +763,30 @@ async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_u
 
                 # Action flow: what users do in sequence
                 cur.execute(
-                    """SELECT action, context, metadata::text, timestamp
+                    """SELECT action, context, metadata::text as meta_text, timestamp
                        FROM user_behavior WHERE user_id = %s AND timestamp >= %s
                        ORDER BY timestamp DESC LIMIT 200""",
                     (uid, cutoff),
                 )
                 rows = cur.fetchall()
-                result["action_flow"] = [
-                    {
-                        "action": r["action"],
-                        "context": (r["context"] or "")[:120],
-                        "metadata": json.loads(r["metadata"]) if r["metadata"] and isinstance(r["metadata"], str) else (r["metadata"] or {}),
-                        "timestamp": r["timestamp"] if isinstance(r["timestamp"], str) else str(r["timestamp"]),
-                    }
-                    for r in rows
-                ]
+                action_flow: list[dict[str, Any]] = []
+                for raw_row in rows:
+                    row = _row_dict(raw_row)
+                    raw_metadata = row.get("meta_text")
+                    timestamp = row.get("timestamp")
+                    action_flow.append(
+                        {
+                            "action": row.get("action"),
+                            "context": (row.get("context") or "")[:120],
+                            "metadata": json.loads(raw_metadata)
+                            if raw_metadata and isinstance(raw_metadata, str)
+                            else (raw_metadata or {}),
+                            "timestamp": timestamp
+                            if isinstance(timestamp, str)
+                            else str(timestamp),
+                        }
+                    )
+                result["action_flow"] = action_flow
 
                 # Pipeline effectiveness: completion rate + avg tokens per pipeline
                 cur.execute(
@@ -765,7 +800,8 @@ async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_u
                 pipe_tokens: dict[str, list[int]] = {}
                 pipe_latency: dict[str, list[float]] = {}
                 for r in cur.fetchall():
-                    raw_meta = r["meta_text"]
+                    row = _row_dict(r)
+                    raw_meta = row.get("meta_text")
                     try:
                         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
                         p = meta.get("pipeline", "unknown")
@@ -803,7 +839,8 @@ async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_u
                 )
                 agent_data: dict[str, dict[str, Any]] = {}
                 for r in cur.fetchall():
-                    raw_meta = r["meta_text"]
+                    row = _row_dict(r)
+                    raw_meta = row.get("meta_text")
                     try:
                         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
                         ag = meta.get("agent", "unknown")
@@ -820,13 +857,21 @@ async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_u
                         pass
 
                 for ag, d in agent_data.items():
-                    result["agent_performance"].append({
-                        "agent": ag,
-                        "tasks": d["tasks"],
-                        "avg_tokens": sum(d["tokens"]) // max(len(d["tokens"]), 1) if d["tokens"] else 0,
-                        "total_cost": round(sum(d["costs"]), 6),
-                        "avg_steps": round(sum(d["steps"]) / max(len(d["steps"]), 1), 1) if d["steps"] else 0,
-                    })
+                    tasks = int(d.get("tasks", 0))
+                    tokens = d.get("tokens", [])
+                    costs = d.get("costs", [])
+                    steps = d.get("steps", [])
+                    result["agent_performance"].append(
+                        {
+                            "agent": ag,
+                            "tasks": tasks,
+                            "avg_tokens": sum(tokens) // len(tokens) if tokens else 0,
+                            "total_cost": round(sum(costs), 6),
+                            "avg_steps": round(sum(steps) / len(steps), 1)
+                            if steps
+                            else 0,
+                        }
+                    )
 
                 # Time patterns: daily activity
                 cur.execute(
@@ -836,7 +881,8 @@ async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_u
                     (uid, cutoff),
                 )
                 result["time_patterns"] = [
-                    {"date": str(r["day"]), "count": r["cnt"]} for r in cur.fetchall()
+                    {"date": str(row.get("day", "")), "count": row.get("cnt", 0)}
+                    for row in (_row_dict(r) for r in cur.fetchall())
                 ]
 
                 # Learning signals: patterns that agents should learn from
@@ -847,14 +893,16 @@ async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_u
                        AND timestamp >= %s""",
                     (uid, cutoff),
                 )
-                pipe_changes = (cur.fetchone() or {}).get("cnt", 0) or 0
+                pipe_change_row = _row_dict(cur.fetchone())
+                pipe_changes = int(pipe_change_row.get("cnt", 0) or 0)
                 cur.execute(
                     """SELECT COUNT(*) as cnt FROM user_behavior
                        WHERE user_id = %s AND action = 'task_submit'
                        AND timestamp >= %s""",
                     (uid, cutoff),
                 )
-                task_submits = (cur.fetchone() or {}).get("cnt", 0) or 0
+                task_submit_row = _row_dict(cur.fetchone())
+                task_submits = int(task_submit_row.get("cnt", 0) or 0)
 
                 if task_submits > 0 and pipe_changes > task_submits * 0.3:
                     result["learning_signals"].append({
@@ -871,7 +919,8 @@ async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_u
                        AND timestamp >= %s""",
                     (uid, cutoff),
                 )
-                downloads = (cur.fetchone() or {}).get("cnt", 0) or 0
+                download_row = _row_dict(cur.fetchone())
+                downloads = int(download_row.get("cnt", 0) or 0)
                 if downloads > 3:
                     result["learning_signals"].append({
                         "signal": "frequent_report_downloads",
@@ -887,7 +936,8 @@ async def behavior_insights(hours: int = 168, user: dict = Depends(get_current_u
                        AND timestamp >= %s""",
                     (uid, cutoff),
                 )
-                deletions = (cur.fetchone() or {}).get("cnt", 0) or 0
+                deletion_row = _row_dict(cur.fetchone())
+                deletions = int(deletion_row.get("cnt", 0) or 0)
                 if task_submits > 0 and deletions > task_submits * 0.2:
                     result["learning_signals"].append({
                         "signal": "high_deletion_rate",

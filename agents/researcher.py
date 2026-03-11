@@ -53,6 +53,8 @@ class ResearcherAgent(BaseAgent):
             "TOOLS AVAILABLE:\n"
             "- web_search: Search the web for current information (use as many times as needed)\n"
             "- web_fetch: Fetch full content from a specific URL (use freely for deep research)\n"
+            "- summarize_video: Extract info + transcript + summary from a YouTube video (with auto-translation)\n"
+            "- fetch_transcript: Fetch raw transcript/subtitles from a YouTube video (with auto-translation)\n"
             "- mcp_list_tools: List available MCP server tools — ALWAYS CHECK THIS FIRST!\n"
             "- mcp_call: Call an MCP tool for specialized data (databases, APIs, external services)\n"
             "- rag_query: Search the document knowledge base for internal knowledge\n"

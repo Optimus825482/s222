@@ -14,6 +14,10 @@ from typing import Any
 logger = logging.getLogger("prompt_strategies")
 
 
+def _db_row_to_dict(row: Any) -> dict[str, Any]:
+    return dict(row or {})
+
+
 class PromptStrategyManager:
     """CRUD + version tracking for prompt strategies."""
 
@@ -77,7 +81,8 @@ class PromptStrategyManager:
                     "SELECT COALESCE(MAX(version), 0) + 1 as next_ver FROM prompt_strategies WHERE agent_role = %s AND task_type = %s",
                     (agent_role, task_type),
                 )
-                next_ver = cur.fetchone()["next_ver"]
+                next_ver_row = _db_row_to_dict(cur.fetchone())
+                next_ver = int(next_ver_row.get("next_ver", 1) or 1)
 
                 cur.execute(
                     """INSERT INTO prompt_strategies
@@ -93,16 +98,22 @@ class PromptStrategyManager:
                     ),
                 )
                 row = cur.fetchone()
+                row_dict = _db_row_to_dict(row)
+                created_at = row_dict.get("created_at")
+                created_at_iso = None
+                isoformat_fn = getattr(created_at, "isoformat", None)
+                if callable(isoformat_fn):
+                    created_at_iso = isoformat_fn()
             conn.commit()
             logger.info(f"Prompt strategy created: {name} v{next_ver} for {agent_role}/{task_type}")
             return {
-                "id": row["id"],
+                "id": row_dict.get("id"),
                 "agent_role": agent_role,
                 "task_type": task_type,
                 "name": name,
                 "version": next_ver,
                 "is_active": False,
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                "created_at": created_at_iso,
             }
         finally:
             self._release(conn)
@@ -131,7 +142,7 @@ class PromptStrategyManager:
                     params,
                 )
                 rows = cur.fetchall()
-            return [self._row_to_dict(dict(r)) for r in rows]
+            return [self._row_to_dict(_db_row_to_dict(r)) for r in rows]
         finally:
             self._release(conn)
 
@@ -143,20 +154,21 @@ class PromptStrategyManager:
             with conn.cursor() as cur:
                 # Get strategy details
                 cur.execute("SELECT * FROM prompt_strategies WHERE id = %s", (strategy_id,))
-                strategy = cur.fetchone()
-                if not strategy:
+                strategy_row = cur.fetchone()
+                if not strategy_row:
                     raise ValueError(f"Strategy {strategy_id} not found")
+                strategy = _db_row_to_dict(strategy_row)
 
-                role = strategy["agent_role"]
-                task = strategy["task_type"]
+                role = str(strategy.get("agent_role") or "")
+                task = str(strategy.get("task_type") or "")
 
                 # Check for active A/B experiment conflict
                 cur.execute(
                     "SELECT COUNT(*) as cnt FROM ab_experiments WHERE agent_role = %s AND task_type = %s AND status = 'active'",
                     (role, task),
                 )
-                conflict = cur.fetchone()
-                if conflict and conflict["cnt"] > 0:
+                conflict = _db_row_to_dict(cur.fetchone())
+                if int(conflict.get("cnt", 0) or 0) > 0:
                     raise ValueError(f"Active A/B experiment exists for {role}/{task}. Conclude it first.")
 
                 # Deactivate all strategies for this role+task
@@ -171,7 +183,7 @@ class PromptStrategyManager:
                 )
             conn.commit()
             logger.info(f"Activated strategy {strategy_id} for {role}/{task}")
-            return self._row_to_dict(dict(strategy) | {"is_active": True})
+            return self._row_to_dict(strategy | {"is_active": True})
         except ValueError:
             raise
         except Exception as e:
@@ -191,7 +203,7 @@ class PromptStrategyManager:
                     (agent_role, task_type),
                 )
                 row = cur.fetchone()
-            return self._row_to_dict(dict(row)) if row else None
+            return self._row_to_dict(_db_row_to_dict(row)) if row else None
         finally:
             self._release(conn)
 
@@ -203,7 +215,7 @@ class PromptStrategyManager:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM prompt_strategies WHERE id = %s", (strategy_id,))
                 row = cur.fetchone()
-            return self._row_to_dict(dict(row)) if row else None
+            return self._row_to_dict(_db_row_to_dict(row)) if row else None
         finally:
             self._release(conn)
 

@@ -5,10 +5,9 @@ import json
 import sys
 import uuid
 from pathlib import Path
-from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -16,11 +15,22 @@ _parent = str(Path(__file__).parent.parent)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
-from deps import get_current_user, _audit
-from shared_state import _AGENT_ROLES, _utcnow
+from deps import get_current_user, _audit  # noqa: E402
+from shared_state import _utcnow  # noqa: E402
 
 
 router = APIRouter()
+
+
+def _row_dict(row: Any) -> dict[str, Any]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
 
 
 # ── 8. Tool Usage Analytics — PostgreSQL Persistence ─────────────
@@ -103,15 +113,19 @@ async def get_tool_usage_analytics(
 
             tool_stats = []
             for row in tool_rows:
-                count = row[1]
+                row_data = _row_dict(row)
+                count = int(row_data.get("count", 0) or 0)
+                success_count = int(row_data.get("success_count", 0) or 0)
+                total_latency = float(row_data.get("total_latency_ms", 0) or 0)
+                agents_value = row_data.get("agents")
                 tool_stats.append(
                     {
-                        "tool_name": row[0],
+                        "tool_name": row_data.get("tool_name", ""),
                         "count": count,
-                        "success_rate": round(row[2] / max(count, 1) * 100, 1),
-                        "avg_latency_ms": round(row[3] / max(count, 1), 1),
-                        "total_tokens": row[4],
-                        "agents": row[5].split(",") if row[5] else [],
+                        "success_rate": round(success_count / max(count, 1) * 100, 1),
+                        "avg_latency_ms": round(total_latency / max(count, 1), 1),
+                        "total_tokens": int(row_data.get("total_tokens", 0) or 0),
+                        "agents": str(agents_value).split(",") if agents_value else [],
                     }
                 )
 
@@ -130,15 +144,21 @@ async def get_tool_usage_analytics(
 
             agent_stats = []
             for row in agent_rows:
-                count = row[1]
+                row_data = _row_dict(row)
+                count = int(row_data.get("tool_calls", 0) or 0)
+                success_count = int(row_data.get("success_count", 0) or 0)
+                total_latency = float(row_data.get("total_latency_ms", 0) or 0)
+                tools_used_value = row_data.get("tools_used")
                 agent_stats.append(
                     {
-                        "agent_role": row[0],
+                        "agent_role": row_data.get("agent_role", ""),
                         "tool_calls": count,
-                        "success_rate": round(row[2] / max(count, 1) * 100, 1),
-                        "avg_latency_ms": round(row[3] / max(count, 1), 1),
-                        "total_tokens": row[4],
-                        "tools_used": row[5].split(",") if row[5] else [],
+                        "success_rate": round(success_count / max(count, 1) * 100, 1),
+                        "avg_latency_ms": round(total_latency / max(count, 1), 1),
+                        "total_tokens": int(row_data.get("total_tokens", 0) or 0),
+                        "tools_used": str(tools_used_value).split(",")
+                        if tools_used_value
+                        else [],
                     }
                 )
 
@@ -149,12 +169,33 @@ async def get_tool_usage_analytics(
                 (uid, limit),
             )
             recent_rows = cur.fetchall()
-            col_names = [desc[0] for desc in cur.description]
-            recent = [dict(zip(col_names, row)) for row in recent_rows]
+            description = cur.description or []
+            col_names = [desc[0] for desc in description]
+            recent = []
+            for row in recent_rows:
+                if isinstance(row, dict):
+                    recent.append(dict(row))
+                elif col_names and isinstance(row, (list, tuple)):
+                    recent.append(dict(zip(col_names, row)))
+                else:
+                    row_data = _row_dict(row)
+                    if row_data:
+                        recent.append(row_data)
 
             # Total count
-            cur.execute("SELECT COUNT(*) FROM tool_usage WHERE user_id = %s", (uid,))
-            total = cur.fetchone()[0]
+            cur.execute(
+                "SELECT COUNT(*) AS total FROM tool_usage WHERE user_id = %s", (uid,)
+            )
+            total_row = cur.fetchone()
+            total = 0
+            if total_row is not None:
+                if isinstance(total_row, dict):
+                    total = int(total_row.get("total", total_row.get("count", 0)) or 0)
+                elif isinstance(total_row, (list, tuple)):
+                    total = int(total_row[0]) if total_row else 0
+                else:
+                    total_data = _row_dict(total_row)
+                    total = int(total_data.get("total", total_data.get("count", 0)) or 0)
 
     finally:
         release_conn(conn)
@@ -305,7 +346,7 @@ except Exception as _e:
     _bench_runner = None
     BENCHMARK_SCENARIOS = {}
 
-    def get_scenarios(cat=None):
+    def get_scenarios(category: str | None = None):
         return []
 
 
@@ -331,6 +372,25 @@ def _require_bench_runner():
             status_code=503,
             detail="Benchmark modülü yüklenemedi. Logları kontrol edin.",
         )
+    return _bench_runner
+
+
+def _require_error_analyzer():
+    if _error_analyzer is None:
+        raise HTTPException(status_code=503, detail="Error analyzer not available")
+    return _error_analyzer
+
+
+def _require_cost_tracker():
+    if _cost_tracker is None:
+        raise HTTPException(status_code=503, detail="Cost tracker not available")
+    return _cost_tracker
+
+
+def _require_auto_optimizer():
+    if _auto_optimizer is None:
+        raise HTTPException(status_code=503, detail="Auto optimizer not available")
+    return _auto_optimizer
 
 
 # ── Benchmark progress tracking (in-memory) ─────────────────────
@@ -343,8 +403,8 @@ async def benchmark_leaderboard(
     user: dict = Depends(get_current_user),
 ):
     """Get agent leaderboard based on benchmark scores."""
-    _require_bench_runner()
-    lb = _bench_runner.get_leaderboard(days=days)
+    bench_runner = _require_bench_runner()
+    lb = bench_runner.get_leaderboard(days=days)
     return {"leaderboard": lb}
 
 
@@ -356,8 +416,8 @@ async def benchmark_results(
     user: dict = Depends(get_current_user),
 ):
     """Get benchmark results with optional agent and date filter."""
-    _require_bench_runner()
-    results = _bench_runner.get_results(agent_role=agent_role, limit=limit, days=days)
+    bench_runner = _require_bench_runner()
+    results = bench_runner.get_results(agent_role=agent_role, limit=limit, days=days)
     return {"results": results, "total": len(results)}
 
 
@@ -366,7 +426,7 @@ async def run_benchmark(
     body: BenchmarkRunRequest, user: dict = Depends(get_current_user)
 ):
     """Run benchmark scenario(s) for an agent."""
-    _require_bench_runner()
+    bench_runner = _require_bench_runner()
     _audit(
         "run_benchmark",
         user["user_id"],
@@ -375,7 +435,7 @@ async def run_benchmark(
     try:
         # Single scenario — run synchronously (fast)
         if body.scenario_id and body.agent_role:
-            result = await _bench_runner.run_single(body.agent_role, body.scenario_id)
+            result = await bench_runner.run_single(body.agent_role, body.scenario_id)
             return {"result": result, "type": "single"}
 
         # Suite — run as background task with progress tracking
@@ -403,7 +463,7 @@ async def run_benchmark(
 
         async def _run_suite_bg():
             try:
-                summary = await _bench_runner.run_suite(
+                summary = await bench_runner.run_suite(
                     agent_role=body.agent_role,
                     category=body.category,
                     progress_callback=_progress_cb,
@@ -456,7 +516,7 @@ async def run_benchmark_stream(
     body: BenchmarkRunRequest, user: dict = Depends(get_current_user)
 ):
     """SSE stream for real-time benchmark progress."""
-    _require_bench_runner()
+    bench_runner = _require_bench_runner()
     _audit(
         "run_benchmark_stream",
         user["user_id"],
@@ -470,7 +530,9 @@ async def run_benchmark_stream(
             # Single scenario — no incremental progress needed
             if body.scenario_id and body.agent_role:
                 yield f"data: {json.dumps({'event': 'started', 'total': 1, 'type': 'single'})}\n\n"
-                result = await _bench_runner.run_single(body.agent_role, body.scenario_id)
+                result = await bench_runner.run_single(
+                    body.agent_role, body.scenario_id
+                )
                 yield f"data: {json.dumps({'event': 'progress', 'completed': 1, 'total': 1, 'status': 'ok', 'agent_role': body.agent_role, 'scenario_id': body.scenario_id, 'scenario_name': result.get('scenario_name', body.scenario_id)})}\n\n"
                 yield f"data: {json.dumps({'event': 'done', 'type': 'single', 'result': result})}\n\n"
             else:
@@ -498,7 +560,7 @@ async def run_benchmark_stream(
                     await progress_queue.put(info)
 
                 async def _run():
-                    summary = await _bench_runner.run_suite(
+                    summary = await bench_runner.run_suite(
                         agent_role=body.agent_role,
                         category=body.category,
                         progress_callback=_cb,
@@ -532,9 +594,9 @@ async def compare_agents_benchmark(
     user: dict = Depends(get_current_user),
 ):
     """Compare two agents head-to-head on benchmark scores."""
-    _require_bench_runner()
+    bench_runner = _require_bench_runner()
     try:
-        comparison = _bench_runner.compare_agents(role_a, role_b)
+        comparison = bench_runner.compare_agents(role_a, role_b)
         return {"comparison": comparison}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -548,8 +610,8 @@ async def benchmark_history(
     user: dict = Depends(get_current_user),
 ):
     """Get historical benchmark scores for trend analysis."""
-    _require_bench_runner()
-    history = _bench_runner.get_history(agent_role, scenario_id, days=days)
+    bench_runner = _require_bench_runner()
+    history = bench_runner.get_history(agent_role, scenario_id, days=days)
     return {"history": history, "agent_role": agent_role}
 
 
@@ -582,7 +644,8 @@ async def record_error_event(
 ):
     """Record an error event and auto-classify it."""
     try:
-        event = _error_analyzer.record_error(
+        error_analyzer = _require_error_analyzer()
+        event = error_analyzer.record_error(
             agent_role=body.agent_role,
             error_message=body.error_message,
             task_type=body.task_type,
@@ -600,7 +663,8 @@ async def error_stats(
     user: dict = Depends(get_current_user),
 ):
     """Get aggregated error statistics."""
-    stats = _error_analyzer.get_error_stats(agent_role=agent_role, hours=hours)
+    error_analyzer = _require_error_analyzer()
+    stats = error_analyzer.get_error_stats(agent_role=agent_role, hours=hours)
     return {"stats": stats}
 
 
@@ -610,7 +674,8 @@ async def error_timeline(
     user: dict = Depends(get_current_user),
 ):
     """Get hourly error counts for timeline chart."""
-    timeline = _error_analyzer.get_error_timeline(hours=hours)
+    error_analyzer = _require_error_analyzer()
+    timeline = error_analyzer.get_error_timeline(hours=hours)
     return {"timeline": timeline}
 
 
@@ -621,7 +686,8 @@ async def list_error_patterns(
     user: dict = Depends(get_current_user),
 ):
     """List detected error patterns."""
-    patterns = _error_analyzer.get_patterns(status=status, agent_role=agent_role)
+    error_analyzer = _require_error_analyzer()
+    patterns = error_analyzer.get_patterns(status=status, agent_role=agent_role)
     return {"patterns": patterns, "total": len(patterns)}
 
 
@@ -632,42 +698,46 @@ async def detect_error_patterns(
 ):
     """Run pattern detection on recent errors."""
     _audit("detect_error_patterns", user["user_id"], detail=f"hours={hours}")
-    new_patterns = _error_analyzer.detect_patterns(window_hours=hours)
+    error_analyzer = _require_error_analyzer()
+    new_patterns = error_analyzer.detect_patterns(window_hours=hours)
     return {"new_patterns": new_patterns, "total_new": len(new_patterns)}
 
 
 @router.get("/api/errors/recommendations")
 async def error_recommendations(user: dict = Depends(get_current_user)):
     """Get optimization recommendations based on active error patterns."""
-    recs = _error_analyzer.get_recommendations()
+    error_analyzer = _require_error_analyzer()
+    recs = error_analyzer.get_recommendations()
     return {"recommendations": recs, "total": len(recs)}
 
 
 @router.post("/api/errors/patterns/{pattern_id}/resolve")
 async def resolve_error_pattern(
-    pattern_id: int,
+    pattern_id: str,
     body: ResolvePatternRequest,
     user: dict = Depends(get_current_user),
 ):
     """Mark an error pattern as resolved."""
     _audit("resolve_pattern", user["user_id"], detail=f"pattern={pattern_id}")
-    success = _error_analyzer.resolve_pattern(pattern_id, body.resolution_notes)
-    if not success:
+    error_analyzer = _require_error_analyzer()
+    result = error_analyzer.resolve_pattern(pattern_id, body.resolution_notes)
+    if not result or result.get("error"):
         raise HTTPException(status_code=404, detail="Pattern not found")
-    return {"resolved": True, "pattern_id": pattern_id}
+    return {"resolved": True, "pattern_id": pattern_id, "result": result}
 
 
 @router.post("/api/errors/patterns/{pattern_id}/suppress")
 async def suppress_error_pattern(
-    pattern_id: int,
+    pattern_id: str,
     user: dict = Depends(get_current_user),
 ):
     """Suppress a noisy error pattern."""
     _audit("suppress_pattern", user["user_id"], detail=f"pattern={pattern_id}")
-    success = _error_analyzer.suppress_pattern(pattern_id)
-    if not success:
+    error_analyzer = _require_error_analyzer()
+    result = error_analyzer.suppress_pattern(pattern_id)
+    if not result or result.get("error"):
         raise HTTPException(status_code=404, detail="Pattern not found")
-    return {"suppressed": True, "pattern_id": pattern_id}
+    return {"suppressed": True, "pattern_id": pattern_id, "result": result}
 
 
 # ── 13. Cost Tracking ────────────────────────────────────────────
@@ -703,7 +773,8 @@ async def record_usage_event(
 ):
     """Record a token usage event."""
     try:
-        event = _cost_tracker.record_usage(
+        cost_tracker = _require_cost_tracker()
+        event = cost_tracker.record_usage(
             agent_role=body.agent_role,
             model=body.model,
             input_tokens=body.input_tokens,
@@ -719,7 +790,8 @@ async def record_usage_event(
 @router.get("/api/costs/summary")
 async def cost_summary(hours: int = 24, user: dict = Depends(get_current_user)):
     """Get aggregated cost summary."""
-    return _cost_tracker.get_cost_summary(hours=hours)
+    cost_tracker = _require_cost_tracker()
+    return cost_tracker.get_cost_summary(hours=hours)
 
 
 @router.get("/api/costs/timeline")
@@ -727,10 +799,9 @@ async def cost_timeline(
     hours: int = 24, granularity: str = "hour", user: dict = Depends(get_current_user)
 ):
     """Get cost timeline data."""
+    cost_tracker = _require_cost_tracker()
     return {
-        "timeline": _cost_tracker.get_cost_timeline(
-            hours=hours, granularity=granularity
-        )
+        "timeline": cost_tracker.get_cost_timeline(hours=hours, granularity=granularity)
     }
 
 
@@ -739,7 +810,8 @@ async def agent_costs(
     agent_role: str, hours: int = 24, user: dict = Depends(get_current_user)
 ):
     """Get detailed cost breakdown for a specific agent."""
-    return _cost_tracker.get_agent_costs(agent_role=agent_role, hours=hours)
+    cost_tracker = _require_cost_tracker()
+    return cost_tracker.get_agent_costs(agent_role=agent_role, hours=hours)
 
 
 @router.get("/api/costs/top-consumers")
@@ -747,7 +819,8 @@ async def top_consumers(
     hours: int = 24, limit: int = 10, user: dict = Depends(get_current_user)
 ):
     """Get agents ranked by cost."""
-    return {"consumers": _cost_tracker.get_top_consumers(hours=hours, limit=limit)}
+    cost_tracker = _require_cost_tracker()
+    return {"consumers": cost_tracker.get_top_consumers(hours=hours, limit=limit)}
 
 
 @router.post("/api/costs/budget")
@@ -758,7 +831,8 @@ async def set_budget(body: SetBudgetRequest, user: dict = Depends(get_current_us
         user["user_id"],
         detail=f"agent={body.agent_role} limit={body.daily_limit}",
     )
-    return _cost_tracker.set_budget(
+    cost_tracker = _require_cost_tracker()
+    return cost_tracker.set_budget(
         agent_role=body.agent_role,
         daily_limit=body.daily_limit,
         alert_threshold=body.alert_threshold,
@@ -770,19 +844,22 @@ async def check_budget(
     agent_role: str | None = None, user: dict = Depends(get_current_user)
 ):
     """Check budget status."""
-    return _cost_tracker.check_budget(agent_role=agent_role)
+    cost_tracker = _require_cost_tracker()
+    return cost_tracker.check_budget(agent_role=agent_role)
 
 
 @router.get("/api/costs/forecast")
 async def cost_forecast(days: int = 7, user: dict = Depends(get_current_user)):
     """Get cost forecast based on trends."""
-    return _cost_tracker.get_cost_forecast(days=days)
+    cost_tracker = _require_cost_tracker()
+    return cost_tracker.get_cost_forecast(days=days)
 
 
 @router.get("/api/costs/stats")
 async def usage_stats(user: dict = Depends(get_current_user)):
     """Get overall usage statistics."""
-    return _cost_tracker.get_usage_stats()
+    cost_tracker = _require_cost_tracker()
+    return cost_tracker.get_usage_stats()
 
 
 # ── Auto-Optimizer API ───────────────────────────────────────────
@@ -800,7 +877,8 @@ except Exception as _e:
 @router.get("/api/optimizer/stats")
 async def optimizer_stats(user: dict = Depends(get_current_user)):
     """Get optimization statistics summary."""
-    stats = _auto_optimizer.get_optimization_stats()
+    auto_optimizer = _require_auto_optimizer()
+    stats = auto_optimizer.get_optimization_stats()
     return stats
 
 
@@ -812,7 +890,8 @@ async def optimizer_recommendations(
     user: dict = Depends(get_current_user),
 ):
     """List recommendations with optional filters."""
-    recs = _auto_optimizer.get_recommendations(
+    auto_optimizer = _require_auto_optimizer()
+    recs = auto_optimizer.get_recommendations(
         category=category, priority=priority, status=status
     )
     return {"recommendations": recs, "total": len(recs)}
@@ -822,7 +901,8 @@ async def optimizer_recommendations(
 async def optimizer_analyze(user: dict = Depends(get_current_user)):
     """Run full analysis and generate new recommendations."""
     _audit("optimizer_analyze", user["user_id"])
-    new_recs = _auto_optimizer.analyze_and_recommend()
+    auto_optimizer = _require_auto_optimizer()
+    new_recs = auto_optimizer.analyze_and_recommend()
     return {"new_recommendations": new_recs, "total_new": len(new_recs)}
 
 
@@ -833,7 +913,8 @@ async def optimizer_apply(
 ):
     """Apply a pending recommendation."""
     _audit("optimizer_apply", user["user_id"], detail=f"rec={rec_id}")
-    result = _auto_optimizer.apply_recommendation(rec_id)
+    auto_optimizer = _require_auto_optimizer()
+    result = auto_optimizer.apply_recommendation(rec_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -846,7 +927,8 @@ async def optimizer_dismiss(
 ):
     """Dismiss a pending recommendation."""
     _audit("optimizer_dismiss", user["user_id"], detail=f"rec={rec_id}")
-    result = _auto_optimizer.dismiss_recommendation(rec_id)
+    auto_optimizer = _require_auto_optimizer()
+    result = auto_optimizer.dismiss_recommendation(rec_id)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -858,7 +940,8 @@ async def optimizer_agent_profile(
     user: dict = Depends(get_current_user),
 ):
     """Get optimization profile for a specific agent."""
-    profile = _auto_optimizer.get_agent_optimization_profile(agent_role)
+    auto_optimizer = _require_auto_optimizer()
+    profile = auto_optimizer.get_agent_optimization_profile(agent_role)
     return profile
 
 
@@ -868,7 +951,8 @@ async def optimizer_history(
     user: dict = Depends(get_current_user),
 ):
     """Get optimization action history."""
-    history = _auto_optimizer.get_optimization_history(limit=limit)
+    auto_optimizer = _require_auto_optimizer()
+    history = auto_optimizer.get_optimization_history(limit=limit)
     return {"history": history, "total": len(history)}
 
 

@@ -5,8 +5,8 @@ Faz 10.5 — Diğer ajanların ilerleme durumunu canlı görüntüleme
 
 import asyncio
 from datetime import datetime
-from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -27,7 +27,7 @@ class ProgressStep:
     started_at: datetime
     completed_at: Optional[datetime] = None
     progress_percent: int = 0
-    metadata: Dict = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -37,10 +37,10 @@ class AgentProgress:
     task_id: str
     status: AgentStatus
     current_step: Optional[ProgressStep] = None
-    steps: List[ProgressStep] = None
+    steps: List[ProgressStep] = field(default_factory=list)
     overall_progress: int = 0
-    started_at: datetime = None
-    updated_at: datetime = None
+    started_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     def __post_init__(self):
         if self.steps is None:
@@ -76,7 +76,7 @@ class AgentProgressTracker:
         description: str,
         status: AgentStatus,
         progress_percent: int = 0,
-        metadata: Dict = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Adım güncelle"""
         if agent_id not in self._progress:
@@ -161,7 +161,7 @@ class AgentProgressTracker:
             "metadata": step.metadata or {},
         }
 
-    def get_progress(self, agent_id: str) -> Optional[Dict]:
+    def get_progress(self, agent_id: str) -> Optional[Dict[str, Any]]:
         """Agent ilerlemesini al (JSON-safe)."""
         if agent_id not in self._progress:
             return None
@@ -172,16 +172,27 @@ class AgentProgressTracker:
             "agent_name": progress.agent_name,
             "task_id": progress.task_id,
             "status": progress.status.value,
-            "current_step": self._step_to_dict(progress.current_step) if progress.current_step else None,
+            "current_step": self._step_to_dict(progress.current_step)
+            if progress.current_step
+            else None,
             "steps": [self._step_to_dict(s) for s in progress.steps],
             "overall_progress": progress.overall_progress,
-            "started_at": progress.started_at.isoformat(),
-            "updated_at": progress.updated_at.isoformat(),
+            "started_at": progress.started_at.isoformat()
+            if progress.started_at
+            else "",
+            "updated_at": progress.updated_at.isoformat()
+            if progress.updated_at
+            else "",
         }
-    
-    def get_all_progress(self) -> List[Dict]:
+
+    def get_all_progress(self) -> List[Dict[str, Any]]:
         """Tüm agent ilerlemelerini al"""
-        return [self.get_progress(aid) for aid in self._progress.keys()]
+        all_progress: List[Dict[str, Any]] = []
+        for agent_id in self._progress.keys():
+            progress = self.get_progress(agent_id)
+            if progress is not None:
+                all_progress.append(progress)
+        return all_progress
     
     async def subscribe(self) -> asyncio.Queue:
         """İlerleme güncellemelerine abone ol"""
@@ -213,6 +224,9 @@ class AgentProgressTracker:
         
         for agent_id, progress in self._progress.items():
             if progress.status == AgentStatus.COMPLETED:
+                if progress.updated_at is None:
+                    to_remove.append(agent_id)
+                    continue
                 age = (now - progress.updated_at).total_seconds() / 60
                 if age > max_age_minutes:
                     to_remove.append(agent_id)

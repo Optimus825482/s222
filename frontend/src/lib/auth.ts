@@ -13,6 +13,8 @@ export interface AuthUser {
 
 interface AuthStore {
   user: AuthUser | null;
+  hasHydrated: boolean;
+  markHydrated: () => void;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -21,6 +23,11 @@ export const useAuth = create<AuthStore>()(
   persist(
     (set, get) => ({
       user: null,
+      hasHydrated: false,
+
+      markHydrated: () => {
+        set({ hasHydrated: true });
+      },
 
       login: async (username: string, password: string) => {
         const res = await fetch(`${BASE}/api/auth/login`, {
@@ -35,6 +42,7 @@ export const useAuth = create<AuthStore>()(
           throw new Error(err.detail || "Giriş başarısız");
         }
         const data = await res.json();
+        sessionStorage.removeItem("auth:validated-token");
         set({
           user: {
             user_id: data.user_id,
@@ -52,12 +60,16 @@ export const useAuth = create<AuthStore>()(
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => {});
         }
+        sessionStorage.removeItem("auth:validated-token");
         set({ user: null });
       },
     }),
     {
       name: "ops-center-auth",
       partialize: (state) => ({ user: state.user }),
+      onRehydrateStorage: () => (state) => {
+        state?.markHydrated();
+      },
     },
   ),
 );

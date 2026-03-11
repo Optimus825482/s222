@@ -108,6 +108,10 @@ class AutoOptimizer:
         logger.info("Auto-optimizer generated %d new recommendations", len(new_recs))
         return new_recs
 
+    @staticmethod
+    def _rows_to_dicts(rows: list[Any]) -> list[dict[str, Any]]:
+        return [AutoOptimizer._row_to_dict(row) for row in rows]
+
     def _check_success_rates(self) -> list[dict[str, Any]]:
         """Check agents with success rate below threshold → reliability."""
         results: list[dict[str, Any]] = []
@@ -122,21 +126,24 @@ class AutoOptimizer:
                     GROUP BY agent_role
                     HAVING COUNT(*) >= 5
                 """)
-                rows = cur.fetchall()
+                rows = self._rows_to_dicts(cur.fetchall())
 
             for row in rows:
-                rate = (row["success"] / row["total"]) * 100 if row["total"] else 100
+                total = int(row.get("total") or 0)
+                success = int(row.get("success") or 0)
+                agent_role = str(row.get("agent_role") or "unknown")
+                rate = (success / total) * 100 if total else 100
                 if rate < _SUCCESS_RATE_THRESHOLD:
                     rec = self._create_recommendation(
                         category="reliability",
                         priority="high",
-                        title=f"Low success rate: {row['agent_role']} ({rate:.0f}%)",
+                        title=f"Low success rate: {agent_role} ({rate:.0f}%)",
                         description=(
-                            f"Agent '{row['agent_role']}' has a success rate of {rate:.1f}% "
-                            f"({row['success']}/{row['total']} tasks). "
+                            f"Agent '{agent_role}' has a success rate of {rate:.1f}% "
+                            f"({success}/{total} tasks). "
                             f"Threshold is {_SUCCESS_RATE_THRESHOLD}%."
                         ),
-                        affected_agents=[row["agent_role"]],
+                        affected_agents=[agent_role],
                         suggested_actions=[
                             "Review agent system prompt for clarity",
                             "Check if task types match agent capabilities",
@@ -168,20 +175,24 @@ class AutoOptimizer:
                     GROUP BY agent_role
                     HAVING COUNT(*) >= 3
                 """)
-                rows = cur.fetchall()
+                rows = self._rows_to_dicts(cur.fetchall())
 
             for row in rows:
-                avg_lat = float(row["avg_latency"])
+                avg_lat = float(row.get("avg_latency") or 0)
+                total = int(row.get("total") or 0)
+                agent_role = str(row.get("agent_role") or "unknown")
                 if avg_lat > _LATENCY_THRESHOLD_MS:
                     rec = self._create_recommendation(
                         category="performance",
-                        priority="high" if avg_lat > _LATENCY_THRESHOLD_MS * 2 else "medium",
-                        title=f"High latency: {row['agent_role']} ({avg_lat:.0f}ms avg)",
+                        priority="high"
+                        if avg_lat > _LATENCY_THRESHOLD_MS * 2
+                        else "medium",
+                        title=f"High latency: {agent_role} ({avg_lat:.0f}ms avg)",
                         description=(
-                            f"Agent '{row['agent_role']}' averages {avg_lat:.0f}ms response time "
-                            f"across {row['total']} tasks. Threshold is {_LATENCY_THRESHOLD_MS:.0f}ms."
+                            f"Agent '{agent_role}' averages {avg_lat:.0f}ms response time "
+                            f"across {total} tasks. Threshold is {_LATENCY_THRESHOLD_MS:.0f}ms."
                         ),
-                        affected_agents=[row["agent_role"]],
+                        affected_agents=[agent_role],
                         suggested_actions=[
                             "Switch to a faster model variant",
                             "Reduce prompt/context size",
@@ -215,20 +226,22 @@ class AutoOptimizer:
                     HAVING COUNT(*) >= 5
                     ORDER BY COUNT(*) DESC
                 """)
-                rows = cur.fetchall()
+                rows = self._rows_to_dicts(cur.fetchall())
 
             for row in rows:
-                count = row["error_count"]
+                count = int(row.get("error_count") or 0)
+                unique_types = int(row.get("unique_types") or 0)
+                agent_role = str(row.get("agent_role") or "unknown")
                 priority = "critical" if count >= 20 else ("high" if count >= 10 else "medium")
                 rec = self._create_recommendation(
                     category="quality",
                     priority=priority,
-                    title=f"High error count: {row['agent_role']} ({count} errors/7d)",
+                    title=f"High error count: {agent_role} ({count} errors/7d)",
                     description=(
-                        f"Agent '{row['agent_role']}' generated {count} errors "
-                        f"({row['unique_types']} unique types) in the last 7 days."
+                        f"Agent '{agent_role}' generated {count} errors "
+                        f"({unique_types} unique types) in the last 7 days."
                     ),
-                    affected_agents=[row["agent_role"]],
+                    affected_agents=[agent_role],
                     suggested_actions=[
                         "Review error logs for root cause analysis",
                         "Add input validation and output parsing guards",
@@ -258,14 +271,16 @@ class AutoOptimizer:
                     FROM evaluations
                     GROUP BY agent_role
                 """)
-                rows = cur.fetchall()
+                rows = self._rows_to_dicts(cur.fetchall())
 
             now = datetime.now(timezone.utc)
             for row in rows:
                 try:
-                    last_used = row["last_used"]
+                    last_used = row.get("last_used")
                     if isinstance(last_used, str):
                         last_used = datetime.fromisoformat(last_used)
+                    if last_used is None:
+                        continue
                     if last_used.tzinfo is None:
                         last_used = last_used.replace(tzinfo=timezone.utc)
                     days_inactive = (now - last_used).days
@@ -273,15 +288,17 @@ class AutoOptimizer:
                     continue
 
                 if days_inactive >= _INACTIVE_DAYS_THRESHOLD:
+                    agent_role = str(row.get("agent_role") or "unknown")
+                    total_tasks = int(row.get("total_tasks") or 0)
                     rec = self._create_recommendation(
                         category="cost",
                         priority="low" if days_inactive < 14 else "medium",
-                        title=f"Inactive agent: {row['agent_role']} ({days_inactive}d idle)",
+                        title=f"Inactive agent: {agent_role} ({days_inactive}d idle)",
                         description=(
-                            f"Agent '{row['agent_role']}' has not been used for {days_inactive} days. "
-                            f"Last activity: {row['last_used']}. Total historical tasks: {row['total_tasks']}."
+                            f"Agent '{agent_role}' has not been used for {days_inactive} days. "
+                            f"Last activity: {last_used}. Total historical tasks: {total_tasks}."
                         ),
-                        affected_agents=[row["agent_role"]],
+                        affected_agents=[agent_role],
                         suggested_actions=[
                             "Evaluate if agent role is still needed",
                             "Consider merging capabilities into another agent",
@@ -311,22 +328,28 @@ class AutoOptimizer:
                     WHERE status = 'active' AND frequency >= %s
                     ORDER BY frequency DESC
                 """, (_ERROR_FREQUENCY_THRESHOLD,))
-                rows = cur.fetchall()
+                rows = self._rows_to_dicts(cur.fetchall())
 
             for row in rows:
                 agents = []
                 try:
-                    agents = json.loads(row["agent_roles_json"]) if row["agent_roles_json"] else []
+                    agent_roles_json = row.get("agent_roles_json")
+                    agents = json.loads(agent_roles_json) if agent_roles_json else []
                 except (json.JSONDecodeError, TypeError):
                     pass
+
+                pattern_name = str(row.get("pattern_name") or "unknown")
+                frequency = int(row.get("frequency") or 0)
+                error_type = str(row.get("error_type") or "unknown")
+                description = str(row.get("description") or "")
 
                 rec = self._create_recommendation(
                     category="reliability",
                     priority="critical",
-                    title=f"Recurring error pattern: {row['pattern_name']} (freq={row['frequency']})",
+                    title=f"Recurring error pattern: {pattern_name} (freq={frequency})",
                     description=(
-                        f"Error pattern '{row['pattern_name']}' has occurred {row['frequency']} times. "
-                        f"Type: {row['error_type']}. {row['description'] or ''}"
+                        f"Error pattern '{pattern_name}' has occurred {frequency} times. "
+                        f"Type: {error_type}. {description}"
                     ),
                     affected_agents=agents,
                     suggested_actions=[
@@ -336,7 +359,7 @@ class AutoOptimizer:
                         "Consider circuit breaker or fallback mechanism",
                         "Review and update error handling logic",
                     ],
-                    estimated_impact=f"Eliminate {row['frequency']} recurring errors",
+                    estimated_impact=f"Eliminate {frequency} recurring errors",
                 )
                 results.append(rec)
         except Exception as exc:
@@ -361,22 +384,25 @@ class AutoOptimizer:
                     GROUP BY agent_role
                     HAVING COUNT(*) >= 3
                 """)
-                rows = cur.fetchall()
+                rows = self._rows_to_dicts(cur.fetchall())
 
             for row in rows:
-                avg = float(row["avg_score"])
+                avg = float(row.get("avg_score") or 0)
+                agent_role = str(row.get("agent_role") or "unknown")
+                total_runs = int(row.get("total_runs") or 0)
+                avg_latency = float(row.get("avg_latency") or 0)
                 if avg < _BENCHMARK_BASELINE_SCORE:
                     rec = self._create_recommendation(
                         category="performance",
                         priority="high" if avg < 2.0 else "medium",
-                        title=f"Below benchmark baseline: {row['agent_role']} (score={avg:.2f}/5)",
+                        title=f"Below benchmark baseline: {agent_role} (score={avg:.2f}/5)",
                         description=(
-                            f"Agent '{row['agent_role']}' scored {avg:.2f}/5.0 across "
-                            f"{row['total_runs']} benchmark runs. "
+                            f"Agent '{agent_role}' scored {avg:.2f}/5.0 across "
+                            f"{total_runs} benchmark runs. "
                             f"Baseline threshold is {_BENCHMARK_BASELINE_SCORE}/5.0. "
-                            f"Avg latency: {row['avg_latency']}ms."
+                            f"Avg latency: {avg_latency:.0f}ms."
                         ),
-                        affected_agents=[row["agent_role"]],
+                        affected_agents=[agent_role],
                         suggested_actions=[
                             "Review agent prompt and system instructions",
                             "Test with alternative model providers",
@@ -421,19 +447,28 @@ class AutoOptimizer:
                     ORDER BY created_at DESC
                     LIMIT 1
                 """, (title, category))
-                existing = cur.fetchone()
-                
+                existing = self._row_to_dict(cur.fetchone())
+
                 if existing:
                     # Check if affected agents overlap
                     existing_agents = []
                     try:
-                        existing_agents = json.loads(existing["affected_agents"]) if existing["affected_agents"] else []
+                        existing_affected_agents = existing.get("affected_agents")
+                        existing_agents = (
+                            json.loads(existing_affected_agents)
+                            if existing_affected_agents
+                            else []
+                        )
                     except (json.JSONDecodeError, TypeError):
                         pass
                     
                     # If same agents affected, skip creating duplicate
                     if set(existing_agents) == set(affected_agents):
-                        cur.execute("SELECT * FROM recommendations WHERE id = %s", (existing["id"],))
+                        existing_id = int(existing.get("id") or 0)
+                        cur.execute(
+                            "SELECT * FROM recommendations WHERE id = %s",
+                            (existing_id,),
+                        )
                         row = cur.fetchone()
                         logger.debug("Skipping duplicate recommendation: %s", title)
                         return self._row_to_dict(row)
@@ -441,14 +476,25 @@ class AutoOptimizer:
                     # If overlapping agents, update existing instead of creating new
                     if set(existing_agents) & set(affected_agents):
                         merged_agents = list(set(existing_agents) | set(affected_agents))
+                        existing_id = int(existing.get("id") or 0)
                         cur.execute(
                             "UPDATE recommendations SET affected_agents = %s, updated_at = %s WHERE id = %s",
-                            (json.dumps(merged_agents, ensure_ascii=False), now, existing["id"]),
+                            (
+                                json.dumps(merged_agents, ensure_ascii=False),
+                                now,
+                                existing_id,
+                            ),
                         )
-                        cur.execute("SELECT * FROM recommendations WHERE id = %s", (existing["id"],))
+                        cur.execute(
+                            "SELECT * FROM recommendations WHERE id = %s",
+                            (existing_id,),
+                        )
                         row = cur.fetchone()
                         conn.commit()
-                        logger.info("Merged recommendation %d with new affected agents", existing["id"])
+                        logger.info(
+                            "Merged recommendation %d with new affected agents",
+                            existing_id,
+                        )
                         return self._row_to_dict(row)
 
                 cur.execute(
@@ -468,8 +514,8 @@ class AutoOptimizer:
                         now,
                     ),
                 )
-                result = cur.fetchone()
-                rec_id = result["id"]
+                result = self._row_to_dict(cur.fetchone())
+                rec_id = int(result.get("id") or 0)
                 conn.commit()
         finally:
             release_conn(conn)
@@ -538,28 +584,39 @@ class AutoOptimizer:
         try:
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) AS cnt FROM recommendations")
-                total = cur.fetchone()["cnt"]
+                total_row = self._row_to_dict(cur.fetchone())
+                total = int(total_row.get("cnt") or 0)
 
                 cur.execute(
                     "SELECT status, COUNT(*) AS cnt FROM recommendations GROUP BY status"
                 )
-                by_status = {row["status"]: row["cnt"] for row in cur.fetchall()}
+                by_status = {
+                    str(row.get("status") or "unknown"): int(row.get("cnt") or 0)
+                    for row in self._rows_to_dicts(cur.fetchall())
+                }
 
                 cur.execute(
                     "SELECT category, COUNT(*) AS cnt FROM recommendations GROUP BY category"
                 )
-                by_category = {row["category"]: row["cnt"] for row in cur.fetchall()}
+                by_category = {
+                    str(row.get("category") or "unknown"): int(row.get("cnt") or 0)
+                    for row in self._rows_to_dicts(cur.fetchall())
+                }
 
                 cur.execute(
                     "SELECT priority, COUNT(*) AS cnt FROM recommendations GROUP BY priority"
                 )
-                by_priority = {row["priority"]: row["cnt"] for row in cur.fetchall()}
+                by_priority = {
+                    str(row.get("priority") or "unknown"): int(row.get("cnt") or 0)
+                    for row in self._rows_to_dicts(cur.fetchall())
+                }
 
                 cur.execute(
                     "SELECT COUNT(*) AS cnt FROM recommendations "
                     "WHERE status = 'pending' AND priority = 'critical'"
                 )
-                pending_critical = cur.fetchone()["cnt"]
+                pending_critical_row = self._row_to_dict(cur.fetchone())
+                pending_critical = int(pending_critical_row.get("cnt") or 0)
         finally:
             release_conn(conn)
 
@@ -591,23 +648,31 @@ class AutoOptimizer:
                 cur.execute(
                     "SELECT * FROM recommendations WHERE id = %s", (rec_id,)
                 )
-                existing = cur.fetchone()
+                existing = self._row_to_dict(cur.fetchone())
 
                 if not existing:
                     return {"error": f"Recommendation {rec_id} not found"}
 
-                if existing["status"] != "pending":
-                    return {"error": f"Recommendation {rec_id} is already '{existing['status']}'"}
+                existing_status = str(existing.get("status") or "unknown")
+                if existing_status != "pending":
+                    return {
+                        "error": f"Recommendation {rec_id} is already '{existing_status}'"
+                    }
 
                 # Auto-apply safety: skip critical recommendations
-                if auto and existing["priority"] == "critical":
+                if auto and str(existing.get("priority") or "") == "critical":
                     logger.info("Skipping auto-apply for critical recommendation %d", rec_id)
                     return {"error": "Critical recommendations require manual approval"}
 
-                category = existing["category"]
+                category = str(existing.get("category") or "")
                 affected_agents = []
                 try:
-                    affected_agents = json.loads(existing["affected_agents"]) if existing["affected_agents"] else []
+                    existing_affected_agents = existing.get("affected_agents")
+                    affected_agents = (
+                        json.loads(existing_affected_agents)
+                        if existing_affected_agents
+                        else []
+                    )
                 except (json.JSONDecodeError, TypeError):
                     pass
 
@@ -751,13 +816,16 @@ class AutoOptimizer:
                 cur.execute(
                     "SELECT * FROM recommendations WHERE id = %s", (rec_id,)
                 )
-                existing = cur.fetchone()
+                existing = self._row_to_dict(cur.fetchone())
 
                 if not existing:
                     return {"error": f"Recommendation {rec_id} not found"}
 
-                if existing["status"] != "pending":
-                    return {"error": f"Recommendation {rec_id} is already '{existing['status']}'"}
+                existing_status = str(existing.get("status") or "unknown")
+                if existing_status != "pending":
+                    return {
+                        "error": f"Recommendation {rec_id} is already '{existing_status}'"
+                    }
 
                 now = datetime.now(timezone.utc).isoformat()
                 cur.execute(
@@ -819,15 +887,17 @@ class AutoOptimizer:
                            SUM(CASE WHEN score >= 3.5 THEN 1 ELSE 0 END) AS success_count
                     FROM evaluations WHERE agent_role = %s
                 """, (agent_role,))
-                row = cur.fetchone()
-                if row and row["total"]:
+                row = self._row_to_dict(cur.fetchone())
+                total = int(row.get("total") or 0)
+                if total:
+                    success_count = int(row.get("success_count") or 0)
                     eval_stats = {
-                        "total_tasks": row["total"],
-                        "avg_score": float(row["avg_score"] or 0),
-                        "avg_latency_ms": float(row["avg_latency"] or 0),
-                        "success_rate_pct": round(
-                            (row["success_count"] / row["total"]) * 100, 1
-                        ) if row["total"] else 0,
+                        "total_tasks": total,
+                        "avg_score": float(row.get("avg_score") or 0),
+                        "avg_latency_ms": float(row.get("avg_latency") or 0),
+                        "success_rate_pct": round((success_count / total) * 100, 1)
+                        if total
+                        else 0,
                     }
         except Exception:
             pass
@@ -846,11 +916,11 @@ class AutoOptimizer:
                     WHERE agent_role = %s
                     AND created_at >= NOW() - INTERVAL '7 days'
                 """, (agent_role,))
-                row = cur.fetchone()
+                row = self._row_to_dict(cur.fetchone())
                 if row:
                     error_stats = {
-                        "errors_last_7d": row["total_errors"],
-                        "unique_error_types": row["unique_types"],
+                        "errors_last_7d": int(row.get("total_errors") or 0),
+                        "unique_error_types": int(row.get("unique_types") or 0),
                     }
         except Exception:
             pass
@@ -867,11 +937,12 @@ class AutoOptimizer:
                            COUNT(*) AS total_runs
                     FROM benchmark_results WHERE agent_role = %s
                 """, (agent_role,))
-                row = cur.fetchone()
-                if row and row["total_runs"]:
+                row = self._row_to_dict(cur.fetchone())
+                total_runs = int(row.get("total_runs") or 0)
+                if total_runs:
                     bench_stats = {
-                        "avg_benchmark_score": float(row["avg_score"] or 0),
-                        "total_benchmark_runs": row["total_runs"],
+                        "avg_benchmark_score": float(row.get("avg_score") or 0),
+                        "total_benchmark_runs": total_runs,
                     }
         except Exception:
             pass
@@ -931,9 +1002,9 @@ class AutoOptimizer:
     # ── Helpers ──────────────────────────────────────────────────
 
     @staticmethod
-    def _row_to_dict(row: dict) -> dict[str, Any]:
+    def _row_to_dict(row: Any) -> dict[str, Any]:
         """Convert a PG RealDictRow to a dict, parsing JSON fields."""
-        d = dict(row)
+        d = dict(row or {})
         for json_field in ("affected_agents", "suggested_actions"):
             if d.get(json_field) and isinstance(d[json_field], str):
                 try:

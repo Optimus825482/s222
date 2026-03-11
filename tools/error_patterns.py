@@ -146,9 +146,17 @@ _RECOMMENDATION_TEMPLATES: dict[str, str] = {
 }
 
 
+def _row_to_dict(row: Any) -> dict[str, Any]:
+    return dict(row or {})
+
+
+def _rows_to_dicts(rows: list[Any]) -> list[dict[str, Any]]:
+    return [_row_to_dict(row) for row in rows]
+
+
 # ── ErrorPatternAnalyzer ─────────────────────────────────────────
 
-class ErrorPatternAnalyzer:
+class _LegacyErrorPatternAnalyzer:
     """Records, classifies, and analyzes error events across agents."""
 
     # ── Record ───────────────────────────────────────────────────
@@ -187,7 +195,8 @@ class ErrorPatternAnalyzer:
                     ),
                 )
                 row = cur.fetchone()
-                event_id = row["id"]
+                row_data = dict(row or {})
+                event_id = row_data.get("id")
             conn.commit()
         finally:
             release_conn(conn)
@@ -238,8 +247,13 @@ class ErrorPatternAnalyzer:
         # Group by (error_type, agent_role)
         groups: dict[tuple[str, str], list[dict]] = {}
         for row in rows:
-            key = (row["error_type"], row["agent_role"])
-            groups.setdefault(key, []).append(dict(row))
+            row_data = dict(row or {})
+            error_type = row_data.get("error_type")
+            agent_role = row_data.get("agent_role")
+            if not error_type or not agent_role:
+                continue
+            key = (str(error_type), str(agent_role))
+            groups.setdefault(key, []).append(row_data)
 
         detected: list[dict[str, Any]] = []
 
@@ -324,20 +338,21 @@ class ErrorPatternAnalyzer:
                     (error_type, f'%"{agent_role}"%'),
                 )
                 existing = cur.fetchone()
+                existing_data = dict(existing or {})
 
-                if existing:
+                if existing_data:
                     # Update existing pattern
-                    new_freq = existing["frequency"] + frequency
+                    new_freq = int(existing_data.get("frequency") or 0) + frequency
                     cur.execute(
                         """UPDATE error_patterns
                            SET frequency = %s, last_seen = %s
                            WHERE id = %s""",
-                        (new_freq, last_seen, existing["id"]),
+                        (new_freq, last_seen, existing_data.get("id")),
                     )
                     conn.commit()
 
                     return {
-                        "id": existing["id"],
+                        "id": existing_data.get("id"),
                         "pattern_name": f"{error_type}:{agent_role}",
                         "error_type": error_type,
                         "agent_role": agent_role,
@@ -370,7 +385,8 @@ class ErrorPatternAnalyzer:
                     ),
                 )
                 row = cur.fetchone()
-                pattern_id = row["id"]
+                row_data = dict(row or {})
+                pattern_id = row_data.get("id")
             conn.commit()
         finally:
             release_conn(conn)
@@ -454,7 +470,7 @@ class ErrorPatternAnalyzer:
                     f"SELECT COUNT(*) as cnt FROM error_events {base_where}",
                     base_params,
                 )
-                total = cur.fetchone()["cnt"]
+                total = int(_row_to_dict(cur.fetchone()).get("cnt") or 0)
 
                 # By error type
                 cur.execute(
@@ -463,7 +479,12 @@ class ErrorPatternAnalyzer:
                         GROUP BY error_type ORDER BY cnt DESC""",
                     base_params,
                 )
-                by_type = {row["error_type"]: row["cnt"] for row in cur.fetchall()}
+                by_type = {
+                    str(row_data.get("error_type") or "unknown"): int(
+                        row_data.get("cnt") or 0
+                    )
+                    for row_data in _rows_to_dicts(cur.fetchall())
+                }
 
                 # By agent
                 cur.execute(
@@ -472,7 +493,12 @@ class ErrorPatternAnalyzer:
                         GROUP BY agent_role ORDER BY cnt DESC""",
                     base_params,
                 )
-                by_agent = {row["agent_role"]: row["cnt"] for row in cur.fetchall()}
+                by_agent = {
+                    str(row_data.get("agent_role") or "unknown"): int(
+                        row_data.get("cnt") or 0
+                    )
+                    for row_data in _rows_to_dicts(cur.fetchall())
+                }
 
                 # By severity
                 cur.execute(
@@ -481,7 +507,12 @@ class ErrorPatternAnalyzer:
                         GROUP BY severity ORDER BY cnt DESC""",
                     base_params,
                 )
-                by_severity = {row["severity"]: row["cnt"] for row in cur.fetchall()}
+                by_severity = {
+                    str(row_data.get("severity") or "unknown"): int(
+                        row_data.get("cnt") or 0
+                    )
+                    for row_data in _rows_to_dicts(cur.fetchall())
+                }
         finally:
             release_conn(conn)
 
@@ -518,12 +549,16 @@ class ErrorPatternAnalyzer:
 
         # Aggregate into hourly buckets
         timeline: dict[str, dict[str, Any]] = {}
-        for row in rows:
-            h = row["hour"]
+        for row_data in _rows_to_dicts(rows):
+            h = str(row_data.get("hour") or "")
+            error_type = row_data.get("error_type")
+            count = int(row_data.get("cnt") or 0)
+            if not h or not error_type:
+                continue
             if h not in timeline:
                 timeline[h] = {"hour": h, "count": 0, "by_type": {}}
-            timeline[h]["count"] += row["cnt"]
-            timeline[h]["by_type"][row["error_type"]] = row["cnt"]
+            timeline[h]["count"] += count
+            timeline[h]["by_type"][str(error_type)] = count
 
         return list(timeline.values())
 
@@ -583,7 +618,11 @@ class ErrorPatternAnalyzer:
                 finally:
                     release_conn(conn)
 
-                agents = [r["agent_role"] for r in agent_rows]
+                agents = [
+                    str(row_data.get("agent_role"))
+                    for row_data in _rows_to_dicts(agent_rows)
+                    if row_data.get("agent_role")
+                ]
                 agent_label = ", ".join(agents) if agents else "Unknown agent"
 
                 template = _RECOMMENDATION_TEMPLATES.get(
@@ -674,15 +713,15 @@ class ErrorPatternAnalyzer:
 
 # ── Module-level Singleton ───────────────────────────────────────
 
-_analyzer: ErrorPatternAnalyzer | None = None
+_legacy_analyzer: _LegacyErrorPatternAnalyzer | None = None
 
 
-def get_error_analyzer() -> ErrorPatternAnalyzer:
-    """Get the global ErrorPatternAnalyzer singleton."""
-    global _analyzer
-    if _analyzer is None:
-        _analyzer = ErrorPatternAnalyzer()
-    return _analyzer
+def _get_legacy_error_analyzer() -> _LegacyErrorPatternAnalyzer:
+    """Legacy analyzer retained only for backward file history context."""
+    global _legacy_analyzer
+    if _legacy_analyzer is None:
+        _legacy_analyzer = _LegacyErrorPatternAnalyzer()
+    return _legacy_analyzer
 
 
 # ── ErrorPatternAnalyzer ─────────────────────────────────────────
@@ -781,9 +820,13 @@ class ErrorPatternAnalyzer:
 
         # Group by (error_type, agent_role)
         groups: dict[tuple[str, str], list[dict]] = {}
-        for row in rows:
-            key = (row["error_type"], row["agent_role"])
-            groups.setdefault(key, []).append(dict(row))
+        for row_data in _rows_to_dicts(rows):
+            error_type = row_data.get("error_type")
+            agent_role = row_data.get("agent_role")
+            if not error_type or not agent_role:
+                continue
+            key = (str(error_type), str(agent_role))
+            groups.setdefault(key, []).append(row_data)
 
         detected: list[dict[str, Any]] = []
 
@@ -868,20 +911,21 @@ class ErrorPatternAnalyzer:
                     (error_type, f'%"{agent_role}"%'),
                 )
                 existing = cur.fetchone()
+                existing_data = _row_to_dict(existing)
 
-                if existing:
+                if existing_data:
                     # Update existing pattern
-                    new_freq = existing["frequency"] + frequency
+                    new_freq = int(existing_data.get("frequency") or 0) + frequency
                     cur.execute(
                         """UPDATE error_patterns
                            SET frequency = %s, last_seen = %s
                            WHERE id = %s""",
-                        (new_freq, last_seen, existing["id"]),
+                        (new_freq, last_seen, existing_data.get("id")),
                     )
                     conn.commit()
 
                     return {
-                        "id": existing["id"],
+                        "id": existing_data.get("id"),
                         "pattern_name": f"{error_type}:{agent_role}",
                         "error_type": error_type,
                         "agent_role": agent_role,
@@ -1007,7 +1051,7 @@ class ErrorPatternAnalyzer:
                     f"SELECT COUNT(*) as cnt FROM error_events {base_where}",
                     base_params,
                 )
-                total = cur.fetchone()["cnt"]
+                total = int(_row_to_dict(cur.fetchone()).get("cnt") or 0)
 
                 # By error type
                 cur.execute(
@@ -1016,7 +1060,12 @@ class ErrorPatternAnalyzer:
                         GROUP BY error_type ORDER BY cnt DESC""",
                     base_params,
                 )
-                by_type = {row["error_type"]: row["cnt"] for row in cur.fetchall()}
+                by_type = {
+                    str(row_data.get("error_type") or "unknown"): int(
+                        row_data.get("cnt") or 0
+                    )
+                    for row_data in _rows_to_dicts(cur.fetchall())
+                }
 
                 # By agent
                 cur.execute(
@@ -1025,7 +1074,12 @@ class ErrorPatternAnalyzer:
                         GROUP BY agent_role ORDER BY cnt DESC""",
                     base_params,
                 )
-                by_agent = {row["agent_role"]: row["cnt"] for row in cur.fetchall()}
+                by_agent = {
+                    str(row_data.get("agent_role") or "unknown"): int(
+                        row_data.get("cnt") or 0
+                    )
+                    for row_data in _rows_to_dicts(cur.fetchall())
+                }
 
                 # By severity
                 cur.execute(
@@ -1034,7 +1088,12 @@ class ErrorPatternAnalyzer:
                         GROUP BY severity ORDER BY cnt DESC""",
                     base_params,
                 )
-                by_severity = {row["severity"]: row["cnt"] for row in cur.fetchall()}
+                by_severity = {
+                    str(row_data.get("severity") or "unknown"): int(
+                        row_data.get("cnt") or 0
+                    )
+                    for row_data in _rows_to_dicts(cur.fetchall())
+                }
         finally:
             release_conn(conn)
 
@@ -1078,12 +1137,16 @@ class ErrorPatternAnalyzer:
 
         # Aggregate into hourly buckets
         timeline: dict[str, dict[str, Any]] = {}
-        for row in rows:
-            h = row["hour"]
+        for row_data in _rows_to_dicts(rows):
+            h = str(row_data.get("hour") or "")
+            error_type = row_data.get("error_type")
+            count = int(row_data.get("cnt") or 0)
+            if not h or not error_type:
+                continue
             if h not in timeline:
                 timeline[h] = {"hour": h, "count": 0, "by_type": {}}
-            timeline[h]["count"] += row["cnt"]
-            timeline[h]["by_type"][row["error_type"]] = row["cnt"]
+            timeline[h]["count"] += count
+            timeline[h]["by_type"][str(error_type)] = count
 
         return list(timeline.values())
 
@@ -1151,7 +1214,11 @@ class ErrorPatternAnalyzer:
                 finally:
                     release_conn(conn)
 
-                agents = [r["agent_role"] for r in agent_rows]
+                agents = [
+                    str(row_data.get("agent_role"))
+                    for row_data in _rows_to_dicts(agent_rows)
+                    if row_data.get("agent_role")
+                ]
                 agent_label = ", ".join(agents) if agents else "Unknown agent"
 
                 template = _RECOMMENDATION_TEMPLATES.get(

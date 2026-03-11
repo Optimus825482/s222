@@ -16,6 +16,16 @@ from tools.pg_connection import get_conn, release_conn
 
 logger = logging.getLogger(__name__)
 
+
+def _scalar_from_row(row: Any, default: int = 0) -> int:
+    if row is None:
+        return default
+    if isinstance(row, tuple):
+        value = row[0] if row else default
+        return int(value) if value is not None else default
+    return default
+
+
 # ── Knowledge Sharing ───────────────────────────────────────────
 
 def share_knowledge(
@@ -74,7 +84,7 @@ def get_relevant_knowledge(
                 SELECT * FROM collective_knowledge 
                 WHERE confidence >= %s AND active = TRUE
             """
-            params = [min_confidence]
+            params: list[object] = [min_confidence]
             
             if knowledge_types:
                 base_query += " AND knowledge_type = ANY(%s)"
@@ -297,7 +307,7 @@ def get_collective_status() -> dict[str, Any]:
         with conn.cursor() as cur:
             # Total knowledge
             cur.execute("SELECT COUNT(*) FROM collective_knowledge WHERE active = TRUE")
-            total_knowledge = cur.fetchone()[0]
+            total_knowledge = _scalar_from_row(cur.fetchone())
             
             # Knowledge by type
             cur.execute("""
@@ -322,7 +332,7 @@ def get_collective_status() -> dict[str, Any]:
                 SELECT COUNT(*) FROM collective_knowledge 
                 WHERE created_at > NOW() - INTERVAL '24 hours'
             """)
-            recent = cur.fetchone()[0]
+            recent = _scalar_from_row(cur.fetchone())
             
             return {
                 "total_knowledge_items": total_knowledge,

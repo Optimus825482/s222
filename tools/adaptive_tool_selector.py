@@ -169,10 +169,14 @@ class PerformanceAwareSelector:
                     """)
                     rows = cur.fetchall()
                     for row in rows:
-                        self.agent_performance[row["agent_role"]] = {
-                            "total_tasks": row["total"],
-                            "avg_score": float(row["avg_score"] or 0),
-                            "avg_latency_ms": float(row["avg_latency"] or 0),
+                        row_data = dict(row or {})
+                        agent_role = str(row_data.get("agent_role") or "")
+                        if not agent_role:
+                            continue
+                        self.agent_performance[agent_role] = {
+                            "total_tasks": row_data.get("total", 0),
+                            "avg_score": float(row_data.get("avg_score") or 0),
+                            "avg_latency_ms": float(row_data.get("avg_latency") or 0),
                         }
             finally:
                 release_conn(conn)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import urllib.parse
 from typing import Any
 
@@ -163,6 +164,8 @@ class OrchestratorAgent(BaseAgent):
             "- decompose_task: Break work into sub-tasks (prefer parallel)\n"
             "- direct_response: Simple answers only\n"
             "- web_search / web_fetch: Search/fetch web content\n"
+            "- summarize_video: Extract info + transcript + summary from YouTube videos\n"
+            "- fetch_transcript: Fetch raw transcript from YouTube videos (with auto-translation)\n"
             "- find_skill / use_skill: Load specialized knowledge\n"
             "- save_memory / recall_memory: Persistent memory\n"
             "- code_execute: Run Python/JS/Bash\n"
@@ -837,8 +840,12 @@ class OrchestratorAgent(BaseAgent):
     async def _handle_run_workflow(self, fn_args: dict, thread: Thread) -> str:
         """Execute a workflow template or custom workflow."""
         from tools.workflow_engine import (
-            WORKFLOW_TEMPLATES, create_workflow, execute_workflow,
-            WorkflowStep, Workflow,
+            get_template,
+            WORKFLOW_TEMPLATES,
+            create_workflow,
+            execute_workflow,
+            WorkflowStep,
+            Workflow,
         )
 
         template_name = fn_args.get("template", "")
@@ -846,15 +853,7 @@ class OrchestratorAgent(BaseAgent):
         custom_steps = fn_args.get("custom_steps")
 
         if template_name != "custom" and template_name in WORKFLOW_TEMPLATES:
-            template = WORKFLOW_TEMPLATES[template_name]
-            steps = [WorkflowStep(**s) for s in template["steps"]]
-            workflow = Workflow(
-                workflow_id=f"{template_name}-{int(time.time())}",
-                name=template["name"],
-                description=template["description"],
-                steps=steps,
-                variables=variables,
-            )
+            workflow = get_template(template_name, variables=variables)
         elif template_name == "custom" and custom_steps:
             steps = [WorkflowStep(**s) for s in custom_steps]
             workflow = Workflow(
@@ -1988,13 +1987,7 @@ class OrchestratorAgent(BaseAgent):
             trigger_post_task_auto_chat(
                 task_summary=user_input[:120],
                 participating_agents=None,
+                user_id=user_id or "__system__",
             )
         except Exception:
-            try:
-                from routes.messaging import trigger_post_task_auto_chat
-                trigger_post_task_auto_chat(
-                    task_summary=user_input[:120],
-                    participating_agents=None,
-                )
-            except Exception:
-                pass
+            pass

@@ -139,6 +139,17 @@ def get_execution_history(task_id: str | None = None, limit: int = 100) -> list[
     ]
 
 
+def _row_dict(row: Any) -> dict[str, Any]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
 # ── Scheduled Task Scheduler ─────────────────────────────────────
 
 _scheduler: AsyncIOScheduler | None = None
@@ -248,32 +259,37 @@ class ScheduledTaskScheduler:
             cur.execute("SELECT * FROM scheduled_tasks WHERE enabled = TRUE")
             rows = cur.fetchall()
             for row in rows:
-                task = self._row_to_task(row)
+                task = self._row_to_task(_row_dict(row))
                 self._task_cache[task.id] = task
                 self._schedule_task(task)
             logger.info("[ScheduledTasks] Loaded %d tasks from DB", len(rows))
         finally:
             release_conn(conn)
 
-    def _row_to_task(self, row: dict) -> ScheduledTask:
+    def _row_to_task(self, row: Any) -> ScheduledTask:
         """Convert DB row to ScheduledTask."""
+        row_data = _row_dict(row)
         return ScheduledTask(
-            id=row["id"],
-            name=row["name"],
-            task_type=TaskType(row["task_type"]),
-            cron_expr=row["cron_expr"],
-            handler_ref=row["handler_ref"],
-            params=json.loads(row["params"]) if row["params"] else {},
-            enabled=bool(row["enabled"]),
-            user_id=row["user_id"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            last_run=row["last_run"],
-            last_status=TaskStatus(row["last_status"]),
-            last_result=json.loads(row["last_result"]) if row["last_result"] else None,
-            run_count=row["run_count"] or 0,
-            error_count=row["error_count"] or 0,
-            tags=json.loads(row["tags"]) if row["tags"] else [],
+            id=str(row_data.get("id", "")),
+            name=str(row_data.get("name", "")),
+            task_type=TaskType(str(row_data.get("task_type", TaskType.CALLABLE.value))),
+            cron_expr=str(row_data.get("cron_expr", "")),
+            handler_ref=str(row_data.get("handler_ref", "")),
+            params=json.loads(row_data["params"]) if row_data.get("params") else {},
+            enabled=bool(row_data.get("enabled", False)),
+            user_id=row_data.get("user_id"),
+            created_at=row_data.get("created_at"),
+            updated_at=row_data.get("updated_at"),
+            last_run=row_data.get("last_run"),
+            last_status=TaskStatus(
+                str(row_data.get("last_status", TaskStatus.PENDING.value))
+            ),
+            last_result=json.loads(row_data["last_result"])
+            if row_data.get("last_result")
+            else None,
+            run_count=int(row_data.get("run_count", 0) or 0),
+            error_count=int(row_data.get("error_count", 0) or 0),
+            tags=json.loads(row_data["tags"]) if row_data.get("tags") else [],
         )
 
     def _task_to_dict(self, task: ScheduledTask) -> dict:
@@ -420,7 +436,7 @@ class ScheduledTaskScheduler:
             cur.execute("SELECT * FROM scheduled_tasks WHERE id = %s", (task_id,))
             row = cur.fetchone()
             if row:
-                task = self._row_to_task(row)
+                task = self._row_to_task(_row_dict(row))
                 self._task_cache[task.id] = task
                 return task
             return None
@@ -454,7 +470,7 @@ class ScheduledTaskScheduler:
             cur = conn.cursor()
             cur.execute(query, params)
             rows = cur.fetchall()
-            return [self._row_to_task(r) for r in rows]
+            return [self._row_to_task(_row_dict(row)) for row in rows]
         finally:
             release_conn(conn)
 
@@ -632,20 +648,27 @@ class ScheduledTaskScheduler:
                     (limit,),
                 )
             rows = cur.fetchall()
-            return [
-                {
-                    "id": r["id"],
-                    "task_id": r["task_id"],
-                    "status": r["status"],
-                    "started_at": r["started_at"].isoformat() if r["started_at"] else None,
-                    "finished_at": r["finished_at"].isoformat() if r["finished_at"] else None,
-                    "duration_ms": r["duration_ms"],
-                    "result": json.loads(r["result"]) if r["result"] else None,
-                    "error": r["error"],
-                    "retry_count": r["retry_count"] or 0,
-                }
-                for r in rows
-            ]
+            executions: list[dict[str, Any]] = []
+            for row in rows:
+                row_data = _row_dict(row)
+                started_at = row_data.get("started_at")
+                finished_at = row_data.get("finished_at")
+                executions.append(
+                    {
+                        "id": row_data.get("id"),
+                        "task_id": row_data.get("task_id"),
+                        "status": row_data.get("status"),
+                        "started_at": started_at.isoformat() if started_at else None,
+                        "finished_at": finished_at.isoformat() if finished_at else None,
+                        "duration_ms": row_data.get("duration_ms"),
+                        "result": json.loads(row_data["result"])
+                        if row_data.get("result")
+                        else None,
+                        "error": row_data.get("error"),
+                        "retry_count": int(row_data.get("retry_count", 0) or 0),
+                    }
+                )
+            return executions
         finally:
             release_conn(conn)
 
@@ -720,9 +743,18 @@ async def _execute_task_internal(task: ScheduledTask) -> dict:
             body = task.params.get("body")
             timeout = task.params.get("timeout", 30)
 
+            if not isinstance(url, str) or not url:
+                raise ValueError("HTTP task requires a valid 'url' parameter")
+
+            request_url: str = url
+
             async with aiohttp.ClientSession() as session:
                 async with session.request(
-                    method, url, headers=headers, data=body, timeout=aiohttp.ClientTimeout(total=timeout)
+                    method,
+                    request_url,
+                    headers=headers,
+                    data=body,
+                    timeout=aiohttp.ClientTimeout(total=timeout),
                 ) as resp:
                     result = {
                         "status_code": resp.status,

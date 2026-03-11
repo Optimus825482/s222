@@ -77,6 +77,7 @@ YOUTUBE_SUMMARIZER_TOOL = {
         "description": (
             "Extract video info, transcript, and summary from a YouTube video. "
             "Returns title, description, metadata, and transcript (from captions or Whisper transcription). "
+            "Supports automatic translation to any target language (e.g. 'tr' for Turkish). "
             "Use for researching YouTube content, extracting information from videos."
         ),
         "parameters": {
@@ -90,6 +91,10 @@ YOUTUBE_SUMMARIZER_TOOL = {
                     "type": "string",
                     "description": "Preferred language code for subtitles (default: 'en')",
                 },
+                "target_language": {
+                    "type": "string",
+                    "description": "Target language for translation (e.g. 'tr' for Turkish, 'de' for German). If set, transcript will be auto-translated.",
+                },
                 "use_whisper_fallback": {
                     "type": "boolean",
                     "description": "Use Whisper transcription if no subtitles available (default: true)",
@@ -102,6 +107,42 @@ YOUTUBE_SUMMARIZER_TOOL = {
                 "max_transcript_chars": {
                     "type": "integer",
                     "description": "Maximum characters to include in transcript (default: 10000)",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+}
+
+YOUTUBE_TRANSCRIPT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "fetch_transcript",
+        "description": (
+            "Fetch the transcript/subtitles from a YouTube video. "
+            "Returns the full text and timestamped segments. "
+            "Supports multi-language: tries target language first, falls back to English, then any available. "
+            "Can auto-translate to a target language (e.g. 'tr' for Turkish). "
+            "Use when you need the raw text content of a YouTube video for analysis, research, or reference."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "YouTube video URL",
+                },
+                "language": {
+                    "type": "string",
+                    "description": "Preferred subtitle language code (default: 'en')",
+                },
+                "target_language": {
+                    "type": "string",
+                    "description": "Auto-translate transcript to this language (e.g. 'tr', 'de', 'fr'). Omit to keep original.",
+                },
+                "max_chars": {
+                    "type": "integer",
+                    "description": "Max characters to return (default: 15000)",
                 },
             },
             "required": ["url"],
@@ -1951,6 +1992,8 @@ SEARCH_THREAD_HISTORY_TOOL = {
 ORCHESTRATOR_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    YOUTUBE_SUMMARIZER_TOOL,
+    YOUTUBE_TRANSCRIPT_TOOL,
     SAVE_MEMORY_TOOL,
     RECALL_MEMORY_TOOL,
     LIST_MEMORIES_TOOL,
@@ -2143,6 +2186,7 @@ RESEARCHER_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
     YOUTUBE_SUMMARIZER_TOOL,
+    YOUTUBE_TRANSCRIPT_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
     LIST_MEMORIES_TOOL,
@@ -2182,6 +2226,7 @@ RESEARCHER_TOOLS = [
 THINKER_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    YOUTUBE_TRANSCRIPT_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
     LIST_MEMORIES_TOOL,
@@ -2222,6 +2267,7 @@ THINKER_TOOLS = [
 SPEED_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    YOUTUBE_TRANSCRIPT_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
     LIST_MEMORIES_TOOL,
@@ -2262,6 +2308,7 @@ SPEED_TOOLS = [
 REASONER_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    YOUTUBE_TRANSCRIPT_TOOL,
     RECALL_MEMORY_TOOL,
     SAVE_MEMORY_TOOL,
     LIST_MEMORIES_TOOL,
@@ -2302,6 +2349,7 @@ REASONER_TOOLS = [
 CRITIC_TOOLS = [
     WEB_SEARCH_TOOL,
     WEB_FETCH_TOOL,
+    YOUTUBE_TRANSCRIPT_TOOL,
     FIND_SKILL_TOOL,
     USE_SKILL_TOOL,
     RAG_QUERY_TOOL,

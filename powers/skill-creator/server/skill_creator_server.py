@@ -29,8 +29,6 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     "skill-creator-server",
-    version="1.0.0",
-    description="Skill evaluation, benchmarking, validation, and search tools",
 )
 
 

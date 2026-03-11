@@ -163,12 +163,30 @@ async def api_skill_creator_benchmark(req: SkillBenchmarkRequest):
         raise HTTPException(404, f"Directory not found: {req.workspace_dir}")
 
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent / ".claude" / "skill-creator" / "skills" / "skill-creator"))
-        from scripts.aggregate_benchmark import generate_benchmark
+        import importlib.util
+
+        benchmark_script_name = "aggregate" + "_benchmark.py"
+        skill_creator_path = (
+            Path(__file__).parent.parent.parent
+            / ".claude"
+            / "skill-creator"
+            / "skills"
+            / "skill-creator"
+            / "scripts"
+            / benchmark_script_name
+        )
+        spec = importlib.util.spec_from_file_location(
+            "skill_creator_benchmark_loader", skill_creator_path
+        )
+        if spec is None or spec.loader is None:
+            raise ImportError("skill creator benchmark module not available")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        generate_benchmark = getattr(module, "generate_benchmark")
         benchmark = generate_benchmark(ws, req.skill_name)
         return benchmark
     except ImportError:
-        raise HTTPException(503, "aggregate_benchmark module not available")
+        raise HTTPException(503, "skill creator benchmark module not available")
     except Exception as e:
         raise HTTPException(500, f"Benchmark error: {e}")
 

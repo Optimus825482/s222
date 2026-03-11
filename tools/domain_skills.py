@@ -1271,10 +1271,10 @@ def toggle_domain_skill(domain_id: str, enabled: bool) -> dict:
                     "SELECT source FROM domain_skill_registry WHERE domain_id = %s",
                     (domain_id,)
                 )
-                row = cur.fetchone()
+                row_data: dict[str, Any] = dict(cur.fetchone() or {})
         finally:
             release_conn(conn)
-        if row and row["source"] == "discovered":
+        if row_data and row_data.get("source") == "discovered":
             del DOMAINS[domain_id]
     elif enabled and domain_id not in DOMAINS:
         # Re-discover to reload

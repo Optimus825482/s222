@@ -6,11 +6,24 @@ Metrics, A/B experiments, prompt strategies, routing weights, dashboard.
 from __future__ import annotations
 
 import logging
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("self_improvement")
 router = APIRouter(tags=["self-improvement"])
+
+
+def _row_dict(row: Any) -> dict[str, Any]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
 
 
 # ── Request Models ───────────────────────────────────────────────
@@ -40,14 +53,18 @@ class PromptStrategyRequest(BaseModel):
 def get_agent_metrics(agent_role: str):
     """Aggregated agent performance stats."""
     from tools.performance_collector import get_performance_collector
-    return get_performance_collector().get_agent_stats(agent_role)
+
+    collector: Any = get_performance_collector()
+    return collector.get_agent_stats(agent_role)
 
 
 @router.get("/api/metrics/skills/{skill_id}")
 def get_skill_metrics(skill_id: str):
     """Skill usage stats."""
     from tools.performance_collector import get_performance_collector
-    return get_performance_collector().get_skill_stats(skill_id)
+
+    collector: Any = get_performance_collector()
+    return collector.get_skill_stats(skill_id)
 
 
 # ── Experiment Endpoints ─────────────────────────────────────────
@@ -127,17 +144,29 @@ def dashboard_overview():
         conn = get_conn()
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) as cnt FROM performance_metrics")
-            overview["total_metrics"] = cur.fetchone()["cnt"]
+            overview["total_metrics"] = int(
+                _row_dict(cur.fetchone()).get("cnt", 0) or 0
+            )
             cur.execute("SELECT COUNT(*) as cnt FROM ab_experiments")
-            overview["total_experiments"] = cur.fetchone()["cnt"]
+            overview["total_experiments"] = int(
+                _row_dict(cur.fetchone()).get("cnt", 0) or 0
+            )
             cur.execute("SELECT COUNT(*) as cnt FROM ab_experiments WHERE status = 'active'")
-            overview["active_experiments"] = cur.fetchone()["cnt"]
+            overview["active_experiments"] = int(
+                _row_dict(cur.fetchone()).get("cnt", 0) or 0
+            )
             cur.execute("SELECT COUNT(*) as cnt FROM prompt_strategies")
-            overview["total_strategies"] = cur.fetchone()["cnt"]
+            overview["total_strategies"] = int(
+                _row_dict(cur.fetchone()).get("cnt", 0) or 0
+            )
             cur.execute("SELECT COUNT(*) as cnt FROM prompt_strategies WHERE is_active = TRUE")
-            overview["active_strategies"] = cur.fetchone()["cnt"]
+            overview["active_strategies"] = int(
+                _row_dict(cur.fetchone()).get("cnt", 0) or 0
+            )
             cur.execute("SELECT COUNT(*) as cnt FROM optimization_history")
-            overview["total_optimizations"] = cur.fetchone()["cnt"]
+            overview["total_optimizations"] = int(
+                _row_dict(cur.fetchone()).get("cnt", 0) or 0
+            )
         release_conn(conn)
     except Exception as e:
         overview["error"] = str(e)
@@ -171,19 +200,30 @@ def agent_history(
             """, (agent_role, limit))
             rows = cur.fetchall()
         release_conn(conn)
+        data = []
+        for row in rows:
+            row_data = _row_dict(row)
+            period_value = row_data.get("period")
+            period_str = (
+                period_value.isoformat()
+                if period_value is not None and hasattr(period_value, "isoformat")
+                else str(period_value)
+            )
+            data.append(
+                {
+                    "period": period_str,
+                    "task_count": int(row_data.get("task_count", 0) or 0),
+                    "avg_score": round(float(row_data.get("avg_score", 0) or 0), 2),
+                    "avg_latency_ms": round(
+                        float(row_data.get("avg_latency", 0) or 0), 1
+                    ),
+                    "total_tokens": int(row_data.get("total_tokens", 0) or 0),
+                }
+            )
         return {
             "agent_role": agent_role,
             "granularity": granularity,
-            "data": [
-                {
-                    "period": r["period"].isoformat() if hasattr(r["period"], "isoformat") else str(r["period"]),
-                    "task_count": r["task_count"],
-                    "avg_score": round(float(r["avg_score"] or 0), 2),
-                    "avg_latency_ms": round(float(r["avg_latency"] or 0), 1),
-                    "total_tokens": int(r["total_tokens"] or 0),
-                }
-                for r in rows
-            ],
+            "data": data,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

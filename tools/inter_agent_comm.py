@@ -231,8 +231,8 @@ class AgentMessageBus:
             del self._shared_knowledge[key]
         
         return result
-    
-    def clear_knowledge(self, key: str = None) -> None:
+
+    def clear_knowledge(self, key: Optional[str] = None) -> None:
         """Clear shared knowledge."""
         if key:
             self._shared_knowledge.pop(key, None)
@@ -240,8 +240,10 @@ class AgentMessageBus:
             self._shared_knowledge.clear()
     
     # ── History & Debugging ─────────────────────────────────────────
-    
-    def get_history(self, agent_role: str = None, limit: int = 50) -> list[dict]:
+
+    def get_history(
+        self, agent_role: Optional[str] = None, limit: int = 50
+    ) -> list[dict]:
         """Get message history for debugging."""
         messages = self._history[-limit:]
         if agent_role:
@@ -268,7 +270,7 @@ async def send_direct_message(
     from_agent: str,
     to_agent: str,
     content: str,
-    metadata: dict = None,
+    metadata: Optional[dict[str, Any]] = None,
     requires_response: bool = False,
     priority: int = 0,
 ) -> str:
@@ -291,7 +293,7 @@ async def send_collaboration_request(
     from_agent: str,
     to_agent: str,
     task_description: str,
-    context: dict = None,
+    context: Optional[dict[str, Any]] = None,
     thread_id: str = "",
 ) -> str:
     """Request collaboration from another agent."""
@@ -336,7 +338,7 @@ async def send_task_delegation(
 async def broadcast_alert(
     from_agent: str,
     alert_content: str,
-    metadata: dict = None,
+    metadata: Optional[dict[str, Any]] = None,
 ) -> None:
     """Broadcast an alert to all agents."""
     bus = get_message_bus()
@@ -351,8 +353,13 @@ async def broadcast_alert(
     await bus.send(message)
 
 
-def share_knowledge(key: str, value: Any, source_agent: str, 
-                   confidence: float = 1.0, tags: list[str] = None) -> None:
+def share_knowledge(
+    key: str,
+    value: Any,
+    source_agent: str,
+    confidence: float = 1.0,
+    tags: Optional[list[str]] = None,
+) -> None:
     """Share knowledge with all agents."""
     bus = get_message_bus()
     knowledge = SharedKnowledge(

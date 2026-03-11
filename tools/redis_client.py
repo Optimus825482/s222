@@ -25,6 +25,7 @@ import logging
 import os
 import time
 from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger("redis_client")
 
@@ -122,6 +123,8 @@ def get_redis():
 def _connect_sentinel(cfg: dict) -> Any:
     """Connect via Redis Sentinel for HA."""
     _ensure_redis()
+    sentinel_module: Any = cast(Any, _sentinel_mod)
+    assert sentinel_module is not None
     hosts = []
     for h in cfg["sentinel_hosts"].split(","):
         h = h.strip()
@@ -135,7 +138,7 @@ def _connect_sentinel(cfg: dict) -> Any:
     if cfg["sentinel_password"]:
         sentinel_kwargs["password"] = cfg["sentinel_password"]
 
-    sentinel = _sentinel_mod.Sentinel(
+    sentinel = sentinel_module.Sentinel(
         hosts,
         socket_timeout=cfg["socket_timeout"],
         sentinel_kwargs=sentinel_kwargs,
@@ -156,7 +159,9 @@ def _connect_sentinel(cfg: dict) -> Any:
 def _connect_standalone(cfg: dict) -> Any:
     """Connect to standalone Redis."""
     _ensure_redis()
-    return _redis_mod.Redis.from_url(
+    redis_module: Any = cast(Any, _redis_mod)
+    assert redis_module is not None
+    return redis_module.Redis.from_url(
         cfg["url"],
         password=cfg["password"] or None,
         db=cfg["db"],

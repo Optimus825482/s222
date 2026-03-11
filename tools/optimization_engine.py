@@ -7,9 +7,16 @@ and selects optimal prompt strategies based on performance data.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 logger = logging.getLogger("optimization_engine")
+
+
+def _as_row(row: object) -> Mapping[str, Any] | None:
+    if isinstance(row, Mapping):
+        return row
+    return None
 
 
 class OptimizationEngine:
@@ -74,7 +81,10 @@ class OptimizationEngine:
             self._release(conn)
 
             scored: list[tuple[float, str]] = []
-            for row in rows:
+            for fetched in rows:
+                row = _as_row(fetched)
+                if row is None:
+                    continue
                 avg_rating = float(row["avg_rating"] or 0) / 5.0
                 task_use = int(row["task_use_count"] or 0)
                 norm_use = min(task_use / 100.0, 1.0)
@@ -150,7 +160,10 @@ class OptimizationEngine:
             self._release(conn)
 
             result = []
-            for i, row in enumerate(rows, 1):
+            for i, fetched in enumerate(rows, 1):
+                row = _as_row(fetched)
+                if row is None:
+                    continue
                 avg_rating = float(row["avg_rating"] or 0) / 5.0
                 task_uses = int(row["total_task_uses"] or 0)
                 norm_use = min(task_uses / 100.0, 1.0)

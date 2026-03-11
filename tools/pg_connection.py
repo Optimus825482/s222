@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import contextmanager
-from typing import Generator
+from typing import Any, Generator, Mapping, TypeAlias
 
 import psycopg2
 import psycopg2.extras
@@ -23,6 +23,9 @@ from config import DATABASE_URL
 logger = logging.getLogger(__name__)
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
+
+# Dict-like row shape returned by RealDictCursor (for downstream typing)
+DBRow: TypeAlias = Mapping[str, Any]
 
 # ── Pool Management ──────────────────────────────────────────────
 

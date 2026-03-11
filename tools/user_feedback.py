@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -21,6 +22,12 @@ from typing import Any, Optional
 from tools.pg_connection import get_conn, release_conn
 
 logger = logging.getLogger(__name__)
+
+
+def _as_row(row: object) -> Mapping[str, Any] | None:
+    if isinstance(row, Mapping):
+        return row
+    return None
 
 
 @dataclass
@@ -173,8 +180,11 @@ def submit_feedback(
                 task_input[:500] if task_input else None,
                 task_output[:2000] if task_output else None,
             ))
-            
-            feedback_id = cur.fetchone()["id"]
+
+            inserted = _as_row(cur.fetchone())
+            if inserted is None:
+                raise ValueError("Feedback insert did not return id")
+            feedback_id = inserted["id"]
             
             # Update aggregated stats
             _update_agent_stats(cur, agent_role, rating)
@@ -232,7 +242,7 @@ def get_feedback_for_thread(thread_id: str) -> list[dict]:
                 ORDER BY created_at DESC
             """, (thread_id,))
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            return [dict(r) for fetched in rows if (r := _as_row(fetched)) is not None]
     finally:
         release_conn(conn)
 
@@ -251,7 +261,7 @@ def get_agent_feedback_stats(agent_role: Optional[str] = None) -> list[dict]:
                     SELECT * FROM agent_feedback_stats ORDER BY total_ratings DESC
                 """)
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            return [dict(r) for fetched in rows if (r := _as_row(fetched)) is not None]
     finally:
         release_conn(conn)
 
@@ -275,7 +285,7 @@ def get_feedback_leaderboard(limit: int = 10) -> list[dict]:
                 LIMIT %s
             """, (limit,))
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            return [dict(r) for fetched in rows if (r := _as_row(fetched)) is not None]
     finally:
         release_conn(conn)
 
@@ -301,7 +311,10 @@ def get_feedback_trends(days: int = 7) -> dict:
             
             # Organize by date
             trends = {}
-            for r in rows:
+            for fetched in rows:
+                r = _as_row(fetched)
+                if r is None:
+                    continue
                 date_str = str(r["date"])
                 if date_str not in trends:
                     trends[date_str] = {}
@@ -320,7 +333,7 @@ def get_feedback_trends(days: int = 7) -> dict:
         release_conn(conn)
 
 
-def get_rlhf_training_data(limit: int = 100) -> list[dict]:
+def get_rlhf_training_data(limit: int = 100) -> dict[str, Any]:
     """
     Get training data for RLHF.
     Returns pairs of positive/negative feedback for the same task type.
@@ -341,7 +354,11 @@ def get_rlhf_training_data(limit: int = 100) -> list[dict]:
                 ORDER BY created_at DESC
                 LIMIT %s
             """, (limit,))
-            positive = [dict(r) for r in cur.fetchall()]
+            positive = [
+                dict(r)
+                for fetched in cur.fetchall()
+                if (r := _as_row(fetched)) is not None
+            ]
             
             # Get negative feedback with context
             cur.execute("""
@@ -356,7 +373,11 @@ def get_rlhf_training_data(limit: int = 100) -> list[dict]:
                 ORDER BY created_at DESC
                 LIMIT %s
             """, (limit,))
-            negative = [dict(r) for r in cur.fetchall()]
+            negative = [
+                dict(r)
+                for fetched in cur.fetchall()
+                if (r := _as_row(fetched)) is not None
+            ]
             
             return {
                 "positive_examples": positive,

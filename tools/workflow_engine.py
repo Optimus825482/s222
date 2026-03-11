@@ -22,6 +22,9 @@ from core.models import AgentRole, EventType, Thread
 
 logger = logging.getLogger(__name__)
 
+MAX_STEP_VISITS_MULTIPLIER = 2
+MIN_STEP_VISITS = 10
+
 
 # ── Data Models ──────────────────────────────────────────────────
 
@@ -286,21 +289,16 @@ async def _execute_parallel_steps(
     async def _run_one(sid: str) -> tuple[str, Any]:
         s = all_steps.get(sid)
         if s is None:
-            return sid, f"[error] Step '{sid}' not found"
-        result = await _execute_step(s, variables, thread)
+            raise ValueError(f"Parallel step '{sid}' not found")
+        try:
+            result = await _execute_step(s, variables, thread)
+        except Exception as exc:
+            raise RuntimeError(f"Parallel step '{sid}' failed: {exc}") from exc
         return sid, result
 
     tasks = [_run_one(sid) for sid in step_ids]
-    pairs = await asyncio.gather(*tasks, return_exceptions=True)
-
-    results: dict[str, Any] = {}
-    for item in pairs:
-        if isinstance(item, Exception):
-            logger.error("Parallel step exception: %s", item)
-            continue
-        sid, val = item
-        results[sid] = val
-    return results
+    pairs = await asyncio.gather(*tasks)
+    return {sid: value for sid, value in pairs}
 
 
 async def _execute_step(
@@ -341,12 +339,16 @@ async def _execute_human_approval(
 
     # Try the human_loop tool if available; otherwise auto-approve with warning
     try:
-        from tools.human_loop import request_human_approval
+        from tools import human_loop
+
+        request_human_approval = getattr(human_loop, "request_human_approval")
         approved = await request_human_approval(prompt_text)
         if not approved:
             raise RuntimeError(f"Human rejected step '{step.step_id}': {prompt_text}")
-    except ImportError:
-        logger.warning("human_loop not available — auto-approving step '%s'", step.step_id)
+    except (ImportError, AttributeError):
+        logger.warning(
+            "human_loop not available — auto-approving step '%s'", step.step_id
+        )
 
     if thread:
         thread.add_event(
@@ -415,13 +417,41 @@ async def execute_workflow(
 
     # Build ordered execution list (linear by default; conditions/parallel alter flow)
     step_order = [s.step_id for s in workflow.steps]
+    max_step_visits = max(len(step_order) * MAX_STEP_VISITS_MULTIPLIER, MIN_STEP_VISITS)
+    consumed_parallel_steps: set[str] = set()
+    step_visits: dict[str, int] = {}
     idx = 0
 
     while idx < len(step_order):
         step_id = step_order[idx]
+        if step_id in consumed_parallel_steps:
+            idx += 1
+            continue
+
         step = step_map.get(step_id)
         if step is None:
             logger.warning("Step '%s' not found in workflow — skipping", step_id)
+            idx += 1
+            continue
+
+        step_visits[step_id] = step_visits.get(step_id, 0) + 1
+        if step_visits[step_id] > max_step_visits:
+            loop_error = RuntimeError(
+                f"Workflow step '{step_id}' exceeded max visits ({max_step_visits}). Possible infinite loop detected."
+            )
+            err_result = await _handle_step_error(
+                step,
+                loop_error,
+                variables,
+                step_results,
+                executed_steps,
+                step_map,
+                workflow,
+                t0,
+                thread,
+            )
+            if err_result is not None:
+                return err_result
             idx += 1
             continue
 
@@ -437,21 +467,34 @@ async def execute_workflow(
                     variables[sid] = val
                     step_results[sid] = val
                     executed_steps.append(sid)
+                    consumed_parallel_steps.add(sid)
                 variables[step_id] = json.dumps(parallel_results, ensure_ascii=False, default=str)
                 executed_steps.append(step_id)
                 idx += 1
                 continue
             except Exception as e:
-                return await _handle_step_error(
-                    step, e, variables, step_results, executed_steps,
-                    step_map, workflow, t0, thread,
+                err_result = await _handle_step_error(
+                    step,
+                    e,
+                    variables,
+                    step_results,
+                    executed_steps,
+                    step_map,
+                    workflow,
+                    t0,
+                    thread,
                 )
+                if err_result is not None:
+                    return err_result
+                idx += 1
+                continue
 
         # ── Condition branching ──────────────────────────────────
         if step.step_type == "condition":
             try:
                 next_step_id = await _execute_condition_step(step, variables)
                 step_results[step_id] = next_step_id
+                variables[step_id] = next_step_id
                 executed_steps.append(step_id)
                 # Jump to the target step
                 if next_step_id in step_map:
@@ -466,10 +509,21 @@ async def execute_workflow(
                     idx += 1
                 continue
             except Exception as e:
-                return await _handle_step_error(
-                    step, e, variables, step_results, executed_steps,
-                    step_map, workflow, t0, thread,
+                err_result = await _handle_step_error(
+                    step,
+                    e,
+                    variables,
+                    step_results,
+                    executed_steps,
+                    step_map,
+                    workflow,
+                    t0,
+                    thread,
                 )
+                if err_result is not None:
+                    return err_result
+                idx += 1
+                continue
 
         # ── Normal step execution with retry ─────────────────────
         last_error: Exception | None = None
@@ -563,7 +617,7 @@ async def _handle_step_error(
 
         case "rollback":
             await _rollback(executed_steps, step_map, variables)
-            return WorkflowResult(
+            result = WorkflowResult(
                 workflow_id=workflow.workflow_id,
                 status="rolled_back",
                 step_results=step_results,
@@ -571,9 +625,14 @@ async def _handle_step_error(
                 duration_ms=duration_ms,
                 variables=variables,
             )
+            try:
+                save_workflow_result(result)
+            except Exception as exc:
+                logger.warning("Failed to persist rolled back workflow result: %s", exc)
+            return result
 
         case "abort" | _:
-            return WorkflowResult(
+            result = WorkflowResult(
                 workflow_id=workflow.workflow_id,
                 status="failed",
                 step_results=step_results,
@@ -581,6 +640,11 @@ async def _handle_step_error(
                 duration_ms=duration_ms,
                 variables=variables,
             )
+            try:
+                save_workflow_result(result)
+            except Exception as exc:
+                logger.warning("Failed to persist failed workflow result: %s", exc)
+            return result
 
 
 # ── Template Workflows ───────────────────────────────────────────

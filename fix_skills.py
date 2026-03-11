@@ -77,7 +77,7 @@ def fix_frontmatter(frontmatter: str, skill_dir_name: str) -> tuple[str, bool, s
 
     return fixed, True, reason
 
-def process_skill(skill_path: Path, dry_run: bool = False) -> dict:
+def process_skill(skill_path: Path, dry_run: bool = False) -> dict | None:
     skill_md = skill_path / "SKILL.md"
     if not skill_md.exists():
         return None

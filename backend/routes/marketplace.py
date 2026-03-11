@@ -14,6 +14,17 @@ logger = logging.getLogger("marketplace")
 router = APIRouter(tags=["marketplace"])
 
 
+def _row_dict(row: object) -> dict[str, object]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    try:
+        return dict(row)  # type: ignore[arg-type]
+    except Exception:
+        return {}
+
+
 # ── Request Models ───────────────────────────────────────────────
 
 class RatingRequest(BaseModel):
@@ -139,7 +150,10 @@ def get_skill_detail(skill_id: str):
     # Enrich with performance stats
     try:
         from tools.performance_collector import get_performance_collector
-        stats = get_performance_collector().get_skill_stats(skill_id)
+
+        collector = get_performance_collector()
+        get_skill_stats = getattr(collector, "get_skill_stats", None)
+        stats = get_skill_stats(skill_id) if callable(get_skill_stats) else {}
         skill["performance"] = stats
     except Exception:
         pass
@@ -159,14 +173,19 @@ def submit_rating(skill_id: str, req: RatingRequest):
                 "INSERT INTO skill_ratings (skill_id, score, review_text, reviewer, reviewer_type) VALUES (%s, %s, %s, %s, %s) RETURNING id, created_at",
                 (skill_id, req.score, req.review_text, req.reviewer, req.reviewer_type),
             )
-            row = cur.fetchone()
+            row = _row_dict(cur.fetchone())
             # Update skills.avg_score
             cur.execute(
                 "UPDATE skills SET avg_score = (SELECT AVG(score) FROM skill_ratings WHERE skill_id = %s) WHERE id = %s",
                 (skill_id, skill_id),
             )
         conn.commit()
-        return {"id": row["id"], "skill_id": skill_id, "score": req.score, "created_at": str(row["created_at"])}
+        return {
+            "id": row.get("id"),
+            "skill_id": skill_id,
+            "score": req.score,
+            "created_at": str(row.get("created_at", "")),
+        }
     finally:
         _release(conn)
 
@@ -178,15 +197,16 @@ def list_ratings(skill_id: str, page: int = Query(1, ge=1), per_page: int = Quer
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) as total FROM skill_ratings WHERE skill_id = %s", (skill_id,))
-            total = cur.fetchone()["total"]
+            total = _row_dict(cur.fetchone()).get("total", 0)
             offset = (page - 1) * per_page
             cur.execute(
                 "SELECT * FROM skill_ratings WHERE skill_id = %s ORDER BY created_at DESC LIMIT %s OFFSET %s",
                 (skill_id, per_page, offset),
             )
             rows = cur.fetchall()
+        normalized_rows = [_rating_to_dict(_row_dict(r)) for r in rows]
         return {
-            "ratings": [_rating_to_dict(dict(r)) for r in rows],
+            "ratings": normalized_rows,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -203,7 +223,7 @@ def list_templates():
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM skill_templates ORDER BY category, name")
             rows = cur.fetchall()
-        return {"templates": [dict(r) for r in rows]}
+        return {"templates": [_row_dict(r) for r in rows]}
     finally:
         _release(conn)
 
@@ -215,20 +235,20 @@ def create_from_template(req: FromTemplateRequest):
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM skill_templates WHERE id = %s", (req.template_id,))
-            tmpl = cur.fetchone()
+            tmpl = _row_dict(cur.fetchone())
         if not tmpl:
             raise HTTPException(status_code=404, detail="Template not found")
     finally:
         _release(conn)
-    knowledge = req.knowledge_override or tmpl["knowledge_template"]
-    description = req.description or tmpl["description"]
+    knowledge = req.knowledge_override or str(tmpl.get("knowledge_template", ""))
+    description = req.description or str(tmpl.get("description", ""))
     from tools.dynamic_skills import create_skill
     result = create_skill(
         skill_id=req.skill_id,
         name=req.name,
         description=description,
         knowledge=knowledge,
-        category=tmpl["category"],
+        category=str(tmpl.get("category", "template")),
         source="template",
     )
     return result

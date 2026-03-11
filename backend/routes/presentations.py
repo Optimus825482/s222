@@ -11,7 +11,7 @@ import random
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -34,7 +34,12 @@ router = APIRouter(prefix="/api/presentations", tags=["presentations"])
 def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     """Convert hex color to RGB tuple."""
     hex_color = hex_color.lstrip("#")
-    return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+    rgb_values: tuple[int, int, int] = (
+        int(hex_color[0:2], 16),
+        int(hex_color[2:4], 16),
+        int(hex_color[4:6], 16),
+    )
+    return rgb_values
 
 
 def rgb_to_hex(r: int, g: int, b: int) -> str:
@@ -367,10 +372,11 @@ async def _research_topic(prompt: str, language: str) -> str:
 
     # Compile research context
     research_parts: list[str] = []
-    for i, result in enumerate(all_results):
-        if isinstance(result, Exception):
+    for result_item in all_results:
+        if isinstance(result_item, BaseException):
             continue
-        for r in result:
+        result_rows = cast(list[dict[str, Any]], result_item)
+        for r in result_rows:
             research_parts.append(
                 f"- [{r.get('title', '')}]({r.get('url', '')}): {r.get('snippet', '')}"
             )

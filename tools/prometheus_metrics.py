@@ -66,6 +66,7 @@ class MetricsCollector:
 
     def _init_prometheus(self):
         """Initialize Prometheus metric objects."""
+        assert _prom is not None
         self._prom_request_total = _prom.Counter(
             "agent_requests_total",
             "Total agent requests",

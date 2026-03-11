@@ -23,6 +23,35 @@ VALID_ROLES = {"orchestrator", "thinker", "speed", "researcher", "reasoner", "cr
 PERIOD_MAP = {"1h": "1 hour", "24h": "24 hours", "7d": "7 days"}
 
 
+def _row_dict(row):
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
+def _agent_metrics_payload(rows):
+    agents = []
+    for row in rows:
+        row_data = _row_dict(row)
+        agents.append(
+            {
+                "agent_role": row_data.get("agent_role", "unknown"),
+                "avg_response_time": round(
+                    float(row_data.get("avg_response_time", 0) or 0), 2
+                ),
+                "success_rate": round(float(row_data.get("success_rate", 0) or 0), 2),
+                "total_tokens": int(row_data.get("total_tokens", 0) or 0),
+                "task_count": int(row_data.get("task_count", 0) or 0),
+            }
+        )
+    return agents
+
+
 def _get_collector():
     from tools.performance_collector import PerformanceCollector
     return PerformanceCollector()
@@ -77,50 +106,67 @@ def get_prometheus_metrics():
     lines.append("# HELP agent_response_time_ms Average response time in milliseconds")
     lines.append("# TYPE agent_response_time_ms gauge")
     for row in agent_rows:
-        lines.append(f'agent_response_time_ms{{agent="{row["agent_role"]}"}} {row["avg_response_time"]:.2f}')
+        row_data = _row_dict(row)
+        lines.append(
+            f'agent_response_time_ms{{agent="{row_data.get("agent_role", "unknown")}"}} {float(row_data.get("avg_response_time", 0) or 0):.2f}'
+        )
     lines.append("")
 
     # Agent success rate
     lines.append("# HELP agent_success_rate_percent Success rate percentage")
     lines.append("# TYPE agent_success_rate_percent gauge")
     for row in agent_rows:
-        lines.append(f'agent_success_rate_percent{{agent="{row["agent_role"]}"}} {row["success_rate"]:.2f}')
+        row_data = _row_dict(row)
+        lines.append(
+            f'agent_success_rate_percent{{agent="{row_data.get("agent_role", "unknown")}"}} {float(row_data.get("success_rate", 0) or 0):.2f}'
+        )
     lines.append("")
 
     # Agent task count
     lines.append("# HELP agent_tasks_total Total tasks processed")
     lines.append("# TYPE agent_tasks_total counter")
     for row in agent_rows:
-        lines.append(f'agent_tasks_total{{agent="{row["agent_role"]}"}} {row["task_count"]}')
+        row_data = _row_dict(row)
+        lines.append(
+            f'agent_tasks_total{{agent="{row_data.get("agent_role", "unknown")}"}} {int(row_data.get("task_count", 0) or 0)}'
+        )
     lines.append("")
 
     # Agent tokens
     lines.append("# HELP agent_tokens_total Total tokens used")
     lines.append("# TYPE agent_tokens_total counter")
     for row in agent_rows:
-        lines.append(f'agent_tokens_total{{agent="{row["agent_role"]}"}} {row["total_tokens"]}')
+        row_data = _row_dict(row)
+        lines.append(
+            f'agent_tokens_total{{agent="{row_data.get("agent_role", "unknown")}"}} {int(row_data.get("total_tokens", 0) or 0)}'
+        )
     lines.append("")
 
     # System metrics
-    if sys_row:
+    sys_data = _row_dict(sys_row)
+    if sys_data:
         lines.append("# HELP system_tasks_total Total system tasks in 24h")
         lines.append("# TYPE system_tasks_total counter")
-        lines.append(f"system_tasks_total {sys_row['total_tasks']}")
+        lines.append(f"system_tasks_total {int(sys_data.get('total_tasks', 0) or 0)}")
         lines.append("")
 
         lines.append("# HELP system_tokens_total Total system tokens in 24h")
         lines.append("# TYPE system_tokens_total counter")
-        lines.append(f"system_tokens_total {sys_row['total_tokens']}")
+        lines.append(f"system_tokens_total {int(sys_data.get('total_tokens', 0) or 0)}")
         lines.append("")
 
         lines.append("# HELP system_success_rate_percent Overall success rate")
         lines.append("# TYPE system_success_rate_percent gauge")
-        lines.append(f"system_success_rate_percent {sys_row['success_rate']:.2f}")
+        lines.append(
+            f"system_success_rate_percent {float(sys_data.get('success_rate', 0) or 0):.2f}"
+        )
         lines.append("")
 
         lines.append("# HELP system_avg_response_time_ms Average system response time")
         lines.append("# TYPE system_avg_response_time_ms gauge")
-        lines.append(f"system_avg_response_time_ms {sys_row['avg_response_time']:.2f}")
+        lines.append(
+            f"system_avg_response_time_ms {float(sys_data.get('avg_response_time', 0) or 0):.2f}"
+        )
         lines.append("")
 
     # Uptime metric
@@ -163,19 +209,7 @@ def get_all_agents_metrics(period: str = Query("24h")):
             )
             rows = cur.fetchall()
 
-        return {
-            "period": period,
-            "agents": [
-                {
-                    "agent_role": r["agent_role"],
-                    "avg_response_time": round(float(r["avg_response_time"]), 2),
-                    "success_rate": round(float(r["success_rate"]), 2),
-                    "total_tokens": int(r["total_tokens"]),
-                    "task_count": int(r["task_count"]),
-                }
-                for r in rows
-            ],
-        }
+        return {"period": period, "agents": _agent_metrics_payload(rows)}
     except Exception as e:
         logger.error("All agents metrics query failed: %s", e)
         raise HTTPException(500, f"Metrics query failed: {e}")

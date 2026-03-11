@@ -12,10 +12,11 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Awaitable
+from typing import Any, Awaitable, Callable
 
-from tools.pg_connection import get_conn, release_conn
+from tools.pg_connection import DBRow, get_conn, release_conn
 
 logger = logging.getLogger(__name__)
 
@@ -447,7 +448,11 @@ class BenchmarkRunner:
                 params,
             )
             rows = cur.fetchall()
-            return [self._row_to_dict(r) for r in rows]
+            return [
+                row
+                for fetched in rows
+                if (row := self._row_to_dict(fetched)) is not None
+            ]
         finally:
             release_conn(conn)
 
@@ -479,7 +484,11 @@ class BenchmarkRunner:
                 params,
             )
             rows = cur.fetchall()
-            return [dict(r) for r in rows]
+            return [
+                row
+                for fetched in rows
+                if (row := self._row_to_dict(fetched)) is not None
+            ]
         finally:
             release_conn(conn)
 
@@ -505,7 +514,11 @@ class BenchmarkRunner:
                 params,
             )
             rows = cur.fetchall()
-            return [self._row_to_dict(r) for r in rows]
+            return [
+                row
+                for fetched in rows
+                if (row := self._row_to_dict(fetched)) is not None
+            ]
         finally:
             release_conn(conn)
 
@@ -527,10 +540,10 @@ class BenchmarkRunner:
                     """,
                     (role,),
                 )
-                row = cur.fetchone()
+                row = self._row_to_dict(cur.fetchone())
                 if row is None or row["total_runs"] == 0:
                     return {"total_runs": 0, "avg_score": 0.0, "avg_latency_ms": 0.0}
-                return dict(row)
+                return row
 
             def _category_scores(role: str) -> dict[str, float]:
                 cur.execute(
@@ -543,7 +556,11 @@ class BenchmarkRunner:
                     (role,),
                 )
                 rows = cur.fetchall()
-                return {r["category"]: float(r["avg"]) for r in rows}
+                return {
+                    row["category"]: float(row["avg"])
+                    for fetched in rows
+                    if (row := self._row_to_dict(fetched)) is not None
+                }
 
             stats_a = _agent_stats(role_a)
             stats_b = _agent_stats(role_b)
@@ -579,7 +596,11 @@ class BenchmarkRunner:
     # -- helpers ------------------------------------------------------------
 
     @staticmethod
-    def _row_to_dict(row: dict) -> dict:
+    def _row_to_dict(row: object) -> dict[str, Any] | None:
+        if row is None:
+            return None
+        if not isinstance(row, Mapping):
+            return None
         d = dict(row)
         if "dimensions" in d and isinstance(d["dimensions"], str):
             try:

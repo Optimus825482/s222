@@ -121,9 +121,13 @@ class DeltaEncryptor:
             combined = nonce + plaintext
             ciphertext = base64.b64encode(combined).decode()
             nonce_b64 = base64.b64encode(nonce).decode()
-        
+
+        ciphertext_str = (
+            ciphertext.decode() if isinstance(ciphertext, bytes) else str(ciphertext)
+        )
+
         return EncryptedPayload(
-            ciphertext=ciphertext.decode() if isinstance(ciphertext, bytes) else ciphertext,
+            ciphertext=ciphertext_str,
             nonce=nonce_b64,
             timestamp=datetime.utcnow().isoformat(),
         )
@@ -324,6 +328,9 @@ class SecureChannel:
         
         # Check nonce (replay protection)
         nonce = auth_message.get("nonce")
+        if not isinstance(nonce, str):
+            logger.warning("Invalid nonce received")
+            return False, None
         if nonce in self._used_nonces:
             logger.warning(f"Replay attack detected: duplicate nonce")
             return False, None

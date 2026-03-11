@@ -8,10 +8,17 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger("ab_testing")
+
+
+def _as_row(row: object) -> Mapping[str, Any] | None:
+    if isinstance(row, Mapping):
+        return row
+    return None
 
 
 class ABTestManager:
@@ -86,7 +93,7 @@ class ABTestManager:
                     "SELECT COUNT(*) as cnt FROM ab_experiments WHERE agent_role = %s AND task_type = %s AND status = 'active'",
                     (agent_role, task_type),
                 )
-                row = cur.fetchone()
+                row = _as_row(cur.fetchone())
                 if row and row["cnt"] > 0:
                     raise ValueError(f"Active experiment already exists for {agent_role}/{task_type}")
 
@@ -97,7 +104,9 @@ class ABTestManager:
                        RETURNING id, created_at""",
                     (experiment_id, agent_role, task_type, control_strategy_id, variant_strategy_id, traffic_split),
                 )
-                result = cur.fetchone()
+                result = _as_row(cur.fetchone())
+                if result is None:
+                    raise ValueError("Experiment insert did not return a row")
             conn.commit()
             logger.info(f"A/B experiment created: {experiment_id} for {agent_role}/{task_type}")
             return {
@@ -125,7 +134,7 @@ class ABTestManager:
                     "SELECT traffic_split FROM ab_experiments WHERE experiment_id = %s AND status = 'active'",
                     (experiment_id,),
                 )
-                row = cur.fetchone()
+                row = _as_row(cur.fetchone())
             if not row:
                 return "control"  # Default fallback
             split = float(row["traffic_split"])
@@ -176,13 +185,21 @@ class ABTestManager:
                     "SELECT score FROM ab_experiment_results WHERE experiment_id = %s AND variant = 'control'",
                     (experiment_id,),
                 )
-                control_scores = [float(r["score"]) for r in cur.fetchall()]
+                control_scores = [
+                    float(row["score"])
+                    for fetched in cur.fetchall()
+                    if (row := _as_row(fetched)) is not None
+                ]
 
                 cur.execute(
                     "SELECT score FROM ab_experiment_results WHERE experiment_id = %s AND variant = 'variant'",
                     (experiment_id,),
                 )
-                variant_scores = [float(r["score"]) for r in cur.fetchall()]
+                variant_scores = [
+                    float(row["score"])
+                    for fetched in cur.fetchall()
+                    if (row := _as_row(fetched)) is not None
+                ]
             self._release(conn)
         except Exception:
             self._release(conn)
@@ -198,7 +215,13 @@ class ABTestManager:
 
         try:
             from scipy.stats import ttest_ind
-            t_stat, p_value = ttest_ind(control_scores, variant_scores, equal_var=False)
+
+            ttest_result = cast(
+                tuple[float, float],
+                ttest_ind(control_scores, variant_scores, equal_var=False),
+            )
+            t_stat = float(ttest_result[0])
+            p_value = float(ttest_result[1])
         except ImportError:
             # Fallback: manual Welch's t-test
             import math

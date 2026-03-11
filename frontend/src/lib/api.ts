@@ -55,6 +55,14 @@ function getCurrentUserId(): string {
   return "";
 }
 
+const fetch: typeof globalThis.fetch = async (input, init) => {
+  const response = await globalThis.fetch(input, init);
+  if (response.status === 401) {
+    clearAuthOn401();
+  }
+  return response;
+};
+
 export async function fetcher<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAuthToken();
   const res = await fetch(`${BASE}${path}`, {

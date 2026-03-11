@@ -217,37 +217,41 @@ def _persist_event_to_scheduler(event: AgentEvent) -> None:
 
         if event.event_type == AgentEventType.PERIODIC and event.schedule:
             # Create a periodic scheduled task
-            asyncio.create_task(scheduler.create_task(
-                name=f"agent-event:{event.id}",
-                task_type=TaskType.AGENT_EVENT,
-                cron_expr=event.schedule,
-                handler_ref="agent_event_handler",
-                params={
-                    "event_id": event.id,
-                    "target_agent": event.target_agent,
-                    "message": event.message,
-                    "metadata": event.metadata,
-                },
-                tags=["agent-event", event.target_agent],
-                task_id=event.id,
-            ))
+            asyncio.create_task(
+                scheduler.create_task(
+                    name=f"agent-event:{event.id}",
+                    task_type=TaskType.CALLABLE,
+                    cron_expr=event.schedule,
+                    handler_ref="agent_event_handler",
+                    params={
+                        "event_id": event.id,
+                        "target_agent": event.target_agent,
+                        "message": event.message,
+                        "metadata": event.metadata,
+                    },
+                    tags=["agent-event", event.target_agent],
+                    task_id=event.id,
+                )
+            )
         elif event.event_type == AgentEventType.ONE_SHOT and event.trigger_at:
             # Convert to cron-like one-shot via scheduler
-            asyncio.create_task(scheduler.create_task(
-                name=f"agent-event:{event.id}",
-                task_type=TaskType.AGENT_EVENT,
-                cron_expr=_datetime_to_cron(event.trigger_at),
-                handler_ref="agent_event_handler",
-                params={
-                    "event_id": event.id,
-                    "target_agent": event.target_agent,
-                    "message": event.message,
-                    "metadata": event.metadata,
-                    "one_shot": True,
-                },
-                tags=["agent-event", "one-shot", event.target_agent],
-                task_id=event.id,
-            ))
+            asyncio.create_task(
+                scheduler.create_task(
+                    name=f"agent-event:{event.id}",
+                    task_type=TaskType.CALLABLE,
+                    cron_expr=_datetime_to_cron(event.trigger_at),
+                    handler_ref="agent_event_handler",
+                    params={
+                        "event_id": event.id,
+                        "target_agent": event.target_agent,
+                        "message": event.message,
+                        "metadata": event.metadata,
+                        "one_shot": True,
+                    },
+                    tags=["agent-event", "one-shot", event.target_agent],
+                    task_id=event.id,
+                )
+            )
     except Exception as e:
         logger.warning("[AgentEvents] Could not persist to scheduler: %s", e)
 

@@ -8,7 +8,7 @@ support for yt-dlp (video info/subtitles) and Whisper (audio transcription fallb
 
 import logging
 import sys
-from typing import Optional
+from typing import Any, Optional, cast
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -37,11 +37,19 @@ class YouTubeSummarizeRequest(BaseModel):
     """Request model for YouTube summarization."""
     url: str = Field(..., description="YouTube video URL (supports youtube.com, youtu.be, etc.)")
     language: str = Field(default="en", description="Preferred transcript language code (e.g., 'en', 'tr', 'de')")
+    target_language: Optional[str] = Field(
+        default=None,
+        description="Target language for auto-translation (e.g., 'tr' for Turkish)",
+    )
     include_timestamps: bool = Field(default=False, description="Include timestamps in transcript")
     max_summary_length: int = Field(default=2000, description="Maximum summary length in characters")
     use_whisper_fallback: bool = Field(default=True, description="Use Whisper if no subtitles available")
     whisper_model: str = Field(default="base", description="Whisper model: tiny, base, small, medium, large")
     max_transcript_chars: int = Field(default=10000, description="Max transcript characters to return")
+    use_agent_summary: bool = Field(
+        default=False,
+        description="Use an AI agent for summarization + translation instead of simple LLM call",
+    )
 
 
 class YouTubeInfoRequest(BaseModel):
@@ -95,6 +103,8 @@ class YouTubeStatusResponse(BaseModel):
     yt_dlp_available: bool
     whisper_available: bool
     transcript_api_available: bool = False
+    yt_transcript_api_available: bool = False
+    deep_translator_available: bool = False
     features: dict
     whisper_models: list[str]
     supported_urls: list[str]
@@ -107,8 +117,14 @@ def _extract_video_id_from_url(url: str) -> Optional[str]:
     try:
         # Use yt-dlp to extract video ID reliably
         import yt_dlp
-        ydl_opts = {"quiet": True, "no_warnings": True, "extract_flat": True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
+        ydl_opts: dict[str, Any] = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+        }
+        youtube_dl_class: Any = yt_dlp.YoutubeDL
+        with youtube_dl_class(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             return info.get("id") if info else None
     except Exception:
@@ -126,7 +142,9 @@ def _extract_video_id_from_url(url: str) -> Optional[str]:
         return None
 
 
-async def generate_summary(transcript: str, max_length: int = 2000) -> str:
+async def generate_summary(
+    transcript: str, max_length: int = 2000, target_language: Optional[str] = None
+) -> str:
     """Generate AI summary of transcript using available LLM."""
     if not transcript:
         return ""
@@ -134,7 +152,20 @@ async def generate_summary(transcript: str, max_length: int = 2000) -> str:
     # Truncate if too long
     if len(transcript) > MAX_TRANSCRIPT_LENGTH:
         transcript = transcript[:MAX_TRANSCRIPT_LENGTH] + "... [truncated]"
-    
+
+    # Determine output language instruction
+    lang_instruction = ""
+    if target_language:
+        lang_map = {
+            "tr": "Turkish",
+            "en": "English",
+            "de": "German",
+            "fr": "French",
+            "es": "Spanish",
+        }
+        lang_name = lang_map.get(target_language, target_language)
+        lang_instruction = f"\n\nIMPORTANT: Write the entire summary in {lang_name}."
+
     try:
         from openai import AsyncOpenAI
         from config import MODELS
@@ -143,9 +174,9 @@ async def generate_summary(transcript: str, max_length: int = 2000) -> str:
         
         # Get model config
         model_name = "gpt-4o-mini"  # Default to fast model for summarization
-        for model in MODELS:
+        for model_key, model in MODELS.items():
             if "summary" in model.get("role", "").lower() or model.get("role") == "assistant":
-                model_name = model.get("model", model_name)
+                model_name = model.get("id", model_name)
                 break
         
         prompt = f"""Summarize the following YouTube video transcript in a clear, structured format.
@@ -155,7 +186,7 @@ Provide:
 2. **Key Points**: Bullet points of the main arguments/ideas
 3. **Takeaways**: What should viewers learn/remember?
 
-Keep the summary under {max_length} characters.
+Keep the summary under {max_length} characters.{lang_instruction}
 
 Transcript:
 {transcript}
@@ -165,19 +196,79 @@ Summary:"""
         response = await client.chat.completions.create(
             model=model_name,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that creates clear, concise summaries of video content."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that creates clear, concise summaries of video content.",
+                },
+                {"role": "user", "content": prompt},
             ],
-            max_tokens=max_length // 3,  # Rough estimate
+            max_tokens=max_length // 3,
             temperature=0.3,
         )
-        
-        return response.choices[0].message.content.strip()
+
+        content = response.choices[0].message.content
+        return content.strip() if content else ""
     
     except Exception as e:
         logger.error(f"Summary generation failed: {e}", exc_info=True)
-        # Return a truncated transcript as fallback
         return f"[Summary generation failed. First {max_length} chars of transcript:]\n\n{transcript[:max_length]}"
+
+
+async def _agent_summarize(
+    transcript: str,
+    video_title: str = "",
+    target_language: str = "tr",
+    max_length: int = 2000,
+) -> str:
+    """
+    Use the Researcher agent to summarize + translate a YouTube transcript.
+    Falls back to direct LLM call if agent system is unavailable.
+    """
+    try:
+        from agents.researcher import ResearcherAgent
+        from core.models import Thread
+
+        agent = ResearcherAgent()
+
+        lang_map = {
+            "tr": "Türkçe",
+            "en": "English",
+            "de": "Deutsch",
+            "fr": "Français",
+            "es": "Español",
+        }
+        lang_name = lang_map.get(target_language, target_language)
+
+        # Truncate transcript for agent context
+        max_ctx = min(len(transcript), 15000)
+        ctx_transcript = transcript[:max_ctx]
+        if len(transcript) > max_ctx:
+            ctx_transcript += "\n\n[... transcript truncated]"
+
+        task_prompt = (
+            f"Aşağıdaki YouTube video transkriptini {lang_name} dilinde özetle.\n\n"
+            f"Video Başlığı: {video_title}\n\n"
+            f"Kurallar:\n"
+            f"- Özet en fazla {max_length} karakter olsun\n"
+            f"- Ana konu, kilit noktalar ve çıkarımları belirt\n"
+            f"- Tüm özeti {lang_name} dilinde yaz\n"
+            f"- Yapılandırılmış ve okunabilir format kullan\n\n"
+            f"Transkript:\n{ctx_transcript}"
+        )
+
+        thread = Thread()
+        response = await agent.execute(task_prompt, thread)
+
+        if response and response.strip():
+            return response[:max_length]
+
+    except Exception as e:
+        logger.warning(f"Agent summarization failed, falling back to direct LLM: {e}")
+
+    # Fallback to direct LLM
+    return await generate_summary(
+        transcript, max_length=max_length, target_language=target_language
+    )
 
 
 # ── Endpoints ────────────────────────────────────────────────────
@@ -193,19 +284,33 @@ async def get_youtube_status(user: dict = Depends(get_current_user)):
     - Supported features
     """
     try:
-        from tools.youtube_summarizer import YT_DLP_AVAILABLE, WHISPER_AVAILABLE, TRANSCRIPT_API_AVAILABLE
+        from tools.youtube_summarizer import (
+            YT_DLP_AVAILABLE,
+            WHISPER_AVAILABLE,
+            TRANSCRIPT_API_AVAILABLE,
+            YT_TRANSCRIPT_API_AVAILABLE,
+            DEEP_TRANSLATOR_AVAILABLE,
+        )
         
         return YouTubeStatusResponse(
             yt_dlp_available=YT_DLP_AVAILABLE,
             whisper_available=WHISPER_AVAILABLE,
             transcript_api_available=TRANSCRIPT_API_AVAILABLE,
+            yt_transcript_api_available=YT_TRANSCRIPT_API_AVAILABLE,
+            deep_translator_available=DEEP_TRANSLATOR_AVAILABLE,
             features={
                 "transcript_api": TRANSCRIPT_API_AVAILABLE,
+                "yt_transcript_api": YT_TRANSCRIPT_API_AVAILABLE,
+                "deep_translator": DEEP_TRANSLATOR_AVAILABLE,
                 "video_info": True,
                 "subtitle_extraction": YT_DLP_AVAILABLE,
                 "whisper_transcription": WHISPER_AVAILABLE,
+                "auto_translation": DEEP_TRANSLATOR_AVAILABLE,
+                "agent_summarization": True,
             },
-            whisper_models=["tiny", "base", "small", "medium", "large"] if WHISPER_AVAILABLE else [],
+            whisper_models=["tiny", "base", "small", "medium", "large"]
+            if WHISPER_AVAILABLE
+            else [],
             supported_urls=[
                 "youtube.com/watch?v=...",
                 "youtu.be/...",
@@ -305,19 +410,33 @@ async def get_youtube_transcript(
         transcript_task = get_transcript(
             url=request.url,
             language=request.language,
+            target_language=request.target_language,
             use_whisper_fallback=request.use_whisper_fallback,
             whisper_model=request.whisper_model,
         )
-        
-        video_result, transcript_result = await asyncio.gather(
+
+        gathered_results = await asyncio.gather(
             video_info_task, transcript_task, return_exceptions=True
         )
+        video_result_raw, transcript_result_raw = gathered_results
         
         # Handle exceptions
-        if isinstance(video_result, Exception):
-            video_result = {"success": False, "video_info": None, "error": str(video_result)}
-        if isinstance(transcript_result, Exception):
-            transcript_result = {"success": False, "transcript": None, "error": str(transcript_result)}
+        if isinstance(video_result_raw, Exception):
+            video_result: dict[str, Any] = {
+                "success": False,
+                "video_info": None,
+                "error": str(video_result_raw),
+            }
+        else:
+            video_result = cast(dict[str, Any], video_result_raw)
+        if isinstance(transcript_result_raw, Exception):
+            transcript_result: dict[str, Any] = {
+                "success": False,
+                "transcript": None,
+                "error": str(transcript_result_raw),
+            }
+        else:
+            transcript_result = cast(dict[str, Any], transcript_result_raw)
         
         video_info = video_result.get("video_info", {}) if video_result.get("success") else {}
         video_id = video_info.get("id", _extract_video_id_from_url(request.url) or "")
@@ -386,13 +505,14 @@ async def summarize_youtube_video(
     user: dict = Depends(get_current_user),
 ):
     """Summarize a YouTube video by extracting its transcript and generating an AI summary.
-    
+
     **Features:**
     - Extracts video metadata (title, channel, duration)
     - Downloads transcript/captions in preferred language
-    - Falls back to Whisper transcription if no subtitles available
-    - Generates AI-powered summary of the content
-    
+    - Falls back to youtube_transcript_api for robust multi-language support
+    - Auto-translates transcript to target_language via deep_translator
+    - Generates AI-powered summary (direct LLM or agent-based)
+
     **Supported URL formats:**
     - youtube.com/watch?v=VIDEO_ID
     - youtu.be/VIDEO_ID
@@ -406,6 +526,7 @@ async def summarize_youtube_video(
         result = await summarize_video(
             url=request.url,
             language=request.language,
+            target_language=request.target_language,
             use_whisper_fallback=request.use_whisper_fallback,
             whisper_model=request.whisper_model,
             max_transcript_chars=request.max_transcript_chars,
@@ -421,7 +542,11 @@ async def summarize_youtube_video(
         
         # Format transcript with timestamps if requested
         formatted_transcript = full_text
-        if request.include_timestamps and transcript_data.get("segments"):
+        if (
+            request.include_timestamps
+            and isinstance(transcript_data, dict)
+            and transcript_data.get("segments")
+        ):
             segments = transcript_data.get("segments", [])
             formatted_parts = []
             for seg in segments:
@@ -436,17 +561,29 @@ async def summarize_youtube_video(
         max_chars = request.max_transcript_chars
         if len(formatted_transcript) > max_chars:
             formatted_transcript = formatted_transcript[:max_chars] + "\n\n[... transcript truncated]"
-        
-        # Generate AI summary
+
+        # Generate summary — agent-based or direct LLM
         summary = ""
         if full_text:
-            summary = await generate_summary(full_text, max_length=request.max_summary_length)
+            if request.use_agent_summary:
+                summary = await _agent_summarize(
+                    full_text,
+                    video_title=video_info.get("title", ""),
+                    target_language=request.target_language or request.language,
+                    max_length=request.max_summary_length,
+                )
+            else:
+                summary = await generate_summary(
+                    full_text,
+                    max_length=request.max_summary_length,
+                    target_language=request.target_language,
+                )
         
         # Audit log
         _audit(
             "youtube_summarize",
             user.get("user_id", user.get("sub", "unknown")),
-            detail=f"Video: {video_id}, Title: {video_info.get('title', 'Unknown')}"
+            detail=f"Video: {video_id}, Title: {video_info.get('title', 'Unknown')}, Agent: {request.use_agent_summary}",
         )
         
         # Collect errors

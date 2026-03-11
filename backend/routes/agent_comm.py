@@ -100,7 +100,7 @@ async def agent_task_queue(agent_role: str):
 @router.get("/overview")
 async def communication_overview():
     """Tüm iletişim protokolü özet dashboard'u."""
-    result = {"ok": True}
+    result: dict[str, object] = {"ok": True}
     try:
         from core.event_bus import get_event_bus
         bus = get_event_bus()

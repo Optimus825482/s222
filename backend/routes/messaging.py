@@ -1,9 +1,11 @@
 """Agent messaging, autonomous chat, post-task meetings, and learning endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 import asyncio
 import uuid
 import sys
@@ -22,29 +24,82 @@ router = APIRouter()
 
 # ── In-memory state ─────────────────────────────────────────────
 
-_AGENT_MESSAGES: list[dict] = []
-_AUTONOMOUS_CONVERSATIONS: list[dict] = []
-_POST_TASK_MEETINGS: list[dict] = []
+_SYSTEM_USER_ID = "__system__"
+_MAX_AGENT_MESSAGES = 200
+_MAX_AUTONOMOUS_CONVERSATIONS = 50
+_MAX_POST_TASK_MEETINGS = 30
 
-_AUTO_CHAT_CONFIG: dict = {
-    "enabled": True,
-    "auto_start": True,
-    "interval_minutes": 5,
-    "max_exchanges": 4,
-    "enabled_agents": ["orchestrator", "thinker", "speed", "researcher", "reasoner", "critic"],
-    "topics": [
-        "sistem performansı", "görev optimizasyonu", "yeni stratejiler",
-        "hata analizi", "işbirliği fırsatları", "teknoloji trendleri",
-    ],
-    "personality_prompts": {
-        "orchestrator": "Sen DeepSeek Chat, orkestratör ajansın. Kullanıcının niyetini anlar, görevleri koordine eder, büyük resmi görürsün. Diğer ajanlara liderlik edersin ama saygılısın.",
-        "thinker": "Sen MiniMax, derin düşünür ajansın. Karmaşık problemleri analiz eder, felsefi ve stratejik düşünürsün.",
-        "speed": "Sen Step Flash, hız ajanısın. Pratik, hızlı çözümler üretirsin. Enerjik ve aksiyona yöneliksin.",
-        "researcher": "Sen GLM, araştırmacı ajansın. Veri odaklı, meraklı ve detaycısın. Her şeyi araştırmak istersin.",
-        "reasoner": "Sen Nemotron, mantık ajanısın. Matematiksel ve mantıksal düşünürsün. Kanıta dayalı konuşursun.",
-        "critic": "Sen Qwen3, eleştirmen ve skill yaratıcı ajansın. Kalite kontrol yapar, eksikleri bulur, iyileştirme önerileri sunar ve yeni yetenekler oluşturursun. Yapıcı ama acımasız bir eleştirmensin.",
-    },
+
+def _default_auto_chat_config() -> dict[str, Any]:
+    return {
+        "enabled": True,
+        "auto_start": True,
+        "interval_minutes": 5,
+        "max_exchanges": 4,
+        "enabled_agents": [
+            "orchestrator",
+            "thinker",
+            "speed",
+            "researcher",
+            "reasoner",
+            "critic",
+        ],
+        "topics": [
+            "sistem performansı",
+            "görev optimizasyonu",
+            "yeni stratejiler",
+            "hata analizi",
+            "işbirliği fırsatları",
+            "teknoloji trendleri",
+        ],
+        "personality_prompts": {
+            "orchestrator": "Sen DeepSeek Chat, orkestratör ajansın. Kullanıcının niyetini anlar, görevleri koordine eder, büyük resmi görürsün. Diğer ajanlara liderlik edersin ama saygılısın.",
+            "thinker": "Sen MiniMax, derin düşünür ajansın. Karmaşık problemleri analiz eder, felsefi ve stratejik düşünürsün.",
+            "speed": "Sen Step Flash, hız ajanısın. Pratik, hızlı çözümler üretirsin. Enerjik ve aksiyona yöneliksin.",
+            "researcher": "Sen GLM, araştırmacı ajansın. Veri odaklı, meraklı ve detaycısın. Her şeyi araştırmak istersin.",
+            "reasoner": "Sen Nemotron, mantık ajanısın. Matematiksel ve mantıksal düşünürsün. Kanıta dayalı konuşursun.",
+            "critic": "Sen Qwen3, eleştirmen ve skill yaratıcı ajansın. Kalite kontrol yapar, eksikleri bulur, iyileştirme önerileri sunar ve yeni yetenekler oluşturursun. Yapıcı ama acımasız bir eleştirmensin.",
+        },
+    }
+
+
+_AGENT_MESSAGES: dict[str, list[dict[str, Any]]] = {}
+_AUTONOMOUS_CONVERSATIONS: dict[str, list[dict[str, Any]]] = {}
+_POST_TASK_MEETINGS: dict[str, list[dict[str, Any]]] = {}
+_AUTO_CHAT_CONFIG: dict[str, dict[str, Any]] = {
+    _SYSTEM_USER_ID: _default_auto_chat_config(),
 }
+
+
+def _get_user_entries(
+    store: dict[str, list[dict[str, Any]]], user_id: str
+) -> list[dict[str, Any]]:
+    return store.setdefault(user_id, [])
+
+
+def _get_auto_chat_config(user_id: str) -> dict[str, Any]:
+    if user_id not in _AUTO_CHAT_CONFIG:
+        _AUTO_CHAT_CONFIG[user_id] = _default_auto_chat_config()
+    return _AUTO_CHAT_CONFIG[user_id]
+
+
+def _trim_entries(entries: list[dict[str, Any]], max_size: int) -> None:
+    if len(entries) > max_size:
+        entries[:] = entries[-max_size:]
+
+
+def _serialize_auto_chat_config(user_id: str) -> dict[str, Any]:
+    cfg = _get_auto_chat_config(user_id)
+    return {
+        "enabled": cfg["enabled"],
+        "auto_start": cfg.get("auto_start", True),
+        "interval_minutes": cfg.get("interval_minutes", 5),
+        "max_exchanges": cfg["max_exchanges"],
+        "enabled_agents": list(cfg["enabled_agents"]),
+        "topics": list(cfg["topics"]),
+        "personality_prompts": deepcopy(cfg.get("personality_prompts", {})),
+        "scheduler_running": _auto_chat_running,
+    }
 
 
 # ── Pydantic models ─────────────────────────────────────────────
@@ -75,11 +130,11 @@ async def _auto_chat_loop():
     await asyncio.sleep(30)
     try:
         while _auto_chat_running:
-            cfg = _AUTO_CHAT_CONFIG
+            cfg = _get_auto_chat_config(_SYSTEM_USER_ID)
             interval = max(cfg.get("interval_minutes", 5), 1) * 60
             if cfg.get("enabled") and cfg.get("auto_start"):
                 try:
-                    conv = _run_autonomous_chat_round()
+                    conv = _run_autonomous_chat_round(_SYSTEM_USER_ID)
                     if conv:
                         print(f"[AutoChat] Auto-triggered: {conv['initiator']} ⇄ {conv['responder']} — {conv['topic']}")
                 except Exception as e:
@@ -116,10 +171,11 @@ async def stop_auto_chat_scheduler():
 def trigger_post_task_auto_chat(
     task_summary: str,
     participating_agents: list[str] | None = None,
+    user_id: str = _SYSTEM_USER_ID,
 ) -> dict | None:
     """Trigger autonomous chat + post-task meeting after task completion.
     Called internally from orchestrator — no auth needed."""
-    cfg = _AUTO_CHAT_CONFIG
+    cfg = _get_auto_chat_config(user_id)
     if not cfg.get("enabled"):
         return None
 
@@ -127,6 +183,7 @@ def trigger_post_task_auto_chat(
     try:
         agents = participating_agents or cfg["enabled_agents"][:3]
         meeting = _generate_post_task_meeting(
+            user_id=user_id,
             task_summary=task_summary,
             participating_agents=agents,
             task_status="completed",
@@ -139,7 +196,7 @@ def trigger_post_task_auto_chat(
         original_topics = list(cfg["topics"])
         task_topic = f"az önce tamamlanan görev: {task_summary[:80]}"
         cfg["topics"] = [task_topic] + original_topics[:2]
-        conv = _run_autonomous_chat_round()
+        conv = _run_autonomous_chat_round(user_id)
         cfg["topics"] = original_topics
     except Exception:
         pass
@@ -169,21 +226,20 @@ async def send_agent_message(
     if not content or len(content) > 2000:
         raise HTTPException(status_code=400, detail="Content must be 1-2000 chars")
 
+    user_messages = _get_user_entries(_AGENT_MESSAGES, user["user_id"])
     msg = {
-        "id": f"msg-{len(_AGENT_MESSAGES)}",
+        "id": f"msg-{uuid.uuid4().hex[:8]}",
         "sender": sender,
         "receiver": receiver,
         "content": content[:2000],
         "timestamp": _utcnow().isoformat(),
         "user_id": user["user_id"],
     }
-    _AGENT_MESSAGES.append(msg)
+    user_messages.append(msg)
 
-    # Keep only last 200 messages
-    if len(_AGENT_MESSAGES) > 200:
-        _AGENT_MESSAGES[:] = _AGENT_MESSAGES[-200:]
+    _trim_entries(user_messages, _MAX_AGENT_MESSAGES)
 
-    return {"message": msg, "total_messages": len(_AGENT_MESSAGES)}
+    return {"message": msg, "total_messages": len(user_messages)}
 
 
 @router.get("/api/agents/messages")
@@ -196,7 +252,7 @@ async def get_agent_messages(
     """Get recent agent-to-agent messages with optional filtering."""
     _audit("agent_messages_view", user["user_id"])
 
-    filtered = _AGENT_MESSAGES.copy()
+    filtered = _get_user_entries(_AGENT_MESSAGES, user["user_id"]).copy()
     if sender:
         filtered = [m for m in filtered if m["sender"] == sender]
     if receiver:
@@ -218,13 +274,13 @@ async def get_agent_messages(
 # ═════════════════════════════════════════════════════════════════
 
 
-def _run_autonomous_chat_round() -> dict | None:
+def _run_autonomous_chat_round(user_id: str = _SYSTEM_USER_ID) -> dict | None:
     """Core logic for one autonomous conversation round (no auth required).
     Returns the conversation dict, or None if disabled / not enough agents.
     """
     import random as _rnd
 
-    cfg = _AUTO_CHAT_CONFIG
+    cfg = _get_auto_chat_config(user_id)
     if not cfg["enabled"]:
         return None
 
@@ -304,11 +360,11 @@ def _run_autonomous_chat_round() -> dict | None:
         "messages": conversation_messages,
         "started_at": now.isoformat(),
         "message_count": len(conversation_messages),
+        "user_id": user_id,
     }
-    _AUTONOMOUS_CONVERSATIONS.append(conversation)
-
-    if len(_AUTONOMOUS_CONVERSATIONS) > 50:
-        _AUTONOMOUS_CONVERSATIONS[:] = _AUTONOMOUS_CONVERSATIONS[-50:]
+    user_conversations = _get_user_entries(_AUTONOMOUS_CONVERSATIONS, user_id)
+    user_conversations.append(conversation)
+    _trim_entries(user_conversations, _MAX_AUTONOMOUS_CONVERSATIONS)
 
     return conversation
 
@@ -318,13 +374,15 @@ async def trigger_autonomous_chat(user: dict = Depends(get_current_user)):
     """Trigger an autonomous conversation round between two random agents."""
     _audit("autonomous_chat_trigger", user["user_id"])
 
-    conv = _run_autonomous_chat_round()
+    conv = _run_autonomous_chat_round(user["user_id"])
     if conv is None:
         raise HTTPException(status_code=400, detail="Autonomous chat is disabled or not enough agents")
 
     return {
         "conversation": conv,
-        "total_conversations": len(_AUTONOMOUS_CONVERSATIONS),
+        "total_conversations": len(
+            _get_user_entries(_AUTONOMOUS_CONVERSATIONS, user["user_id"])
+        ),
     }
 
 
@@ -337,7 +395,7 @@ async def get_autonomous_conversations(
     """Get autonomous conversation threads."""
     _audit("autonomous_chat_view", user["user_id"])
 
-    convs = _AUTONOMOUS_CONVERSATIONS.copy()
+    convs = _get_user_entries(_AUTONOMOUS_CONVERSATIONS, user["user_id"]).copy()
     if agent:
         convs = [c for c in convs if c["initiator"] == agent or c["responder"] == agent]
 
@@ -355,18 +413,7 @@ async def get_autonomous_conversations(
 @router.get("/api/agents/autonomous-chat/config")
 async def get_auto_chat_config(user: dict = Depends(get_current_user)):
     """Get current autonomous chat configuration (including personality prompts for UI)."""
-    return {
-        "config": {
-            "enabled": _AUTO_CHAT_CONFIG["enabled"],
-            "auto_start": _AUTO_CHAT_CONFIG.get("auto_start", True),
-            "interval_minutes": _AUTO_CHAT_CONFIG.get("interval_minutes", 5),
-            "max_exchanges": _AUTO_CHAT_CONFIG["max_exchanges"],
-            "enabled_agents": _AUTO_CHAT_CONFIG["enabled_agents"],
-            "topics": _AUTO_CHAT_CONFIG["topics"],
-            "personality_prompts": _AUTO_CHAT_CONFIG.get("personality_prompts", {}),
-            "scheduler_running": _auto_chat_running,
-        }
-    }
+    return {"config": _serialize_auto_chat_config(user["user_id"])}
 
 
 @router.post("/api/agents/autonomous-chat/config")
@@ -376,39 +423,24 @@ async def update_auto_chat_config(
 ):
     """Update autonomous chat configuration."""
     _audit("autonomous_chat_config", user["user_id"])
+    cfg = _get_auto_chat_config(user["user_id"])
 
     if req.enabled is not None:
-        _AUTO_CHAT_CONFIG["enabled"] = req.enabled
+        cfg["enabled"] = req.enabled
     if req.auto_start is not None:
-        _AUTO_CHAT_CONFIG["auto_start"] = req.auto_start
+        cfg["auto_start"] = req.auto_start
     if req.interval_minutes is not None:
-        _AUTO_CHAT_CONFIG["interval_minutes"] = max(1, min(req.interval_minutes, 60))
+        cfg["interval_minutes"] = max(1, min(req.interval_minutes, 60))
     if req.max_exchanges is not None:
-        _AUTO_CHAT_CONFIG["max_exchanges"] = max(2, min(req.max_exchanges, 6))
+        cfg["max_exchanges"] = max(2, min(req.max_exchanges, 6))
     if req.enabled_agents is not None:
         valid = [a for a in req.enabled_agents if a in _AGENT_ROLES]
         if len(valid) >= 2:
-            _AUTO_CHAT_CONFIG["enabled_agents"] = valid
+            cfg["enabled_agents"] = valid
     if req.topics is not None and len(req.topics) > 0:
-        _AUTO_CHAT_CONFIG["topics"] = req.topics[:20]
+        cfg["topics"] = req.topics[:20]
 
-    # Restart scheduler if auto_start changed
-    if req.auto_start is not None or req.enabled is not None:
-        if _AUTO_CHAT_CONFIG.get("enabled") and _AUTO_CHAT_CONFIG.get("auto_start"):
-            asyncio.ensure_future(start_auto_chat_scheduler())
-        else:
-            asyncio.ensure_future(stop_auto_chat_scheduler())
-
-    return {"config": {
-        "enabled": _AUTO_CHAT_CONFIG["enabled"],
-        "auto_start": _AUTO_CHAT_CONFIG.get("auto_start", True),
-        "interval_minutes": _AUTO_CHAT_CONFIG.get("interval_minutes", 5),
-        "max_exchanges": _AUTO_CHAT_CONFIG["max_exchanges"],
-        "enabled_agents": _AUTO_CHAT_CONFIG["enabled_agents"],
-        "topics": _AUTO_CHAT_CONFIG["topics"],
-        "personality_prompts": _AUTO_CHAT_CONFIG.get("personality_prompts", {}),
-        "scheduler_running": _auto_chat_running,
-    }}
+    return {"config": _serialize_auto_chat_config(user["user_id"])}
 
 
 # ═════════════════════════════════════════════════════════════════
@@ -419,6 +451,7 @@ async def update_auto_chat_config(
 def _generate_post_task_meeting(
     task_summary: str,
     participating_agents: list[str],
+    user_id: str = _SYSTEM_USER_ID,
     task_status: str = "completed",
     task_duration_ms: int = 0,
     total_tokens: int = 0,
@@ -523,11 +556,12 @@ def _generate_post_task_meeting(
         "duration_ms": task_duration_ms,
         "total_tokens": total_tokens,
         "message_count": len(messages),
+        "user_id": user_id,
     }
 
-    _POST_TASK_MEETINGS.append(meeting)
-    if len(_POST_TASK_MEETINGS) > 30:
-        _POST_TASK_MEETINGS[:] = _POST_TASK_MEETINGS[-30:]
+    user_meetings = _get_user_entries(_POST_TASK_MEETINGS, user_id)
+    user_meetings.append(meeting)
+    _trim_entries(user_meetings, _MAX_POST_TASK_MEETINGS)
 
     return meeting
 
@@ -540,11 +574,15 @@ async def trigger_post_task_meeting(
     """Manually trigger a post-task retrospective meeting."""
     _audit("post_task_meeting", user["user_id"])
     meeting = _generate_post_task_meeting(
+        user_id=user["user_id"],
         task_summary=task_summary,
         participating_agents=_AGENT_ROLES.copy(),
         task_status="completed",
     )
-    return {"meeting": meeting, "total_meetings": len(_POST_TASK_MEETINGS)}
+    return {
+        "meeting": meeting,
+        "total_meetings": len(_get_user_entries(_POST_TASK_MEETINGS, user["user_id"])),
+    }
 
 
 @router.get("/api/agents/autonomous-chat/meetings")
@@ -555,10 +593,11 @@ async def get_post_task_meetings(
     """Get post-task retrospective meetings."""
     _audit("meetings_view", user["user_id"])
     limit = max(1, min(limit, 30))
-    entries = _POST_TASK_MEETINGS[-limit:]
+    user_meetings = _get_user_entries(_POST_TASK_MEETINGS, user["user_id"])
+    entries = user_meetings[-limit:]
     entries.reverse()
     return {
-        "total": len(_POST_TASK_MEETINGS),
+        "total": len(user_meetings),
         "meetings": entries,
         "timestamp": _utcnow().isoformat(),
     }

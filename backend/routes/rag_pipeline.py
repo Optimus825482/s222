@@ -25,6 +25,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/rag", tags=["rag"])
 
 
+def _row_dict(row: Any) -> dict[str, Any]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
 # ── Pydantic Models ──────────────────────────────────────────────
 
 
@@ -165,14 +176,14 @@ async def rag_stats(user: dict = Depends(get_current_user)):
             cur.execute(
                 "SELECT COUNT(*) AS cnt FROM documents WHERE (user_id = %s OR user_id IS NULL)", (uid,)
             )
-            total_docs = (cur.fetchone() or {}).get("cnt", 0)
+            total_docs = int(_row_dict(cur.fetchone()).get("cnt", 0) or 0)
 
             cur.execute(
                 """SELECT COUNT(*) AS cnt FROM chunks c
                    JOIN documents d ON c.doc_id = d.id
                    WHERE (d.user_id = %s OR d.user_id IS NULL)""", (uid,)
             )
-            total_chunks = (cur.fetchone() or {}).get("cnt", 0)
+            total_chunks = int(_row_dict(cur.fetchone()).get("cnt", 0) or 0)
 
             cur.execute(
                 """SELECT COUNT(*) AS cnt FROM chunks c
@@ -180,14 +191,15 @@ async def rag_stats(user: dict = Depends(get_current_user)):
                    WHERE c.embedding IS NOT NULL
                      AND (d.user_id = %s OR d.user_id IS NULL)""", (uid,)
             )
-            total_embedded = (cur.fetchone() or {}).get("cnt", 0)
+            total_embedded = int(_row_dict(cur.fetchone()).get("cnt", 0) or 0)
 
             cur.execute(
                 """SELECT MAX(d.created_at) AS last_at FROM documents d
                    WHERE (d.user_id = %s OR d.user_id IS NULL)""", (uid,)
             )
-            row = cur.fetchone() or {}
-            last_ingest = str(row["last_at"]) if row.get("last_at") else None
+            row_data = _row_dict(cur.fetchone())
+            last_at = row_data.get("last_at")
+            last_ingest = str(last_at) if last_at else None
 
         return {
             "total_documents": total_docs,

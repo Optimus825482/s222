@@ -11,8 +11,9 @@ import logging
 import threading
 import time
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -23,6 +24,25 @@ logger = logging.getLogger(__name__)
 
 # Module-level scheduler instance
 _scheduler: AsyncIOScheduler | None = None
+ScheduleRow = Mapping[str, Any]
+
+
+def _as_schedule_row(raw_row: Any) -> ScheduleRow | None:
+    """DB fetch sonuçlarını dict-benzeri schedule satırına daralt."""
+    if isinstance(raw_row, Mapping):
+        return cast(ScheduleRow, raw_row)
+    return None
+
+
+def _parse_variables(raw_variables: Any) -> dict[str, Any]:
+    """Schedule variables alanını güvenli şekilde dict'e dönüştür."""
+    if isinstance(raw_variables, Mapping):
+        return dict(raw_variables)
+    try:
+        parsed = json.loads(str(raw_variables))
+    except Exception:
+        return {}
+    return dict(parsed) if isinstance(parsed, Mapping) else {}
 
 
 # ── Job execution callback ───────────────────────────────────────
@@ -35,16 +55,16 @@ async def _run_scheduled_workflow(schedule_id: str) -> None:
     try:
         cur = conn.cursor()
         cur.execute("SELECT * FROM schedules WHERE id = %s", (schedule_id,))
-        row = cur.fetchone()
+        row = _as_schedule_row(cur.fetchone())
         if not row:
             logger.warning("[Scheduler] Schedule '%s' not found, skipping", schedule_id)
             return
-        if not row["enabled"]:
+        if not bool(row["enabled"]):
             logger.info("[Scheduler] Schedule '%s' disabled, skipping", schedule_id)
             return
 
-        template_name = row["template"]
-        variables = json.loads(row["variables"])
+        template_name = str(row["template"])
+        variables = _parse_variables(row["variables"])
     finally:
         release_conn(conn)
 
@@ -125,9 +145,10 @@ async def init_scheduler() -> None:
     try:
         cur = conn.cursor()
         cur.execute("SELECT id, cron_expr FROM schedules WHERE enabled = TRUE")
-        rows = cur.fetchall()
+        raw_rows = cur.fetchall()
+        rows = [r for r in (_as_schedule_row(raw) for raw in raw_rows) if r is not None]
         for row in rows:
-            _add_job_to_scheduler(row["id"], row["cron_expr"])
+            _add_job_to_scheduler(str(row["id"]), str(row["cron_expr"]))
         logger.info("[Scheduler] Loaded %d active schedule(s)", len(rows))
     finally:
         release_conn(conn)
@@ -140,7 +161,7 @@ def add_schedule(
     template: str,
     cron_expr: str,
     variables: dict[str, Any] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Yeni schedule oluştur ve scheduler'a ekle."""
     # Cron expression'ı validate et
     try:
@@ -194,17 +215,18 @@ def remove_schedule(schedule_id: str) -> bool:
     return deleted
 
 
-def toggle_schedule(schedule_id: str, enabled: bool | None = None) -> dict:
+def toggle_schedule(schedule_id: str, enabled: bool | None = None) -> dict[str, Any]:
     """Schedule'ı aç/kapat. enabled=None ise toggle yapar."""
     conn = get_conn()
+    row: ScheduleRow | None = None
     try:
         cur = conn.cursor()
         cur.execute("SELECT * FROM schedules WHERE id = %s", (schedule_id,))
-        row = cur.fetchone()
+        row = _as_schedule_row(cur.fetchone())
         if not row:
             raise ValueError(f"Schedule '{schedule_id}' not found")
 
-        new_enabled = (not row["enabled"]) if enabled is None else enabled
+        new_enabled = (not bool(row["enabled"])) if enabled is None else enabled
 
         cur.execute(
             "UPDATE schedules SET enabled = %s WHERE id = %s",
@@ -214,8 +236,11 @@ def toggle_schedule(schedule_id: str, enabled: bool | None = None) -> dict:
     finally:
         release_conn(conn)
 
+    if row is None:
+        raise ValueError(f"Schedule '{schedule_id}' not found")
+
     if new_enabled:
-        _add_job_to_scheduler(schedule_id, row["cron_expr"])
+        _add_job_to_scheduler(schedule_id, str(row["cron_expr"]))
     else:
         _remove_job_from_scheduler(schedule_id)
 
@@ -223,25 +248,26 @@ def toggle_schedule(schedule_id: str, enabled: bool | None = None) -> dict:
     return get_schedule(schedule_id)
 
 
-def list_schedules() -> list[dict]:
+def list_schedules() -> list[dict[str, Any]]:
     """Tüm schedule'ları listele."""
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute("SELECT * FROM schedules ORDER BY created_at DESC")
-        rows = cur.fetchall()
+        raw_rows = cur.fetchall()
+        rows = [r for r in (_as_schedule_row(raw) for raw in raw_rows) if r is not None]
         return [_row_to_dict(r) for r in rows]
     finally:
         release_conn(conn)
 
 
-def get_schedule(schedule_id: str) -> dict:
+def get_schedule(schedule_id: str) -> dict[str, Any]:
     """Tek bir schedule getir."""
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute("SELECT * FROM schedules WHERE id = %s", (schedule_id,))
-        row = cur.fetchone()
+        row = _as_schedule_row(cur.fetchone())
         if not row:
             raise ValueError(f"Schedule '{schedule_id}' not found")
         return _row_to_dict(row)
@@ -249,11 +275,11 @@ def get_schedule(schedule_id: str) -> dict:
         release_conn(conn)
 
 
-def _row_to_dict(row: dict) -> dict:
+def _row_to_dict(row: ScheduleRow) -> dict[str, Any]:
     """PG Row (dict) → dict dönüşümü, next_run'ı scheduler'dan al."""
     global _scheduler
     d = dict(row)
-    d["variables"] = json.loads(d["variables"])
+    d["variables"] = _parse_variables(d.get("variables"))
     d["enabled"] = bool(d["enabled"])
 
     # APScheduler'dan next_run bilgisini al

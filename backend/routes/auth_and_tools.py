@@ -526,8 +526,8 @@ async def api_proactive_skill_suggestions(user: dict = Depends(get_current_user)
                     title = ""
                     if isinstance(thread, dict):
                         title = thread.get("title", thread.get("name", ""))
-                    elif hasattr(thread, "title"):
-                        title = thread.title or ""
+                    else:
+                        title = getattr(thread, "title", "") or ""
                     if title:
                         for word in title.lower().split():
                             if len(word) > 3:
@@ -901,7 +901,5 @@ async def get_reflexion_results(limit: int = 20):
         data = json.loads(results_file.read_text())
         results = data.get("results", [])[-limit:]
         return results
-    except Exception:
-        return []
     except Exception:
         return []

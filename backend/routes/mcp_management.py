@@ -23,6 +23,17 @@ router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 _health_cache: dict[str, dict[str, Any]] = {}
 
 
+def _row_dict(row: Any) -> dict[str, Any]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return dict(row)
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
 def _set_health(server_id: str, healthy: bool, tool_count: int = 0, error: str = ""):
     _health_cache[server_id] = {
         "healthy": healthy,
@@ -136,11 +147,11 @@ async def mcp_toggle_server(
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id, active FROM mcp_servers WHERE id = %s", (server_id,))
-            row = cur.fetchone()
-            if not row:
+            row_data = _row_dict(cur.fetchone())
+            if not row_data:
                 raise HTTPException(404, f"Server '{server_id}' not found")
 
-            new_active = not row["active"]
+            new_active = not bool(row_data.get("active", False))
             cur.execute("UPDATE mcp_servers SET active = %s WHERE id = %s", (new_active, server_id))
         conn.commit()
     finally:
@@ -224,17 +235,21 @@ async def mcp_usage_stats(user: dict = Depends(get_current_user)):
                              AND (tool_name ILIKE %s OR tool_name ILIKE %s)""",
                         (uid, f"%{sid}%", f"%{sname}%"),
                     )
-                    row = cur.fetchone()
-                    cnt = row[0] if row else 0
+                    row_data = _row_dict(cur.fetchone())
+                    cnt = int(row_data.get("cnt", 0) or 0)
                     if cnt > 0:
-                        server_stats.append({
-                            "server_id": sid,
-                            "server_name": sname,
-                            "call_count": cnt,
-                            "success_count": row[1] or 0,
-                            "total_latency_ms": round(row[2] or 0, 1),
-                            "total_tokens": row[3] or 0,
-                        })
+                        server_stats.append(
+                            {
+                                "server_id": sid,
+                                "server_name": sname,
+                                "call_count": cnt,
+                                "success_count": int(row_data.get("ok", 0) or 0),
+                                "total_latency_ms": round(
+                                    float(row_data.get("lat", 0) or 0), 1
+                                ),
+                                "total_tokens": int(row_data.get("tok", 0) or 0),
+                            }
+                        )
                 except Exception:
                     pass
 

@@ -99,6 +99,10 @@ class ChaosEngine:
         if not self._enabled:
             return ChaosResult(scenario, target, False, "Chaos engine not enabled")
 
+        try:
+            scenario_key = ChaosScenario(scenario)
+        except ValueError:
+            return ChaosResult(scenario, target, False, f"Unknown scenario: {scenario}")
         handler = {
             ChaosScenario.AGENT_TIMEOUT: self._inject_agent_timeout,
             ChaosScenario.EVENT_BUS_OVERLOAD: self._inject_bus_overload,
@@ -106,7 +110,7 @@ class ChaosEngine:
             ChaosScenario.AGENT_CRASH: self._inject_agent_crash,
             ChaosScenario.DB_CONNECTION_DROP: self._inject_db_drop,
             ChaosScenario.MEMORY_PRESSURE: self._inject_memory_pressure,
-        }.get(scenario)
+        }.get(scenario_key)
 
         if not handler:
             return ChaosResult(scenario, target, False, f"Unknown scenario: {scenario}")

@@ -85,7 +85,9 @@ class CRDTDocument:
             self.op_counter[agent_id] = self.op_counter.get(agent_id, 0) + 1
             return f"{agent_id}:{int(time.time()*1000)}:{self.op_counter[agent_id]}"
 
-    def apply_insert(self, agent_id: str, position: int, text: str, metadata: Dict = None) -> DocumentOp:
+    def apply_insert(
+        self, agent_id: str, position: int, text: str, metadata: Dict | None = None
+    ) -> DocumentOp:
         """Apply insert operation with CRDT semantics"""
         with self.lock:
             op_id = self._generate_op_id(agent_id)
@@ -105,7 +107,9 @@ class CRDTDocument:
             self.version_counter += 1
             return op
 
-    def apply_delete(self, agent_id: str, position: int, length: int, metadata: Dict = None) -> DocumentOp:
+    def apply_delete(
+        self, agent_id: str, position: int, length: int, metadata: Dict | None = None
+    ) -> DocumentOp:
         """Apply delete operation with CRDT semantics"""
         with self.lock:
             op_id = self._generate_op_id(agent_id)
@@ -212,7 +216,7 @@ class CRDTDocument:
 class CollaborativeDocManager:
     """Manages all collaborative documents with persistence"""
 
-    def __init__(self, storage_path: str = None):
+    def __init__(self, storage_path: str | None = None):
         self.storage_path = storage_path or os.getenv("COLLAB_DOC_PATH", "./data/collab_docs")
         os.makedirs(self.storage_path, exist_ok=True)
         self.documents: Dict[str, CollaborativeDocument] = {}
@@ -428,7 +432,9 @@ class CollaborativeDocManager:
             self._save_doc(doc)
             return doc
 
-    def list_documents(self, agent_id: str = None) -> List[CollaborativeDocument]:
+    def list_documents(
+        self, agent_id: str | None = None
+    ) -> List[CollaborativeDocument]:
         """List accessible documents"""
         with self.lock:
             if agent_id:
@@ -577,7 +583,9 @@ class AgentCollabProtocol:
         }
 
     @staticmethod
-    def create_cursor_sync(agent_id: str, position: int, selection: Dict = None) -> Dict:
+    def create_cursor_sync(
+        agent_id: str, position: int, selection: Dict | None = None
+    ) -> Dict:
         """Create cursor position sync"""
         return {
             "type": "cursor_sync",
@@ -625,8 +633,10 @@ if __name__ == "__main__":
 
     # Apply an insert
     crdt = manager.get_crdt_document(doc.doc_id)
-    op = crdt.apply_insert("speed", 7, "world", {"cursor": 7})
-    print(f"After insert: {doc.content}")
+    if crdt is not None:
+        op = crdt.apply_insert("speed", 7, "world", {"cursor": 7})
+        print(f"Applied op: {op.id}")
+        print(f"After insert: {crdt.content}")
 
     # Get syntax tokens
     tokens = tokenize_code(doc.content, "python")

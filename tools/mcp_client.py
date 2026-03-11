@@ -20,7 +20,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from tools.pg_connection import get_conn, release_conn
 
@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 MCP_CONFIG_PATH = DATA_DIR / "mcp_servers.json"
+
+
+def _row_to_dict(row: Any) -> dict[str, Any]:
+    return dict(row or {})
 
 
 def _ensure_tables() -> None:
@@ -156,9 +160,13 @@ async def _mcp_handshake(
     stdout: asyncio.StreamReader,
 ) -> bool:
     """Perform MCP initialize → initialized handshake. Returns True on success."""
+    stdin = proc.stdin
+    if stdin is None:
+        return False
+
     # Step 1: Send initialize request
-    proc.stdin.write(_build_initialize_request().encode())
-    await proc.stdin.drain()
+    stdin.write(_build_initialize_request().encode())
+    await stdin.drain()
 
     # Step 2: Read initialize response
     response = await _read_json_response(stdout, timeout=10.0)
@@ -166,8 +174,8 @@ async def _mcp_handshake(
         return False
 
     # Step 3: Send initialized notification
-    proc.stdin.write(_build_initialized_notification().encode())
-    await proc.stdin.drain()
+    stdin.write(_build_initialized_notification().encode())
+    await stdin.drain()
 
     # Small delay to let server process the notification
     await asyncio.sleep(0.1)
@@ -228,16 +236,18 @@ def list_servers(active_only: bool = True) -> list[dict[str, Any]]:
             if active_only:
                 query += " WHERE s.active = TRUE"
             cur.execute(query)
-            rows = cur.fetchall()
+            rows = [_row_to_dict(row) for row in cur.fetchall()]
             return [
                 {
-                    "id": r["id"],
-                    "name": r["name"],
-                    "command": r["command"],
-                    "args": json.loads(r["args"]) if isinstance(r["args"], str) else r["args"],
-                    "description": r["description"],
-                    "active": r["active"],
-                    "tool_count": r["tool_count"],
+                    "id": r.get("id"),
+                    "name": r.get("name"),
+                    "command": r.get("command"),
+                    "args": json.loads(r.get("args") or "[]")
+                    if isinstance(r.get("args"), str)
+                    else (r.get("args") or []),
+                    "description": r.get("description"),
+                    "active": r.get("active"),
+                    "tool_count": r.get("tool_count"),
                 }
                 for r in rows
             ]
@@ -301,7 +311,11 @@ def load_servers_from_config(config_path: str | Path | None = None) -> int:
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM mcp_servers WHERE active = TRUE")
-            db_ids = {r["id"] for r in cur.fetchall()}
+            db_ids = {
+                str(row_data.get("id"))
+                for row_data in (_row_to_dict(row) for row in cur.fetchall())
+                if row_data.get("id")
+            }
             stale_ids = db_ids - config_ids
             if stale_ids:
                 cur.execute(
@@ -331,16 +345,22 @@ async def discover_tools(server_id: str) -> list[dict[str, Any]]:
                 "SELECT * FROM mcp_servers WHERE id = %s AND active = TRUE",
                 (server_id,),
             )
-            server = cur.fetchone()
+            server = _row_to_dict(cur.fetchone())
     finally:
         release_conn(conn)
 
     if not server:
         return []
 
-    command = server["command"]
-    args = json.loads(server["args"]) if isinstance(server["args"], str) else server["args"]
-    env_vars = json.loads(server["env"]) if isinstance(server["env"], str) else server["env"]
+    command = str(server.get("command") or "")
+    args_value = server.get("args")
+    env_value = server.get("env")
+    args = json.loads(args_value) if isinstance(args_value, str) else (args_value or [])
+    env_vars = (
+        json.loads(env_value) if isinstance(env_value, str) else (env_value or {})
+    )
+    if not command:
+        return []
 
     try:
         env = {**os.environ, **{k: v for k, v in env_vars.items() if v}}
@@ -352,9 +372,12 @@ async def discover_tools(server_id: str) -> list[dict[str, Any]]:
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
+        stdout = proc.stdout
 
         # Perform MCP handshake
-        handshake_ok = await _mcp_handshake(proc, proc.stdout)
+        if stdout is None:
+            return []
+        handshake_ok = await _mcp_handshake(proc, stdout)
         if not handshake_ok:
             logger.warning(f"MCP handshake failed for {server_id}, trying direct tools/list")
             # Fallback: some older servers might not need handshake
@@ -371,19 +394,27 @@ async def discover_tools(server_id: str) -> list[dict[str, Any]]:
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
+            stdin = proc.stdin
+            stdout = proc.stdout
+            if stdin is None or stdout is None:
+                return []
             # Try direct tools/list (legacy fallback)
-            proc.stdin.write(_build_tools_list_request().encode())
-            await proc.stdin.drain()
-            response = await _read_json_response(proc.stdout, timeout=10.0)
+            stdin.write(_build_tools_list_request().encode())
+            await stdin.drain()
+            response = await _read_json_response(stdout, timeout=10.0)
         else:
+            stdin = proc.stdin
+            if stdin is None:
+                return []
             # Send tools/list after successful handshake
-            proc.stdin.write(_build_tools_list_request().encode())
-            await proc.stdin.drain()
-            response = await _read_json_response(proc.stdout, timeout=10.0)
+            stdin.write(_build_tools_list_request().encode())
+            await stdin.drain()
+            response = await _read_json_response(stdout, timeout=10.0)
 
         # Clean up process
         try:
-            proc.stdin.close()
+            if stdin is not None:
+                stdin.close()
             proc.kill()
             await proc.wait()
         except Exception:
@@ -448,17 +479,25 @@ def list_discovered_tools(server_id: str | None = None) -> list[dict[str, Any]]:
                 cur.execute("SELECT * FROM mcp_tools WHERE server_id = %s", (server_id,))
             else:
                 cur.execute("SELECT * FROM mcp_tools")
-            rows = cur.fetchall()
-            return [
-                {
-                    "id": r["id"],
-                    "server_id": r["server_id"],
-                    "name": r["name"],
-                    "description": r["description"],
-                    "parameters": json.loads(r["parameters"]) if isinstance(r["parameters"], str) else r["parameters"],
-                }
-                for r in rows
-            ]
+            rows: list[dict[str, Any]] = [_row_to_dict(row) for row in cur.fetchall()]
+            tools: list[dict[str, Any]] = []
+            for row in rows:
+                raw_parameters = row.get("parameters")
+                parsed_parameters = (
+                    json.loads(raw_parameters or "{}")
+                    if isinstance(raw_parameters, str)
+                    else (raw_parameters or {})
+                )
+                tools.append(
+                    {
+                        "id": row.get("id"),
+                        "server_id": row.get("server_id"),
+                        "name": row.get("name"),
+                        "description": row.get("description"),
+                        "parameters": parsed_parameters,
+                    }
+                )
+            return tools
     finally:
         release_conn(conn)
 
@@ -489,9 +528,22 @@ async def call_mcp_tool(
     if not server:
         return {"success": False, "error": f"Server '{server_id}' not found or inactive"}
 
-    command = server["command"]
-    args = json.loads(server["args"]) if isinstance(server["args"], str) else server["args"]
-    env_vars = json.loads(server["env"]) if isinstance(server["env"], str) else server["env"]
+    server_row: dict[str, Any] = _row_to_dict(server)
+    raw_args = server_row.get("args")
+    raw_env = server_row.get("env")
+    command = str(server_row.get("command") or "")
+    args = (
+        json.loads(raw_args or "[]") if isinstance(raw_args, str) else (raw_args or [])
+    )
+    env_vars = (
+        json.loads(raw_env or "{}") if isinstance(raw_env, str) else (raw_env or {})
+    )
+
+    if not command:
+        return {
+            "success": False,
+            "error": f"Server '{server_id}' has no command configured",
+        }
 
     t0 = time.monotonic()
     try:
@@ -504,21 +556,32 @@ async def call_mcp_tool(
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
+        stdin = proc.stdin
+        stdout = proc.stdout
+
+        if stdin is None or stdout is None:
+            return {
+                "success": False,
+                "error": f"Server '{server_id}' did not expose stdio pipes",
+            }
+
+        writer = cast(asyncio.StreamWriter, stdin)
+        reader = cast(asyncio.StreamReader, stdout)
 
         # Perform MCP handshake
-        handshake_ok = await _mcp_handshake(proc, proc.stdout)
+        handshake_ok = await _mcp_handshake(proc, reader)
         if not handshake_ok:
             logger.warning(f"MCP handshake failed for {server_id}, trying direct call")
 
         # Send tool call
-        proc.stdin.write(_build_tool_call_request(tool_name, arguments).encode())
-        await proc.stdin.drain()
+        writer.write(_build_tool_call_request(tool_name, arguments).encode())
+        await writer.drain()
 
-        response = await _read_json_response(proc.stdout, timeout=timeout)
+        response = await _read_json_response(reader, timeout=timeout)
 
         # Clean up
         try:
-            proc.stdin.close()
+            writer.close()
             proc.kill()
             await proc.wait()
         except Exception:
@@ -614,17 +677,19 @@ def get_call_history(server_id: str | None = None, limit: int = 20) -> list[dict
                        FROM mcp_call_history ORDER BY called_at DESC LIMIT %s""",
                     (limit,),
                 )
-            rows = cur.fetchall()
-            return [
-                {
-                    "server_id": r["server_id"],
-                    "tool_name": r["tool_name"],
-                    "success": r["success"],
-                    "latency_ms": r["latency_ms"],
-                    "called_at": str(r["called_at"]),
-                }
-                for r in rows
-            ]
+            rows: list[dict[str, Any]] = [_row_to_dict(row) for row in cur.fetchall()]
+            history: list[dict[str, Any]] = []
+            for row in rows:
+                history.append(
+                    {
+                        "server_id": row.get("server_id"),
+                        "tool_name": row.get("tool_name"),
+                        "success": row.get("success"),
+                        "latency_ms": row.get("latency_ms"),
+                        "called_at": str(row.get("called_at")),
+                    }
+                )
+            return history
     finally:
         release_conn(conn)
 

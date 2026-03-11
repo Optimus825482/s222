@@ -24,6 +24,7 @@ from core.protocols import (
 from tools.pg_connection import get_conn, release_conn, db_conn
 
 logger = logging.getLogger(__name__)
+_collector: PerformanceCollector | None = None
 
 # Period → PostgreSQL interval mapping
 PERIOD_MAP: dict[str, str] = {
@@ -200,18 +201,64 @@ class PerformanceCollector:
                         (agent_role, interval),
                     )
                     row = cur.fetchone()
+            row_data = dict(row or {})
             return {
                 "agent_role": agent_role,
                 "period": period,
-                "avg_response_time": round(float(row["avg_response_time"]), 2),
-                "success_rate": round(float(row["success_rate"]), 2),
-                "total_tokens": int(row["total_tokens"]),
-                "task_count": int(row["task_count"]),
+                "avg_response_time": round(
+                    float(row_data.get("avg_response_time", 0)), 2
+                ),
+                "success_rate": round(float(row_data.get("success_rate", 0)), 2),
+                "total_tokens": int(row_data.get("total_tokens", 0)),
+                "task_count": int(row_data.get("task_count", 0)),
             }
         except Exception as e:
             logger.error(f"Agent summary query failed: {e}")
             return {
                 "agent_role": agent_role,
+                "period": period,
+                "avg_response_time": 0,
+                "success_rate": 0,
+                "total_tokens": 0,
+                "task_count": 0,
+                "error": str(e),
+            }
+
+    def get_agent_stats(self, agent_role: str, period: str = "24h") -> dict[str, Any]:
+        return self.get_agent_summary(agent_role, period)
+
+    def get_skill_stats(self, skill_id: str, period: str = "24h") -> dict[str, Any]:
+        interval = PERIOD_MAP.get(period, "24 hours")
+        try:
+            with db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """SELECT
+                             COALESCE(AVG(response_time_ms), 0)       AS avg_response_time,
+                             COALESCE(AVG(success::int) * 100, 0)     AS success_rate,
+                             COALESCE(SUM(total_tokens), 0)           AS total_tokens,
+                             COUNT(*)                                  AS task_count
+                           FROM agent_metrics_log
+                           WHERE skill_id = %s
+                             AND recorded_at >= now() - %s::interval""",
+                        (skill_id, interval),
+                    )
+                    row = cur.fetchone()
+            row_data = dict(row or {})
+            return {
+                "skill_id": skill_id,
+                "period": period,
+                "avg_response_time": round(
+                    float(row_data.get("avg_response_time", 0) or 0), 2
+                ),
+                "success_rate": round(float(row_data.get("success_rate", 0) or 0), 2),
+                "total_tokens": int(row_data.get("total_tokens", 0) or 0),
+                "task_count": int(row_data.get("task_count", 0) or 0),
+            }
+        except Exception as e:
+            logger.error(f"Skill summary query failed: {e}")
+            return {
+                "skill_id": skill_id,
                 "period": period,
                 "avg_response_time": 0,
                 "success_rate": 0,
@@ -234,8 +281,9 @@ class PerformanceCollector:
                            FROM agent_metrics_log"""
                     )
                     row = cur.fetchone()
-            total_tokens = int(row["total_tokens"])
-            total_tasks = int(row["total_tasks"])
+                    row_data = dict(row or {})
+                    total_tokens = int(row_data.get("total_tokens", 0))
+                    total_tasks = int(row_data.get("total_tasks", 0))
             uptime = time.time() - self._start_time
             cost_estimate = round(total_tokens / 1000 * DEFAULT_COST_PER_1K, 4)
             return {
@@ -295,3 +343,11 @@ class PerformanceCollector:
     @property
     def buffer_size(self) -> int:
         return len(self._buffer)
+
+
+def get_performance_collector() -> PerformanceCollector:
+    """Return a process-wide singleton collector."""
+    global _collector
+    if _collector is None:
+        _collector = PerformanceCollector()
+    return _collector

@@ -126,8 +126,9 @@ def _extract_pptx(file_path: Path) -> str:
     for slide_idx, slide in enumerate(prs.slides, 1):
         slide_texts: list[str] = []
         for shape in slide.shapes:
-            if shape.has_text_frame:
-                for paragraph in shape.text_frame.paragraphs:
+            text_frame = getattr(shape, "text_frame", None)
+            if getattr(shape, "has_text_frame", False) and text_frame is not None:
+                for paragraph in text_frame.paragraphs:
                     text = paragraph.text.strip()
                     if text:
                         slide_texts.append(text)
