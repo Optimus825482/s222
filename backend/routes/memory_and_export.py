@@ -18,7 +18,7 @@ async def api_memory_stats(user: dict = Depends(get_current_user)):
     """Get layered memory statistics."""
     try:
         from tools.memory import get_memory_stats
-        return get_memory_stats()
+        return await get_memory_stats()
     except Exception as e:
         return {"error": str(e), "total_memories": 0}
 
@@ -28,9 +28,9 @@ async def api_memory_layers(user: dict = Depends(get_current_user)):
     """Get memories grouped by layer."""
     try:
         from tools.memory import list_memories
-        working = list_memories(layer="working", limit=10)
-        episodic = list_memories(layer="episodic", limit=20)
-        semantic = list_memories(layer="semantic", limit=20)
+        working = await list_memories(layer="working", limit=10)
+        episodic = await list_memories(layer="episodic", limit=20)
+        semantic = await list_memories(layer="semantic", limit=20)
         return {"working": working, "episodic": episodic, "semantic": semantic}
     except Exception as e:
         return {"working": [], "episodic": [], "semantic": [], "error": str(e)}
@@ -40,7 +40,7 @@ async def api_memory_layers(user: dict = Depends(get_current_user)):
 async def api_delete_memory(memory_id: int, user: dict = Depends(get_current_user)):
     try:
         from tools.memory import delete_memory
-        ok = delete_memory(memory_id)
+        ok = await delete_memory(memory_id)
         if not ok:
             raise HTTPException(404, "Memory not found")
         return {"deleted": True}
@@ -78,7 +78,7 @@ async def api_memory_correlate(
     """Find correlated memories across layers and categories."""
     try:
         from tools.memory import correlate_memories
-        return correlate_memories(query, max_results, time_window_hours)
+        return await correlate_memories(query, max_results, time_window_hours)
     except Exception as e:
         return {"clusters": [], "total_found": 0, "error": str(e)}
 
@@ -108,7 +108,7 @@ async def api_memory_related(
     """Find memories related to a specific memory."""
     try:
         from tools.memory import find_related_memories
-        return find_related_memories(memory_id, max_results)
+        return await find_related_memories(memory_id, max_results)
     except Exception as e:
         return []
 

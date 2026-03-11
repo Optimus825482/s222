@@ -36,9 +36,9 @@ MAX_SUMMARY_LENGTH = 10_000  # Characters
 class YouTubeSummarizeRequest(BaseModel):
     """Request model for YouTube summarization."""
     url: str = Field(..., description="YouTube video URL (supports youtube.com, youtu.be, etc.)")
-    language: str = Field(default="en", description="Preferred transcript language code (e.g., 'en', 'tr', 'de')")
+    language: str = Field(default="tr", description="Preferred transcript language code (e.g., 'en', 'tr', 'de')")
     target_language: Optional[str] = Field(
-        default=None,
+        default="tr",
         description="Target language for auto-translation (e.g., 'tr' for Turkish)",
     )
     include_timestamps: bool = Field(default=False, description="Include timestamps in transcript")

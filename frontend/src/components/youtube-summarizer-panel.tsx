@@ -26,14 +26,32 @@ export default function YoutubeSummarizerPanel() {
         title?: string;
         duration?: string;
         author?: string;
+        duration_seconds?: number;
+        channel?: string;
         transcript?: string;
         summary?: string;
         error?: string;
       }>("/api/youtube/summarize", {
         method: "POST",
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({
+          url,
+          language: "tr",
+          target_language: "tr",
+          use_agent_summary: true,
+          max_summary_length: 1800,
+        }),
       });
-      setResult(data);
+      setResult({
+        ...data,
+        duration:
+          data.duration ??
+          (typeof data.duration_seconds === "number"
+            ? `${Math.floor(data.duration_seconds / 60)}:${String(
+                data.duration_seconds % 60,
+              ).padStart(2, "0")}`
+            : undefined),
+        author: data.author ?? data.channel,
+      });
     } catch (err) {
       setResult({ error: (err as Error).message || "İstek başarısız oldu" });
     } finally {
