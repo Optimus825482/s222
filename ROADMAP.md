@@ -1,6 +1,6 @@
 # 🗺️ Multi-Agent Ops Center — Sistem Geliştirme Yol Haritası
 
-> Son güncelleme: 2026-03-08 (Faz 14 — pi-mono entegrasyonu eklendi)
+> Son güncelleme: 2026-03-11 (Faz 15 — pi-mono derin uyarlama yol haritası eklendi)
 > Durum: Aktif geliştirme
 
 ## Renk Kodları
@@ -415,6 +415,62 @@ pi-mom (Slack bot) pattern'ini kullanarak Faz 11.5 multi-channel gateway'i hızl
 - 🟢 Kanal-bağımsız mesaj normalizasyonu (pi-agent-core message format)
 - 🟢 Docker sandbox isolation (kanal başına izole çalışma ortamı)
 
+## Faz 15 — pi-mono Derin Uyarlama ve Ürünleştirme 🧩 `[🔴 PLANLANMIŞ]`
+
+Faz 14 ile alınan temel pi-mono entegrasyonlarını ürün seviyesinde derinleştirme.
+Amaç, paketleri birebir taşımak değil; `agent`, `ai`, `coding-agent`, `mom` ve `web-ui`
+içindeki olgun pattern'leri mevcut Multi-Agent Ops Center mimarisine kontrollü biçimde uyarlamak.
+
+### 15.1 — Artifact UX ve Tool Renderer Katmanı `[🔴 PLANLANMIŞ]`
+
+`pi-web-ui` içindeki artifact ve renderer desenlerini mevcut XP masaüstü deneyimine taşıma.
+
+- 🔴 Artifact panel derinleştirme — agent çıktılarını ayrı yan panel/pencere mantığında yönetme
+- 🔴 Tool renderer registry — her tool sonucu için tip-bazlı özel renderer standardı
+- 🔴 Attachment lifecycle — yükleme, önizleme, extraction ve artifact'e bağlama akışı
+- 🔴 Document extraction UX iyileştirmesi — PDF/DOCX/XLSX/PPTX çıktılarının daha görünür yönetimi
+- 🔴 Frontend session metadata storage — konuşma listesi, son aktif oturum, kullanıcı tercihleri
+
+### 15.2 — Session Branching, Compaction ve Skill Platformu `[🔴 PLANLANMIŞ]`
+
+`pi-coding-agent` içindeki oturum ve yetenek yönetimi desenlerini ürünleştirme.
+
+- 🔴 Session tree — alternatif çözüm yolları için dallanan oturum yapısı
+- 🔴 Session compaction v2 — uzun konuşmalarda branch summary + context sıkıştırma
+- 🔴 Skill discovery/validation pipeline — frontmatter kontrollü skill yükleme standardı
+- 🔴 Extension hook surface — dashboard/agent lifecycle için genişletilebilir event kancaları
+- 🔴 Komut paleti — slash command mantığını UI action palette olarak sunma
+
+### 15.3 — Agent Runtime Standardizasyonu `[🔴 PLANLANMIŞ]`
+
+`pi-agent-core` ve `pi-ai` içindeki agent yaşam döngüsü ve provider abstraction desenlerini pekiştirme.
+
+- 🔴 Event-stream sözleşmesi standardı — assistant delta, thinking, tool-call, tool-result akışını tek şemaya bağlama
+- 🔴 Tool argument validation v2 — retry/correction loop'larını backend standardı haline getirme
+- 🔴 Steering ve follow-up queue standardı — çalışan agent'ı yönlendirme ve otomatik devam mekanizması
+- 🔴 Provider registry derinleştirme — model/policy/proxy/fallback kararlarını merkezi yönetim
+- 🔴 Unified model capabilities map — hangi modelin reasoning/tool/vision desteği verdiğini merkezi katalogda tutma
+
+### 15.4 — Sandboxed Autonomy, Queue ve Scheduled Events `[🔴 PLANLANMIŞ]`
+
+`pi-mom` içindeki güvenli yürütme ve otonom görev yönetimi desenlerini backend'e taşıma.
+
+- 🔴 Host/Docker sandbox abstraction — tool ve kod yürütme için ortak executor katmanı
+- 🔴 Kanal/oturum bazlı queueing — çakışan agent görevlerini sıralı yürütme
+- 🔴 File/event tabanlı scheduled tasks — heartbeat ve workflow scheduler ile birleşik görev modeli
+- 🔴 Workspace isolation — agent başına ya da kanal başına izole çalışma dizini politikası
+- 🔴 Execution logs ve replay — otonom görev çalıştırmalarını tekrar izleme
+
+### 15.5 — Telemetry, Rollout ve Sertleştirme `[🔴 PLANLANMIŞ]`
+
+Yeni kabiliyetleri güvenli ve ölçülebilir şekilde devreye alma.
+
+- 🔴 Feature flag ile kademeli açılış — artifact, branching, sandbox gibi özellikleri kontrollü açma
+- 🔴 Yeni metrikler — artifact kullanım oranı, compaction etkinliği, branch başarı oranı
+- 🔴 Failure analytics — renderer/sandbox/session hataları için özel izleme
+- 🔴 Product adoption dashboard — yeni pi-mono uyarlamalarının kullanım etkisini ölçme
+- 🔴 Rollback playbook — yeni runtime/UI katmanları için geri alma prosedürü
+
 ---
 
 ## Özet Tablo
@@ -437,6 +493,7 @@ pi-mom (Slack bot) pattern'ini kullanarak Faz 11.5 multi-channel gateway'i hızl
 | Faz 12 — Kolektif Bilinç 🧬     | 🟡 Kısmi        | █████░░░░░░░ 40%  |
 | Faz 13 — Kiro Entegrasyon 🔮    | 🟡 Devam ediyor | ███░░░░░░░░░ 30%  |
 | Faz 14 — pi-mono Entegrasyon 🔌 | 🟢 Tamamlandı   | ████████████ 100% |
+| Faz 15 — Derin Uyarlama 🧩      | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
 
 ---
 
@@ -450,4 +507,5 @@ pi-mom (Slack bot) pattern'ini kullanarak Faz 11.5 multi-channel gateway'i hızl
 - Faz 11-12: OpenClaw / Moltbook ekosisteminden ilham alınmıştır
 - Faz 13: Kiro IDE skill ve power entegrasyonu — geliştirme hızını artırmak için
 - Faz 14: [badlogic/pi-mono](https://github.com/badlogic/pi-mono) entegrasyonu — 20+ LLM provider, unified gateway, gelişmiş chat UI, agent runtime framework
+- Faz 15: pi-mono pattern'lerinin ürün seviyesinde derin uyarlanması — artifact UX, session branching, runtime standardizasyonu, sandboxed autonomy
 - İlham kaynakları: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com) · [Forbes: Crustafarianism](https://www.forbes.com/sites/johnkoetsier/2026/01/30/ai-agents-created-their-own-religion-crustafarianism-on-an-agent-only-social-network/) · [pi-mono](https://github.com/badlogic/pi-mono)

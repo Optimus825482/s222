@@ -1,26 +1,70 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { History, Loader2, Trash2 } from "lucide-react";
+import { Clock3, GitBranch, History, Loader2, Radio, Scissors, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { setPendingThread } from "@/lib/ws-store";
-import type { ThreadSummary } from "@/lib/types";
+import { useSessionPersistence, type SessionMeta } from "@/lib/use-session-persistence";
+
+interface SessionListItem {
+  id: string;
+  title: string;
+  taskCount: number;
+  eventCount: number;
+  updatedAt: string;
+  branchLabel?: string | null;
+  compactedSummary?: string | null;
+}
 
 export function XpSessionsPanel() {
-  const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const {
+    listSessions,
+    deleteSession,
+    clearAll,
+    lastSessionId,
+    isReady: persistReady,
+  } = useSessionPersistence();
+  const [threads, setThreads] = useState<SessionListItem[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const mapSessionMeta = useCallback((session: SessionMeta): SessionListItem => {
+    return {
+      id: session.id,
+      title: session.title,
+      taskCount: session.taskCount,
+      eventCount: session.messageCount,
+      updatedAt: session.lastUpdated,
+      branchLabel: session.branch_label,
+      compactedSummary: session.compacted_summary,
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await api.listThreads(50);
-      setThreads(list);
+      if (persistReady) {
+        const list = await listSessions();
+        setThreads(list.map(mapSessionMeta));
+      } else {
+        const list = await api.listThreads(50);
+        setThreads(
+          list.map((thread) => ({
+            id: thread.id,
+            title: thread.preview || thread.id.slice(0, 12),
+            taskCount: thread.task_count,
+            eventCount: thread.event_count,
+            updatedAt: thread.created_at,
+            branchLabel: thread.branch_label,
+            compactedSummary: thread.compacted_summary,
+          })),
+        );
+      }
     } catch (err) {
       console.error("[XpSessions] load error:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [listSessions, mapSessionMeta, persistReady]);
 
   useEffect(() => {
     load();
@@ -28,7 +72,7 @@ export function XpSessionsPanel() {
 
   const handleDelete = async (id: string) => {
     try {
-      await api.deleteThread(id);
+      await Promise.allSettled([api.deleteThread(id), deleteSession(id)]);
       setThreads((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       console.error("[XpSessions] delete error:", err);
@@ -38,7 +82,7 @@ export function XpSessionsPanel() {
   const handleDeleteAll = async () => {
     if (!confirm("Tüm oturumlar silinsin mi?")) return;
     try {
-      await api.deleteAllThreads();
+      await Promise.allSettled([api.deleteAllThreads(), clearAll()]);
       setThreads([]);
     } catch (err) {
       console.error("[XpSessions] deleteAll error:", err);
@@ -84,21 +128,12 @@ export function XpSessionsPanel() {
         {threads.map((t) => (
           <div
             key={t.id}
-            className="flex items-start gap-2 p-3 hover:bg-[#e8e4d4] transition-colors group cursor-pointer"
-            onClick={() => {
-              setPendingThread(t.id);
-              window.dispatchEvent(
-                new CustomEvent("open-thread", { detail: t.id }),
-              );
-              window.dispatchEvent(
-                new CustomEvent("open-app", { detail: "chat" }),
-              );
-            }}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
+            className="flex items-start gap-2 p-3 hover:bg-[#e8e4d4] transition-colors group"
+          >
+            <button
+              type="button"
+              className="flex-1 min-w-0 text-left cursor-pointer"
+              onClick={() => {
                 setPendingThread(t.id);
                 window.dispatchEvent(
                   new CustomEvent("open-thread", { detail: t.id }),
@@ -106,21 +141,41 @@ export function XpSessionsPanel() {
                 window.dispatchEvent(
                   new CustomEvent("open-app", { detail: "chat" }),
                 );
-              }
-            }}
-          >
-            <div className="flex-1 min-w-0">
+              }}
+            >
               <div className="text-xs text-gray-700 truncate">
-                {t.preview || t.id.slice(0, 12)}
+                {t.title || t.id.slice(0, 12)}
               </div>
-              <div className="text-[10px] text-gray-500 mt-0.5">
-                {fmtDate(t.created_at)} · {t.task_count} görev · {t.event_count}{" "}
-                olay
+              <div className="text-[10px] text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="inline-flex items-center gap-1">
+                  <Clock3 className="w-3 h-3" />
+                  {fmtDate(t.updatedAt)}
+                </span>
+                <span>{t.taskCount} görev</span>
+                <span>{t.eventCount} olay</span>
+                {lastSessionId === t.id && (
+                  <span className="inline-flex items-center gap-1 text-[#0066cc] font-medium">
+                    <Radio className="w-3 h-3" />
+                    Aktif
+                  </span>
+                )}
+                {t.branchLabel && (
+                  <span className="inline-flex items-center gap-1 text-[#6b46c1] font-medium">
+                    <GitBranch className="w-3 h-3" />
+                    {t.branchLabel}
+                  </span>
+                )}
+                {t.compactedSummary && (
+                  <span className="inline-flex items-center gap-1 text-[#92400e] font-medium">
+                    <Scissors className="w-3 h-3" />
+                    Compact
+                  </span>
+                )}
               </div>
-            </div>
+            </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
+              type="button"
+              onClick={() => {
                 handleDelete(t.id);
               }}
               className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300 transition-all"

@@ -167,6 +167,11 @@ class Thread(BaseModel):
     tasks: list[Task] = Field(default_factory=list)
     agent_metrics: dict[str, AgentMetrics] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=_now)
+    parent_thread_id: str | None = None
+    root_thread_id: str | None = None
+    branch_label: str | None = None
+    compacted_summary: str | None = None
+    last_compacted_at: datetime | None = None
 
     def add_event(
         self,

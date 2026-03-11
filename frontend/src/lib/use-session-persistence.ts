@@ -13,6 +13,11 @@ export interface SessionMeta {
   messageCount: number;
   lastUpdated: string;
   taskCount: number;
+  parent_thread_id?: string | null;
+  root_thread_id?: string | null;
+  branch_label?: string | null;
+  compacted_summary?: string | null;
+  last_compacted_at?: string | null;
 }
 
 interface StoredSession {
@@ -22,6 +27,11 @@ interface StoredSession {
   messageCount: number;
   taskCount: number;
   lastUpdated: string;
+  parent_thread_id?: string | null;
+  root_thread_id?: string | null;
+  branch_label?: string | null;
+  compacted_summary?: string | null;
+  last_compacted_at?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +127,11 @@ function toStoredSession(thread: Thread): StoredSession {
     messageCount: thread.events.length,
     taskCount: thread.tasks.length,
     lastUpdated: new Date().toISOString(),
+    parent_thread_id: thread.parent_thread_id,
+    root_thread_id: thread.root_thread_id,
+    branch_label: thread.branch_label,
+    compacted_summary: thread.compacted_summary,
+    last_compacted_at: thread.last_compacted_at,
   };
 }
 
@@ -256,13 +271,31 @@ export function useSessionPersistence() {
       // Newest first
       return all
         .reverse()
-        .map(({ thread_id, title, messageCount, lastUpdated, taskCount }) => ({
-          id: thread_id,
-          title,
-          messageCount,
-          lastUpdated,
-          taskCount,
-        }));
+        .map(
+          ({
+            thread_id,
+            title,
+            messageCount,
+            lastUpdated,
+            taskCount,
+            parent_thread_id,
+            root_thread_id,
+            branch_label,
+            compacted_summary,
+            last_compacted_at,
+          }) => ({
+            id: thread_id,
+            title,
+            messageCount,
+            lastUpdated,
+            taskCount,
+            parent_thread_id,
+            root_thread_id,
+            branch_label,
+            compacted_summary,
+            last_compacted_at,
+          }),
+        );
     } catch {
       return [];
     }

@@ -29,6 +29,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { DetailModal } from "./detail-modal";
+import ArtifactsPanel, { hasRenderableArtifacts } from "@/components/artifacts-panel";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -725,6 +726,11 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
               >
                 {task.final_result}
               </div>
+              {hasRenderableArtifacts(task.final_result) && (
+                <div className="mt-2">
+                  <ArtifactsPanel content={task.final_result} />
+                </div>
+              )}
             </div>
           )}
 
@@ -915,7 +921,28 @@ function ThreadDetailView({
           >
             {lastStatus}
           </span>
+          {thread.branch_label && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-white border border-[#d6d2c2] text-[#333]">
+              Branch: {thread.branch_label}
+            </span>
+          )}
+          {thread.compacted_summary && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-white border border-[#d6d2c2] text-[#333]">
+              Compact özeti var
+            </span>
+          )}
         </div>
+
+        {thread.compacted_summary && (
+          <div className="px-3 py-2 border-b text-[11px]" style={{ backgroundColor: "#fffdf5", borderColor: "#ece9d8" }}>
+            <div className="font-semibold mb-1" style={{ color: "#7c5a00" }}>
+              Compact Özeti
+            </div>
+            <div className="whitespace-pre-wrap leading-relaxed" style={{ color: "#5f4b00" }}>
+              {thread.compacted_summary}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div

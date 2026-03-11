@@ -3,6 +3,8 @@
 import sys
 import time
 import uuid
+import re
+from collections import OrderedDict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,21 @@ from core.state import list_threads, load_thread
 from shared_state import _AGENT_ROLES, _AUDIT_LOG, _utcnow, _APP_START_TIME
 
 router = APIRouter()
+
+_WORKFLOW_TOOL_RE = re.compile(r"\[workflow\] Calling tool '([^']+)'")
+_TOOL_NAME_RE = re.compile(r"^([a-zA-Z_][\w.-]*)\(")
+
+
+def _extract_tool_name(content: str) -> str | None:
+    workflow_match = _WORKFLOW_TOOL_RE.search(content)
+    if workflow_match:
+        return workflow_match.group(1)
+
+    direct_match = _TOOL_NAME_RE.match(content)
+    if direct_match:
+        return direct_match.group(1)
+
+    return None
 
 
 # ── 1. Agent Performance Analytics ───────────────────────────────
@@ -435,44 +452,78 @@ async def get_thread_analytics(
         raise HTTPException(status_code=404, detail="Thread not found")
 
     try:
-        # Timeline: ordered events
-        timeline: list[dict] = []
+        # Timeline: frontend-facing ordered event list
+        event_timeline: list[dict[str, Any]] = []
         for ev in thread.events:
-            timeline.append({
-                "id": ev.id,
+            event_timeline.append({
                 "timestamp": ev.timestamp.isoformat(),
-                "type": ev.event_type.value,
+                "event_type": ev.event_type.value,
                 "agent": ev.agent_role.value if ev.agent_role else None,
-                "content_preview": ev.content[:150],
             })
 
-        # Agent participation breakdown
-        agent_participation: dict[str, dict] = {}
+        # Agent participation breakdown matching frontend contract
+        agent_participation: dict[str, dict[str, Any]] = {}
         for role in _AGENT_ROLES:
             if role in thread.agent_metrics:
                 m = thread.agent_metrics[role]
                 agent_participation[role] = {
-                    "total_calls": m.total_calls,
-                    "total_tokens": m.total_tokens,
-                    "avg_latency_ms": round(m.avg_latency_ms, 1),
-                    "success_rate_pct": round(m.success_rate * 100, 1),
-                    "last_active": m.last_active.isoformat() if m.last_active else None,
+                    "calls": m.total_calls,
+                    "tokens": m.total_tokens,
+                    "latency_ms": round(m.avg_latency_ms, 1),
                 }
 
-        # Task summary
-        tasks_summary: list[dict] = []
+        # Ensure all agents exist so the frontend can render stable records
+        for role in _AGENT_ROLES:
+            agent_participation.setdefault(
+                role,
+                {
+                    "calls": 0,
+                    "tokens": 0,
+                    "latency_ms": 0.0,
+                },
+            )
+
+        pipeline_types_used = list(
+            OrderedDict.fromkeys(task.pipeline_type.value for task in thread.tasks)
+        )
+
+        tool_stats: dict[str, dict[str, float]] = {}
+        for ev in thread.events:
+            if ev.event_type.value != "tool_call":
+                continue
+            tool_name = _extract_tool_name(ev.content)
+            if not tool_name:
+                continue
+            bucket = tool_stats.setdefault(tool_name, {"count": 0, "latency_total": 0.0})
+            bucket["count"] += 1
+
+        tool_calls = [
+            {
+                "tool": tool,
+                "count": int(values["count"]),
+                "avg_latency_ms": round(
+                    values["latency_total"] / values["count"], 1
+                )
+                if values["count"]
+                else 0.0,
+            }
+            for tool, values in sorted(
+                tool_stats.items(), key=lambda item: (-item[1]["count"], item[0])
+            )
+        ]
+
         for task in thread.tasks:
-            tasks_summary.append({
-                "id": task.id,
-                "input_preview": task.user_input[:120],
-                "pipeline": task.pipeline_type.value,
-                "status": task.status.value,
-                "sub_task_count": len(task.sub_tasks),
-                "total_tokens": task.total_tokens,
-                "total_latency_ms": task.total_latency_ms,
-                "created_at": task.created_at.isoformat(),
-                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-            })
+            agent_key = None
+            if task.pipeline_type.value and task.pipeline_type.value not in pipeline_types_used:
+                pipeline_types_used.append(task.pipeline_type.value)
+            for sub_task in task.sub_tasks:
+                agent_key = sub_task.assigned_agent.value if hasattr(sub_task.assigned_agent, "value") else str(sub_task.assigned_agent)
+                if agent_key not in agent_participation:
+                    agent_participation[agent_key] = {
+                        "calls": 0,
+                        "tokens": 0,
+                        "latency_ms": 0.0,
+                    }
 
         # Cost estimation (rough: $0.001 per 1K tokens)
         total_tokens = sum(m.total_tokens for m in thread.agent_metrics.values())
@@ -487,15 +538,13 @@ async def get_thread_analytics(
 
         return {
             "thread_id": thread_id,
-            "created_at": thread.created_at.isoformat(),
-            "event_count": len(thread.events),
-            "task_count": len(thread.tasks),
             "duration_ms": round(duration_ms, 1),
-            "total_tokens": total_tokens,
-            "estimated_cost_usd": estimated_cost,
             "agent_participation": agent_participation,
-            "tasks": tasks_summary,
-            "timeline": timeline[-100:],
+            "pipeline_types_used": pipeline_types_used,
+            "tool_calls": tool_calls,
+            "event_timeline": event_timeline[-100:],
+            "total_tokens": total_tokens,
+            "total_cost_estimate": estimated_cost,
         }
 
     except HTTPException:

@@ -70,6 +70,11 @@ def list_threads(limit: int = 50, user_id: str | None = None) -> list[dict]:
                 "created_at": data.get("created_at", ""),
                 "task_count": len(data.get("tasks", [])),
                 "event_count": len(data.get("events", [])),
+                "parent_thread_id": data.get("parent_thread_id"),
+                "root_thread_id": data.get("root_thread_id"),
+                "branch_label": data.get("branch_label"),
+                "compacted_summary": data.get("compacted_summary"),
+                "last_compacted_at": data.get("last_compacted_at"),
             })
         except (json.JSONDecodeError, KeyError):
             continue

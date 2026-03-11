@@ -112,6 +112,11 @@ export interface Thread {
   tasks: Task[];
   agent_metrics: Record<string, AgentMetrics>;
   created_at: string;
+  parent_thread_id?: string | null;
+  root_thread_id?: string | null;
+  branch_label?: string | null;
+  compacted_summary?: string | null;
+  last_compacted_at?: string | null;
 }
 
 export interface ThreadSummary {
@@ -120,6 +125,11 @@ export interface ThreadSummary {
   created_at: string;
   task_count: number;
   event_count: number;
+  parent_thread_id?: string | null;
+  root_thread_id?: string | null;
+  branch_label?: string | null;
+  compacted_summary?: string | null;
+  last_compacted_at?: string | null;
 }
 
 /** Performance baseline report (agent-orchestration-improve-agent skill) */

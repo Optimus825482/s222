@@ -23,7 +23,7 @@ import {
 import { trackBehavior } from "@/lib/behavior-tracker";
 import { useSessionPersistence } from "@/lib/use-session-persistence";
 import { useToast } from "@/components/toast";
-import { Plus } from "lucide-react";
+import { GitBranch, Plus, Scissors } from "lucide-react";
 
 export default function ChatDesktopPanel() {
   const { user } = useAuth();
@@ -159,9 +159,17 @@ export default function ChatDesktopPanel() {
   useEffect(() => {
     const pending = consumePendingThread();
     if (pending) {
-      api
-        .getThread(pending)
-        .then((loaded) => setThread(loaded))
+      loadSession(pending)
+        .then((restored) => {
+          if (restored) {
+            setThread(restored);
+            return null;
+          }
+          return api.getThread(pending);
+        })
+        .then((loaded) => {
+          if (loaded) setThread(loaded);
+        })
         .catch((err) =>
           console.error("[ChatDesktopPanel] pending thread load error:", err),
         );
@@ -189,7 +197,8 @@ export default function ChatDesktopPanel() {
       const threadId = (e as CustomEvent<string>).detail;
       if (!threadId) return;
       try {
-        const loaded = await api.getThread(threadId);
+        const restored = await loadSession(threadId);
+        const loaded = restored ?? (await api.getThread(threadId));
         setThread(loaded);
       } catch (err) {
         console.error("[ChatDesktopPanel] load thread error:", err);
@@ -197,7 +206,7 @@ export default function ChatDesktopPanel() {
     };
     window.addEventListener("open-thread", handler);
     return () => window.removeEventListener("open-thread", handler);
-  }, []);
+  }, [loadSession]);
 
   const isProcessing = status === "running" || status === "connecting";
 
@@ -218,6 +227,52 @@ export default function ChatDesktopPanel() {
     window.addEventListener("new-session", handler);
     return () => window.removeEventListener("new-session", handler);
   }, [handleNewSession]);
+
+  const handleBranch = useCallback(async () => {
+    if (!thread || isProcessing) return;
+    try {
+      const branched = await api.branchThread(thread.id);
+      setThread(branched);
+      setActiveThread(branched);
+      saveSessionDebounced(branched);
+      toast({
+        type: "success",
+        title: "Branch oluşturuldu",
+        message: branched.branch_label || branched.id,
+        duration: 4000,
+      });
+    } catch (error) {
+      toast({
+        type: "error",
+        title: "Branch oluşturulamadı",
+        message: error instanceof Error ? error.message : "Beklenmeyen hata",
+        duration: 5000,
+      });
+    }
+  }, [thread, isProcessing, saveSessionDebounced, toast]);
+
+  const handleCompact = useCallback(async () => {
+    if (!thread || isProcessing) return;
+    try {
+      const compacted = await api.compactThread(thread.id);
+      setThread(compacted);
+      setActiveThread(compacted);
+      saveSessionDebounced(compacted);
+      toast({
+        type: "success",
+        title: "Session compact edildi",
+        message: "Özet güncellendi.",
+        duration: 4000,
+      });
+    } catch (error) {
+      toast({
+        type: "error",
+        title: "Compact işlemi başarısız",
+        message: error instanceof Error ? error.message : "Beklenmeyen hata",
+        duration: 5000,
+      });
+    }
+  }, [thread, isProcessing, saveSessionDebounced, toast]);
 
   const handleSend = async (message: string, attachments?: AttachedFile[]) => {
     // Attachment'ları yükle ve extracted text'i mesaja ekle
@@ -271,6 +326,30 @@ export default function ChatDesktopPanel() {
             }}
           />
         </div>
+        {thread && (
+          <>
+            <button
+              onClick={handleBranch}
+              disabled={isProcessing}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Mevcut oturumdan branch oluştur"
+              aria-label="Branch oluştur"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Branch</span>
+            </button>
+            <button
+              onClick={handleCompact}
+              disabled={isProcessing}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/60 border border-slate-700/50 hover:bg-slate-700/60 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Oturumu compact et"
+              aria-label="Compact et"
+            >
+              <Scissors className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Compact</span>
+            </button>
+          </>
+        )}
         <button
           onClick={handleNewSession}
           disabled={isProcessing}
@@ -282,6 +361,20 @@ export default function ChatDesktopPanel() {
           <span className="hidden sm:inline">Yeni</span>
         </button>
       </div>
+      {thread && (thread.branch_label || thread.compacted_summary) && (
+        <div className="shrink-0 px-3 py-2 border-b border-slate-700/40 bg-slate-900/40 text-[11px] text-slate-300 flex flex-wrap gap-2">
+          {thread.branch_label && (
+            <span className="rounded-full border border-slate-700 bg-slate-800/70 px-2 py-0.5">
+              Branch: {thread.branch_label}
+            </span>
+          )}
+          {thread.compacted_summary && (
+            <span className="rounded-full border border-slate-700 bg-slate-800/70 px-2 py-0.5">
+              Compact özeti hazır
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <ChatArea thread={thread} isProcessing={isProcessing} status={status} />
       </div>

@@ -64,6 +64,10 @@ export function detectArtifacts(content: string): Artifact[] {
   return artifacts;
 }
 
+export function hasRenderableArtifacts(content?: string | null): boolean {
+  return Boolean(content && detectArtifacts(content).length > 0);
+}
+
 /* ── Helpers ────────────────────────────────────────────────────── */
 
 const TYPE_META: Record<

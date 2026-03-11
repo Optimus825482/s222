@@ -11,6 +11,7 @@ import { getWSSnapshot, subscribeWS } from "@/lib/ws-store";
 import type { StreamToolCall } from "@/lib/ws-store";
 import type { WSLiveEvent } from "@/lib/types";
 import { getAgentInfo, EVENT_ICONS } from "@/lib/agents";
+import ArtifactsPanel, { hasRenderableArtifacts } from "@/components/artifacts-panel";
 import {
   Activity,
   Brain,
@@ -435,19 +436,27 @@ function PipelineTab({
             {streamToolCalls.map((tc) => (
               <div
                 key={tc.id || tc.name}
-                className="flex items-start gap-1.5 text-[11px]"
+                className="rounded border border-[#e5e0d0] bg-white/70 p-1.5 text-[11px]"
               >
-                {tc.status === "running" ? (
-                  <Loader2 className="w-3 h-3 text-amber-500 animate-spin shrink-0 mt-0.5" />
-                ) : (
-                  <Check className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
-                )}
-                <span className="font-medium text-gray-700">{tc.name}</span>
-                {tc.args && (
-                  <span className="text-gray-400 truncate text-[9px] font-mono">
-                    {tc.args.slice(0, 100)}
-                  </span>
-                )}
+                <div className="flex items-start gap-1.5">
+                  {tc.status === "running" ? (
+                    <Loader2 className="w-3 h-3 text-amber-500 animate-spin shrink-0 mt-0.5" />
+                  ) : (
+                    <Check className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-700">{tc.name}</div>
+                    {tc.args && (
+                      hasRenderableArtifacts(tc.args) ? (
+                        <ArtifactsPanel content={tc.args} />
+                      ) : (
+                        <pre className="mt-1 whitespace-pre-wrap break-words rounded bg-[#f5f2e8] px-2 py-1 text-[9px] text-gray-500 font-mono">
+                          {tc.args.slice(0, 400)}
+                        </pre>
+                      )
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>

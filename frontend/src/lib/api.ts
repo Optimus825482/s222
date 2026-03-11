@@ -281,6 +281,26 @@ export const api = {
       { method: "DELETE" },
     );
   },
+  branchThread: (id: string, branchLabel?: string) => {
+    const uid = getCurrentUserId();
+    return fetcher<Thread>(
+      `/api/threads/${id}/branch${uid ? `?user_id=${uid}` : ""}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ branch_label: branchLabel }),
+      },
+    );
+  },
+  compactThread: (id: string, summary?: string) => {
+    const uid = getCurrentUserId();
+    return fetcher<Thread>(
+      `/api/threads/${id}/compact${uid ? `?user_id=${uid}` : ""}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ summary }),
+      },
+    );
+  },
 
   // RAG
   ragIngest: (content: string, title: string, source = "") => {

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from pydantic import BaseModel
-import sys, hashlib
+import sys, hashlib, uuid
 from pathlib import Path
 
 _parent = str(Path(__file__).parent.parent)
@@ -58,6 +58,34 @@ class SkillCreateRequest(BaseModel):
     knowledge: str
     category: str = "general"
     keywords: list[str] = []
+
+
+class BranchThreadRequest(BaseModel):
+    branch_label: str | None = None
+
+
+class CompactThreadRequest(BaseModel):
+    summary: str | None = None
+
+
+def _derive_compacted_summary(thread: Thread) -> str:
+    task_results = [
+        str(task.final_result).strip()
+        for task in thread.tasks[-3:]
+        if task.final_result
+    ]
+    if task_results:
+        return "\n\n".join(task_results)[:2000]
+
+    event_lines = [
+        f"[{event.agent_role or 'system'}] {event.content.strip()}"
+        for event in thread.events[-10:]
+        if event.content.strip()
+    ]
+    if event_lines:
+        return "\n".join(event_lines)[:2000]
+
+    return "Henüz özetlenecek içerik yok."
 
 
 # ── Auth Endpoints ────────────────────────────────────────────────
@@ -143,6 +171,44 @@ async def api_get_thread(thread_id: str, user: dict = Depends(get_current_user))
     thread = load_thread(thread_id, user_id=user["user_id"])
     if not thread:
         raise HTTPException(404, "Thread not found")
+    return thread.model_dump(mode="json")
+
+
+@router.post("/api/threads/{thread_id}/branch")
+async def api_branch_thread(
+    thread_id: str,
+    req: BranchThreadRequest,
+    user: dict = Depends(get_current_user),
+):
+    thread = load_thread(thread_id, user_id=user["user_id"])
+    if not thread:
+        raise HTTPException(404, "Thread not found")
+
+    branch_data = thread.model_dump(mode="python")
+    branch_data["id"] = uuid.uuid4().hex
+    branch_data["created_at"] = _utcnow()
+    branch_data["parent_thread_id"] = thread.id
+    branch_data["root_thread_id"] = thread.root_thread_id or thread.id
+    branch_data["branch_label"] = req.branch_label or f"Branch {branch_data['id'][:6]}"
+
+    branch = Thread.model_validate(branch_data)
+    save_thread(branch, user_id=user["user_id"])
+    return branch.model_dump(mode="json")
+
+
+@router.post("/api/threads/{thread_id}/compact")
+async def api_compact_thread(
+    thread_id: str,
+    req: CompactThreadRequest,
+    user: dict = Depends(get_current_user),
+):
+    thread = load_thread(thread_id, user_id=user["user_id"])
+    if not thread:
+        raise HTTPException(404, "Thread not found")
+
+    thread.compacted_summary = (req.summary or "").strip() or _derive_compacted_summary(thread)
+    thread.last_compacted_at = _utcnow()
+    save_thread(thread, user_id=user["user_id"])
     return thread.model_dump(mode="json")
 
 
