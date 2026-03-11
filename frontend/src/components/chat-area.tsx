@@ -567,10 +567,10 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
         {/* Mobile-friendly metadata footer for final results */}
         {isFinal && lastTask && (
           <div className="mt-3 pt-2 border-t border-border/50 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-            {lastTask.total_tokens > 0 && (
+            {(lastTask.total_tokens ?? 0) > 0 && (
               <span className="inline-flex items-center gap-0.5">
                 <Coins className="w-3 h-3" aria-hidden="true" />
-                {lastTask.total_tokens.toLocaleString("tr-TR")} token
+                {(lastTask.total_tokens ?? 0).toLocaleString("tr-TR")} token
               </span>
             )}
             {lastTask.total_latency_ms > 0 && (

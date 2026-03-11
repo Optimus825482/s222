@@ -59,6 +59,7 @@ ROLE_ALLOWLIST: dict[str, set[str]] = {
         "request_approval",
         "spawn_subagent",
         "send_agent_message",
+        "check_agent_messages",
         "get_agent_baseline",
         "get_best_agent",
         "self_evaluate",
@@ -195,6 +196,28 @@ ROLE_ALLOWLIST: dict[str, set[str]] = {
         "search_thread_history",
     },
 }
+
+
+def _sync_allowlist_with_registry() -> None:
+    """Keep ROLE_ALLOWLIST aligned with tools.registry.AGENT_TOOLS.
+
+    This prevents runtime sandbox blocks when a tool is exposed to an agent
+    in registry but forgotten in static ROLE_ALLOWLIST.
+    """
+    try:
+        from tools.registry import AGENT_TOOLS
+
+        for role, tools in AGENT_TOOLS.items():
+            tool_names = {
+                t.get("function", {}).get("name") for t in tools if isinstance(t, dict)
+            }
+            tool_names.discard(None)
+            ROLE_ALLOWLIST.setdefault(role, set()).update(tool_names)
+    except Exception as e:
+        logger.warning("Failed to sync sandbox allowlist with registry: %s", e)
+
+
+_sync_allowlist_with_registry()
 
 # Dangerous patterns in code execution
 _DANGEROUS_CODE_PATTERNS = [

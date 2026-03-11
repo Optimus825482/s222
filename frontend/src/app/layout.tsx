@@ -63,7 +63,11 @@ export default function RootLayout({
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js').then((reg) => {
+                  fetch('/sw.js', { cache: 'no-store' }).then((resp) => {
+                    if (!resp.ok) return null;
+                    return navigator.serviceWorker.register('/sw.js');
+                  }).then((reg) => {
+                    if (!reg) return;
                     // Check for updates every 60 seconds
                     setInterval(() => reg.update(), 60000);
                     // When a new SW is waiting, reload to activate

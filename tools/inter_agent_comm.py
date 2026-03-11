@@ -12,9 +12,7 @@ Features:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -120,6 +118,17 @@ class AgentMessageBus:
     def __init__(self):
         # Message queues per agent
         self._queues: dict[str, asyncio.Queue] = {}
+        # Pre-register known agent roles to avoid "unknown recipient" warnings
+        # before target agents are lazily instantiated.
+        for role in (
+            "orchestrator",
+            "thinker",
+            "researcher",
+            "speed",
+            "reasoner",
+            "critic",
+        ):
+            self._queues[role] = asyncio.Queue()
         # Shared knowledge store
         self._shared_knowledge: dict[str, SharedKnowledge] = {}
         # Message handlers per agent
@@ -144,6 +153,9 @@ class AgentMessageBus:
     
     async def send(self, message: AgentMessage) -> bool:
         """Send a message to one or more agents."""
+        # Normalize recipient to keep role matching resilient against casing/whitespace.
+        message.to_agent = (message.to_agent or "").strip().lower()
+
         # Add to history
         self._history.append(message)
         if len(self._history) > self._max_history:
