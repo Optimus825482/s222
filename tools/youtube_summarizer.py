@@ -205,8 +205,9 @@ async def _get_transcript_via_yt_api(
     language: str = "en",
 ) -> ResultDict:
     """
-    Fallback: youtube_transcript_api v1.x ile transcript al.
-    Strateji: hangi dilde varsa onu al, çeviri sonra deep_translator ile yapılır.
+    youtube_transcript_api v1.x ile transcript al.
+    Strateji: önce list() ile mevcut dilleri bul, sonra fetch() ile al.
+    Hangi dilde varsa onu al, çeviri sonra deep_translator ile yapılır.
     """
     if not YT_TRANSCRIPT_API_AVAILABLE:
         return {
@@ -221,24 +222,69 @@ async def _get_transcript_via_yt_api(
         try:
             api = YouTubeTranscriptApi()
 
-            # Direkt fetch — hangi dilde varsa onu al
-            fetched = api.fetch(video_id)
-            raw_data = fetched.to_raw_data()
+            # Önce mevcut transcript'leri listele
+            detected_lang = "en"
+            source_type = "yt_transcript_api"
+            fetched = None
 
-            # Dili tespit etmeye çalış
-            detected_lang = "en"  # default
             try:
-                t_list = api.list(video_id)
-                # İlk bulunan transcript'in dilini al
-                for method in [t_list.find_generated_transcript, t_list.find_manually_created_transcript]:
+                transcript_list = api.list(video_id)
+                logger.info(f"yt_transcript_api: listed transcripts for {video_id}")
+
+                # Mevcut dilleri logla
+                available_langs = []
+                for t in transcript_list:
+                    available_langs.append(f"{t.language_code}({'auto' if t.is_generated else 'manual'})")
+                logger.info(f"yt_transcript_api: available languages: {available_langs}")
+
+                # Strateji: herhangi bir dilde al (önce manual, sonra auto)
+                best_transcript = None
+
+                # 1. Manuel transcript ara (herhangi bir dil)
+                try:
+                    for t in transcript_list:
+                        if not t.is_generated:
+                            best_transcript = t
+                            break
+                except Exception:
+                    pass
+
+                # 2. Otomatik transcript ara (herhangi bir dil)
+                if not best_transcript:
                     try:
-                        tr = method(["en", "tr", "de", "fr", "es", "pt", "ru", "ja", "ko", "zh-Hans"])
-                        detected_lang = tr.language_code
-                        break
+                        for t in transcript_list:
+                            if t.is_generated:
+                                best_transcript = t
+                                break
                     except Exception:
-                        continue
-            except Exception:
-                pass
+                        pass
+
+                if best_transcript:
+                    detected_lang = best_transcript.language_code
+                    source_type = "yt_transcript_api_manual" if not best_transcript.is_generated else "yt_transcript_api_auto"
+                    logger.info(f"yt_transcript_api: fetching {detected_lang} ({source_type})")
+                    fetched = api.fetch(video_id, languages=[detected_lang])
+                else:
+                    logger.warning(f"yt_transcript_api: no transcripts found in list for {video_id}")
+
+            except Exception as list_err:
+                logger.warning(f"yt_transcript_api: list() failed: {list_err}, trying direct fetch...")
+
+            # Fallback: direkt fetch (parametresiz — ilk mevcut dili alır)
+            if fetched is None:
+                try:
+                    fetched = api.fetch(video_id)
+                    logger.info(f"yt_transcript_api: direct fetch succeeded for {video_id}")
+                except Exception as fetch_err:
+                    logger.error(f"yt_transcript_api: fetch() also failed: {fetch_err}")
+                    return {
+                        "success": False, "transcript": None, "source": None,
+                        "language": None,
+                        "error": f"yt_transcript_api: {fetch_err}",
+                    }
+
+            raw_data = fetched.to_raw_data()
+            logger.info(f"yt_transcript_api: got {len(raw_data)} raw segments")
 
             segments = []
             for item in raw_data:
@@ -255,10 +301,11 @@ async def _get_transcript_via_yt_api(
             if not segments:
                 return {
                     "success": False, "transcript": None, "source": None,
-                    "language": None, "error": "yt_transcript_api: no segments found",
+                    "language": None, "error": "yt_transcript_api: no segments found after parsing",
                 }
 
             full_text = " ".join(s["text"] for s in segments)
+            logger.info(f"yt_transcript_api: success — {len(segments)} segments, {len(full_text)} chars, lang={detected_lang}")
             return {
                 "success": True,
                 "transcript": {
@@ -266,18 +313,20 @@ async def _get_transcript_via_yt_api(
                     "segments": segments,
                     "word_count": len(full_text.split()),
                 },
-                "source": "yt_transcript_api",
+                "source": source_type,
                 "language": detected_lang,
                 "error": None,
             }
         except Exception as e:
+            logger.error(f"yt_transcript_api: unexpected error: {e}", exc_info=True)
             return {
                 "success": False, "transcript": None, "source": None,
                 "language": None,
                 "error": f"yt_transcript_api: {e}",
             }
 
-    return await asyncio.get_event_loop().run_in_executor(None, _fetch_sync)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _fetch_sync)
 
 
 # ── Translation via deep_translator ──────────────────────────────
@@ -348,7 +397,8 @@ async def translate_text(
                 "error": f"Translation failed: {e}",
             }
 
-    return await asyncio.get_event_loop().run_in_executor(None, _translate_sync)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _translate_sync)
 
 
 async def get_transcript(
@@ -360,10 +410,10 @@ async def get_transcript(
 ) -> ResultDict:
     """
     Extract transcript with multi-method fallback:
-    1. InnerTube API (primary — no deps, works on cloud)
-    2. youtube_transcript_api (fallback — robust multi-language)
+    1. youtube_transcript_api (primary — robust, multi-language, works on cloud IPs)
+    2. InnerTube API (fallback — no deps but unreliable on server/cloud IPs)
 
-    If target_language is set and differs from source, auto-translates.
+    If target_language is set and differs from source, auto-translates via deep_translator.
     """
     video_id = extract_video_id(url)
     if not video_id:
@@ -375,87 +425,99 @@ async def get_transcript(
             "error": "Invalid YouTube URL",
         }
 
-    innertube_result = None
-    try:
-        # ── Primary: InnerTube API ────────────────────────────────
-        player_data = await _fetch_innertube_player(video_id)
+    result = None
 
-        playability = player_data.get("playabilityStatus", {})
-        if playability.get("status") == "ERROR":
-            innertube_result = {
-                "success": False,
-                "transcript": None,
-                "source": None,
-                "language": None,
-                "error": playability.get("reason", "Video unavailable"),
-            }
-        else:
-            tracks = _extract_caption_tracks(player_data)
-            if not tracks:
-                innertube_result = {
-                    "success": False,
-                    "transcript": None,
-                    "source": None,
-                    "language": None,
-                    "error": "No captions via InnerTube",
-                }
-            else:
-                # Pick best track — prefer requested language, then 'en', then first
-                chosen_track = None
-                for track in tracks:
-                    if track.get("languageCode", "") == language:
-                        chosen_track = track
-                        break
-                if chosen_track is None:
-                    for track in tracks:
-                        if track.get("languageCode", "") == "en":
-                            chosen_track = track
-                            break
-                if chosen_track is None:
-                    chosen_track = tracks[0]
-
-                actual_lang = chosen_track.get("languageCode", language)
-                kind = chosen_track.get("kind", "")
-                source = "auto_captions" if kind == "asr" else "manual_subtitles"
-
-                base_url = chosen_track.get("baseUrl", "")
-                if base_url:
-                    xml_text = await _download_transcript_xml(base_url)
-                    segments = _parse_transcript_xml(xml_text)
-                    if segments:
-                        full_text = " ".join(s["text"] for s in segments)
-                        innertube_result = {
-                            "success": True,
-                            "transcript": {
-                                "full_text": full_text,
-                                "segments": segments,
-                                "word_count": len(full_text.split()),
-                            },
-                            "source": source,
-                            "language": actual_lang,
-                            "error": None,
-                        }
-
-    except Exception as e:
-        logger.warning(f"InnerTube failed, will try fallback: {e}")
-
-    # ── Fallback: youtube_transcript_api ──────────────────────────
-    if not innertube_result or not innertube_result.get("success"):
-        logger.info("Trying youtube_transcript_api fallback...")
+    # ── Primary: youtube_transcript_api (daha güvenilir, özellikle sunucularda) ──
+    if YT_TRANSCRIPT_API_AVAILABLE:
+        logger.info(f"Trying youtube_transcript_api (primary) for {video_id}...")
         yt_api_result = await _get_transcript_via_yt_api(video_id, language)
         if yt_api_result.get("success"):
-            innertube_result = yt_api_result
-        elif innertube_result is None:
-            innertube_result = yt_api_result
+            result = yt_api_result
+        else:
+            logger.warning(f"youtube_transcript_api failed: {yt_api_result.get('error')}")
+    else:
+        logger.warning("youtube_transcript_api not available, skipping primary method")
+
+    # ── Fallback: InnerTube API ──────────────────────────────────────
+    if not result or not result.get("success"):
+        logger.info(f"Trying InnerTube (fallback) for {video_id}...")
+        try:
+            player_data = await _fetch_innertube_player(video_id)
+
+            playability = player_data.get("playabilityStatus", {})
+            if playability.get("status") == "ERROR":
+                innertube_error = playability.get("reason", "Video unavailable")
+                logger.warning(f"InnerTube: video error — {innertube_error}")
+                if result is None:
+                    result = {
+                        "success": False,
+                        "transcript": None,
+                        "source": None,
+                        "language": None,
+                        "error": innertube_error,
+                    }
+            else:
+                tracks = _extract_caption_tracks(player_data)
+                if not tracks:
+                    logger.warning("InnerTube: no caption tracks found")
+                    if result is None:
+                        result = {
+                            "success": False,
+                            "transcript": None,
+                            "source": None,
+                            "language": None,
+                            "error": "No captions via InnerTube",
+                        }
+                else:
+                    # Pick best track — prefer requested language, then 'en', then first
+                    chosen_track = None
+                    for track in tracks:
+                        if track.get("languageCode", "") == language:
+                            chosen_track = track
+                            break
+                    if chosen_track is None:
+                        for track in tracks:
+                            if track.get("languageCode", "") == "en":
+                                chosen_track = track
+                                break
+                    if chosen_track is None:
+                        chosen_track = tracks[0]
+
+                    actual_lang = chosen_track.get("languageCode", language)
+                    kind = chosen_track.get("kind", "")
+                    source = "auto_captions" if kind == "asr" else "manual_subtitles"
+
+                    base_url = chosen_track.get("baseUrl", "")
+                    if base_url:
+                        xml_text = await _download_transcript_xml(base_url)
+                        segments = _parse_transcript_xml(xml_text)
+                        if segments:
+                            full_text = " ".join(s["text"] for s in segments)
+                            result = {
+                                "success": True,
+                                "transcript": {
+                                    "full_text": full_text,
+                                    "segments": segments,
+                                    "word_count": len(full_text.split()),
+                                },
+                                "source": source,
+                                "language": actual_lang,
+                                "error": None,
+                            }
+                            logger.info(f"InnerTube fallback succeeded: {actual_lang}, {len(segments)} segments")
+
+        except Exception as e:
+            logger.warning(f"InnerTube fallback failed: {e}")
 
     # ── Auto-translate if target_language differs ─────────────────
-    result = innertube_result or {
-        "success": False,
-        "transcript": None,
-        "source": None,
-        "language": None,
-        "error": "All transcript methods failed",
-    }
+    if result is None:
+        result = {
+            "success": False,
+            "transcript": None,
+            "source": None,
+            "language": None,
+            "error": "All transcript methods failed",
+        }
 
     if (
         result.get("success")
@@ -469,6 +531,7 @@ async def get_transcript(
             else ""
         )
         if full_text:
+            logger.info(f"Auto-translating from {result.get('language')} to {target_language}...")
             tr_result = await translate_text(
                 full_text,
                 target_language=target_language,
@@ -480,6 +543,9 @@ async def get_transcript(
                 result["transcript"] = transcript_data
                 result["language"] = target_language
                 result["source"] = f"{result.get('source', 'unknown')}+translated"
+                logger.info(f"Translation successful to {target_language}")
+            else:
+                logger.warning(f"Translation failed: {tr_result.get('error')}")
 
     return result
 
