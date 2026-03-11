@@ -200,24 +200,13 @@ def _parse_transcript_xml(xml_text: str) -> list[dict]:
     return segments
 
 
-def _transcript_item_value(item: Any, key: str, default: Any = None) -> Any:
-    if isinstance(item, dict):
-        return item.get(key, default)
-    return getattr(item, key, default)
-
-
 async def _get_transcript_via_yt_api(
     video_id: str,
     language: str = "en",
 ) -> ResultDict:
     """
-    Fallback: youtube_transcript_api ile transcript al.
-    Eski Flask uygulamasındaki çoklu fallback mantığı:
-    1. İstenen dilde manuel altyazı
-    2. İstenen dilde otomatik altyazı
-    3. İngilizce → YouTube çevirisi (istenen dile)
-    4. İngilizce ham
-    5. İlk bulunan herhangi bir dil
+    Fallback: youtube_transcript_api v1.x ile transcript al.
+    Strateji: hangi dilde varsa onu al, çeviri sonra deep_translator ile yapılır.
     """
     if not YT_TRANSCRIPT_API_AVAILABLE:
         return {
@@ -229,131 +218,65 @@ async def _get_transcript_via_yt_api(
         }
 
     def _fetch_sync() -> ResultDict:
-        is_target_source = False
-        transcript_data = None
-        source = "yt_transcript_api"
-        actual_lang = language
-        errors: list[str] = []
+        try:
+            api = YouTubeTranscriptApi()
 
-        def _process_transcript_list(t_list):
-            nonlocal is_target_source
-            # 1. Target language — manual
+            # Direkt fetch — hangi dilde varsa onu al
+            fetched = api.fetch(video_id)
+            raw_data = fetched.to_raw_data()
+
+            # Dili tespit etmeye çalış
+            detected_lang = "en"  # default
             try:
-                tr = t_list.find_transcript([language])
-                is_target_source = True
-                return tr.fetch()
-            except Exception:
-                pass
-            # 2. Target language — auto-generated
-            try:
-                tr = t_list.find_generated_transcript([language])
-                is_target_source = True
-                return tr.fetch()
-            except Exception:
-                pass
-            # 3. English → translate via YouTube
-            try:
-                try:
-                    eng = t_list.find_transcript(["en"])
-                except Exception:
-                    eng = t_list.find_generated_transcript(["en"])
-                if eng.is_translatable:
+                t_list = api.list(video_id)
+                # İlk bulunan transcript'in dilini al
+                for method in [t_list.find_generated_transcript, t_list.find_manually_created_transcript]:
                     try:
-                        translated = eng.translate(language)
-                        is_target_source = True
-                        return translated.fetch()
+                        tr = method(["en", "tr", "de", "fr", "es", "pt", "ru", "ja", "ko", "zh-Hans"])
+                        detected_lang = tr.language_code
+                        break
                     except Exception:
-                        pass
-                return eng.fetch()
+                        continue
             except Exception:
                 pass
-            # 4. Any available
-            try:
-                return t_list.find_generated_transcript([language, "en"]).fetch()
-            except Exception:
-                pass
-            return None
 
-        # Method 1: list_transcripts (modern API)
-        transcript_api_class = cast(Any, YouTubeTranscriptApi)
-        list_transcripts = getattr(transcript_api_class, "list_transcripts", None)
-
-        if callable(list_transcripts):
-            try:
-                t_list = list_transcripts(video_id)
-                transcript_data = _process_transcript_list(t_list)
-            except Exception as e:
-                errors.append(f"list_transcripts: {e}")
-
-        # Method 2: get_transcript (legacy API)
-        get_transcript = getattr(transcript_api_class, "get_transcript", None)
-        if not transcript_data and callable(get_transcript):
-            try:
-                transcript_data = get_transcript(video_id, languages=[language, "en"])
-            except Exception as e:
-                errors.append(f"get_transcript: {e}")
-
-        # Method 3: Instance-based API (some versions)
-        if not transcript_data:
-            try:
-                api_instance: Any = transcript_api_class()
-                instance_list_transcripts = getattr(
-                    api_instance, "list_transcripts", None
-                )
-                if callable(instance_list_transcripts):
-                    try:
-                        t_list = instance_list_transcripts(video_id)
-                        transcript_data = _process_transcript_list(t_list)
-                    except Exception as e:
-                        errors.append(f"instance.list_transcripts: {e}")
-                instance_fetch = getattr(api_instance, "fetch", None)
-                if not transcript_data and callable(instance_fetch):
-                    try:
-                        transcript_data = instance_fetch(video_id)
-                    except Exception as e:
-                        errors.append(f"instance.fetch: {e}")
-            except Exception as e:
-                errors.append(f"instance_creation: {e}")
-
-        if not transcript_data:
-            return {
-                "success": False,
-                "transcript": None,
-                "source": None,
-                "language": None,
-                "error": f"yt_transcript_api failed: {'; '.join(errors)}",
-            }
-
-        # Normalize — transcript_data is list[dict] with text/start/duration
-        transcript_items = cast(list[Any], transcript_data)
-        segments = []
-        for item in transcript_items:
-            text = str(_transcript_item_value(item, "text", "") or "").strip()
-            if text:
-                start = float(_transcript_item_value(item, "start", 0) or 0)
-                dur = float(_transcript_item_value(item, "duration", 0) or 0)
-                segments.append(
-                    {
+            segments = []
+            for item in raw_data:
+                text = str(item.get("text", "")).strip()
+                if text:
+                    start = float(item.get("start", 0))
+                    dur = float(item.get("duration", 0))
+                    segments.append({
                         "start": round(start, 2),
                         "end": round(start + dur, 2),
                         "text": text,
-                    }
-                )
+                    })
 
-        full_text = " ".join(s["text"] for s in segments)
-        return {
-            "success": True,
-            "transcript": {
-                "full_text": full_text,
-                "segments": segments,
-                "word_count": len(full_text.split()),
-            },
-            "source": source,
-            "language": actual_lang if is_target_source else "en",
-            "error": None,
-        }
+            if not segments:
+                return {
+                    "success": False, "transcript": None, "source": None,
+                    "language": None, "error": "yt_transcript_api: no segments found",
+                }
 
-    # Run sync API in thread pool
+            full_text = " ".join(s["text"] for s in segments)
+            return {
+                "success": True,
+                "transcript": {
+                    "full_text": full_text,
+                    "segments": segments,
+                    "word_count": len(full_text.split()),
+                },
+                "source": "yt_transcript_api",
+                "language": detected_lang,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "success": False, "transcript": None, "source": None,
+                "language": None,
+                "error": f"yt_transcript_api: {e}",
+            }
+
     return await asyncio.get_event_loop().run_in_executor(None, _fetch_sync)
 
 
