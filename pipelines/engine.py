@@ -35,7 +35,7 @@ from core.models import (
 logger = logging.getLogger(__name__)
 
 
-def _status_meta(status: TaskStatus | str) -> dict[str, str]:
+def _status_meta(status: TaskStatus | str) -> dict[str, Any]:
     canonical = TaskStatus.normalize(status)
     return {
         "run_state": canonical,
@@ -43,7 +43,7 @@ def _status_meta(status: TaskStatus | str) -> dict[str, str]:
     }
 
 
-def _transition_meta(previous: TaskStatus | str, current: TaskStatus | str) -> dict[str, str]:
+def _transition_meta(previous: TaskStatus | str, current: TaskStatus | str) -> dict[str, Any]:
     prev_canonical = TaskStatus.normalize(previous)
     curr_canonical = TaskStatus.normalize(current)
     return {
@@ -508,7 +508,7 @@ class PipelineEngine:
                 agent_role=subtask.assigned_agent.value,
                 task_type=task_type,
                 output=result,
-                tokens_used=subtask.token_usage,
+                tokens_used=subtask.token_usage or 0,
                 latency_ms=subtask.latency_ms,
                 task_preview=subtask.description[:200],
             )
@@ -526,7 +526,7 @@ class PipelineEngine:
             get_performance_collector().record(
                 agent_role=subtask.assigned_agent.value,
                 response_time_ms=subtask.latency_ms,
-                total_tokens=subtask.token_usage,
+                total_tokens=subtask.token_usage or 0,
                 success=True,
                 metadata={
                     "task_type": task_type,

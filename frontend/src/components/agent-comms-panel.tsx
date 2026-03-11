@@ -369,14 +369,16 @@ function AutonomousChatTab() {
         >
           ⚙️
         </button>
-        <label htmlFor="agent-filter" className="sr-only">
+        <label id="agent-filter-label" htmlFor="agent-filter" className="sr-only">
           Agent filtresi
         </label>
         <select
           id="agent-filter"
+          name="agent-filter"
           value={filterAgent}
           onChange={(x) => setFilterAgent(x.target.value)}
           className={`ml-auto ${sCls}`}
+          aria-labelledby="agent-filter-label"
           aria-label="Agent filtresi"
           title="Agent filtresi"
         >
@@ -656,14 +658,16 @@ function ManualMessagesTab() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-2 items-center">
-        <label htmlFor="sender-filter" className="sr-only">
+        <label id="sender-filter-label" htmlFor="sender-filter" className="sr-only">
           Gönderen filtresi
         </label>
         <select
           id="sender-filter"
+          name="sender-filter"
           value={fS}
           onChange={(x) => setFS(x.target.value)}
           className={sCls}
+          aria-labelledby="sender-filter-label"
           aria-label="Gönderen filtresi"
           title="Gönderen filtresi"
         >
@@ -671,14 +675,16 @@ function ManualMessagesTab() {
           <Opts />
         </select>
         <span className="text-[10px] text-slate-600">→</span>
-        <label htmlFor="receiver-filter" className="sr-only">
+        <label id="receiver-filter-label" htmlFor="receiver-filter" className="sr-only">
           Alıcı filtresi
         </label>
         <select
           id="receiver-filter"
+          name="receiver-filter"
           value={fR}
           onChange={(x) => setFR(x.target.value)}
           className={sCls}
+          aria-labelledby="receiver-filter-label"
           aria-label="Alıcı filtresi"
           title="Alıcı filtresi"
         >
@@ -734,28 +740,32 @@ function ManualMessagesTab() {
       )}
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 space-y-2">
         <div className="flex gap-2 items-center">
-          <label htmlFor="message-sender" className="sr-only">
+          <label id="message-sender-label" htmlFor="message-sender" className="sr-only">
             Gönderen ajan
           </label>
           <select
             id="message-sender"
+            name="message-sender"
             value={snd}
             onChange={(x) => setSnd(x.target.value)}
             className={`flex-1 ${sCls}`}
+            aria-labelledby="message-sender-label"
             aria-label="Gönderen ajan"
             title="Gönderen ajan"
           >
             <Opts />
           </select>
           <span className="text-[10px] text-slate-600">→</span>
-          <label htmlFor="message-receiver" className="sr-only">
+          <label id="message-receiver-label" htmlFor="message-receiver" className="sr-only">
             Alıcı ajan
           </label>
           <select
             id="message-receiver"
+            name="message-receiver"
             value={rcv}
             onChange={(x) => setRcv(x.target.value)}
             className={`flex-1 ${sCls}`}
+            aria-labelledby="message-receiver-label"
             aria-label="Alıcı ajan"
             title="Alıcı ajan"
           >
@@ -1123,6 +1133,7 @@ function SocialSummaryBlock() {
               </label>
               <select
                 id="tie-breaker-strategy"
+                name="tie-breaker-strategy"
                 value={policy.tie_breaker}
                 onChange={(e) =>
                   setPolicy((p) =>

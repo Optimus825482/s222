@@ -116,8 +116,9 @@ def _get_yt_api_instance() -> "YouTubeTranscriptApi":
             from pathlib import Path
             cookie_path = Path(YOUTUBE_COOKIES_PATH)
             if cookie_path.exists():
-                logger.info("Using cookie-based auth for YouTube")
-                return YouTubeTranscriptApi(cookie_path=str(cookie_path))
+                logger.info("Cookie path configured for YouTube transcript API")
+                # NOTE: youtube_transcript_api v1.x does not support cookie_path in constructor.
+                # We keep this branch as a logged hint and fall through to direct client init.
     except (ImportError, Exception) as e:
         logger.debug(f"Cookie auth not configured: {e}")
 

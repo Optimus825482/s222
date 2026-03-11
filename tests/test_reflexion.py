@@ -39,8 +39,9 @@ class ReflexionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         parsed = reflexion.parse_evaluation(text)
-
         self.assertIsNotNone(parsed)
+        assert parsed is not None
+
         self.assertEqual(parsed["total"], 15)
         self.assertEqual(parsed["scores"]["accuracy"], 3)
 
@@ -54,8 +55,9 @@ class ReflexionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         parsed = reflexion.parse_evaluation(text)
-
         self.assertIsNotNone(parsed)
+        assert parsed is not None
+
         self.assertEqual(parsed["total"], 10)
 
     async def test_evaluate_and_improve_uses_call_llm_dict_content(self) -> None:
@@ -115,6 +117,8 @@ class ReflexionTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(final_response, "R")
+        self.assertIsNotNone(evaluation)
+        assert evaluation is not None
         self.assertTrue(evaluation["fallback_used"])
         self.assertIn("evaluation_parse_failed", evaluation["weaknesses"][0])
         self.assertTrue(any("parse/validation failed" in msg for msg in logs.output))

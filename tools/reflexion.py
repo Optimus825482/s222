@@ -264,7 +264,7 @@ async def evaluate_and_improve(
     
     iteration = 0
     current_response = response
-    evaluation = None
+    evaluation: dict[str, Any] | None = None
     
     while iteration < max_iterations:
         # Build evaluation prompt
@@ -274,9 +274,9 @@ async def evaluate_and_improve(
             # Call LLM for evaluation
             eval_result = await agent.call_llm([{"role": "user", "content": eval_prompt}])
             eval_response = _extract_llm_content(eval_result)
-            evaluation = parse_evaluation(eval_response)
+            parsed_evaluation = parse_evaluation(eval_response)
 
-            if not _is_valid_evaluation(evaluation):
+            if not _is_valid_evaluation(parsed_evaluation):
                 logger.warning(
                     "Reflexion evaluation parse/validation failed; using safe fallback",
                     extra={
@@ -287,8 +287,16 @@ async def evaluate_and_improve(
                 evaluation = _fallback_evaluation("invalid_or_incomplete_payload")
                 break
 
+            # Pyright/Pylance type narrowing: keep a guaranteed dict after validation.
+            if parsed_evaluation is None:
+                evaluation = _fallback_evaluation("none_payload")
+                break
+
+            current_evaluation: dict[str, Any] = parsed_evaluation
+            evaluation = current_evaluation
+
             # Check if improvement needed
-            if not should_improve(evaluation, threshold):
+            if not should_improve(current_evaluation, threshold):
                 logger.info(f"Reflexion: Response passed (avg score >= {threshold})")
                 break
 
@@ -297,8 +305,8 @@ async def evaluate_and_improve(
                 break
 
             # Build improvement prompt
-            weaknesses = evaluation.get("weaknesses", [])
-            improvements = evaluation.get("improvements", [])
+            weaknesses = current_evaluation.get("weaknesses", [])
+            improvements = current_evaluation.get("improvements", [])
 
             improve_prompt = build_improvement_prompt(
                 question=question,
@@ -315,10 +323,10 @@ async def evaluate_and_improve(
             logger.info(f"Reflexion: Improved response (iteration {iteration})")
 
             # Save insight
-            save_reflection_insight(question, evaluation, improved=True)
+            save_reflection_insight(question, current_evaluation, improved=True)
 
             # Save result for UI
-            save_reflection_result(agent.role.value, question, evaluation, improved=True)
+            save_reflection_result(agent.role.value, question, current_evaluation, improved=True)
 
         except Exception as e:
             logger.error(f"Reflexion error: {e}")

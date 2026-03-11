@@ -585,7 +585,6 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-start gap-2 px-3 py-2.5 text-left"
-        aria-expanded={expanded}
       >
         <span className="shrink-0 text-[11px] font-bold text-[#003399]">
           #{index + 1}
@@ -644,7 +643,6 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
                   <div
                     key={st.id}
                     className="flex items-start gap-2 py-1 text-[11px]"
-                    style={undefined}
                   >
                     <span className={clsx("shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium", stStatusClass)}>
                       {st.status}

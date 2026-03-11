@@ -111,11 +111,18 @@ export function AgentIdentityEditor() {
     <div className="flex flex-col gap-3">
       {/* Header: Agent selector + Initialize button */}
       <div className="flex items-center gap-2 flex-wrap">
+        <label id="agent-identity-role-label" htmlFor="agent-identity-role" className="sr-only">
+          Agent seçimi
+        </label>
         <select
+          id="agent-identity-role"
+          name="agent-identity-role"
           value={role}
           onChange={(e) => setRole(e.target.value as AgentRole)}
           className="bg-slate-800/60 border border-slate-700/50 rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/50"
+          aria-labelledby="agent-identity-role-label"
           aria-label="Agent seçimi"
+          title="Agent seçimi"
         >
           {allRoles.map((r) => (
             <option key={r} value={r}>
@@ -125,10 +132,7 @@ export function AgentIdentityEditor() {
         </select>
         <span
           className="text-[10px] px-2 py-0.5 rounded"
-          style={{
-            backgroundColor: agentCfg.color + "22",
-            color: agentCfg.color,
-          }}
+          title={`${agentCfg.name} (${role})`}
         >
           {agentCfg.icon} {role}
         </span>
@@ -152,7 +156,9 @@ export function AgentIdentityEditor() {
           <button
             key={t.key}
             role="tab"
-            aria-selected={tab === t.key}
+            {...(tab === t.key
+              ? { "aria-selected": "true" }
+              : { "aria-selected": "false" })}
             onClick={() => setTab(t.key)}
             className={`text-xs font-medium px-3 py-1.5 border-b-2 transition-colors ${
               tab === t.key

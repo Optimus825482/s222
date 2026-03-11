@@ -1,0 +1,11 @@
+{
+    "hooks": {
+        "PreToolUse": [
+            {
+                "type": "command",
+                "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const h=JSON.parse(d||'{}');const tool=(h.toolName||'').toLowerCase();const cmd=String((h.toolInput&&h.toolInput.command)||'').toLowerCase();const isTerminal=tool.includes('terminal');const isBuild=/npm\\s+run\\s+build|next\\s+build|docker\\s+compose.*\\sbuild/.test(cmd);if(isTerminal&&isBuild){const out={hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'ask',permissionDecisionReason:'Build oncecesi hizli dogrulama kontrolu'},systemMessage:'Build oncesi en az bir hizli kontrol calistirman onerilir: npm --prefix frontend run lint veya pytest tests -q.'};console.log(JSON.stringify(out));}else{console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow'}}));}});\"",
+                "timeout": 10
+            }
+        ]
+    }
+}
