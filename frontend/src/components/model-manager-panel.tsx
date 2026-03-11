@@ -423,7 +423,7 @@ function GatewayTab() {
     { label: "Çalışma Süresi", value: health.uptime, accent: "text-slate-200" },
     {
       label: "Toplam İstek",
-      value: health.total_requests.toLocaleString("tr-TR"),
+      value: (health.total_requests ?? 0).toLocaleString("tr-TR"),
       accent: "text-cyan-400",
     },
     {

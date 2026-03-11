@@ -954,7 +954,7 @@ export function BehaviorTab() {
                   %{p.completion_rate}
                 </span>
                 <span className="text-[9px] text-slate-500 tabular-nums w-16 text-right">
-                  {p.avg_tokens.toLocaleString()} tok
+                  {(p.avg_tokens ?? 0).toLocaleString("tr-TR")} tok
                 </span>
               </div>
             ))}
@@ -979,7 +979,7 @@ export function BehaviorTab() {
                   {a.tasks} görev
                 </span>
                 <span className="text-slate-400 tabular-nums">
-                  ~{a.avg_tokens.toLocaleString()} tok
+                  ~{(a.avg_tokens ?? 0).toLocaleString("tr-TR")} tok
                 </span>
                 <span className="text-slate-400 tabular-nums">
                   ~{a.avg_steps} adım

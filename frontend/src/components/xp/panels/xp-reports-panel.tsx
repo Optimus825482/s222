@@ -48,6 +48,11 @@ function formatDate(iso: string) {
   }
 }
 
+function formatNum(value: unknown): string {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n.toLocaleString("tr-TR") : "0";
+}
+
 function buildThreadMarkdown(thread: Thread): string {
   let md = `# Thread: ${thread.id}\n\nOluşturulma: ${formatDate(thread.created_at)}\n\n`;
   md += `## Görevler (${thread.tasks.length})\n\n`;
@@ -601,7 +606,7 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
               {task.pipeline_type}
             </span>
             <span className="text-[10px] text-[#666]">
-              {task.total_tokens.toLocaleString()} token
+              {formatNum(task.total_tokens)} token
             </span>
             <span className="text-[10px] text-[#666]">
               {((task.total_latency_ms ?? 0) / 1000).toFixed(1)}s
@@ -846,7 +851,7 @@ function ThreadDetailView({
           <span>{thread.tasks.length} görev</span>
           <span>{thread.events.length} olay</span>
           <span>
-            {totalTokens.toLocaleString()} token
+            {formatNum(totalTokens)} token
           </span>
           <span>
             {((totalLatency ?? 0) / 1000).toFixed(1)}s
@@ -948,7 +953,7 @@ function ThreadDetailView({
                   </span>
                   <span className="text-[#888]">Token</span>
                   <span className="text-right text-[#333]">
-                    {m.total_tokens.toLocaleString()}
+                    {formatNum(m.total_tokens)}
                   </span>
                   <span className="text-[#888]">Başarı</span>
                   <span className="text-right text-[#333]">

@@ -48,7 +48,7 @@ function UserBehaviorWidget() {
         <span className="text-xs font-medium text-gray-700">Kullanıcı Davranışı</span>
       </div>
       <p className="text-xs text-gray-600 mb-2">
-        Toplam <strong>{data.total_events.toLocaleString()}</strong> olay
+        Toplam <strong>{(data.total_events ?? 0).toLocaleString("tr-TR")}</strong> olay
       </p>
       {top.length > 0 && (
         <ul className="text-[11px] text-gray-500 space-y-0.5">

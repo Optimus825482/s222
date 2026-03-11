@@ -122,10 +122,11 @@ function fmtRate(v: number | undefined | null): string {
   return `${(v ?? 0).toFixed(1)}%`;
 }
 
-function fmtTokens(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
-  return v.toLocaleString();
+function fmtTokens(v: number | undefined | null): string {
+  const n = v ?? 0;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString("tr-TR");
 }
 
 function fmtCost(v: number | undefined | null): string {
@@ -278,7 +279,7 @@ export default function PerformanceDashboard() {
           <SummaryCard
             icon="📋"
             label="Toplam Görev"
-            value={system.total_tasks.toLocaleString()}
+            value={(system.total_tasks ?? 0).toLocaleString("tr-TR")}
             accent="text-amber-400"
           />
           <SummaryCard
@@ -487,7 +488,7 @@ export default function PerformanceDashboard() {
                       {fmtRate(a.success_rate)}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">
-                      {a.task_count.toLocaleString()}
+                      {(a.task_count ?? 0).toLocaleString("tr-TR")}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">
                       {fmtTokens(a.total_tokens)}

@@ -20,8 +20,7 @@ from core.models import (
 )
 from core.events import build_orchestrator_context
 from tools.registry import ORCHESTRATOR_TOOLS
-from tools.cache import get_cached_response, cache_response, cache_stats
-from tools.circuit_breaker import get_circuit_breaker
+from tools.cache import get_cached_response, cache_response
 
 # Keywords that trigger brainstorm mode (Turkish + English)
 _BRAINSTORM_PATTERNS = re.compile(
@@ -603,8 +602,10 @@ class OrchestratorAgent(BaseAgent):
     async def _handle_idea_to_project(self, fn_args: dict, thread: Thread) -> str:
         """Run the Idea-to-Project pipeline through specialist agents."""
         from tools.idea_to_project import (
-            PHASES, get_phase_prompt, get_phase_agent,
-            detect_project_type, save_project_output,
+            PHASES,
+            get_phase_prompt,
+            detect_project_type,
+            save_project_output,
         )
         from pipelines.engine import PipelineEngine
 
