@@ -183,6 +183,129 @@ GATEWAY_MODELS = {
 
 ROLE_TO_MODEL = {cfg["role"]: key for key, cfg in MODELS.items()}
 
+# ── Runtime Standardization / Rollout Flags (Faz 15.3-15.5) ─────
+
+RUNTIME_EVENT_SCHEMA_VERSION = os.getenv("RUNTIME_EVENT_SCHEMA_VERSION", "2")
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    return os.getenv(name, str(default).lower()).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+FEATURE_FLAGS = {
+    "runtime_event_v2": _env_flag("FEATURE_RUNTIME_EVENT_V2", True),
+    "steering_queue_v2": _env_flag("FEATURE_STEERING_QUEUE_V2", True),
+    "provider_registry_v2": _env_flag("FEATURE_PROVIDER_REGISTRY_V2", True),
+    "sandbox_executor_v1": _env_flag("FEATURE_SANDBOX_EXECUTOR_V1", True),
+    "session_queueing_v1": _env_flag("FEATURE_SESSION_QUEUEING_V1", True),
+    "scheduled_events_v1": _env_flag("FEATURE_SCHEDULED_EVENTS_V1", True),
+    "telemetry_runtime_v1": _env_flag("FEATURE_TELEMETRY_RUNTIME_V1", True),
+}
+
+
+def _resolve_model_key(model_key_or_role: str) -> str:
+    return ROLE_TO_MODEL.get(model_key_or_role, model_key_or_role)
+
+
+def _get_gateway_config(model_key_or_role: str) -> dict | None:
+    model_key = _resolve_model_key(model_key_or_role)
+    return GATEWAY_MODELS.get(model_key)
+
+
+def _get_primary_provider(model_key_or_role: str) -> str:
+    model_key = _resolve_model_key(model_key_or_role)
+    gateway_cfg = _get_gateway_config(model_key)
+    if gateway_cfg and gateway_cfg.get("primary", {}).get("provider"):
+        return str(gateway_cfg["primary"]["provider"])
+    return str(MODELS[model_key].get("base_url", "nvidia"))
+
+
+def _get_primary_model_id(model_key_or_role: str) -> str:
+    model_key = _resolve_model_key(model_key_or_role)
+    gateway_cfg = _get_gateway_config(model_key)
+    if gateway_cfg and gateway_cfg.get("primary", {}).get("id"):
+        return str(gateway_cfg["primary"]["id"])
+    return str(MODELS[model_key]["id"])
+
+
+MODEL_CAPABILITIES = {
+    model_key: {
+        "reasoning": bool(cfg.get("has_thinking")),
+        "thinking": bool(cfg.get("has_thinking")),
+        "streaming": bool(PI_GATEWAY_STREAMING_ENABLED),
+        "tool_calls": True,
+        "steering": True,
+        "follow_up": True,
+        "gateway_routing": model_key in GATEWAY_MODELS,
+        "fallback": bool(PI_GATEWAY_FALLBACK_ENABLED and model_key in GATEWAY_MODELS),
+        "vision": False,
+    }
+    for model_key, cfg in MODELS.items()
+}
+
+
+PROVIDER_REGISTRY = {
+    model_key: {
+        "role": cfg["role"],
+        "primary_provider": _get_primary_provider(model_key),
+        "primary_model": _get_primary_model_id(model_key),
+        "alternatives": list((_get_gateway_config(model_key) or {}).get("alternatives", [])),
+        "gateway_enabled": bool(PI_GATEWAY_ENABLED and model_key in GATEWAY_MODELS),
+        "gateway_url": PI_GATEWAY_URL if PI_GATEWAY_ENABLED else None,
+        "fallback_enabled": bool(PI_GATEWAY_FALLBACK_ENABLED and model_key in GATEWAY_MODELS),
+    }
+    for model_key, cfg in MODELS.items()
+}
+
+
+def get_feature_flags() -> dict[str, bool]:
+    return dict(FEATURE_FLAGS)
+
+
+def is_feature_enabled(flag_name: str, default: bool = False) -> bool:
+    return bool(FEATURE_FLAGS.get(flag_name, default))
+
+
+def get_model_capabilities(model_key_or_role: str) -> dict[str, bool | str]:
+    model_key = _resolve_model_key(model_key_or_role)
+    capabilities: dict[str, bool | str] = {
+        key: value for key, value in MODEL_CAPABILITIES.get(model_key, {}).items()
+    }
+    capabilities["model_key"] = model_key
+    capabilities["role"] = MODELS[model_key]["role"]
+    return capabilities
+
+
+def get_provider_registry_entry(model_key_or_role: str) -> dict[str, object]:
+    model_key = _resolve_model_key(model_key_or_role)
+    entry = dict(PROVIDER_REGISTRY.get(model_key, {}))
+    entry["model_key"] = model_key
+    return entry
+
+
+def get_provider_registry_summary() -> dict[str, object]:
+    return {
+        "gateway_enabled": PI_GATEWAY_ENABLED,
+        "fallback_enabled": PI_GATEWAY_FALLBACK_ENABLED,
+        "streaming_enabled": PI_GATEWAY_STREAMING_ENABLED,
+        "runtime_schema_version": RUNTIME_EVENT_SCHEMA_VERSION,
+        "roles": {
+            model_key: {
+                "primary_provider": entry["primary_provider"],
+                "primary_model": entry["primary_model"],
+                "alternative_count": len(entry.get("alternatives", [])),
+                "gateway_enabled": entry["gateway_enabled"],
+                "fallback_enabled": entry["fallback_enabled"],
+            }
+            for model_key, entry in PROVIDER_REGISTRY.items()
+        },
+    }
+
 # ── Paths ────────────────────────────────────────────────────────
 
 DATA_DIR = Path(__file__).parent / "data"

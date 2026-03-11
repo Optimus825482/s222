@@ -1,6 +1,6 @@
 # 🗺️ Multi-Agent Ops Center — Sistem Geliştirme Yol Haritası
 
-> Son güncelleme: 2026-03-11 (Faz 15 — pi-mono derin uyarlama yol haritası eklendi)
+> Son güncelleme: 2026-03-11 (Faz 15 uygulama durumu güncellendi)
 > Durum: Aktif geliştirme
 
 ## Renk Kodları
@@ -415,61 +415,61 @@ pi-mom (Slack bot) pattern'ini kullanarak Faz 11.5 multi-channel gateway'i hızl
 - 🟢 Kanal-bağımsız mesaj normalizasyonu (pi-agent-core message format)
 - 🟢 Docker sandbox isolation (kanal başına izole çalışma ortamı)
 
-## Faz 15 — pi-mono Derin Uyarlama ve Ürünleştirme 🧩 `[🔴 PLANLANMIŞ]`
+## Faz 15 — pi-mono Derin Uyarlama ve Ürünleştirme 🧩 `[🟡 KISMİ]`
 
 Faz 14 ile alınan temel pi-mono entegrasyonlarını ürün seviyesinde derinleştirme.
 Amaç, paketleri birebir taşımak değil; `agent`, `ai`, `coding-agent`, `mom` ve `web-ui`
 içindeki olgun pattern'leri mevcut Multi-Agent Ops Center mimarisine kontrollü biçimde uyarlamak.
 
-### 15.1 — Artifact UX ve Tool Renderer Katmanı `[🔴 PLANLANMIŞ]`
+### 15.1 — Artifact UX ve Tool Renderer Katmanı `[🟢 TAMAMLANDI]`
 
 `pi-web-ui` içindeki artifact ve renderer desenlerini mevcut XP masaüstü deneyimine taşıma.
 
-- 🔴 Artifact panel derinleştirme — agent çıktılarını ayrı yan panel/pencere mantığında yönetme
-- 🔴 Tool renderer registry — her tool sonucu için tip-bazlı özel renderer standardı
-- 🔴 Attachment lifecycle — yükleme, önizleme, extraction ve artifact'e bağlama akışı
-- 🔴 Document extraction UX iyileştirmesi — PDF/DOCX/XLSX/PPTX çıktılarının daha görünür yönetimi
-- 🔴 Frontend session metadata storage — konuşma listesi, son aktif oturum, kullanıcı tercihleri
+- 🟢 Artifact panel derinleştirme — XP raporlar ve artifact görünümü agent çıktılarını ayrı panel mantığında gösteriyor
+- 🟢 Tool renderer registry — renderable artifact tespiti ve tool-result bazlı renderer standardı eklendi
+- 🟡 Attachment lifecycle — önizleme/extraction tarafı görünür hale geldi; tam yükleme yaşam döngüsü henüz derinleştirilmedi
+- 🟢 Document extraction UX iyileştirmesi — PDF/DOCX/XLSX/PPTX çıktıları daha görünür ve tutarlı gösteriliyor
+- 🟢 Frontend session metadata storage — local persistence ile konuşma listesi, son aktif oturum ve tercihlerin saklanması
 
-### 15.2 — Session Branching, Compaction ve Skill Platformu `[🔴 PLANLANMIŞ]`
+### 15.2 — Session Branching, Compaction ve Skill Platformu `[🟡 KISMİ]`
 
 `pi-coding-agent` içindeki oturum ve yetenek yönetimi desenlerini ürünleştirme.
 
-- 🔴 Session tree — alternatif çözüm yolları için dallanan oturum yapısı
-- 🔴 Session compaction v2 — uzun konuşmalarda branch summary + context sıkıştırma
-- 🔴 Skill discovery/validation pipeline — frontmatter kontrollü skill yükleme standardı
-- 🔴 Extension hook surface — dashboard/agent lifecycle için genişletilebilir event kancaları
-- 🔴 Komut paleti — slash command mantığını UI action palette olarak sunma
+- 🟢 Session tree — branch endpoint'leri ve oturum metadata'sı ile dallanan oturum temeli eklendi
+- 🟢 Session compaction v2 — branch summary + context sıkıştırma akışı backend/frontend seviyesinde ürünleştirildi
+- 🔴 Skill discovery/validation pipeline — frontmatter kontrollü skill yükleme standardı henüz tamamlanmadı
+- 🔴 Extension hook surface — dashboard/agent lifecycle için genişletilebilir event kancaları henüz tamamlanmadı
+- 🔴 Komut paleti — slash command mantığını UI action palette olarak sunma henüz tamamlanmadı
 
-### 15.3 — Agent Runtime Standardizasyonu `[🔴 PLANLANMIŞ]`
+### 15.3 — Agent Runtime Standardizasyonu `[🟢 TAMAMLANDI]`
 
 `pi-agent-core` ve `pi-ai` içindeki agent yaşam döngüsü ve provider abstraction desenlerini pekiştirme.
 
-- 🔴 Event-stream sözleşmesi standardı — assistant delta, thinking, tool-call, tool-result akışını tek şemaya bağlama
-- 🔴 Tool argument validation v2 — retry/correction loop'larını backend standardı haline getirme
-- 🔴 Steering ve follow-up queue standardı — çalışan agent'ı yönlendirme ve otomatik devam mekanizması
-- 🔴 Provider registry derinleştirme — model/policy/proxy/fallback kararlarını merkezi yönetim
-- 🔴 Unified model capabilities map — hangi modelin reasoning/tool/vision desteği verdiğini merkezi katalogda tutma
+- 🟢 Event-stream sözleşmesi standardı — websocket olayları ortak envelope ve schema version ile normalize edildi
+- 🟢 Tool argument validation v2 — retry/correction ve metadata akışı backend standardına bağlandı
+- 🟢 Steering ve follow-up queue standardı — çalışan agent yönlendirme/follow-up akışı standardize edildi
+- 🟢 Provider registry derinleştirme — model/policy/proxy/fallback kararları merkezi metadata ile yönetiliyor
+- 🟢 Unified model capabilities map — reasoning/tool/vision desteği merkezi capability haritasında tutuluyor
 
-### 15.4 — Sandboxed Autonomy, Queue ve Scheduled Events `[🔴 PLANLANMIŞ]`
+### 15.4 — Sandboxed Autonomy, Queue ve Scheduled Events `[🟡 KISMİ]`
 
 `pi-mom` içindeki güvenli yürütme ve otonom görev yönetimi desenlerini backend'e taşıma.
 
-- 🔴 Host/Docker sandbox abstraction — tool ve kod yürütme için ortak executor katmanı
-- 🔴 Kanal/oturum bazlı queueing — çakışan agent görevlerini sıralı yürütme
-- 🔴 File/event tabanlı scheduled tasks — heartbeat ve workflow scheduler ile birleşik görev modeli
-- 🔴 Workspace isolation — agent başına ya da kanal başına izole çalışma dizini politikası
-- 🔴 Execution logs ve replay — otonom görev çalıştırmalarını tekrar izleme
+- 🟡 Host/Docker sandbox abstraction — ortak executor capability surface hazır; host-subprocess mod aktif, Docker izolasyonu henüz yok
+- 🟢 Kanal/oturum bazlı queueing — event bus ve delegation stats ile sıralı yürütme görünürlüğü eklendi
+- 🟢 File/event tabanlı scheduled tasks — heartbeat ve scheduler execution geçmişi tek modelde görünür hale getirildi
+- 🔴 Workspace isolation — agent ya da kanal bazlı tam izole çalışma dizini politikası henüz yok
+- 🟢 Execution logs ve replay — scheduled execution geçmişi ve replay görünürlüğü ürün yüzeyine taşındı
 
-### 15.5 — Telemetry, Rollout ve Sertleştirme `[🔴 PLANLANMIŞ]`
+### 15.5 — Telemetry, Rollout ve Sertleştirme `[🟡 KISMİ]`
 
 Yeni kabiliyetleri güvenli ve ölçülebilir şekilde devreye alma.
 
-- 🔴 Feature flag ile kademeli açılış — artifact, branching, sandbox gibi özellikleri kontrollü açma
-- 🔴 Yeni metrikler — artifact kullanım oranı, compaction etkinliği, branch başarı oranı
-- 🔴 Failure analytics — renderer/sandbox/session hataları için özel izleme
-- 🔴 Product adoption dashboard — yeni pi-mono uyarlamalarının kullanım etkisini ölçme
-- 🔴 Rollback playbook — yeni runtime/UI katmanları için geri alma prosedürü
+- 🟢 Feature flag ile kademeli açılış — runtime feature flags ve rollout readiness backend'e eklendi
+- 🟡 Yeni metrikler — runtime adoption ve failure tarafı eklendi; artifact/branch özel oranlar henüz tamamlanmadı
+- 🟢 Failure analytics — renderer/sandbox/session/runtime kaynaklı hata görünürlüğü genişletildi
+- 🟢 Product adoption dashboard — performance dashboard üstünden kullanım etkisi görünür hale getirildi
+- 🔴 Rollback playbook — yeni runtime/UI katmanları için geri alma prosedürü henüz yazılmadı
 
 ---
 
@@ -493,7 +493,7 @@ Yeni kabiliyetleri güvenli ve ölçülebilir şekilde devreye alma.
 | Faz 12 — Kolektif Bilinç 🧬     | 🟡 Kısmi        | █████░░░░░░░ 40%  |
 | Faz 13 — Kiro Entegrasyon 🔮    | 🟡 Devam ediyor | ███░░░░░░░░░ 30%  |
 | Faz 14 — pi-mono Entegrasyon 🔌 | 🟢 Tamamlandı   | ████████████ 100% |
-| Faz 15 — Derin Uyarlama 🧩      | 🔴 Planlanmış   | ░░░░░░░░░░░░ 0%   |
+| Faz 15 — Derin Uyarlama 🧩      | 🟡 Kısmi        | ████████░░░░ 67%  |
 
 ---
 
@@ -507,5 +507,5 @@ Yeni kabiliyetleri güvenli ve ölçülebilir şekilde devreye alma.
 - Faz 11-12: OpenClaw / Moltbook ekosisteminden ilham alınmıştır
 - Faz 13: Kiro IDE skill ve power entegrasyonu — geliştirme hızını artırmak için
 - Faz 14: [badlogic/pi-mono](https://github.com/badlogic/pi-mono) entegrasyonu — 20+ LLM provider, unified gateway, gelişmiş chat UI, agent runtime framework
-- Faz 15: pi-mono pattern'lerinin ürün seviyesinde derin uyarlanması — artifact UX, session branching, runtime standardizasyonu, sandboxed autonomy
+- Faz 15: pi-mono pattern'lerinin ürün seviyesinde derin uyarlanması — 15.1 ve 15.3 tamamlandı; 15.2/15.4/15.5 kısmi ilerliyor
 - İlham kaynakları: [openclaw.ai](https://openclaw.ai) · [Moltbook](https://moltbook.com) · [Forbes: Crustafarianism](https://www.forbes.com/sites/johnkoetsier/2026/01/30/ai-agents-created-their-own-religion-crustafarianism-on-an-agent-only-social-network/) · [pi-mono](https://github.com/badlogic/pi-mono)

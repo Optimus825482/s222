@@ -19,7 +19,7 @@ if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
 from deps import _get_user_from_token
-from config import MODELS
+from config import MODELS, RUNTIME_EVENT_SCHEMA_VERSION, get_feature_flags
 from core.models import Thread, PipelineType
 from core.state import save_thread, load_thread
 from shared_state import _AGENT_ROLES, _utcnow
@@ -37,9 +37,28 @@ class WSLiveMonitor:
         self._closed = False
         self._events_list = events_list or []
         self._pending_tasks: set[asyncio.Task] = set()
+        self._run_id = uuid.uuid4().hex
+        self._sequence = 0
         # Faz 14.6: Steering queue for injecting user messages into running agent
         from agents.agentic_loop import SteeringQueue
         self._steering_queue = SteeringQueue()
+
+    def _next_envelope(self, *, event: str, phase: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self._sequence += 1
+        return {
+            "schema_version": RUNTIME_EVENT_SCHEMA_VERSION,
+            "event": event,
+            "phase": phase,
+            "run_id": self._run_id,
+            "sequence": self._sequence,
+            "ts": time.time(),
+            "feature_flags": get_feature_flags(),
+            "payload": payload,
+        }
+
+    def envelope(self, *, event: str, phase: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Public wrapper so callers can advance sequence safely."""
+        return self._next_envelope(event=event, phase=phase, payload=payload)
 
     def should_stop(self) -> bool:
         return self._stop
@@ -100,6 +119,11 @@ class WSLiveMonitor:
                 {
                     "type": "monitor_start",
                     "description": task_description,
+                    **self._next_envelope(
+                        event="monitor.started",
+                        phase="start",
+                        payload={"description": task_description},
+                    ),
                 }
             )
         )
@@ -113,6 +137,17 @@ class WSLiveMonitor:
             "extra": extra,
             "timestamp": time.time(),
         }
+        payload.update(
+            self._next_envelope(
+                event=f"live.{event_type}",
+                phase="progress",
+                payload={
+                    "agent": agent,
+                    "content": content,
+                    "extra": extra,
+                },
+            )
+        )
         self._events_list.append(payload)
         self._track_task(self._send(payload))
 
@@ -122,6 +157,11 @@ class WSLiveMonitor:
                 {
                     "type": "monitor_complete",
                     "summary": summary,
+                    **self._next_envelope(
+                        event="monitor.completed",
+                        phase="complete",
+                        payload={"summary": summary},
+                    ),
                 }
             )
         )
@@ -132,6 +172,11 @@ class WSLiveMonitor:
                 {
                     "type": "monitor_error",
                     "message": message,
+                    **self._next_envelope(
+                        event="monitor.error",
+                        phase="error",
+                        payload={"message": message},
+                    ),
                 }
             )
         )
@@ -146,6 +191,17 @@ class WSLiveMonitor:
             "extra": extra,
             "timestamp": time.time(),
         }
+        payload.update(
+            self._next_envelope(
+                event=f"stream.{event_type}",
+                phase="stream",
+                payload={
+                    "agent": agent,
+                    "delta": delta,
+                    "extra": extra,
+                },
+            )
+        )
         self._events_list.append(payload)
         self._track_task(self._send(payload))
 
@@ -249,6 +305,11 @@ async def ws_chat(ws: WebSocket):
                     "thread_id": thread.id,
                     "result": result,
                     "thread": thread.model_dump(mode="json"),
+                    **monitor.envelope(
+                        event="run.result",
+                        phase="complete",
+                        payload={"thread_id": thread.id, "has_result": bool(result)},
+                    ),
                 }
             )
 
@@ -281,6 +342,14 @@ async def ws_chat(ws: WebSocket):
                     {
                         "type": "post_task_meeting",
                         "meeting": meeting,
+                        **monitor.envelope(
+                            event="run.post_task_meeting",
+                            phase="complete",
+                            payload={
+                                "thread_id": thread.id,
+                                "participating_agents": task_agents,
+                            },
+                        ),
                     }
                 )
             except Exception:
@@ -294,6 +363,11 @@ async def ws_chat(ws: WebSocket):
                     "message": err,
                     "traceback": traceback.format_exc(),
                     "thread_id": thread.id,
+                    **monitor.envelope(
+                        event="run.error",
+                        phase="error",
+                        payload={"thread_id": thread.id, "message": err},
+                    ),
                 }
             )
         finally:
@@ -369,6 +443,12 @@ async def ws_chat(ws: WebSocket):
                             "type": "orchestrator_chat_reply",
                             "content": reply,
                             "is_status": is_status_query,
+                            "schema_version": RUNTIME_EVENT_SCHEMA_VERSION,
+                            "event": "steering.reply",
+                            "phase": "progress",
+                            "run_id": getattr(monitor_obj, "_run_id", None),
+                            "sequence": getattr(monitor_obj, "_sequence", 0) + 1,
+                            "ts": time.time(),
                         }
                     )
                 else:
@@ -505,6 +585,12 @@ async def stream_chat(request: Request):
 
             async for event in orchestrator.call_llm_stream(messages, tools):
                 sse_data = json.dumps(event, ensure_ascii=False)
+                if "schema_version" not in event:
+                    event["schema_version"] = RUNTIME_EVENT_SCHEMA_VERSION
+                    event["event"] = f"stream.{event.get('type', 'unknown')}"
+                    event["phase"] = "stream"
+                    event["ts"] = time.time()
+                sse_data = json.dumps(event, ensure_ascii=False)
                 yield f"data: {sse_data}\n\n"
 
                 # On done event, save thread and send final result
@@ -524,6 +610,10 @@ async def stream_chat(request: Request):
                     final_event = json.dumps({
                         "type": "stream_end",
                         "thread_id": thread.id,
+                        "schema_version": RUNTIME_EVENT_SCHEMA_VERSION,
+                        "event": "stream.end",
+                        "phase": "complete",
+                        "ts": time.time(),
                     }, ensure_ascii=False)
                     yield f"data: {final_event}\n\n"
 
@@ -532,6 +622,10 @@ async def stream_chat(request: Request):
                 "type": "error",
                 "message": f"{type(e).__name__}: {e}",
                 "agent": "orchestrator",
+                "schema_version": RUNTIME_EVENT_SCHEMA_VERSION,
+                "event": "stream.error",
+                "phase": "error",
+                "ts": time.time(),
             }, ensure_ascii=False)
             yield f"data: {error_event}\n\n"
 

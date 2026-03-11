@@ -20,24 +20,39 @@ interface BehaviorData {
   recent: { action: string; timestamp: string; details?: string }[];
 }
 
-const CL = [
-  "#f59e0b",
-  "#10b981",
-  "#ef4444",
-  "#06b6d4",
-  "#ec4899",
-  "#84cc16",
-  "#a78bfa",
+const BAR_ACCENT_CLASSES = [
+  "accent-amber-500",
+  "accent-emerald-500",
+  "accent-red-500",
+  "accent-cyan-500",
+  "accent-pink-500",
+  "accent-lime-500",
+  "accent-violet-400",
 ];
 const allRoles = Object.keys(AGENT_CONFIG) as AgentRole[];
 const crd = "bg-slate-800/50 border border-slate-700/50 rounded-lg p-4";
 const sCls =
   "bg-slate-800/60 border border-slate-700/50 rounded px-2 py-1.5 text-[10px] text-slate-300 focus:outline-none focus:border-cyan-500/50";
 
+const AGENT_TONE_CLASSES: Record<string, { text: string; softBg: string }> = {
+  orchestrator: { text: "text-amber-400", softBg: "bg-amber-500/20" },
+  thinker: { text: "text-emerald-400", softBg: "bg-emerald-500/20" },
+  speed: { text: "text-red-400", softBg: "bg-red-500/20" },
+  researcher: { text: "text-cyan-400", softBg: "bg-cyan-500/20" },
+  reasoner: { text: "text-pink-400", softBg: "bg-pink-500/20" },
+  critic: { text: "text-violet-400", softBg: "bg-violet-500/20" },
+};
+
 function ai(r: string) {
   return (
     AGENT_CONFIG[r as AgentRole] ?? { icon: "⚙️", color: "#6b7280", name: r }
   );
+}
+function toneFor(role: string) {
+  return AGENT_TONE_CLASSES[role] ?? {
+    text: "text-slate-400",
+    softBg: "bg-slate-500/20",
+  };
 }
 function ago(ts: string) {
   const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
@@ -83,15 +98,12 @@ function Bar({ v, mx, c, l }: { v: number; mx: number; c: string; l: string }) {
       <span className="text-[10px] text-slate-400 w-20 truncate" title={l}>
         {l}
       </span>
-      <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{
-            width: `${mx > 0 ? Math.min((v / mx) * 100, 100) : 0}%`,
-            backgroundColor: c,
-          }}
-        />
-      </div>
+      <progress
+        className={`flex-1 h-2 overflow-hidden rounded-full bg-slate-700 ${c}`}
+        max={mx}
+        value={v}
+        aria-label={`${l}: ${v}`}
+      />
       <span className="text-[10px] text-slate-500 w-10 text-right tabular-nums">
         {v}
       </span>
@@ -162,7 +174,13 @@ function BehaviorTab() {
             </p>
           )}
           {acts.slice(0, 10).map(([a, c], i) => (
-            <Bar key={a} v={c} mx={mxA} c={CL[i % CL.length]} l={a} />
+            <Bar
+              key={a}
+              v={c}
+              mx={mxA}
+              c={BAR_ACCENT_CLASSES[i % BAR_ACCENT_CLASSES.length]}
+              l={a}
+            />
           ))}
         </div>
       </div>
@@ -351,11 +369,16 @@ function AutonomousChatTab() {
         >
           ⚙️
         </button>
+        <label htmlFor="agent-filter" className="sr-only">
+          Agent filtresi
+        </label>
         <select
+          id="agent-filter"
           value={filterAgent}
           onChange={(x) => setFilterAgent(x.target.value)}
           className={`ml-auto ${sCls}`}
           aria-label="Agent filtresi"
+          title="Agent filtresi"
         >
           <option value="">Tüm Ajanlar</option>
           <Opts />
@@ -388,7 +411,9 @@ function AutonomousChatTab() {
         >
           {convs.map((c) => {
             const ini = ai(c.initiator);
+            const iniTone = toneFor(c.initiator);
             const res = ai(c.responder);
+            const resTone = toneFor(c.responder);
             const isOpen = expanded === c.id;
             return (
               <div
@@ -398,12 +423,15 @@ function AutonomousChatTab() {
                 <button
                   onClick={() => setExpanded(isOpen ? null : c.id)}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                  {...(isOpen
+                    ? { "aria-expanded": "true" }
+                    : { "aria-expanded": "false" })}
                 >
-                  <span className="text-sm" style={{ color: ini.color }}>
+                  <span className={`text-sm ${iniTone.text}`}>
                     {ini.icon}
                   </span>
                   <span className="text-[10px] text-slate-500">⇄</span>
-                  <span className="text-sm" style={{ color: res.color }}>
+                  <span className={`text-sm ${resTone.text}`}>
                     {res.icon}
                   </span>
                   <span className="text-[10px] text-slate-400 flex-1 truncate">
@@ -425,6 +453,7 @@ function AutonomousChatTab() {
                   <div className="border-t border-slate-700/30 px-3 py-2 space-y-1.5">
                     {c.messages.map((m) => {
                       const s = ai(m.sender);
+                      const sTone = toneFor(m.sender);
                       const isLeft = m.sender === c.initiator;
                       return (
                         <div
@@ -432,8 +461,7 @@ function AutonomousChatTab() {
                           className={`flex gap-2 ${isLeft ? "" : "flex-row-reverse"}`}
                         >
                           <div
-                            className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px]"
-                            style={{ backgroundColor: `${s.color}20` }}
+                            className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${sTone.softBg}`}
                           >
                             {s.icon}
                           </div>
@@ -441,10 +469,7 @@ function AutonomousChatTab() {
                             className={`max-w-[80%] rounded-lg px-2.5 py-1.5 ${isLeft ? "bg-slate-700/40 rounded-tl-none" : "bg-cyan-900/20 rounded-tr-none"}`}
                           >
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <span
-                                className="text-[9px] font-semibold"
-                                style={{ color: s.color }}
-                              >
+                              <span className={`text-[9px] font-semibold ${sTone.text}`}>
                                 {s.name}
                               </span>
                               <span className="text-[8px] text-slate-600">
@@ -525,12 +550,15 @@ function CfgPanel({
         </button>
         <span className="text-[10px] text-slate-500">Aralık:</span>
         <input
+          id="auto-chat-interval"
           type="range"
           min={1}
           max={30}
           value={interval}
           onChange={(x) => setInterval_(Number(x.target.value))}
           className="w-20 h-1 accent-cyan-500"
+          aria-label="Sohbet aralığı dakika"
+          title="Sohbet aralığı dakika"
         />
         <span className="text-[10px] text-cyan-400 tabular-nums">
           {interval} dk
@@ -539,12 +567,15 @@ function CfgPanel({
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-slate-500">Maks. mesaj:</span>
         <input
+          id="auto-chat-max-messages"
           type="range"
           min={2}
           max={6}
           value={maxEx}
           onChange={(x) => setMaxEx(Number(x.target.value))}
           className="flex-1 h-1 accent-cyan-500"
+          aria-label="Maksimum mesaj sayısı"
+          title="Maksimum mesaj sayısı"
         />
         <span className="text-[10px] text-cyan-400 tabular-nums w-4 text-center">
           {maxEx}
@@ -625,21 +656,31 @@ function ManualMessagesTab() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-2 items-center">
+        <label htmlFor="sender-filter" className="sr-only">
+          Gönderen filtresi
+        </label>
         <select
+          id="sender-filter"
           value={fS}
           onChange={(x) => setFS(x.target.value)}
           className={sCls}
           aria-label="Gönderen filtresi"
+          title="Gönderen filtresi"
         >
           <option value="">Tüm Göndericiler</option>
           <Opts />
         </select>
         <span className="text-[10px] text-slate-600">→</span>
+        <label htmlFor="receiver-filter" className="sr-only">
+          Alıcı filtresi
+        </label>
         <select
+          id="receiver-filter"
           value={fR}
           onChange={(x) => setFR(x.target.value)}
           className={sCls}
           aria-label="Alıcı filtresi"
+          title="Alıcı filtresi"
         >
           <option value="">Tüm Alıcılar</option>
           <Opts />
@@ -663,24 +704,20 @@ function ManualMessagesTab() {
           )}
           {msgs.map((m) => {
             const s = ai(m.sender),
-              r = ai(m.receiver);
+              sTone = toneFor(m.sender),
+              r = ai(m.receiver),
+              rTone = toneFor(m.receiver);
             return (
               <div
                 key={m.id}
                 className="bg-slate-800/40 border border-slate-700/30 rounded-lg px-3 py-2 hover:border-slate-600/50 transition-colors"
               >
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span
-                    className="text-[10px] font-semibold"
-                    style={{ color: s.color }}
-                  >
+                  <span className={`text-[10px] font-semibold ${sTone.text}`}>
                     {s.icon} {s.name}
                   </span>
                   <span className="text-[9px] text-slate-600">→</span>
-                  <span
-                    className="text-[10px] font-semibold"
-                    style={{ color: r.color }}
-                  >
+                  <span className={`text-[10px] font-semibold ${rTone.text}`}>
                     {r.icon} {r.name}
                   </span>
                   <span className="ml-auto text-[9px] text-slate-600">
@@ -697,20 +734,30 @@ function ManualMessagesTab() {
       )}
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 space-y-2">
         <div className="flex gap-2 items-center">
+          <label htmlFor="message-sender" className="sr-only">
+            Gönderen ajan
+          </label>
           <select
+            id="message-sender"
             value={snd}
             onChange={(x) => setSnd(x.target.value)}
             className={`flex-1 ${sCls}`}
             aria-label="Gönderen ajan"
+            title="Gönderen ajan"
           >
             <Opts />
           </select>
           <span className="text-[10px] text-slate-600">→</span>
+          <label htmlFor="message-receiver" className="sr-only">
+            Alıcı ajan
+          </label>
           <select
+            id="message-receiver"
             value={rcv}
             onChange={(x) => setRcv(x.target.value)}
             className={`flex-1 ${sCls}`}
             aria-label="Alıcı ajan"
+            title="Alıcı ajan"
           >
             <Opts exclude={snd} />
           </select>
@@ -890,8 +937,7 @@ function MeetingsTab() {
                         >
                           <div className="flex items-center gap-1.5 mb-0.5">
                             <span
-                              className="text-[10px]"
-                              style={{ color: speaker.color }}
+                              className={`text-[10px] ${toneFor(msg.speaker).text}`}
                             >
                               {speaker.icon} {speaker.name}
                             </span>
@@ -1072,8 +1118,11 @@ function SocialSummaryBlock() {
               </label>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-slate-500">Tie-breaker</span>
+              <label htmlFor="tie-breaker-strategy" className="text-slate-500">
+                Tie-breaker
+              </label>
               <select
+                id="tie-breaker-strategy"
                 value={policy.tie_breaker}
                 onChange={(e) =>
                   setPolicy((p) =>
@@ -1081,6 +1130,8 @@ function SocialSummaryBlock() {
                   )
                 }
                 className={sCls}
+                aria-label="Tie-breaker stratejisi"
+                title="Tie-breaker stratejisi"
               >
                 <option value="proposer_wins">Proposer kazanır</option>
                 <option value="reject">Varsayılan red</option>
@@ -1171,6 +1222,8 @@ function SocialSummaryBlock() {
                       value={resolveReason}
                       onChange={(e) => setResolveReason(e.target.value)}
                       className={`${sCls} w-full text-[10px]`}
+                      aria-label="Karar gerekçesi"
+                      title="Karar gerekçesi"
                     />
                     <div className="flex gap-1.5">
                       <button
@@ -1260,6 +1313,8 @@ function MeetingsSection() {
           placeholder="Görev özeti (opsiyonel)"
           className={`${sCls} flex-1 min-w-[120px]`}
           maxLength={120}
+          aria-label="Görev özeti"
+          title="Görev özeti"
         />
         <button
           onClick={onTrigger}
@@ -1313,23 +1368,32 @@ export function AgentCommsPanel() {
         aria-label="İletişim ekosistemi sekmeleri"
       >
         {TABS.map((t) => (
-          <button
-            key={t.key}
-            role="tab"
-            aria-selected={tab === t.key}
-            aria-controls={`panel-${t.key}`}
-            onClick={() => setTab(t.key)}
-            className={`text-xs font-medium px-3 py-2 border-b-2 transition-colors ${tab === t.key ? "border-cyan-400 text-cyan-400" : "border-transparent text-slate-500 hover:text-slate-300"}`}
-          >
-            <span className="mr-1">{t.icon}</span>
-            {t.label}
-          </button>
+          (() => {
+            const isSelected = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                id={`tab-${t.key}`}
+                role="tab"
+                {...(isSelected
+                  ? { "aria-selected": "true" }
+                  : { "aria-selected": "false" })}
+                aria-controls={`panel-${t.key}`}
+                onClick={() => setTab(t.key)}
+                className={`text-xs font-medium px-3 py-2 border-b-2 transition-colors ${isSelected ? "border-cyan-400 text-cyan-400" : "border-transparent text-slate-500 hover:text-slate-300"}`}
+              >
+                <span className="mr-1">{t.icon}</span>
+                {t.label}
+              </button>
+            );
+          })()
         ))}
       </div>
       <div
         className="flex-1 overflow-y-auto p-3"
         id={`panel-${tab}`}
         role="tabpanel"
+        aria-labelledby={`tab-${tab}`}
       >
         {tab === "behavior" && <BehaviorTab />}
         {tab === "sohbet" && (

@@ -19,7 +19,7 @@ from typing import Any, Optional
 
 from openai import AsyncOpenAI
 
-from config import NVIDIA_API_KEY, NVIDIA_BASE_URL, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, MODELS, PI_GATEWAY_URL, PI_GATEWAY_ENABLED, PI_GATEWAY_FALLBACK_ENABLED, PI_GATEWAY_STREAMING_ENABLED, GATEWAY_MODELS
+from config import NVIDIA_API_KEY, NVIDIA_BASE_URL, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, MODELS, PI_GATEWAY_URL, PI_GATEWAY_ENABLED, PI_GATEWAY_FALLBACK_ENABLED, PI_GATEWAY_STREAMING_ENABLED, GATEWAY_MODELS, RUNTIME_EVENT_SCHEMA_VERSION, get_feature_flags, get_model_capabilities, get_provider_registry_entry
 from core.models import AgentRole, EventType, Thread
 from core.events import serialize_thread_for_llm
 
@@ -291,6 +291,59 @@ class BaseAgent(ABC):
             return self.gateway_client, gateway_model
         return self.client, effective["id"]
 
+    def _build_runtime_metadata(
+        self,
+        *,
+        model_name: str,
+        provider: str,
+        attempt_count: int,
+        fallback_used: bool,
+        used_gateway: bool,
+        stream: bool,
+        error_message: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        metadata = {
+            "event_schema_version": RUNTIME_EVENT_SCHEMA_VERSION,
+            "feature_flags": get_feature_flags(),
+            "capabilities": get_model_capabilities(self.model_key),
+            "provider_registry": get_provider_registry_entry(self.model_key),
+            "provider": provider,
+            "selected_model": model_name,
+            "attempt_count": attempt_count,
+            "fallback_used": fallback_used,
+            "used_gateway": used_gateway,
+            "stream": stream,
+        }
+        if error_message:
+            metadata["error_message"] = error_message[:500]
+        if extra:
+            metadata.update(extra)
+        return metadata
+
+    def _resolve_runtime_provider_metadata(
+        self,
+        *,
+        model_name: str,
+        effective: dict[str, Any],
+        used_gateway: bool,
+    ) -> tuple[str, dict[str, Any]]:
+        """Avoid claiming a concrete provider when the gateway may have rerouted internally."""
+        provider_entry = get_provider_registry_entry(self.model_key)
+        configured_provider = str(provider_entry.get("primary_provider", effective.get("base_url", "nvidia")))
+        if not used_gateway:
+            return configured_provider, {"configured_provider": configured_provider}
+        if "/" in model_name:
+            actual_provider = model_name.split("/", 1)[0]
+            return actual_provider, {
+                "configured_provider": configured_provider,
+                "gateway_routed": True,
+            }
+        return "gateway", {
+            "configured_provider": configured_provider,
+            "gateway_routed": True,
+        }
+
     def _get_fallback_models(self) -> list[str]:
         """Get fallback model IDs from GATEWAY_MODELS for this agent's role.
         Returns list of 'provider/model_id' strings for gateway fallback.
@@ -359,6 +412,15 @@ class BaseAgent(ABC):
 
         # Attempt primary call
         last_error: Exception | None = None
+        attempt_count = 1
+        fallback_used = False
+        selected_model = model_id
+        used_gateway = client is self.gateway_client
+        selected_provider, runtime_extra = self._resolve_runtime_provider_metadata(
+            model_name=selected_model,
+            effective=effective,
+            used_gateway=used_gateway,
+        )
         try:
             response = await client.chat.completions.create(**kwargs)
         except Exception as primary_err:
@@ -369,6 +431,7 @@ class BaseAgent(ABC):
             if self._is_retryable_error(primary_err) and fallback_models and self.gateway_client:
                 for fb_model in fallback_models:
                     try:
+                        attempt_count += 1
                         fb_kwargs = dict(kwargs)
                         fb_kwargs["model"] = fb_model
                         # Remove fallback_models from extra_body for fallback calls
@@ -378,6 +441,13 @@ class BaseAgent(ABC):
                         elif "extra_body" in fb_kwargs:
                             del fb_kwargs["extra_body"]
                         response = await self.gateway_client.chat.completions.create(**fb_kwargs)
+                        fallback_used = True
+                        selected_model = fb_model
+                        selected_provider, runtime_extra = self._resolve_runtime_provider_metadata(
+                            model_name=selected_model,
+                            effective=effective,
+                            used_gateway=True,
+                        )
                         last_error = None
                         break  # success
                     except Exception as fb_err:
@@ -388,6 +458,7 @@ class BaseAgent(ABC):
             # If all gateway attempts failed, try direct client as last resort
             if response is None and client is self.gateway_client:
                 try:
+                    attempt_count += 1
                     direct_kwargs = dict(kwargs)
                     direct_kwargs["model"] = effective["id"]
                     direct_extra = {k: v for k, v in (effective.get("extra_body") or {}).items()}
@@ -396,6 +467,13 @@ class BaseAgent(ABC):
                     elif "extra_body" in direct_kwargs:
                         del direct_kwargs["extra_body"]
                     response = await self.client.chat.completions.create(**direct_kwargs)
+                    fallback_used = True
+                    selected_model = effective["id"]
+                    selected_provider, runtime_extra = self._resolve_runtime_provider_metadata(
+                        model_name=selected_model,
+                        effective=effective,
+                        used_gateway=False,
+                    )
                     last_error = None
                 except Exception:
                     pass  # keep original error
@@ -408,8 +486,18 @@ class BaseAgent(ABC):
                         agent_role=self.role.value if hasattr(self.role, 'value') else str(self.role),
                         response_time_ms=(time.monotonic() - t0) * 1000,
                         success=False,
-                        model_name=model_id,
+                        model_name=selected_model,
                         error_message=str(last_error)[:500] if last_error else "Unknown error",
+                        metadata=self._build_runtime_metadata(
+                            model_name=selected_model,
+                            provider=selected_provider,
+                            attempt_count=attempt_count,
+                            fallback_used=fallback_used,
+                            used_gateway=used_gateway,
+                            stream=False,
+                            error_message=str(last_error) if last_error else None,
+                            extra=runtime_extra,
+                        ),
                     )
             except Exception:
                 pass
@@ -457,7 +545,16 @@ class BaseAgent(ABC):
                     output_tokens=usage.completion_tokens if usage else 0,
                     total_tokens=usage.total_tokens if usage else 0,
                     success=True,
-                    model_name=model_id,
+                    model_name=selected_model,
+                    metadata=self._build_runtime_metadata(
+                        model_name=selected_model,
+                        provider=selected_provider,
+                        attempt_count=attempt_count,
+                        fallback_used=fallback_used,
+                        used_gateway=used_gateway,
+                        stream=False,
+                        extra=runtime_extra,
+                    ),
                 )
         except Exception:
             pass  # Never break LLM flow for metrics
@@ -471,6 +568,20 @@ class BaseAgent(ABC):
             "tokens_total": usage.total_tokens if usage else 0,
             "latency_ms": latency_ms,
             "thinking": thinking,
+            "provider": selected_provider,
+            "selected_model": selected_model,
+            "fallback_used": fallback_used,
+            "attempt_count": attempt_count,
+            "used_gateway": used_gateway,
+            "runtime": self._build_runtime_metadata(
+                model_name=selected_model,
+                provider=selected_provider,
+                attempt_count=attempt_count,
+                fallback_used=fallback_used,
+                used_gateway=used_gateway,
+                stream=False,
+                extra=runtime_extra,
+            ),
         }
 
     async def call_llm_stream(self, messages: list[dict], tools: list[dict] | None = None):
@@ -530,6 +641,15 @@ class BaseAgent(ABC):
         full_text = ""
         full_thinking = ""
         tool_calls_acc: dict[int, dict] = {}  # index → {id, name, arguments}
+        provider_entry = get_provider_registry_entry(self.model_key)
+        selected_provider, runtime_extra = self._resolve_runtime_provider_metadata(
+            model_name=model_id,
+            effective=effective,
+            used_gateway=client is self.gateway_client,
+        )
+        attempt_count = 1
+        fallback_used = False
+        used_gateway = client is self.gateway_client
 
         try:
             stream = await client.chat.completions.create(**kwargs)
@@ -544,13 +664,39 @@ class BaseAgent(ABC):
                 # --- Text content delta ---
                 if delta.content:
                     full_text += delta.content
-                    yield {"type": "text_delta", "delta": delta.content, "agent": self.role.value}
+                    yield {
+                        "type": "text_delta",
+                        "delta": delta.content,
+                        "agent": self.role.value,
+                        "runtime": self._build_runtime_metadata(
+                            model_name=model_id,
+                            provider=selected_provider,
+                            attempt_count=attempt_count,
+                            fallback_used=fallback_used,
+                            used_gateway=used_gateway,
+                            stream=True,
+                            extra=runtime_extra,
+                        ),
+                    }
 
                 # --- Thinking delta (custom gateway extension) ---
                 thinking_delta = getattr(delta, "thinking", None) or getattr(delta, "reasoning_content", None)
                 if thinking_delta:
                     full_thinking += thinking_delta
-                    yield {"type": "thinking_delta", "delta": thinking_delta, "agent": self.role.value}
+                    yield {
+                        "type": "thinking_delta",
+                        "delta": thinking_delta,
+                        "agent": self.role.value,
+                        "runtime": self._build_runtime_metadata(
+                            model_name=model_id,
+                            provider=selected_provider,
+                            attempt_count=attempt_count,
+                            fallback_used=fallback_used,
+                            used_gateway=used_gateway,
+                            stream=True,
+                            extra=runtime_extra,
+                        ),
+                    }
 
                 # --- Tool call deltas ---
                 if delta.tool_calls:
@@ -574,6 +720,15 @@ class BaseAgent(ABC):
                                     "agent": self.role.value,
                                     "tool_name": tc_name,
                                     "tool_call_id": tc_id,
+                                    "runtime": self._build_runtime_metadata(
+                                        model_name=model_id,
+                                        provider=selected_provider,
+                                        attempt_count=attempt_count,
+                                        fallback_used=fallback_used,
+                                        used_gateway=used_gateway,
+                                        stream=True,
+                                        extra=runtime_extra,
+                                    ),
                                 }
                         else:
                             # Update name if it arrives in a later chunk
@@ -588,6 +743,15 @@ class BaseAgent(ABC):
                                 "delta": tc_delta.function.arguments,
                                 "agent": self.role.value,
                                 "tool_call_id": tool_calls_acc[idx]["id"],
+                                "runtime": self._build_runtime_metadata(
+                                    model_name=model_id,
+                                    provider=selected_provider,
+                                    attempt_count=attempt_count,
+                                    fallback_used=fallback_used,
+                                    used_gateway=used_gateway,
+                                    stream=True,
+                                    extra=runtime_extra,
+                                ),
                             }
 
                 # --- Stream finished ---
@@ -623,6 +787,29 @@ class BaseAgent(ABC):
                     "total_tokens": chunk.usage.total_tokens or 0,
                 }
 
+            try:
+                if self.perf_collector:
+                    self.perf_collector.record(
+                        agent_role=self.role.value if hasattr(self.role, 'value') else str(self.role),
+                        response_time_ms=latency_ms,
+                        input_tokens=int(usage_data.get("prompt_tokens", 0) or 0),
+                        output_tokens=int(usage_data.get("completion_tokens", 0) or 0),
+                        total_tokens=int(usage_data.get("total_tokens", 0) or 0),
+                        success=True,
+                        model_name=model_id,
+                        metadata=self._build_runtime_metadata(
+                            model_name=model_id,
+                            provider=selected_provider,
+                            attempt_count=attempt_count,
+                            fallback_used=fallback_used,
+                            used_gateway=used_gateway,
+                            stream=True,
+                            extra=runtime_extra,
+                        ),
+                    )
+            except Exception:
+                pass
+
             yield {
                 "type": "done",
                 "agent": self.role.value,
@@ -631,6 +818,15 @@ class BaseAgent(ABC):
                 "tool_calls": final_tool_calls,
                 "usage": usage_data,
                 "latency_ms": latency_ms,
+                "runtime": self._build_runtime_metadata(
+                    model_name=model_id,
+                    provider=selected_provider,
+                    attempt_count=attempt_count,
+                    fallback_used=fallback_used,
+                    used_gateway=used_gateway,
+                    stream=True,
+                    extra=runtime_extra,
+                ),
             }
 
         except Exception as e:
@@ -642,7 +838,12 @@ class BaseAgent(ABC):
             try:
                 result = await self.call_llm(messages, tools)
                 if result.get("content"):
-                    yield {"type": "text_delta", "delta": result["content"], "agent": self.role.value}
+                    yield {
+                        "type": "text_delta",
+                        "delta": result["content"],
+                        "agent": self.role.value,
+                        "runtime": result.get("runtime", {}),
+                    }
                 yield {
                     "type": "done",
                     "agent": self.role.value,
@@ -654,6 +855,7 @@ class BaseAgent(ABC):
                         "completion_tokens": result.get("tokens_completion", 0),
                         "total_tokens": result.get("tokens_total", 0),
                     },
+                    "runtime": result.get("runtime", {}),
                 }
             except Exception as fallback_err:
                 yield {
@@ -663,6 +865,16 @@ class BaseAgent(ABC):
                     "thinking": "",
                     "tool_calls": [],
                     "usage": {},
+                    "runtime": self._build_runtime_metadata(
+                        model_name=model_id,
+                        provider=selected_provider,
+                        attempt_count=attempt_count,
+                        fallback_used=True,
+                        used_gateway=used_gateway,
+                        stream=True,
+                        error_message=f"{e} / {fallback_err}",
+                        extra=runtime_extra,
+                    ),
                 }
 
     def set_live_monitor(self, monitor):
@@ -1064,7 +1276,12 @@ class BaseAgent(ABC):
                         f"Steering message injected: {steering_msg[:100]}",
                         agent_role=self.role,
                     )
-                    self._emit("steering", f"Kullanıcı talimatı alındı: {steering_msg[:80]}")
+                    self._emit(
+                        "steering",
+                        f"Kullanıcı talimatı alındı: {steering_msg[:80]}",
+                        queue_standard="v2",
+                        steering_applied=True,
+                    )
 
             # Retry mechanism for LLM calls
             from tools.agent_retry import (
@@ -1188,18 +1405,39 @@ class BaseAgent(ABC):
                     )
 
                     if parse_error:
+                        self._emit(
+                            "tool_validation",
+                            parse_error[:150],
+                            tool_name=fn_name,
+                            validation_status="failed",
+                            validation_code="invalid_tool_arguments",
+                        )
                         tool_result = self._tool_error(
                             "invalid_tool_arguments",
                             parse_error,
                             "Call the same tool again with valid JSON object arguments.",
                         )
                     elif validation_error_msg:
+                        self._emit(
+                            "tool_validation",
+                            validation_error_msg[:150],
+                            tool_name=fn_name,
+                            validation_status="failed",
+                            validation_code="schema_validation_failed",
+                        )
                         tool_result = self._tool_error(
                             "schema_validation_failed",
                             validation_error_msg,
                             None,
                         )
                     else:
+                        self._emit(
+                            "tool_validation",
+                            f"{fn_name} args validated",
+                            tool_name=fn_name,
+                            validation_status="passed",
+                            validation_code="ok",
+                        )
                         try:
                             tool_result = await self.handle_tool_call(
                                 fn_name, fn_args, thread
@@ -1370,6 +1608,12 @@ class BaseAgent(ABC):
                     "content": followup_config.follow_up_message,
                 })
                 self._emit("follow_up", f"Otomatik devam #{follow_up_count}")
+                self._emit(
+                    "follow_up",
+                    f"Otomatik devam #{follow_up_count}",
+                    follow_up_count=follow_up_count,
+                    queue_standard="v2",
+                )
                 thread.add_event(
                     EventType.AGENT_THINKING,
                     f"Auto follow-up #{follow_up_count}: response indicated continuation",

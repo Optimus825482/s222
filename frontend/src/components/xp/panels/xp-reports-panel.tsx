@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import clsx from "clsx";
 import { api, fetchBlob } from "@/lib/api";
 import { trackBehavior } from "@/lib/behavior-tracker";
 import type { ThreadSummary, Thread, Task, AgentEvent } from "@/lib/types";
@@ -96,112 +97,134 @@ function downloadMarkdown(filename: string, content: string) {
 
 const EVENT_STYLES: Record<
   string,
-  { bg: string; border: string; text: string; icon: typeof Cpu; label: string }
+  {
+    containerClass: string;
+    iconClass: string;
+    textClass: string;
+    badgeClass: string;
+    icon: typeof Cpu;
+    label: string;
+  }
 > = {
   user_message: {
-    bg: "#e8f0fe",
-    border: "#4285f4",
-    text: "#1a56db",
+    containerClass: "border-l-[#4285f4] bg-[#e8f0fe]",
+    iconClass: "text-[#4285f4]",
+    textClass: "text-[#1a56db]",
+    badgeClass: "bg-[#4285f418] text-[#1a56db]",
     icon: User,
     label: "Kullanıcı",
   },
   agent_thinking: {
-    bg: "#fef9e7",
-    border: "#f59e0b",
-    text: "#92400e",
+    containerClass: "border-l-[#f59e0b] bg-[#fef9e7]",
+    iconClass: "text-[#f59e0b]",
+    textClass: "text-[#92400e]",
+    badgeClass: "bg-[#f59e0b18] text-[#92400e]",
     icon: Brain,
     label: "Düşünme",
   },
   agent_response: {
-    bg: "#ecfdf5",
-    border: "#10b981",
-    text: "#065f46",
+    containerClass: "border-l-[#10b981] bg-[#ecfdf5]",
+    iconClass: "text-[#10b981]",
+    textClass: "text-[#065f46]",
+    badgeClass: "bg-[#10b98118] text-[#065f46]",
     icon: CheckCircle2,
     label: "Yanıt",
   },
   agent_start: {
-    bg: "#f0f9ff",
-    border: "#3b82f6",
-    text: "#1e40af",
+    containerClass: "border-l-[#3b82f6] bg-[#f0f9ff]",
+    iconClass: "text-[#3b82f6]",
+    textClass: "text-[#1e40af]",
+    badgeClass: "bg-[#3b82f618] text-[#1e40af]",
     icon: Play,
     label: "Başlangıç",
   },
   tool_call: {
-    bg: "#eff6ff",
-    border: "#6366f1",
-    text: "#3730a3",
+    containerClass: "border-l-[#6366f1] bg-[#eff6ff]",
+    iconClass: "text-[#6366f1]",
+    textClass: "text-[#3730a3]",
+    badgeClass: "bg-[#6366f118] text-[#3730a3]",
     icon: Wrench,
     label: "Araç Çağrısı",
   },
   tool_result: {
-    bg: "#f5f3ff",
-    border: "#8b5cf6",
-    text: "#5b21b6",
+    containerClass: "border-l-[#8b5cf6] bg-[#f5f3ff]",
+    iconClass: "text-[#8b5cf6]",
+    textClass: "text-[#5b21b6]",
+    badgeClass: "bg-[#8b5cf618] text-[#5b21b6]",
     icon: Cpu,
     label: "Araç Sonucu",
   },
   routing_decision: {
-    bg: "#fdf4ff",
-    border: "#d946ef",
-    text: "#86198f",
+    containerClass: "border-l-[#d946ef] bg-[#fdf4ff]",
+    iconClass: "text-[#d946ef]",
+    textClass: "text-[#86198f]",
+    badgeClass: "bg-[#d946ef18] text-[#86198f]",
     icon: Zap,
     label: "Yönlendirme",
   },
   pipeline_start: {
-    bg: "#f0fdfa",
-    border: "#14b8a6",
-    text: "#115e59",
+    containerClass: "border-l-[#14b8a6] bg-[#f0fdfa]",
+    iconClass: "text-[#14b8a6]",
+    textClass: "text-[#115e59]",
+    badgeClass: "bg-[#14b8a618] text-[#115e59]",
     icon: Play,
     label: "Pipeline Başlangıç",
   },
   pipeline_step: {
-    bg: "#f0fdfa",
-    border: "#14b8a6",
-    text: "#115e59",
+    containerClass: "border-l-[#14b8a6] bg-[#f0fdfa]",
+    iconClass: "text-[#14b8a6]",
+    textClass: "text-[#115e59]",
+    badgeClass: "bg-[#14b8a618] text-[#115e59]",
     icon: BarChart3,
     label: "Pipeline Adım",
   },
   pipeline_complete: {
-    bg: "#ecfdf5",
-    border: "#10b981",
-    text: "#065f46",
+    containerClass: "border-l-[#10b981] bg-[#ecfdf5]",
+    iconClass: "text-[#10b981]",
+    textClass: "text-[#065f46]",
+    badgeClass: "bg-[#10b98118] text-[#065f46]",
     icon: CheckCircle2,
     label: "Pipeline Tamamlandı",
   },
   synthesis: {
-    bg: "#fffbeb",
-    border: "#f59e0b",
-    text: "#78350f",
+    containerClass: "border-l-[#f59e0b] bg-[#fffbeb]",
+    iconClass: "text-[#f59e0b]",
+    textClass: "text-[#78350f]",
+    badgeClass: "bg-[#f59e0b18] text-[#78350f]",
     icon: Brain,
     label: "Sentez",
   },
   error: {
-    bg: "#fef2f2",
-    border: "#ef4444",
-    text: "#991b1b",
+    containerClass: "border-l-[#ef4444] bg-[#fef2f2]",
+    iconClass: "text-[#ef4444]",
+    textClass: "text-[#991b1b]",
+    badgeClass: "bg-[#ef444418] text-[#991b1b]",
     icon: AlertCircle,
     label: "Hata",
   },
   rag_query: {
-    bg: "#f0f9ff",
-    border: "#0ea5e9",
-    text: "#0c4a6e",
+    containerClass: "border-l-[#0ea5e9] bg-[#f0f9ff]",
+    iconClass: "text-[#0ea5e9]",
+    textClass: "text-[#0c4a6e]",
+    badgeClass: "bg-[#0ea5e918] text-[#0c4a6e]",
     icon: Search,
     label: "RAG Sorgu",
   },
   evaluation: {
-    bg: "#fefce8",
-    border: "#eab308",
-    text: "#713f12",
+    containerClass: "border-l-[#eab308] bg-[#fefce8]",
+    iconClass: "text-[#eab308]",
+    textClass: "text-[#713f12]",
+    badgeClass: "bg-[#eab30818] text-[#713f12]",
     icon: BarChart3,
     label: "Değerlendirme",
   },
 };
 
 const DEFAULT_EVENT_STYLE = {
-  bg: "#f8f6ee",
-  border: "#aca899",
-  text: "#333",
+  containerClass: "border-l-[#aca899] bg-[#f8f6ee]",
+  iconClass: "text-[#aca899]",
+  textClass: "text-[#333]",
+  badgeClass: "bg-[#aca89918] text-[#333]",
   icon: FileText,
   label: "Olay",
 };
@@ -210,13 +233,13 @@ function getEventStyle(eventType: string) {
   return EVENT_STYLES[eventType] ?? DEFAULT_EVENT_STYLE;
 }
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  completed: { bg: "#dcfce7", text: "#166534" },
-  running: { bg: "#dbeafe", text: "#1e40af" },
-  pending: { bg: "#fef9c3", text: "#854d0e" },
-  failed: { bg: "#fee2e2", text: "#991b1b" },
-  routing: { bg: "#f3e8ff", text: "#6b21a8" },
-  reviewing: { bg: "#e0f2fe", text: "#075985" },
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  completed: "bg-[#dcfce7] text-[#166534]",
+  running: "bg-[#dbeafe] text-[#1e40af]",
+  pending: "bg-[#fef9c3] text-[#854d0e]",
+  failed: "bg-[#fee2e2] text-[#991b1b]",
+  routing: "bg-[#f3e8ff] text-[#6b21a8]",
+  reviewing: "bg-[#e0f2fe] text-[#075985]",
 };
 
 // ── Types ────────────────────────────────────────────────────────
@@ -281,6 +304,9 @@ function PresentationDetailView({
   const [currentSlide, setCurrentSlide] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const slide = presentation.slides[currentSlide];
+  const slideBackground = slide?.colors?.background || "#1a1a2e";
+  const slideText = slide?.colors?.text || "#f1f5f9";
+  const slideAccent = slide?.colors?.accent || "#8b5cf6";
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -308,35 +334,26 @@ function PresentationDetailView({
   };
 
   return (
-    <div
-      className="flex flex-col h-full"
-      style={{ backgroundColor: "#fff", color: "#1a1a1a" }}
-    >
+    <div className="flex flex-col h-full bg-white text-[#1a1a1a]">
       {/* Header */}
-      <div
-        className="flex items-center gap-2 px-3 py-2 border-b"
-        style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}
-      >
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#d6d2c2] bg-[#f8f6ee]">
         <button
           onClick={onBack}
-          className="p-1 rounded"
-          style={{ color: "#333" }}
+          className="rounded p-1 text-[#333]"
+          aria-label="Sunum listesine geri dön"
+          title="Geri"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <Presentation className="w-4 h-4" style={{ color: "#8b5cf6" }} />
-        <span
-          className="text-[13px] font-semibold truncate"
-          style={{ color: "#003399" }}
-        >
+        <Presentation className="h-4 w-4 text-[#8b5cf6]" />
+        <span className="truncate text-[13px] font-semibold text-[#003399]">
           {presentation.title}
         </span>
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={handleDownload}
             disabled={downloading}
-            className="p-1.5 rounded text-[10px] flex items-center gap-1"
-            style={{ color: "#065f46", backgroundColor: "#ecfdf5" }}
+            className="flex items-center gap-1 rounded bg-[#ecfdf5] p-1.5 text-[10px] text-[#065f46] disabled:opacity-60"
           >
             {downloading ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -347,8 +364,7 @@ function PresentationDetailView({
           </button>
           <button
             onClick={handleDelete}
-            className="p-1.5 rounded text-[10px] flex items-center gap-1"
-            style={{ color: "#dc2626", backgroundColor: "#fef2f2" }}
+            className="flex items-center gap-1 rounded bg-[#fef2f2] p-1.5 text-[10px] text-[#dc2626]"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Sil</span>
@@ -357,34 +373,29 @@ function PresentationDetailView({
       </div>
 
       {/* Stats */}
-      <div
-        className="flex flex-wrap gap-3 px-3 py-2 border-b text-[11px]"
-        style={{ backgroundColor: "#faf8f0", borderColor: "#ece9d8" }}
-      >
-        <span style={{ color: "#555" }}>{presentation.slide_count} slayt</span>
-        <span style={{ color: "#555" }}>Tema: {presentation.theme}</span>
-        <span style={{ color: "#555" }}>
+      <div className="flex flex-wrap gap-3 border-b border-[#ece9d8] bg-[#faf8f0] px-3 py-2 text-[11px] text-[#555]">
+        <span>{presentation.slide_count} slayt</span>
+        <span>Tema: {presentation.theme}</span>
+        <span>
           Palet: {presentation.palette_name}
         </span>
-        <span style={{ color: "#555" }}>
+        <span>
           {formatDate(presentation.created_at)}
         </span>
       </div>
 
       {/* Slide Navigation */}
-      <div
-        className="flex items-center gap-2 px-3 py-2 border-b"
-        style={{ borderColor: "#ece9d8" }}
-      >
+      <div className="flex items-center gap-2 border-b border-[#ece9d8] px-3 py-2">
         <button
           onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
           disabled={currentSlide === 0}
-          className="p-1 rounded disabled:opacity-50"
-          style={{ color: "#333" }}
+          className="rounded p-1 text-[#333] disabled:opacity-50"
+          aria-label="Önceki slayt"
+          title="Önceki slayt"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="text-[11px]" style={{ color: "#666" }}>
+        <span className="text-[11px] text-[#666]">
           {currentSlide + 1} / {presentation.slides.length}
         </span>
         <button
@@ -394,8 +405,9 @@ function PresentationDetailView({
             )
           }
           disabled={currentSlide === presentation.slides.length - 1}
-          className="p-1 rounded disabled:opacity-50"
-          style={{ color: "#333" }}
+          className="rounded p-1 text-[#333] disabled:opacity-50"
+          aria-label="Sonraki slayt"
+          title="Sonraki slayt"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -405,11 +417,14 @@ function PresentationDetailView({
             <button
               key={i}
               onClick={() => setCurrentSlide(i)}
-              className="px-2 py-1 rounded text-[10px] whitespace-nowrap"
-              style={{
-                backgroundColor: i === currentSlide ? "#8b5cf6" : "#f3f4f6",
-                color: i === currentSlide ? "#fff" : "#333",
-              }}
+              className={clsx(
+                "whitespace-nowrap rounded px-2 py-1 text-[10px]",
+                i === currentSlide
+                  ? "bg-[#8b5cf6] text-white"
+                  : "bg-[#f3f4f6] text-[#333]",
+              )}
+              aria-label={`${i + 1}. slaytı aç`}
+              title={s.title}
             >
               {s.title.slice(0, 15)}...
             </button>
@@ -418,21 +433,9 @@ function PresentationDetailView({
       </div>
 
       {/* Slide Preview */}
-      <div
-        className="flex-1 flex items-center justify-center p-4"
-        style={{
-          backgroundColor: slide?.colors?.background || "#1a1a2e",
-          color: slide?.colors?.text || "#f1f5f9",
-        }}
-      >
-        <div
-          className="w-full max-w-2xl aspect-video rounded-lg shadow-xl p-8 flex flex-col justify-center"
-          style={{ backgroundColor: slide?.colors?.background || "#1a1a2e" }}
-        >
-          <h2
-            className="text-2xl font-bold mb-4"
-            style={{ color: slide?.colors?.accent || "#8b5cf6" }}
-          >
+      <div className="presentation-slide-preview flex flex-1 items-center justify-center p-4">
+        <div className="presentation-slide-card flex aspect-video w-full max-w-2xl flex-col justify-center rounded-lg p-8 shadow-xl">
+          <h2 className="presentation-slide-title mb-4 text-2xl font-bold">
             {slide?.title}
           </h2>
           {slide?.content && (
@@ -442,7 +445,7 @@ function PresentationDetailView({
             <ul className="space-y-2">
               {slide.bullets.map((b: string, i: number) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
-                  <span style={{ color: slide?.colors?.accent }}>•</span>
+                  <span className="presentation-slide-bullet">•</span>
                   <span>{b}</span>
                 </li>
               ))}
@@ -459,6 +462,18 @@ function PresentationDetailView({
           )}
         </div>
       </div>
+      <style jsx>{`
+        .presentation-slide-preview,
+        .presentation-slide-card {
+          background-color: ${slideBackground};
+          color: ${slideText};
+        }
+
+        .presentation-slide-title,
+        .presentation-slide-bullet {
+          color: ${slideAccent};
+        }
+      `}</style>
     </div>
   );
 }
@@ -522,43 +537,32 @@ function EventBlock({ event }: { event: AgentEvent }) {
 
   return (
     <div
-      style={{ borderLeftColor: style.border, backgroundColor: style.bg }}
-      className="border-l-[3px] rounded-r px-3 py-2 mb-2"
+      className={clsx(
+        "mb-2 rounded-r border-l-[3px] px-3 py-2",
+        style.containerClass,
+      )}
     >
       <div className="flex items-center gap-2 mb-1">
-        <Icon
-          style={{ color: style.border }}
-          className="w-3.5 h-3.5 shrink-0"
-        />
-        <span
-          style={{ color: style.text }}
-          className="text-[11px] font-semibold"
-        >
+        <Icon className={clsx("h-3.5 w-3.5 shrink-0", style.iconClass)} />
+        <span className={clsx("text-[11px] font-semibold", style.textClass)}>
           {style.label}
         </span>
         {event.agent_role && (
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded"
-            style={{ backgroundColor: style.border + "18", color: style.text }}
-          >
+          <span className={clsx("rounded px-1.5 py-0.5 text-[10px]", style.badgeClass)}>
             {event.agent_role}
           </span>
         )}
-        <span className="text-[10px] ml-auto" style={{ color: "#888" }}>
+        <span className="ml-auto text-[10px] text-[#888]">
           {new Date(event.timestamp).toLocaleTimeString("tr-TR")}
         </span>
       </div>
-      <div
-        style={{ color: style.text }}
-        className="text-[12px] leading-relaxed whitespace-pre-wrap break-words"
-      >
+      <div className={clsx("break-words whitespace-pre-wrap text-[12px] leading-relaxed", style.textClass)}>
         {displayContent}
       </div>
       {isLong && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-[10px] mt-1 underline"
-          style={{ color: style.border }}
+          className={clsx("mt-1 text-[10px] underline", style.iconClass)}
         >
           {expanded ? "Daralt" : "Devamını göster"}
         </button>
@@ -572,59 +576,44 @@ function EventBlock({ event }: { event: AgentEvent }) {
 function TaskCard({ task, index }: { task: Task; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const [showConfidence, setShowConfidence] = useState(false);
-  const statusStyle = STATUS_COLORS[task.status] ?? {
-    bg: "#f3f4f6",
-    text: "#374151",
-  };
+  const statusClass =
+    STATUS_BADGE_CLASSES[task.status] ?? "bg-[#f3f4f6] text-[#374151]";
 
   return (
-    <div
-      className="rounded border mb-3"
-      style={{ borderColor: "#d6d2c2", backgroundColor: "#fff" }}
-    >
+    <div className="mb-3 rounded border border-[#d6d2c2] bg-white">
       {/* Task header */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-start gap-2 px-3 py-2.5 text-left"
-        style={{ backgroundColor: "#f8f6ee" }}
+        aria-expanded={expanded}
       >
-        <span
-          className="text-[11px] font-bold shrink-0"
-          style={{ color: "#003399" }}
-        >
+        <span className="shrink-0 text-[11px] font-bold text-[#003399]">
           #{index + 1}
         </span>
         <div className="flex-1 min-w-0">
-          <div
-            className="text-[13px] font-medium leading-snug"
-            style={{ color: "#1a1a1a" }}
-          >
+          <div className="text-[13px] font-medium leading-snug text-[#1a1a1a]">
             {task.user_input}
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-1.5">
-            <span
-              className="text-[10px] px-2 py-0.5 rounded font-medium"
-              style={{
-                backgroundColor: statusStyle.bg,
-                color: statusStyle.text,
-              }}
-            >
+            <span className={clsx("rounded px-2 py-0.5 text-[10px] font-medium", statusClass)}>
               {task.status}
             </span>
-            <span className="text-[10px]" style={{ color: "#666" }}>
+            <span className="text-[10px] text-[#666]">
               {task.pipeline_type}
             </span>
-            <span className="text-[10px]" style={{ color: "#666" }}>
+            <span className="text-[10px] text-[#666]">
               {task.total_tokens.toLocaleString()} token
             </span>
-            <span className="text-[10px]" style={{ color: "#666" }}>
+            <span className="text-[10px] text-[#666]">
               {((task.total_latency_ms ?? 0) / 1000).toFixed(1)}s
             </span>
           </div>
         </div>
         <svg
-          className={`w-4 h-4 shrink-0 mt-1 transition-transform ${expanded ? "rotate-180" : ""}`}
-          style={{ color: "#888" }}
+          className={clsx(
+            "mt-1 h-4 w-4 shrink-0 text-[#888] transition-transform",
+            expanded && "rotate-180",
+          )}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -640,43 +629,30 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
 
       {/* Expanded content */}
       {expanded && (
-        <div className="px-3 py-2 border-t" style={{ borderColor: "#d6d2c2" }}>
+        <div className="border-t border-[#d6d2c2] px-3 py-2">
           {/* Sub-tasks */}
           {task.sub_tasks.length > 0 && (
             <div className="mb-3">
-              <div
-                className="text-[11px] font-semibold mb-1.5"
-                style={{ color: "#003399" }}
-              >
+              <div className="mb-1.5 text-[11px] font-semibold text-[#003399]">
                 Alt Görevler ({task.sub_tasks.length})
               </div>
               {task.sub_tasks.map((st) => {
-                const stStatus = STATUS_COLORS[st.status] ?? {
-                  bg: "#f3f4f6",
-                  text: "#374151",
-                };
+                const stStatusClass =
+                  STATUS_BADGE_CLASSES[st.status] ??
+                  "bg-[#f3f4f6] text-[#374151]";
                 return (
                   <div
                     key={st.id}
                     className="flex items-start gap-2 py-1 text-[11px]"
-                    style={{ borderBottom: "1px solid #ece9d8" }}
+                    style={undefined}
                   >
-                    <span
-                      className="px-1.5 py-0.5 rounded text-[9px] font-medium shrink-0"
-                      style={{
-                        backgroundColor: stStatus.bg,
-                        color: stStatus.text,
-                      }}
-                    >
+                    <span className={clsx("shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium", stStatusClass)}>
                       {st.status}
                     </span>
-                    <span style={{ color: "#333" }} className="flex-1">
+                    <span className="flex-1 text-[#333]">
                       {st.description}
                     </span>
-                    <span
-                      style={{ color: "#888" }}
-                      className="shrink-0 text-[10px]"
-                    >
+                    <span className="shrink-0 text-[10px] text-[#888]">
                       {st.assigned_agent}
                     </span>
                   </div>
@@ -687,18 +663,9 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
 
           {/* Final result */}
           {task.final_result && (
-            <div
-              className="rounded p-2.5"
-              style={{
-                backgroundColor: "#ecfdf5",
-                border: "1px solid #a7f3d0",
-              }}
-            >
+            <div className="rounded border border-[#a7f3d0] bg-[#ecfdf5] p-2.5">
               <div className="flex items-center justify-between mb-1">
-                <div
-                  className="text-[11px] font-semibold"
-                  style={{ color: "#065f46" }}
-                >
+                <div className="text-[11px] font-semibold text-[#065f46]">
                   Sonuç
                 </div>
                 {task.confidence_footer && (
@@ -707,12 +674,7 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
                       e.stopPropagation();
                       setShowConfidence(true);
                     }}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
-                    style={{
-                      backgroundColor: "#eff6ff",
-                      color: "#1e40af",
-                      border: "1px solid #bfdbfe",
-                    }}
+                    className="flex items-center gap-1 rounded border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-[10px] font-medium text-[#1e40af] transition-colors"
                     title="Güven Analizi"
                   >
                     <ShieldCheck className="w-3 h-3" />
@@ -720,10 +682,7 @@ function TaskCard({ task, index }: { task: Task; index: number }) {
                   </button>
                 )}
               </div>
-              <div
-                className="text-[12px] leading-relaxed whitespace-pre-wrap"
-                style={{ color: "#064e3b" }}
-              >
+              <div className="whitespace-pre-wrap text-[12px] leading-relaxed text-[#064e3b]">
                 {task.final_result}
               </div>
               {hasRenderableArtifacts(task.final_result) && (
@@ -776,42 +735,34 @@ function ThreadDetailView({
     )
     .join("\n\n---\n\n");
   const hasConfidence = allConfidenceFooters.length > 0;
+  const lastStatusClass =
+    STATUS_BADGE_CLASSES[lastStatus] ?? "bg-[#f3f4f6] text-[#374151]";
 
   return (
-    <div
-      className="flex h-full"
-      style={{ backgroundColor: "#fff", color: "#1a1a1a" }}
-    >
+    <div className="flex h-full bg-white text-[#1a1a1a]">
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header bar */}
-        <div
-          className="flex items-center gap-2 px-3 py-2 border-b"
-          style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}
-        >
+        <div className="flex items-center gap-2 border-b border-[#d6d2c2] bg-[#f8f6ee] px-3 py-2">
           <button
             onClick={onBack}
-            className="p-1 rounded"
-            style={{ color: "#333" }}
+            className="rounded p-1 text-[#333]"
             aria-label="Geri"
+            title="Geri"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <FileText className="w-4 h-4" style={{ color: "#003399" }} />
-          <span
-            className="text-[13px] font-semibold truncate"
-            style={{ color: "#003399" }}
-          >
+          <FileText className="h-4 w-4 text-[#003399]" />
+          <span className="truncate text-[13px] font-semibold text-[#003399]">
             Thread: {thread.id.slice(0, 8)}...
           </span>
           <div className="ml-auto flex items-center gap-1">
             {hasConfidence && (
               <button
                 onClick={() => setShowThreadConfidence(true)}
-                className="p-1.5 rounded text-[10px] flex items-center gap-1"
+                className="flex items-center gap-1 rounded bg-[#eff6ff] p-1.5 text-[10px] text-[#1e40af]"
                 title="Güven Analizi"
                 aria-label="Güven analizini görüntüle"
-                style={{ color: "#1e40af", backgroundColor: "#eff6ff" }}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>Güven</span>
@@ -826,10 +777,9 @@ function ThreadDetailView({
                 );
                 trackBehavior("report_download", thread.id, { format: "md" });
               }}
-              className="p-1.5 rounded text-[10px] flex items-center gap-1"
+              className="flex items-center gap-1 rounded bg-[#ecfdf5] p-1.5 text-[10px] text-[#065f46]"
               title="Sonuç Raporu (MD)"
               aria-label="Sonuç raporunu Markdown olarak indir"
-              style={{ color: "#065f46", backgroundColor: "#ecfdf5" }}
             >
               <FileText className="w-3.5 h-3.5" />
               <span>MD</span>
@@ -862,10 +812,9 @@ function ThreadDetailView({
                 }
               }}
               disabled={exportingPdf}
-              className="p-1.5 rounded text-[10px] flex items-center gap-1"
+              className="flex items-center gap-1 rounded bg-[#dbeafe] p-1.5 text-[10px] text-[#1e40af] disabled:opacity-60"
               title="Sonuç Raporu (PDF)"
               aria-label="Sonuç raporunu PDF olarak indir"
-              style={{ color: "#1e40af", backgroundColor: "#dbeafe" }}
             >
               {exportingPdf ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -881,10 +830,9 @@ function ThreadDetailView({
                   buildThreadMarkdown(thread),
                 )
               }
-              className="p-1.5 rounded"
+              className="rounded p-1.5 text-[#666]"
               title="Tüm detayları indir (.md)"
               aria-label="Tüm detayları Markdown olarak indir"
-              style={{ color: "#666" }}
             >
               <Download className="w-4 h-4" />
             </button>
@@ -892,33 +840,20 @@ function ThreadDetailView({
         </div>
 
         {/* Stats bar */}
-        <div
-          className="flex flex-wrap gap-3 px-3 py-2 border-b text-[11px]"
-          style={{ backgroundColor: "#faf8f0", borderColor: "#ece9d8" }}
-        >
-          <span style={{ color: "#555" }}>
-            <Clock
-              className="w-3 h-3 inline mr-1"
-              style={{ verticalAlign: "-2px" }}
-            />
+        <div className="flex flex-wrap gap-3 border-b border-[#ece9d8] bg-[#faf8f0] px-3 py-2 text-[11px] text-[#555]">
+          <span>
+            <Clock className="mr-1 inline h-3 w-3 align-[-2px]" />
             {formatDate(thread.created_at)}
           </span>
-          <span style={{ color: "#555" }}>{thread.tasks.length} görev</span>
-          <span style={{ color: "#555" }}>{thread.events.length} olay</span>
-          <span style={{ color: "#555" }}>
+          <span>{thread.tasks.length} görev</span>
+          <span>{thread.events.length} olay</span>
+          <span>
             {totalTokens.toLocaleString()} token
           </span>
-          <span style={{ color: "#555" }}>
+          <span>
             {((totalLatency ?? 0) / 1000).toFixed(1)}s
           </span>
-          <span
-            className="px-1.5 py-0.5 rounded text-[10px] font-medium"
-            style={{
-              backgroundColor: (STATUS_COLORS[lastStatus] ?? { bg: "#f3f4f6" })
-                .bg,
-              color: (STATUS_COLORS[lastStatus] ?? { text: "#374151" }).text,
-            }}
-          >
+          <span className={clsx("rounded px-1.5 py-0.5 text-[10px] font-medium", lastStatusClass)}>
             {lastStatus}
           </span>
           {thread.branch_label && (
@@ -934,56 +869,47 @@ function ThreadDetailView({
         </div>
 
         {thread.compacted_summary && (
-          <div className="px-3 py-2 border-b text-[11px]" style={{ backgroundColor: "#fffdf5", borderColor: "#ece9d8" }}>
-            <div className="font-semibold mb-1" style={{ color: "#7c5a00" }}>
+          <div className="border-b border-[#ece9d8] bg-[#fffdf5] px-3 py-2 text-[11px]">
+            <div className="mb-1 font-semibold text-[#7c5a00]">
               Compact Özeti
             </div>
-            <div className="whitespace-pre-wrap leading-relaxed" style={{ color: "#5f4b00" }}>
+            <div className="whitespace-pre-wrap leading-relaxed text-[#5f4b00]">
               {thread.compacted_summary}
             </div>
           </div>
         )}
 
         {/* Tabs */}
-        <div
-          className="flex border-b"
-          style={{ borderColor: "#d6d2c2", backgroundColor: "#f8f6ee" }}
-        >
+        <div className="flex border-b border-[#d6d2c2] bg-[#f8f6ee]">
           <button
             onClick={() => setActiveTab("tasks")}
-            className="px-4 py-2 text-[12px] font-medium border-b-2 transition-colors"
-            style={{
-              borderColor: activeTab === "tasks" ? "#003399" : "transparent",
-              color: activeTab === "tasks" ? "#003399" : "#666",
-              backgroundColor: activeTab === "tasks" ? "#fff" : "transparent",
-            }}
+            className={clsx(
+              "border-b-2 px-4 py-2 text-[12px] font-medium transition-colors",
+              activeTab === "tasks"
+                ? "border-[#003399] bg-white text-[#003399]"
+                : "border-transparent text-[#666]",
+            )}
           >
             Görevler ({thread.tasks.length})
           </button>
           <button
             onClick={() => setActiveTab("events")}
-            className="px-4 py-2 text-[12px] font-medium border-b-2 transition-colors"
-            style={{
-              borderColor: activeTab === "events" ? "#003399" : "transparent",
-              color: activeTab === "events" ? "#003399" : "#666",
-              backgroundColor: activeTab === "events" ? "#fff" : "transparent",
-            }}
+            className={clsx(
+              "border-b-2 px-4 py-2 text-[12px] font-medium transition-colors",
+              activeTab === "events"
+                ? "border-[#003399] bg-white text-[#003399]"
+                : "border-transparent text-[#666]",
+            )}
           >
             Olaylar ({thread.events.length})
           </button>
         </div>
 
         {/* Tab content */}
-        <div
-          className="flex-1 overflow-auto p-3"
-          style={{ backgroundColor: "#fff" }}
-        >
+        <div className="flex-1 overflow-auto bg-white p-3">
           {activeTab === "tasks" ? (
             thread.tasks.length === 0 ? (
-              <div
-                className="text-center py-8 text-[12px]"
-                style={{ color: "#888" }}
-              >
+              <div className="py-8 text-center text-[12px] text-[#888]">
                 Bu thread&apos;de görev yok
               </div>
             ) : (
@@ -992,10 +918,7 @@ function ThreadDetailView({
               ))
             )
           ) : thread.events.length === 0 ? (
-            <div
-              className="text-center py-8 text-[12px]"
-              style={{ color: "#888" }}
-            >
+              <div className="py-8 text-center text-[12px] text-[#888]">
               Bu thread&apos;de olay yok
             </div>
           ) : (
@@ -1007,51 +930,34 @@ function ThreadDetailView({
       {/* Right sidebar — agent metrics */}
       {Object.keys(thread.agent_metrics).length > 0 && (
         <div
-          className="w-52 border-l flex flex-col"
-          style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}
+          className="flex w-52 flex-col border-l border-[#d6d2c2] bg-[#f8f6ee]"
         >
-          <div
-            className="px-3 py-2 border-b"
-            style={{ borderColor: "#d6d2c2" }}
-          >
-            <span
-              className="text-[11px] font-semibold uppercase tracking-wider"
-              style={{ color: "#003399" }}
-            >
+          <div className="border-b border-[#d6d2c2] px-3 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#003399]">
               Agent Metrikleri
             </span>
           </div>
           <div className="flex-1 overflow-auto p-2 space-y-2">
             {Object.entries(thread.agent_metrics).map(([role, m]) => (
-              <div
-                key={role}
-                className="rounded p-2"
-                style={{ backgroundColor: "#fff", border: "1px solid #ece9d8" }}
-              >
-                <div
-                  className="text-[11px] font-semibold mb-1"
-                  style={{ color: "#003399" }}
-                >
+              <div key={role} className="rounded border border-[#ece9d8] bg-white p-2">
+                <div className="mb-1 text-[11px] font-semibold text-[#003399]">
                   {role}
                 </div>
                 <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
-                  <span style={{ color: "#888" }}>Çağrı</span>
-                  <span style={{ color: "#333" }} className="text-right">
+                  <span className="text-[#888]">Çağrı</span>
+                  <span className="text-right text-[#333]">
                     {m.total_calls}
                   </span>
-                  <span style={{ color: "#888" }}>Token</span>
-                  <span style={{ color: "#333" }} className="text-right">
+                  <span className="text-[#888]">Token</span>
+                  <span className="text-right text-[#333]">
                     {m.total_tokens.toLocaleString()}
                   </span>
-                  <span style={{ color: "#888" }}>Başarı</span>
-                  <span style={{ color: "#333" }} className="text-right">
+                  <span className="text-[#888]">Başarı</span>
+                  <span className="text-right text-[#333]">
                     {m.success_count}/{m.total_calls}
                   </span>
-                  <span style={{ color: "#888" }}>Hata</span>
-                  <span
-                    style={{ color: m.error_count > 0 ? "#dc2626" : "#333" }}
-                    className="text-right"
-                  >
+                  <span className="text-[#888]">Hata</span>
+                  <span className={clsx("text-right", m.error_count > 0 ? "text-[#dc2626]" : "text-[#333]")}>
                     {m.error_count}
                   </span>
                 </div>
@@ -1081,26 +987,18 @@ function ProjectDetailView({
   title,
   content,
   onBack,
-}: {
-  title: string;
-  content: string;
-  onBack: () => void;
-}) {
-  return (
-    <div
-      className="flex flex-col h-full"
+    <div className = "flex h-full flex-col bg-white text-[#1a1a1a]" >
+      <div className="flex items-center gap-2 border-b border-[#d6d2c2] bg-[#f8f6ee] px-3 py-2">
       style={{ backgroundColor: "#fff", color: "#1a1a1a" }}
     >
-      <div
-        className="flex items-center gap-2 px-3 py-2 border-b"
+          className="rounded p-1 text-[#333]"
+          title="Geri"
+          aria-label="Proje listesine geri dön"
         style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}
       >
         <button
-          onClick={onBack}
-          className="p-1 rounded"
-          style={{ color: "#333" }}
-          aria-label="Geri"
-        >
+        <FolderOpen className="h-4 w-4 text-[#b45309]" />
+        <span className="truncate text-[13px] font-semibold text-[#003399]">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <FolderOpen className="w-4 h-4" style={{ color: "#b45309" }} />
@@ -1117,19 +1015,15 @@ function ProjectDetailView({
               content,
             )
           }
-          className="ml-auto p-1.5 rounded"
+          className="ml-auto rounded p-1.5 text-[#666]"
           title="İndir (.md)"
           aria-label="Markdown olarak indir"
-          style={{ color: "#666" }}
         >
           <Download className="w-4 h-4" />
         </button>
       </div>
       <div className="flex-1 overflow-auto p-4">
-        <pre
-          className="whitespace-pre-wrap text-[13px] leading-relaxed"
-          style={{ color: "#333", fontFamily: "'Roboto', sans-serif" }}
-        >
+        <pre className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#333] font-sans">
           {content}
         </pre>
       </div>
@@ -1173,6 +1067,12 @@ export function XpReportsPanel() {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, [ctxMenu]);
+
+  useEffect(() => {
+    if (!ctxMenu || !ctxRef.current) return;
+    ctxRef.current.style.left = `${ctxMenu.x}px`;
+    ctxRef.current.style.top = `${ctxMenu.y}px`;
   }, [ctxMenu]);
 
   // ── Data fetching ──
@@ -1386,15 +1286,9 @@ export function XpReportsPanel() {
 
   // ── Render: List View ──
   return (
-    <div
-      className="flex flex-col h-full"
-      style={{ backgroundColor: "#fff", color: "#1a1a1a" }}
-    >
+    <div className="flex h-full flex-col bg-white text-[#1a1a1a]">
       {/* Header */}
-      <div
-        className="flex items-center gap-2 px-3 py-2 border-b"
-        style={{ backgroundColor: "#f8f6ee", borderColor: "#d6d2c2" }}
-      >
+      <div className="flex items-center gap-2 border-b border-[#d6d2c2] bg-[#f8f6ee] px-3 py-2">
         {activeFolder && (
           <button
             onClick={() => {
@@ -1402,18 +1296,15 @@ export function XpReportsPanel() {
               setDetailThread(null);
               setProjectContent(null);
             }}
-            className="p-1 rounded"
-            style={{ color: "#333" }}
+            className="rounded p-1 text-[#333]"
             aria-label="Geri"
+            title="Geri"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
         )}
-        <FolderOpen className="w-4 h-4" style={{ color: "#b45309" }} />
-        <span
-          className="text-[13px] font-semibold"
-          style={{ color: "#003399" }}
-        >
+        <FolderOpen className="h-4 w-4 text-[#b45309]" />
+        <span className="text-[13px] font-semibold text-[#003399]">
           {activeFolder === "threads"
             ? "Görev Raporları"
             : activeFolder === "projects"
@@ -1421,10 +1312,7 @@ export function XpReportsPanel() {
               : "Raporlar"}
         </span>
         {loading && (
-          <Loader2
-            className="w-4 h-4 animate-spin ml-auto"
-            style={{ color: "#3b82f6" }}
-          />
+          <Loader2 className="ml-auto h-4 w-4 animate-spin text-[#3b82f6]" />
         )}
       </div>
 
@@ -1435,125 +1323,70 @@ export function XpReportsPanel() {
           <div className="p-4 space-y-2">
             <button
               onClick={() => openFolder("threads")}
-              className="w-full flex items-center gap-3 p-3 rounded border text-left transition-colors"
-              style={{ borderColor: "#d6d2c2", backgroundColor: "#fff" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f0f4ff";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#fff";
-              }}
+              className="w-full rounded border border-[#d6d2c2] bg-white p-3 text-left transition-colors hover:bg-[#f0f4ff]"
             >
-              <MessageSquare className="w-5 h-5" style={{ color: "#3b82f6" }} />
+              <MessageSquare className="h-5 w-5 text-[#3b82f6]" />
               <div>
-                <div
-                  className="text-[13px] font-medium"
-                  style={{ color: "#1a1a1a" }}
-                >
+                <div className="text-[13px] font-medium text-[#1a1a1a]">
                   Görev Raporları
                 </div>
-                <div className="text-[11px]" style={{ color: "#666" }}>
+                <div className="text-[11px] text-[#666]">
                   Thread geçmişi ve detayları
                 </div>
               </div>
-              <ChevronRight
-                className="w-4 h-4 ml-auto"
-                style={{ color: "#aaa" }}
-              />
+              <ChevronRight className="ml-auto h-4 w-4 text-[#aaa]" />
             </button>
             <button
               onClick={() => openFolder("projects")}
-              className="w-full flex items-center gap-3 p-3 rounded border text-left transition-colors"
-              style={{ borderColor: "#d6d2c2", backgroundColor: "#fff" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#fffbeb";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#fff";
-              }}
+              className="w-full rounded border border-[#d6d2c2] bg-white p-3 text-left transition-colors hover:bg-[#fffbeb]"
             >
-              <FolderOpen className="w-5 h-5" style={{ color: "#d97706" }} />
+              <FolderOpen className="h-5 w-5 text-[#d97706]" />
               <div>
-                <div
-                  className="text-[13px] font-medium"
-                  style={{ color: "#1a1a1a" }}
-                >
+                <div className="text-[13px] font-medium text-[#1a1a1a]">
                   Proje Raporları
                 </div>
-                <div className="text-[11px]" style={{ color: "#666" }}>
+                <div className="text-[11px] text-[#666]">
                   Fikir→Proje dönüşüm raporları
                 </div>
               </div>
-              <ChevronRight
-                className="w-4 h-4 ml-auto"
-                style={{ color: "#aaa" }}
-              />
+              <ChevronRight className="ml-auto h-4 w-4 text-[#aaa]" />
             </button>
             <button
               onClick={() => openFolder("presentations")}
-              className="w-full flex items-center gap-3 p-3 rounded border text-left transition-colors"
-              style={{ borderColor: "#d6d2c2", backgroundColor: "#fff" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f5f3ff";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#fff";
-              }}
+              className="w-full rounded border border-[#d6d2c2] bg-white p-3 text-left transition-colors hover:bg-[#f5f3ff]"
             >
-              <Presentation className="w-5 h-5" style={{ color: "#8b5cf6" }} />
+              <Presentation className="h-5 w-5 text-[#8b5cf6]" />
               <div>
-                <div
-                  className="text-[13px] font-medium"
-                  style={{ color: "#1a1a1a" }}
-                >
+                <div className="text-[13px] font-medium text-[#1a1a1a]">
                   Sunumlar
                 </div>
-                <div className="text-[11px]" style={{ color: "#666" }}>
+                <div className="text-[11px] text-[#666]">
                   Oluşturulan sunum arşivi
                 </div>
               </div>
-              <ChevronRight
-                className="w-4 h-4 ml-auto"
-                style={{ color: "#aaa" }}
-              />
+              <ChevronRight className="ml-auto h-4 w-4 text-[#aaa]" />
             </button>
             <button
               onClick={() => openFolder("workflows")}
-              className="w-full flex items-center gap-3 p-3 rounded border text-left transition-colors"
-              style={{ borderColor: "#d6d2c2", backgroundColor: "#fff" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#ecfdf5";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#fff";
-              }}
+              className="w-full rounded border border-[#d6d2c2] bg-white p-3 text-left transition-colors hover:bg-[#ecfdf5]"
             >
-              <Play className="w-5 h-5" style={{ color: "#10b981" }} />
+              <Play className="h-5 w-5 text-[#10b981]" />
               <div>
-                <div
-                  className="text-[13px] font-medium"
-                  style={{ color: "#1a1a1a" }}
-                >
+                <div className="text-[13px] font-medium text-[#1a1a1a]">
                   İş Akışları
                 </div>
-                <div className="text-[11px]" style={{ color: "#666" }}>
+                <div className="text-[11px] text-[#666]">
                   Çalıştırılan workflow sonuçları
                 </div>
               </div>
-              <ChevronRight
-                className="w-4 h-4 ml-auto"
-                style={{ color: "#aaa" }}
-              />
+              <ChevronRight className="ml-auto h-4 w-4 text-[#aaa]" />
             </button>
           </div>
         ) : activeFolder === "threads" ? (
           /* Thread list */
           <div>
             {threads.length === 0 && !loading && (
-              <div
-                className="p-6 text-center text-[13px]"
-                style={{ color: "#888" }}
-              >
+                <div className="p-6 text-center text-[13px] text-[#888]">
                 Henüz rapor yok
               </div>
             )}
@@ -1569,42 +1402,23 @@ export function XpReportsPanel() {
                     t.preview || t.id.slice(0, 8),
                   )
                 }
-                className="w-full flex items-start gap-3 p-3 text-left transition-colors border-b"
-                style={{ borderColor: "#ece9d8" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f8f6ee";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
+                className="w-full border-b border-[#ece9d8] p-3 text-left transition-colors hover:bg-[#f8f6ee]"
               >
-                <FileText
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: "#3b82f6" }}
-                />
+                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#3b82f6]" />
                 <div className="min-w-0 flex-1">
-                  <div
-                    className="text-[13px] truncate"
-                    style={{ color: "#1a1a1a" }}
-                  >
+                  <div className="truncate text-[13px] text-[#1a1a1a]">
                     {t.preview || t.id}
                   </div>
-                  <div
-                    className="flex items-center gap-2 mt-1 text-[11px]"
-                    style={{ color: "#888" }}
-                  >
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-[#888]">
                     <Clock className="w-3 h-3" />
                     <span>{formatDate(t.created_at)}</span>
-                    <span style={{ color: "#ccc" }}>•</span>
+                    <span className="text-[#ccc]">•</span>
                     <span>{t.task_count} görev</span>
-                    <span style={{ color: "#ccc" }}>•</span>
+                    <span className="text-[#ccc]">•</span>
                     <span>{t.event_count} olay</span>
                   </div>
                 </div>
-                <ChevronRight
-                  className="w-4 h-4 mt-1 shrink-0"
-                  style={{ color: "#ccc" }}
-                />
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#ccc]" />
               </button>
             ))}
           </div>
@@ -1612,10 +1426,7 @@ export function XpReportsPanel() {
           /* Project list */
           <div>
             {projects.length === 0 && !loading && (
-              <div
-                className="p-6 text-center text-[13px]"
-                style={{ color: "#888" }}
-              >
+                  <div className="p-6 text-center text-[13px] text-[#888]">
                 Henüz proje yok
               </div>
             )}
@@ -1626,45 +1437,26 @@ export function XpReportsPanel() {
                 onContextMenu={(e) =>
                   handleContextMenu(e, "projects", p.name, p.name)
                 }
-                className="w-full flex items-start gap-3 p-3 text-left transition-colors border-b"
-                style={{ borderColor: "#ece9d8" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f8f6ee";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
+                className="w-full border-b border-[#ece9d8] p-3 text-left transition-colors hover:bg-[#f8f6ee]"
               >
-                <FolderOpen
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: "#d97706" }}
-                />
+                <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" />
                 <div className="min-w-0 flex-1">
-                  <div
-                    className="text-[13px] truncate"
-                    style={{ color: "#1a1a1a" }}
-                  >
+                  <div className="truncate text-[13px] text-[#1a1a1a]">
                     {p.name}
                   </div>
-                  <div
-                    className="flex items-center gap-2 mt-1 text-[11px]"
-                    style={{ color: "#888" }}
-                  >
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-[#888]">
                     <span>
                       {p.phase_count}/{p.total_phases} faz
                     </span>
                     {p.phases.length > 0 && (
                       <>
-                        <span style={{ color: "#ccc" }}>•</span>
+                        <span className="text-[#ccc]">•</span>
                         <span className="truncate">{p.phases.join(", ")}</span>
                       </>
                     )}
                   </div>
                 </div>
-                <ChevronRight
-                  className="w-4 h-4 mt-1 shrink-0"
-                  style={{ color: "#ccc" }}
-                />
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#ccc]" />
               </button>
             ))}
           </div>
@@ -1672,10 +1464,7 @@ export function XpReportsPanel() {
           /* Presentations list */
           <div>
             {presentations.length === 0 && !loading && (
-              <div
-                className="p-6 text-center text-[13px]"
-                style={{ color: "#888" }}
-              >
+                    <div className="p-6 text-center text-[13px] text-[#888]">
                 Henüz sunum yok
               </div>
             )}
@@ -1686,41 +1475,22 @@ export function XpReportsPanel() {
                 onContextMenu={(e) =>
                   handleContextMenu(e, "presentations", p.id, p.title)
                 }
-                className="w-full flex items-start gap-3 p-3 text-left transition-colors border-b"
-                style={{ borderColor: "#ece9d8" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f8f6ee";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
+                className="w-full border-b border-[#ece9d8] p-3 text-left transition-colors hover:bg-[#f8f6ee]"
               >
-                <Presentation
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: "#8b5cf6" }}
-                />
+                <Presentation className="mt-0.5 h-4 w-4 shrink-0 text-[#8b5cf6]" />
                 <div className="min-w-0 flex-1">
-                  <div
-                    className="text-[13px] truncate"
-                    style={{ color: "#1a1a1a" }}
-                  >
+                  <div className="truncate text-[13px] text-[#1a1a1a]">
                     {p.title}
                   </div>
-                  <div
-                    className="flex items-center gap-2 mt-1 text-[11px]"
-                    style={{ color: "#888" }}
-                  >
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-[#888]">
                     <span>{p.slide_count} slayt</span>
-                    <span style={{ color: "#ccc" }}>•</span>
+                    <span className="text-[#ccc]">•</span>
                     <span>{p.palette_name}</span>
-                    <span style={{ color: "#ccc" }}>•</span>
+                    <span className="text-[#ccc]">•</span>
                     <span>{formatDate(p.created_at)}</span>
                   </div>
                 </div>
-                <ChevronRight
-                  className="w-4 h-4 mt-1 shrink-0"
-                  style={{ color: "#ccc" }}
-                />
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#ccc]" />
               </button>
             ))}
           </div>
@@ -1728,10 +1498,7 @@ export function XpReportsPanel() {
           /* Workflows list */
           <div>
             {workflows.length === 0 && !loading && (
-              <div
-                className="p-6 text-center text-[13px]"
-                style={{ color: "#888" }}
-              >
+                      <div className="p-6 text-center text-[13px] text-[#888]">
                 Henüz iş akışı yok
               </div>
             )}
@@ -1739,51 +1506,35 @@ export function XpReportsPanel() {
               <button
                 key={w.id || w.workflow_id}
                 onClick={() => {}}
-                className="w-full flex items-start gap-3 p-3 text-left transition-colors border-b"
-                style={{ borderColor: "#ece9d8" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f8f6ee";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
+                className="w-full border-b border-[#ece9d8] p-3 text-left transition-colors hover:bg-[#f8f6ee]"
               >
                 <Play
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{
-                    color: w.status === "completed" ? "#10b981" : "#ef4444",
-                  }}
+                  className={clsx(
+                    "mt-0.5 h-4 w-4 shrink-0",
+                    w.status === "completed" ? "text-[#10b981]" : "text-[#ef4444]",
+                  )}
                 />
                 <div className="min-w-0 flex-1">
-                  <div
-                    className="text-[13px] truncate"
-                    style={{ color: "#1a1a1a" }}
-                  >
+                  <div className="truncate text-[13px] text-[#1a1a1a]">
                     {w.workflow_id}
                   </div>
-                  <div
-                    className="flex items-center gap-2 mt-1 text-[11px]"
-                    style={{ color: "#888" }}
-                  >
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-[#888]">
                     <span
-                      className="px-1.5 py-0.5 rounded"
-                      style={{
-                        backgroundColor:
-                          w.status === "completed" ? "#dcfce7" : "#fee2e2",
-                        color: w.status === "completed" ? "#166534" : "#991b1b",
-                      }}
+                      className={clsx(
+                        "rounded px-1.5 py-0.5",
+                        w.status === "completed"
+                          ? "bg-[#dcfce7] text-[#166534]"
+                          : "bg-[#fee2e2] text-[#991b1b]",
+                      )}
                     >
                       {w.status}
                     </span>
                     <span>{w.duration_ms?.toFixed(0)}ms</span>
-                    <span style={{ color: "#ccc" }}>•</span>
+                    <span className="text-[#ccc]">•</span>
                     <span>{formatDate(w.created_at)}</span>
                   </div>
                 </div>
-                <ChevronRight
-                  className="w-4 h-4 mt-1 shrink-0"
-                  style={{ color: "#ccc" }}
-                />
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#ccc]" />
               </button>
             ))}
           </div>
@@ -1794,39 +1545,19 @@ export function XpReportsPanel() {
       {ctxMenu && (
         <div
           ref={ctxRef}
-          className="fixed z-[9999] rounded shadow-xl py-1 min-w-[160px]"
-          style={{
-            left: ctxMenu.x,
-            top: ctxMenu.y,
-            backgroundColor: "#fff",
-            border: "1px solid #d6d2c2",
-          }}
+          className="fixed z-[9999] min-w-[160px] rounded border border-[#d6d2c2] bg-white py-1 shadow-xl"
         >
           <button
             onClick={ctxDownload}
-            className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left transition-colors"
-            style={{ color: "#333" }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f0f4ff";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-[#333] transition-colors hover:bg-[#f0f4ff]"
           >
-            <Download className="w-4 h-4" style={{ color: "#3b82f6" }} />
+            <Download className="h-4 w-4 text-[#3b82f6]" />
             <span>İndir (.md)</span>
           </button>
           {ctxMenu.type === "threads" && (
             <button
               onClick={ctxDelete}
-              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left transition-colors"
-              style={{ color: "#dc2626" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#fef2f2";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-[#dc2626] transition-colors hover:bg-[#fef2f2]"
             >
               <Trash2 className="w-4 h-4" />
               <span>Sil</span>

@@ -17,6 +17,61 @@ interface SystemMetrics {
   total_tasks: number;
   uptime_seconds: number;
   cost_estimate: number;
+  runtime?: {
+    schema_version?: string;
+    rollout_ready?: boolean;
+    feature_flags?: Record<string, boolean>;
+  };
+  failure_analytics?: {
+    failure_count?: number;
+    fallback_usage_count?: number;
+    runtime_v2_adoption_rate?: number;
+    total_count?: number;
+  };
+}
+
+interface ScheduledExecution {
+  id: string;
+  task_id: string;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+  error: string | null;
+}
+
+interface SystemOverview {
+  runtime?: {
+    schema_version?: string;
+    rollout_ready?: boolean;
+    feature_flags?: Record<string, boolean>;
+  };
+  queueing?: {
+    available?: boolean;
+    event_bus?: {
+      dlq_size?: number;
+      pending_requests?: number;
+      total_subscriptions?: number;
+    };
+    delegation?: {
+      active_tasks?: number;
+      priority_queue_size?: number;
+      pending_futures?: number;
+    };
+  };
+  scheduled_tasks?: {
+    available?: boolean;
+    total?: number;
+    enabled?: number;
+    recent_execution_count?: number;
+  };
+  sandbox?: {
+    available?: boolean;
+    mode?: string;
+    isolation_level?: string;
+    workspace_isolation?: boolean;
+    docker_backed?: boolean;
+  };
 }
 
 type Period = "1h" | "24h" | "7d";
@@ -84,6 +139,20 @@ function fmtUptime(seconds: number): string {
   return `${m}m`;
 }
 
+function fmtDate(value: string | null | undefined): string {
+  if (!value) return "-";
+  try {
+    return new Date(value).toLocaleString("tr-TR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+    });
+  } catch {
+    return value;
+  }
+}
+
 /* ── Summary Card ──────────────────────────────────────────────── */
 function SummaryCard({
   icon,
@@ -118,20 +187,28 @@ export default function PerformanceDashboard() {
   const [period, setPeriod] = useState<Period>("24h");
   const [agents, setAgents] = useState<AgentMetrics[]>([]);
   const [system, setSystem] = useState<SystemMetrics | null>(null);
+  const [overview, setOverview] = useState<SystemOverview | null>(null);
+  const [executions, setExecutions] = useState<ScheduledExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
       setError("");
-      const [agentData, sysData] = await Promise.all([
+      const [agentData, sysData, overviewData, executionData] = await Promise.all([
         fetcher<{ agents: AgentMetrics[] }>(
           `/api/metrics/agents?period=${period}`,
         ),
         fetcher<SystemMetrics>("/api/metrics/system"),
+        fetcher<SystemOverview>("/api/system/overview"),
+        fetcher<{ executions: ScheduledExecution[] }>(
+          "/api/scheduled-tasks/executions?limit=5",
+        ),
       ]);
       setAgents(agentData.agents ?? []);
       setSystem(sysData);
+      setOverview(overviewData);
+      setExecutions(executionData.executions ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Metrikler yüklenemedi");
     } finally {
@@ -170,8 +247,7 @@ export default function PerformanceDashboard() {
             <button
               key={p.key}
               onClick={() => setPeriod(p.key)}
-              role="radio"
-              aria-checked={period === p.key}
+              title={`${p.label} aralığını göster`}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                 period === p.key
                   ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
@@ -213,6 +289,137 @@ export default function PerformanceDashboard() {
           />
         </div>
       )}
+
+      {(system?.runtime || system?.failure_analytics || overview) && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-slate-200">Runtime Rollout</h4>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-medium ${overview?.runtime?.rollout_ready
+                    ? "bg-emerald-500/15 text-emerald-400"
+                    : "bg-amber-500/15 text-amber-400"
+                  }`}
+              >
+                {overview?.runtime?.rollout_ready ? "Ready" : "Degraded"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">Schema</div>
+                <div className="text-slate-200 font-mono">
+                  {system?.runtime?.schema_version ?? overview?.runtime?.schema_version ?? "-"}
+                </div>
+              </div>
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">Flags</div>
+                <div className="text-slate-200">
+                  {Object.values(system?.runtime?.feature_flags ?? {}).filter(Boolean).length}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1">
+              {Object.entries(system?.runtime?.feature_flags ?? {}).map(([flag, enabled]) => (
+                <div key={flag} className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400 truncate">{flag}</span>
+                  <span className={enabled ? "text-emerald-400" : "text-slate-500"}>
+                    {enabled ? "on" : "off"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 space-y-3">
+            <h4 className="text-xs font-semibold text-slate-200">Queueing ve Sandbox</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">DLQ</div>
+                <div className="text-slate-200 tabular-nums">{overview?.queueing?.event_bus?.dlq_size ?? 0}</div>
+              </div>
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">Active Tasks</div>
+                <div className="text-slate-200 tabular-nums">{overview?.queueing?.delegation?.active_tasks ?? 0}</div>
+              </div>
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">Priority Queue</div>
+                <div className="text-slate-200 tabular-nums">{overview?.queueing?.delegation?.priority_queue_size ?? 0}</div>
+              </div>
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">Sandbox</div>
+                <div className="text-slate-200">{overview?.sandbox?.mode ?? "-"}</div>
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400 space-y-1">
+              <div>Isolation: <span className="text-slate-300">{overview?.sandbox?.isolation_level ?? "-"}</span></div>
+              <div>Workspace isolation: <span className="text-slate-300">{overview?.sandbox?.workspace_isolation ? "yes" : "no"}</span></div>
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 space-y-3">
+            <h4 className="text-xs font-semibold text-slate-200">Failure Analytics</h4>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">Failures</div>
+                <div className="text-red-400 tabular-nums">{system?.failure_analytics?.failure_count ?? 0}</div>
+              </div>
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">Fallback</div>
+                <div className="text-amber-400 tabular-nums">{system?.failure_analytics?.fallback_usage_count ?? 0}</div>
+              </div>
+              <div className="bg-slate-900/40 rounded px-3 py-2">
+                <div className="text-slate-500 text-[10px] uppercase">Adoption</div>
+                <div className="text-emerald-400 tabular-nums">{fmtRate(system?.failure_analytics?.runtime_v2_adoption_rate)}</div>
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Son 24 saatte {system?.failure_analytics?.total_count ?? 0} kayit uzerinden hesaplandi.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
+          <h4 className="text-xs font-semibold text-slate-200">Replay / Scheduled Executions</h4>
+          <span className="text-[10px] text-slate-500">
+            {overview?.scheduled_tasks?.enabled ?? 0}/{overview?.scheduled_tasks?.total ?? 0} aktif task
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-700/50">
+                <th className="text-left px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wider">Task</th>
+                <th className="text-left px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="text-right px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wider">Duration</th>
+                <th className="text-right px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wider">Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {executions.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-center py-6 text-slate-600">Replay kaydi yok</td>
+                </tr>
+              )}
+              {executions.map((execution) => (
+                <tr key={execution.id} className="border-b border-slate-700/30 hover:bg-slate-700/20">
+                  <td className="px-3 py-2.5 font-mono text-slate-300">{execution.task_id}</td>
+                  <td className="px-3 py-2.5">
+                    <span className={`px-2 py-0.5 rounded text-[10px] ${execution.status === "completed" ? "bg-emerald-500/15 text-emerald-400" : execution.status === "failed" ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"}`}>
+                      {execution.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">
+                    {execution.duration_ms ? fmtMs(execution.duration_ms) : "-"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-slate-500">{fmtDate(execution.started_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* ── Agent Comparison Table ───────────────────────────── */}
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">

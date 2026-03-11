@@ -166,19 +166,25 @@ export function WorkflowHistoryPanel() {
         const Icon = s.i;
         const open = openId === (ex.id ?? null);
         const steps = ex.step_results ? Object.entries(ex.step_results) : [];
+        const panelId = `workflow-details-${ex.id ?? idx}`;
+        const buttonId = `workflow-toggle-${ex.id ?? idx}`;
         return (
           <div
             key={ex.id ?? idx}
             className="bg-slate-800/40 border border-slate-700/40 rounded-lg overflow-hidden"
           >
             <button
+              id={buttonId}
               onClick={() =>
                 setOpenId((p) =>
                   p === (ex.id ?? null) ? null : (ex.id ?? null),
                 )
               }
               className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-700/30 transition-colors"
-              aria-expanded={open}
+              {...(open
+                ? { "aria-expanded": "true" }
+                : { "aria-expanded": "false" })}
+              aria-controls={panelId}
             >
               {open ? (
                 <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
@@ -203,7 +209,12 @@ export function WorkflowHistoryPanel() {
             </button>
 
             {open && (
-              <div className="border-t border-slate-700/40 px-3 py-3 space-y-3">
+              <div
+                id={panelId}
+                role="region"
+                aria-labelledby={buttonId}
+                className="border-t border-slate-700/40 px-3 py-3 space-y-3"
+              >
                 {steps.length > 0 ? (
                   <div className="space-y-1.5">
                     <span className="text-[10px] text-slate-500 uppercase tracking-wider">

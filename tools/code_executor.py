@@ -45,6 +45,20 @@ _DANGEROUS_PATTERNS = [
 ]
 
 
+def get_executor_capabilities() -> dict[str, Any]:
+    """Describe the current execution backend and safety envelope."""
+    return {
+        "mode": "host_subprocess",
+        "isolation_level": "basic",
+        "workspace_isolation": False,
+        "docker_backed": False,
+        "allowed_languages": sorted(ALLOWED_LANGUAGES),
+        "max_execution_time_seconds": MAX_EXECUTION_TIME,
+        "max_output_size": MAX_OUTPUT_SIZE,
+        "blocked_pattern_count": len(_DANGEROUS_PATTERNS),
+    }
+
+
 def _check_safety(code: str) -> tuple[bool, str]:
     """Check code for dangerous patterns. Returns (is_safe, reason)."""
     for pattern in _DANGEROUS_PATTERNS:

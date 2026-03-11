@@ -64,17 +64,8 @@ const crd = "bg-slate-800/50 border border-slate-700/50 rounded-lg p-4";
 const sCls =
   "bg-slate-800/60 border border-slate-700/50 rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/50";
 
-const tabSt = (on: boolean): React.CSSProperties => ({
-  padding: "6px 14px",
-  fontSize: 11,
-  fontFamily: "Tahoma, sans-serif",
-  cursor: "pointer",
-  border: "none",
-  borderBottom: on ? "2px solid #22d3ee" : "2px solid transparent",
-  color: on ? "#22d3ee" : "#94a3b8",
-  background: "transparent",
-  transition: "color .15s, border-color .15s",
-});
+const tabCls = (on: boolean) =>
+  `px-3.5 py-1.5 text-[11px] [font-family:Tahoma,sans-serif] cursor-pointer border-b-2 transition-colors ${on ? "border-cyan-400 text-cyan-400" : "border-transparent text-slate-400 hover:text-slate-300"}`;
 
 /* ── Shared UI ─────────────────────────────────────────────────── */
 
@@ -314,6 +305,7 @@ function MappingTab() {
                 }
                 className={`${sCls} max-w-[180px] truncate`}
                 aria-label={`${role} model seçimi`}
+                title={`${role} model seçimi`}
               >
                 <option value={m.current_model}>{m.current_model}</option>
                 {m.alternatives
@@ -344,16 +336,14 @@ function MappingTab() {
         <button
           onClick={apply}
           disabled={saving || !hasChanges}
-          className="flex-1 px-3 py-2 text-xs font-medium rounded border transition-colors disabled:opacity-40 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border-cyan-500/20"
-          style={{ fontFamily: "Tahoma, sans-serif" }}
+          className="flex-1 px-3 py-2 text-xs font-medium rounded border transition-colors disabled:opacity-40 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border-cyan-500/20 [font-family:Tahoma,sans-serif]"
         >
           {saving ? "Kaydediliyor…" : saved ? "✓ Kaydedildi" : "Uygula"}
         </button>
         <button
           onClick={reset}
           disabled={saving || !hasChanges}
-          className="px-3 py-2 text-xs rounded border transition-colors disabled:opacity-40 bg-slate-700/30 hover:bg-slate-700/50 text-slate-400 border-slate-600/30"
-          style={{ fontFamily: "Tahoma, sans-serif" }}
+          className="px-3 py-2 text-xs rounded border transition-colors disabled:opacity-40 bg-slate-700/30 hover:bg-slate-700/50 text-slate-400 border-slate-600/30 [font-family:Tahoma,sans-serif]"
         >
           Varsayılana Dön
         </button>
@@ -761,6 +751,7 @@ function ValidationTab() {
             onChange={(e) => setTestTool(e.target.value)}
             className={`${sCls} flex-1`}
             aria-label="Test edilecek araç"
+            title="Test edilecek araç"
           >
             <option value="">Araç seçin…</option>
             {schemas.map((s) => (
@@ -820,16 +811,24 @@ export default function ModelManagerPanel() {
         aria-label="Model Yönetimi sekmeleri"
       >
         {TABS.map((t) => (
-          <button
-            key={t.key}
-            role="tab"
-            aria-selected={tab === t.key}
-            aria-controls={`panel-${t.key}`}
-            style={tabSt(tab === t.key)}
-            onClick={() => setTab(t.key)}
-          >
-            {t.icon} {t.label}
-          </button>
+          (() => {
+            const isSelected = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                id={`model-manager-tab-${t.key}`}
+                role="tab"
+                {...(isSelected
+                  ? { "aria-selected": "true" }
+                  : { "aria-selected": "false" })}
+                aria-controls={`panel-${t.key}`}
+                className={tabCls(isSelected)}
+                onClick={() => setTab(t.key)}
+              >
+                {t.icon} {t.label}
+              </button>
+            );
+          })()
         ))}
       </div>
 
@@ -838,6 +837,7 @@ export default function ModelManagerPanel() {
         className="flex-1 overflow-y-auto p-3"
         id={`panel-${tab}`}
         role="tabpanel"
+        aria-labelledby={`model-manager-tab-${tab}`}
       >
         {tab === "providers" && <ProvidersTab />}
         {tab === "mapping" && <MappingTab />}
