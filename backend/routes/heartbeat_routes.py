@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 _parent = str(Path(__file__).parent.parent)
@@ -160,9 +160,22 @@ async def create_scheduled_task(
 @router.get("/api/scheduled-tasks/{task_id}")
 async def get_scheduled_task(
     task_id: str,
+    request: Request,
     user: dict = Depends(get_current_user),
 ):
     """Get a single scheduled task."""
+    # NOTE: Keep compatibility with static endpoints that share this prefix.
+    if task_id == "executions":
+        try:
+            limit = int(request.query_params.get("limit", "100"))
+        except ValueError:
+            limit = 100
+        return await list_all_executions(limit=limit, user=user)
+    if task_id == "handlers":
+        return await list_handlers(user=user)
+    if task_id == "types":
+        return await list_task_types(user=user)
+
     from tools.scheduled_tasks import get_scheduled_task_scheduler
 
     scheduler = get_scheduled_task_scheduler()

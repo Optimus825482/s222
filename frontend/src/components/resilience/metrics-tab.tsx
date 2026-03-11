@@ -104,6 +104,7 @@ function GaugeCard({
       }}
     >
       <Chart
+        chartVersion="current"
         chartType="Gauge"
         width="100%"
         height="100px"
@@ -269,6 +270,7 @@ function SuccessDonut({ entries }: { entries: MetricEntry[] }) {
       >
         <div style={{ flex: "0 0 auto" }}>
           <Chart
+            chartVersion="current"
             chartType="PieChart"
             width="160px"
             height="160px"
@@ -381,6 +383,7 @@ function TaskColumnChart({ entries }: { entries: MetricEntry[] }) {
         </div>
       </div>
       <Chart
+        chartVersion="current"
         chartType="ColumnChart"
         width="100%"
         height="180px"
@@ -412,9 +415,7 @@ export function MetricsTab() {
 
   const load = useCallback(() => {
     setErr("");
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ||
-      "https://ykok0ckoocc880w0cwo0w0w0.77.42.68.4.sslip.io";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
     fetch(`${apiUrl}/api/metrics`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);

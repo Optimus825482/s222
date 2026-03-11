@@ -179,11 +179,11 @@ class ScheduledTaskScheduler:
         self._started = True
         logger.info("[ScheduledTasks] APScheduler started")
 
+        # Ensure persistence tables exist before any DB reads.
+        self._ensure_tables()
+
         # Load existing tasks from DB
         await self._load_tasks_from_db()
-
-        # Ensure table exists
-        self._ensure_tables()
 
     async def stop(self) -> None:
         """Stop the scheduler."""
