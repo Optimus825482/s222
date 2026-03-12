@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+_PG_TABLE_INITIALIZED = False
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 PATTERN_STORE = DATA_DIR / "pattern_executions.json"
@@ -21,8 +22,61 @@ _MAX_RECORDS = 200
 _MIN_OCCURRENCES = 5  # Increased from 3 - patterns must repeat more to become skills
 
 
-def _load_store() -> list[dict]:
-    """Load execution records from JSON file."""
+def _ensure_pg_table() -> None:
+    """Ensure pattern_executions table exists in PostgreSQL."""
+    global _PG_TABLE_INITIALIZED
+    if _PG_TABLE_INITIALIZED:
+        return
+    try:
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS pattern_executions (
+                        id SERIAL PRIMARY KEY,
+                        thread_id VARCHAR(128),
+                        signature VARCHAR(24) NOT NULL,
+                        tools_used JSONB NOT NULL,
+                        user_input_snippet TEXT DEFAULT '',
+                        status VARCHAR(32) DEFAULT 'completed',
+                        user_id VARCHAR(128) DEFAULT '',
+                        created_at TIMESTAMPTZ DEFAULT NOW()
+                    )
+                """)
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_pe_signature ON pattern_executions(signature)")
+            conn.commit()
+            _PG_TABLE_INITIALIZED = True
+        finally:
+            release_conn(conn)
+    except Exception as e:
+        logger.warning(f"pattern_executions table init failed: {e}")
+
+
+def _cleanup_old_records() -> None:
+    """Keep only the last _MAX_RECORDS entries."""
+    try:
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """DELETE FROM pattern_executions
+                       WHERE id NOT IN (
+                           SELECT id FROM pattern_executions
+                           ORDER BY created_at DESC LIMIT %s
+                       )""",
+                    (_MAX_RECORDS,),
+                )
+            conn.commit()
+        finally:
+            release_conn(conn)
+    except Exception:
+        pass
+
+
+def _load_json_store() -> list[dict]:
+    """Load execution records from JSON file (fallback)."""
     if not PATTERN_STORE.exists():
         return []
     try:
@@ -32,8 +86,8 @@ def _load_store() -> list[dict]:
         return []
 
 
-def _save_store(executions: list[dict]) -> None:
-    """Persist execution records."""
+def _save_json_store(executions: list[dict]) -> None:
+    """Persist execution records to JSON (fallback)."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     PATTERN_STORE.write_text(
         json.dumps({"executions": executions[-_MAX_RECORDS:]}, ensure_ascii=False, indent=0),
@@ -93,19 +147,39 @@ def observe_thread(thread: Any, user_id: str | None = None) -> dict[str, Any] | 
     signature = hashlib.md5(json.dumps(tools, sort_keys=True).encode()).hexdigest()[:12]
     snippet = _user_input_snippet(thread)
     status = _thread_status(thread)
+    thread_id = getattr(thread, "id", None) or (thread.get("id") if isinstance(thread, dict) else "")
     record = {
-        "thread_id": getattr(thread, "id", None) or (thread.get("id") if isinstance(thread, dict) else ""),
+        "thread_id": thread_id,
         "signature": signature,
         "tools_used": tools,
         "user_input_snippet": snippet,
         "status": status,
         "user_id": user_id or "",
     }
-    executions = _load_store()
-    executions.append(record)
-    _save_store(executions)
-    logger.debug("Pattern observed: signature=%s tools=%s", signature, tools)
-    return record
+
+    _ensure_pg_table()
+    try:
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO pattern_executions (thread_id, signature, tools_used, user_input_snippet, status, user_id)
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (thread_id, signature, json.dumps(tools), snippet[:500], status, user_id or ""),
+                )
+            conn.commit()
+        finally:
+            release_conn(conn)
+        logger.debug("Pattern observed: signature=%s tools=%s", signature, tools)
+        return record
+    except Exception as e:
+        logger.warning(f"observe_thread PG insert failed, falling back to JSON: {e}")
+        # Fallback to JSON file
+        executions = _load_json_store()
+        executions.append(record)
+        _save_json_store(executions)
+        return record
 
 
 def detect_patterns(min_occurrences: int = _MIN_OCCURRENCES) -> list[dict[str, Any]]:
@@ -113,33 +187,86 @@ def detect_patterns(min_occurrences: int = _MIN_OCCURRENCES) -> list[dict[str, A
     Find repeating execution patterns (same tool sequence seen >= min_occurrences).
     Returns list of { signature, count, tools_used, examples }.
     """
-    executions = _load_store()
-    by_sig: dict[str, list[dict]] = defaultdict(list)
-    for rec in executions:
-        sig = rec.get("signature", "")
-        if sig:
-            by_sig[sig].append(rec)
-    out = []
-    for sig, group in by_sig.items():
-        if len(group) < min_occurrences:
-            continue
-        tools_used = group[0].get("tools_used", [])
-        examples = [
-            {
-                "user_input_snippet": r.get("user_input_snippet", ""),
-                "status": r.get("status", ""),
-                "thread_id": r.get("thread_id", ""),
-            }
-            for r in group[:5]
-        ]
-        out.append({
-            "signature": sig,
-            "count": len(group),
-            "tools_used": tools_used,
-            "examples": examples,
-        })
-    out.sort(key=lambda x: -x["count"])
-    return out
+    _ensure_pg_table()
+    try:
+        from tools.pg_connection import get_conn, release_conn
+        conn = get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT signature, COUNT(*) as cnt,
+                              (array_agg(tools_used ORDER BY created_at DESC))[1] as tools_used
+                       FROM pattern_executions
+                       GROUP BY signature
+                       HAVING COUNT(*) >= %s
+                       ORDER BY cnt DESC""",
+                    (min_occurrences,),
+                )
+                groups = cur.fetchall()
+
+                out = []
+                for g in groups:
+                    gd = dict(g) if hasattr(g, 'keys') else {}
+                    sig = gd.get("signature", "")
+                    cnt = int(gd.get("cnt", 0))
+                    tools_raw = gd.get("tools_used", [])
+                    tools_used = json.loads(tools_raw) if isinstance(tools_raw, str) else (tools_raw or [])
+
+                    # Get examples
+                    cur.execute(
+                        """SELECT user_input_snippet, status, thread_id
+                           FROM pattern_executions
+                           WHERE signature = %s
+                           ORDER BY created_at DESC LIMIT 5""",
+                        (sig,),
+                    )
+                    examples = [
+                        {
+                            "user_input_snippet": dict(r).get("user_input_snippet", ""),
+                            "status": dict(r).get("status", ""),
+                            "thread_id": dict(r).get("thread_id", ""),
+                        }
+                        for r in cur.fetchall()
+                    ]
+                    out.append({
+                        "signature": sig,
+                        "count": cnt,
+                        "tools_used": tools_used,
+                        "examples": examples,
+                    })
+            return out
+        finally:
+            release_conn(conn)
+    except Exception as e:
+        logger.warning(f"detect_patterns PG failed, falling back to JSON: {e}")
+        # Fallback to JSON-based detection
+        executions = _load_json_store()
+        by_sig: dict[str, list[dict]] = defaultdict(list)
+        for rec in executions:
+            sig = rec.get("signature", "")
+            if sig:
+                by_sig[sig].append(rec)
+        out = []
+        for sig, group in by_sig.items():
+            if len(group) < min_occurrences:
+                continue
+            tools_used = group[0].get("tools_used", [])
+            examples = [
+                {
+                    "user_input_snippet": r.get("user_input_snippet", ""),
+                    "status": r.get("status", ""),
+                    "thread_id": r.get("thread_id", ""),
+                }
+                for r in group[:5]
+            ]
+            out.append({
+                "signature": sig,
+                "count": len(group),
+                "tools_used": tools_used,
+                "examples": examples,
+            })
+        out.sort(key=lambda x: -x["count"])
+        return out
 
 
 def generate_skill_from_pattern(

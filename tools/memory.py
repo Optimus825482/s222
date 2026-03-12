@@ -963,8 +963,9 @@ async def save_memory_with_dedup(
 
     embedding = await _get_embedding_async(content)
     if not embedding:
+        logger.warning("save_memory_with_dedup: embedding generation failed, inserting without dedup check")
         result = _insert_memory(content, category, "episodic", tags, source_agent)
-        return {"action": "inserted", "memory_id": result["id"]}
+        return {"action": "inserted_no_dedup", "memory_id": result["id"], "reason": "embedding_failed"}
 
     emb_str = str(embedding)
     conn = get_conn()

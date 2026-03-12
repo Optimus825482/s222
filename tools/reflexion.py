@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import ast
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -24,11 +25,12 @@ SELF_EVALUATE_PROMPT = (
     "2. COMPLETENESS: Did you address all parts of the question?\n"
     "3. CLARITY: Is the response well-structured and easy to understand?\n"
     "4. ACTIONABILITY: Can the user act on this immediately?\n"
-    "5. DEPTH: Is the analysis sufficiently thorough?\n\n"
+    "5. DEPTH: Is the analysis sufficiently thorough?\n"
+    "6. COHERENCE: Does the response flow logically without contradictions?\n\n"
     "Previous response to evaluate:\n{response}\n\n"
     "Original question: {question}\n\n"
     "Output JSON: {{\"scores\": {{\"accuracy\": N, \"completeness\": N, \"clarity\": N, "
-    "\"actionability\": N, \"depth\": N}}, \"total\": N, \"weaknesses\": [\"...\"], "
+    "\"actionability\": N, \"depth\": N, \"coherence\": N}}, \"total\": N, \"weaknesses\": [\"...\"], "
     "\"improvements\": [\"...\"]}}"
 )
 
@@ -83,6 +85,13 @@ def parse_evaluation(eval_text: str) -> dict[str, Any] | None:
     except (json.JSONDecodeError, TypeError):
         pass
 
+    # 1.5) Python-dict-like payloads (single quotes, True/False) are common in LLM output.
+    try:
+        parsed = ast.literal_eval(text)
+        return parsed if isinstance(parsed, dict) else None
+    except (ValueError, SyntaxError):
+        pass
+
     # 2) Markdown code fence blocks (```json ... ``` or ``` ... ```)
     fence_blocks = re.findall(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.DOTALL | re.IGNORECASE)
     for block in fence_blocks:
@@ -91,7 +100,12 @@ def parse_evaluation(eval_text: str) -> dict[str, Any] | None:
             if isinstance(parsed, dict):
                 return parsed
         except (json.JSONDecodeError, TypeError):
-            continue
+            try:
+                parsed = ast.literal_eval(block)
+                if isinstance(parsed, dict):
+                    return parsed
+            except (ValueError, SyntaxError):
+                continue
 
     # 3) Balanced JSON object extraction (best-effort)
     starts = [m.start() for m in re.finditer(r"\{", text)]
@@ -110,7 +124,12 @@ def parse_evaluation(eval_text: str) -> dict[str, Any] | None:
                         if isinstance(parsed, dict) and "scores" in parsed:
                             return parsed
                     except (json.JSONDecodeError, TypeError):
-                        break
+                        try:
+                            parsed = ast.literal_eval(candidate)
+                            if isinstance(parsed, dict) and "scores" in parsed:
+                                return parsed
+                        except (ValueError, SyntaxError):
+                            break
 
     return None
 
@@ -124,8 +143,9 @@ def _fallback_evaluation(reason: str) -> dict[str, Any]:
             "clarity": 5,
             "actionability": 5,
             "depth": 5,
+            "coherence": 5,
         },
-        "total": 25,
+        "total": 30,
         "weaknesses": [f"evaluation_parse_failed:{reason}"],
         "improvements": [],
         "fallback_used": True,
@@ -189,10 +209,16 @@ def save_reflection_result(agent_role: str, question: str, evaluation: dict, imp
         values = [v for v in scores.values() if isinstance(v, (int, float))]
         avg_score = sum(values) / len(values) if values else 0
         
+        # Normalize to 0-1: agentic_eval already uses 0-1 scale, reflexion uses 0-5
+        if evaluation.get("agentic_eval"):
+            normalized_score = round(avg_score, 2)
+        else:
+            normalized_score = round(avg_score / 5, 2)
+        
         # Add new result
         results.append({
             "agent_role": agent_role,
-            "score": round(avg_score / 5, 2),  # Normalize to 0-1
+            "score": normalized_score,
             "issues": evaluation.get("weaknesses", [])[:3],
             "improvements": evaluation.get("improvements", [])[:3],
             "improved": improved,
@@ -242,34 +268,78 @@ async def evaluate_and_improve(
     max_iterations: int = 1,
 ) -> tuple[str, dict[str, Any] | None]:
     """Evaluate response and optionally improve it.
-    
+
+    When max_iterations > 1 and agentic_eval is available, delegates to the
+    evaluator-optimizer loop for rubric-based multi-dimensional scoring with
+    convergence detection.  Falls back to the simple reflexion flow otherwise.
+
     Args:
         agent: The agent instance (has call_llm method)
         question: Original question/input
         response: Agent's response to evaluate
         threshold: Score threshold for improvement (1-5 scale)
         max_iterations: Max improvement iterations
-        
+
     Returns:
         Tuple of (final_response, evaluation_dict or None)
     """
     import config
-    
+
     if not config.REFLEXION_ENABLED:
         return response, None
-    
+
     # Check if this agent should use reflexion
     if config.REFLEXION_AGENTS and agent.role.value not in config.REFLEXION_AGENTS:
         return response, None
-    
+
+    # Enhanced path: use evaluator_optimizer_loop for multi-iteration quality-critical tasks
+    if max_iterations > 1 and config.REFLEXION_AUTO_IMPROVE:
+        try:
+            from tools.agentic_eval import evaluator_optimizer_loop
+
+            # Convert 1-5 threshold to 0-1 scale for agentic_eval
+            score_threshold_01 = min(1.0, threshold / 5.0)
+            best_output, eval_history = await evaluator_optimizer_loop(
+                agent=agent,
+                task=question,
+                output=response,
+                max_iterations=max_iterations,
+                score_threshold=score_threshold_01,
+            )
+            # Build evaluation dict compatible with reflexion format
+            history_dict = eval_history.to_dict()
+            evaluation: dict[str, Any] = {
+                "scores": {},
+                "total": int(eval_history.final_score * 30),  # scale to /30
+                "weaknesses": [],
+                "improvements": [],
+                "agentic_eval": True,
+                "history": history_dict,
+            }
+            if eval_history.iterations:
+                last_iter = eval_history.iterations[-1]
+                evaluation["weaknesses"] = last_iter.weaknesses
+                evaluation["improvements"] = last_iter.improvements
+                evaluation["scores"] = {
+                    dim: int(score) for dim, score in last_iter.dimensions.items()
+                }
+
+            save_reflection_result(
+                agent.role.value, question, evaluation, improved=len(eval_history.iterations) > 1
+            )
+            return best_output, evaluation
+        except Exception as e:
+            logger.debug(f"Agentic eval enhanced path failed, falling back: {e}")
+
+    # Standard reflexion flow
     iteration = 0
     current_response = response
-    evaluation: dict[str, Any] | None = None
-    
+    evaluation = None
+
     while iteration < max_iterations:
         # Build evaluation prompt
         eval_prompt = build_evaluation_prompt(question, current_response)
-        
+
         try:
             # Call LLM for evaluation
             eval_result = await agent.call_llm([{"role": "user", "content": eval_prompt}])
@@ -332,9 +402,9 @@ async def evaluate_and_improve(
             logger.error(f"Reflexion error: {e}")
             evaluation = evaluation or _fallback_evaluation("runtime_error")
             break
-    
+
     # Save final evaluation result for UI (even if no improvement)
     if evaluation:
         save_reflection_result(agent.role.value, question, evaluation, improved=iteration > 0)
-    
+
     return current_response, evaluation

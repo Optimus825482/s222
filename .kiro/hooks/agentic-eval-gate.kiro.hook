@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Agentic Eval Quality Gate",
+  "description": "After completing a spec task, reminds the agent to apply agentic evaluation patterns (rubric-based scoring, convergence detection) to verify output quality before moving on.",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Tamamlanan görevin çıktısını agentic-eval pattern'leri ile değerlendir: 1) Görev tipine uygun rubric seç (code/analysis/prd/architecture/general), 2) Her boyutu 1-5 puanla, 3) Weighted score 0.8'in altındaysa iyileştirme öner. tools/agentic_eval.py'deki RUBRICS sözlüğünü referans al. Convergence detection kurallarını uygula — stagnation veya oscillation varsa dur."
+  }
+}

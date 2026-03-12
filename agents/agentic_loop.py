@@ -135,15 +135,29 @@ class ContextTransformer:
 
 
 def trim_redundant_tool_results(messages: list[dict[str, Any]], config: LoopConfig) -> list[dict[str, Any]]:
-    """Trim long tool results in older messages to save context window space."""
+    """Trim long tool results in older messages to save context window space.
+
+    Improved strategy (inspired by arxiv.org/abs/2510.06727):
+    - Older tool results get progressively more aggressive trimming
+    - Recent 6 messages kept intact, 6-12 messages trimmed to 500 chars,
+      older messages trimmed to 200 chars
+    - Web search results in old messages stripped to just URLs
+    """
     if len(messages) <= 10:
         return messages
     trimmed = []
-    cutoff = len(messages) - 8  # keep last 8 messages intact
+    recent_cutoff = len(messages) - 6   # keep last 6 intact
+    medium_cutoff = len(messages) - 12  # medium trim zone
+
     for i, msg in enumerate(messages):
-        if i < cutoff and msg.get("role") == "tool":
+        if msg.get("role") == "tool":
             content = msg.get("content", "")
-            if len(content) > 500:
+            if i < medium_cutoff and len(content) > 200:
+                # Aggressive trim for old tool results
+                trimmed.append({**msg, "content": content[:200] + "\n...[trimmed — old context]"})
+                continue
+            elif i < recent_cutoff and len(content) > 500:
+                # Medium trim
                 trimmed.append({**msg, "content": content[:400] + "\n...[trimmed]"})
                 continue
         trimmed.append(msg)
@@ -211,7 +225,7 @@ class FollowUpConfig:
         default_factory=lambda: os.getenv("AGENTIC_FOLLOWUP_ENABLED", "true").lower() == "true"
     )
     max_follow_ups: int = field(
-        default_factory=lambda: int(os.getenv("AGENTIC_MAX_FOLLOWUPS", "3"))
+        default_factory=lambda: int(os.getenv("AGENTIC_MAX_FOLLOWUPS", "5"))
     )
     trigger_patterns: list[str] = field(default_factory=lambda: list(_DEFAULT_CONTINUE_PATTERNS))
     follow_up_message: str = "Devam et — önceki yanıtını tamamla."

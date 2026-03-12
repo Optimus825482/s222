@@ -20,6 +20,7 @@ class FeedbackLoop:
     def __init__(self):
         self._initialized = False
         self._recent_metrics: dict[str, deque] = defaultdict(lambda: deque(maxlen=20))
+        self._adaptive_window: dict[str, int] = {}  # agent:task → adaptive window size
         self._started = False
 
     def _get_conn(self):
@@ -143,10 +144,24 @@ class FeedbackLoop:
                     pass
 
             # Check rolling window — trigger re-rank if success_rate < 60%
+            # Adaptive window: shrink on poor performance for faster reaction
             window = list(self._recent_metrics[key])
             if len(window) >= 10:
                 success_count = sum(1 for s in window if s >= 3.0)
                 success_rate = success_count / len(window)
+
+                # Adapt window size: poor agents get shorter windows (faster reaction)
+                if success_rate < 0.5:
+                    new_maxlen = 10  # react fast
+                elif success_rate < 0.7:
+                    new_maxlen = 15
+                else:
+                    new_maxlen = 20  # stable agent, longer window
+                current_maxlen = self._recent_metrics[key].maxlen or 20
+                if new_maxlen != current_maxlen:
+                    old_data = list(self._recent_metrics[key])[-new_maxlen:]
+                    self._recent_metrics[key] = deque(old_data, maxlen=new_maxlen)
+
                 if success_rate < 0.6:
                     logger.info(f"Low success rate ({success_rate:.0%}) for {key} — triggering skill re-rank")
                     try:
@@ -156,7 +171,7 @@ class FeedbackLoop:
                         self._log_optimization(
                             "skill_rerank", agent_role, task_type,
                             f"success_rate={success_rate:.2f}", f"top_skills={ranked[:3]}",
-                            f"Success rate below 60% over last {len(window)} tasks",
+                            f"Success rate below 60% over last {len(window)} tasks (window={new_maxlen})",
                         )
                     except Exception as e:
                         logger.debug(f"Skill re-rank failed: {e}")

@@ -310,12 +310,12 @@ async def ws_chat(ws: WebSocket):
 
         return False
 
-    def _collect_token_usage(thread: Thread | None) -> dict[str, int | None]:
+    def _collect_token_usage(thread: Thread | None) -> dict[str, int]:
         if not thread or not thread.tasks:
             return {
-                "total_tokens": None,
-                "prompt_tokens": None,
-                "completion_tokens": None,
+                "total_tokens": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
             }
 
         total_tokens = sum(getattr(task, "total_tokens", 0) or 0 for task in thread.tasks)
@@ -339,8 +339,8 @@ async def ws_chat(ws: WebSocket):
 
         return {
             "total_tokens": total_tokens,
-            "prompt_tokens": prompt_tokens if has_prompt_completion else None,
-            "completion_tokens": completion_tokens if has_prompt_completion else None,
+            "prompt_tokens": prompt_tokens if has_prompt_completion else 0,
+            "completion_tokens": completion_tokens if has_prompt_completion else 0,
         }
 
     def _resolve_pipeline_type(thread: Thread | None, fallback: str | None = None) -> str:

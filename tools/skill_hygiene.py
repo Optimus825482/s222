@@ -243,3 +243,28 @@ def run_hygiene_check(dry_run: bool = False) -> dict:
         f"{len(report['deactivated'])} deactivated"
     )
     return report
+
+
+def register_scheduled_hygiene() -> bool:
+    """Register skill hygiene as a periodic scheduled task.
+    
+    Should be called once during app startup (e.g. from backend/main.py).
+    Runs hygiene check every 6 hours.
+    Returns True if registered successfully.
+    """
+    try:
+        from tools.scheduled_tasks import register_periodic_task
+        register_periodic_task(
+            task_id="skill-hygiene",
+            name="Skill Hygiene Check",
+            interval_seconds=6 * 3600,  # every 6 hours
+            callback=lambda: run_hygiene_check(dry_run=False),
+        )
+        logger.info("Skill hygiene scheduled task registered (every 6h)")
+        return True
+    except ImportError:
+        logger.debug("scheduled_tasks not available — skill hygiene not auto-scheduled")
+        return False
+    except Exception as e:
+        logger.warning(f"Failed to register skill hygiene schedule: {e}")
+        return False

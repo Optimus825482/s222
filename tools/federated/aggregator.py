@@ -222,6 +222,8 @@ class FederatedAggregator:
         self._model_version: str = "0.0.0"
         self._nodes: dict[str, NodeState] = {}
         self._round_history: list[AggregationRound] = []
+        self._aggregation_task: asyncio.Task | None = None
+        self._round_lock = asyncio.Lock()
         
         # Algorithm
         self._algorithm = self._create_algorithm(strategy)
@@ -275,25 +277,49 @@ class FederatedAggregator:
         
         Nodes will be notified to start local training.
         """
-        if self._current_round and self._current_round.status in [
-            AggregationStatus.COLLECTING,
-            AggregationStatus.AGGREGATING,
-        ]:
-            logger.warning(f"Round {self._current_round.round_number} still in progress")
+        async with self._round_lock:
+            if self._current_round and self._current_round.status in [
+                AggregationStatus.COLLECTING,
+                AggregationStatus.AGGREGATING,
+            ]:
+                if self._is_round_timed_out(self._current_round):
+                    logger.warning(
+                        f"Round {self._current_round.round_number} timed out; marking as failed and starting a new round"
+                    )
+                    self._current_round.status = AggregationStatus.FAILED
+                    self._current_round.end_time = datetime.utcnow().isoformat()
+                    self._round_history.append(self._current_round)
+                    self._current_round = None
+                else:
+                    logger.info(
+                        f"Round {self._current_round.round_number} still in progress"
+                    )
+                    return self._current_round
+
+            round_number = self.current_round_number + 1
+            self._current_round = AggregationRound(
+                round_number=round_number,
+                status=AggregationStatus.COLLECTING,
+                start_time=datetime.utcnow().isoformat(),
+                min_participants=min_participants or self.min_participants,
+                timeout_seconds=timeout_seconds or self.round_timeout,
+            )
+
+            logger.info(
+                f"Started round {round_number}, waiting for {self._current_round.min_participants} participants"
+            )
             return self._current_round
-        
-        round_number = self.current_round_number + 1
-        self._current_round = AggregationRound(
-            round_number=round_number,
-            status=AggregationStatus.COLLECTING,
-            start_time=datetime.utcnow().isoformat(),
-            min_participants=min_participants or self.min_participants,
-            timeout_seconds=timeout_seconds or self.round_timeout,
-        )
-        
-        logger.info(f"Started round {round_number}, waiting for {self._current_round.min_participants} participants")
-        return self._current_round
-    
+
+    def _is_round_timed_out(self, round_state: AggregationRound) -> bool:
+        """Return True when a collecting/aggregating round exceeded its timeout window."""
+        try:
+            started = datetime.fromisoformat(round_state.start_time)
+        except Exception:
+            return False
+        return (
+            datetime.utcnow() - started
+        ).total_seconds() > round_state.timeout_seconds
+
     async def register_node(
         self,
         node_id: str,
@@ -361,8 +387,11 @@ class FederatedAggregator:
         
         # Check if we have enough participants
         if len(self._current_round.deltas) >= self._current_round.min_participants:
-            # Trigger aggregation in background
-            asyncio.create_task(self._aggregate_and_complete())
+            # Trigger aggregation once; avoid duplicate tasks from concurrent submissions.
+            if self._aggregation_task is None or self._aggregation_task.done():
+                self._aggregation_task = asyncio.create_task(
+                    self._aggregate_and_complete()
+                )
         
         return True, f"Delta accepted, {len(self._current_round.deltas)} total"
     
@@ -454,11 +483,13 @@ class FederatedAggregator:
             self._round_history.append(self._current_round)
             
             logger.info(f"Round {self._current_round.round_number} completed, new version: {new_version}")
-            
+
         except Exception as e:
             logger.error(f"Aggregation failed: {e}")
             self._current_round.status = AggregationStatus.FAILED
             self._current_round.end_time = datetime.utcnow().isoformat()
+        finally:
+            self._aggregation_task = None
     
     async def _save_model(self, model: dict[str, Any], version: str) -> None:
         """Save model to storage."""

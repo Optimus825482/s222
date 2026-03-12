@@ -68,6 +68,69 @@ function buildThreadMarkdown(thread: Thread): string {
   return md;
 }
 
+type ReportSection = {
+  title: string;
+  body: string;
+};
+
+const SECTION_TITLE_MAP: Record<string, string> = {
+  "FIKIR ANALIZI": "Fikir Analizi",
+  "PRD OLUŞTURMA": "Ürün Gereksinimleri",
+  "PRD OLUSTURMA": "Ürün Gereksinimleri",
+  "TEKNIK MIMARI": "Teknik Mimari",
+  "TASK BREAKDOWN": "Uygulama Planı",
+  "PROJE İSKELETI": "Proje İskeleti",
+  "PROJE ISKELETI": "Proje İskeleti",
+};
+
+function normalizeSectionTitle(raw: string): string {
+  const normalized = raw.trim().toUpperCase();
+  return SECTION_TITLE_MAP[normalized] ?? raw.trim();
+}
+
+function cleanMarkdownBody(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/^\uFEFF/, "")
+    .replace(/^[ \t]*={8,}[ \t]*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function extractStructuredSections(text: string): ReportSection[] {
+  const input = cleanMarkdownBody(text);
+  const sectionRegex =
+    /={8,}\s*\n\s*[^\n]*📋\s*([^\n]+)\n\s*={8,}\s*\n?/g;
+
+  const markers: Array<{ title: string; index: number; matchLen: number }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = sectionRegex.exec(input)) !== null) {
+    markers.push({
+      title: normalizeSectionTitle(m[1] || "Bölüm"),
+      index: m.index,
+      matchLen: m[0].length,
+    });
+  }
+
+  if (markers.length === 0) {
+    return input ? [{ title: "Çıktı", body: input }] : [];
+  }
+
+  const sections: ReportSection[] = [];
+  for (let i = 0; i < markers.length; i += 1) {
+    const current = markers[i];
+    const next = markers[i + 1];
+    const start = current.index + current.matchLen;
+    const end = next ? next.index : input.length;
+    const body = cleanMarkdownBody(input.slice(start, end));
+    if (!body) continue;
+
+    sections.push({ title: current.title, body });
+  }
+
+  return sections;
+}
+
 function buildCleanReportMarkdown(thread: Thread): string {
   const completedTasks = thread.tasks.filter(
     (t) => t.status === "completed" && t.final_result,
@@ -76,11 +139,43 @@ function buildCleanReportMarkdown(thread: Thread): string {
     return "# Sonuç Raporu\n\nTamamlanmış görev bulunamadı.\n";
 
   const date = formatDate(thread.created_at);
-  let md = `# Sonuç Raporu\n\nTarih: ${date}\n\n---\n\n`;
+  let md = `# Sonuç Raporu\n\n`;
+  md += `Tarih: ${date}\n\n`;
+  md += `## Yönetici Özeti\n\n`;
+  md += `Bu rapor, tamamlanan görevlerden otomatik üretilmiştir. İçerik; yapılandırılmış başlıklar, temizlenmiş metin blokları ve görev bazlı çıktı kırılımı ile sunulmuştur.\n\n`;
 
+  md += `## Görev Özeti\n\n`;
+  md += `| Görev | Pipeline | Token | Süre (sn) |\n`;
+  md += `|---|---|---:|---:|\n`;
   for (const t of completedTasks) {
-    md += `## ${t.user_input}\n\n${t.final_result}\n\n---\n\n`;
+    const safeTitle = (t.user_input || "İsimsiz görev")
+      .replace(/\|/g, "\\|")
+      .trim();
+    md += `| ${safeTitle} | ${t.pipeline_type} | ${formatNum(t.total_tokens)} | ${((t.total_latency_ms ?? 0) / 1000).toFixed(1)} |\n`;
   }
+  md += `\n`;
+
+  md += `## Detaylı Çıktılar\n\n`;
+  for (let i = 0; i < completedTasks.length; i += 1) {
+    const t = completedTasks[i];
+    const title = (t.user_input || "İsimsiz görev").trim();
+    md += `### Görev ${i + 1}: ${title}\n\n`;
+
+    const sections = extractStructuredSections(t.final_result || "");
+    if (sections.length === 0) {
+      md += `İçerik üretilemedi.\n\n`;
+      continue;
+    }
+
+    for (const section of sections) {
+      md += `#### ${section.title}\n\n`;
+      md += `${section.body}\n\n`;
+    }
+  }
+
+  md += `## Son Not\n\n`;
+  md += `Bu belge uygulama içinde kalite şablonu uygulanarak üretildi. Gerekirse bölüm bazlı genişletme yapılabilir.\n`;
+
   return md;
 }
 

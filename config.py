@@ -63,7 +63,7 @@ MODELS = {
         "name": "MiniMax M2.1",
         "role": "thinker",
         "description": "Deep Thinker — complex reasoning, analysis, planning",
-        "max_tokens": 4096,
+        "max_tokens": 8192,
         "temperature": 0.7,
         "top_p": 0.95,
         "has_thinking": True,
@@ -120,7 +120,7 @@ MODELS = {
         "name": "Qwen3 Next 80B",
         "role": "critic",
         "description": "Critic + Skill Creator — quality review, fact-checking, skill generation, improvement suggestions",
-        "max_tokens": 4096,
+        "max_tokens": 8192,
         "temperature": 0.6,
         "top_p": 0.7,
         "has_thinking": False,
@@ -440,7 +440,7 @@ WEBSHARE_PROXY_PASSWORD = os.getenv("WEBSHARE_PROXY_PASSWORD", "")
 YOUTUBE_COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH", "")
 
 # Enable automatic self-evaluation after each agent response
-REFLEXION_ENABLED = os.getenv("REFLEXION_ENABLED", "false").lower() == "true"
+REFLEXION_ENABLED = os.getenv("REFLEXION_ENABLED", "true").lower() == "true"
 
 # Minimum score threshold for improvement (1-5 scale)
 REFLEXION_SCORE_THRESHOLD = float(os.getenv("REFLEXION_SCORE_THRESHOLD", "3.5"))
@@ -449,7 +449,7 @@ REFLEXION_SCORE_THRESHOLD = float(os.getenv("REFLEXION_SCORE_THRESHOLD", "3.5"))
 REFLEXION_AGENTS = os.getenv("REFLEXION_AGENTS", "").split(",") if os.getenv("REFLEXION_AGENTS") else []
 
 # Auto-improve if score below threshold
-REFLEXION_AUTO_IMPROVE = os.getenv("REFLEXION_AUTO_IMPROVE", "false").lower() == "true"
+REFLEXION_AUTO_IMPROVE = os.getenv("REFLEXION_AUTO_IMPROVE", "true").lower() == "true"
 
 # Max improvement iterations per response
 REFLEXION_MAX_ITERATIONS = int(os.getenv("REFLEXION_MAX_ITERATIONS", "1"))

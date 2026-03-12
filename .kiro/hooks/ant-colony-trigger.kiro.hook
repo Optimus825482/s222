@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Ant Colony Trigger",
+  "description": "Kullanıcı mesajında çok dosyalı/karmaşık görev sinyali (refactor, migration, colony, karınca, paralel, tüm dosyalar, sistem geneli) algılandığında ant colony workflow steering'ini aktive eder.",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Kullanıcının mesajını analiz et. Eğer aşağıdaki sinyallerden en az biri varsa, ant-colony-workflow.md steering'indeki faz modelini (Keşif → Plan → Yürütme → Denetim) uygula:\n\nTetikleme sinyalleri:\n- \"refactor\", \"migration\", \"taşı\", \"dönüştür\", \"tüm dosyalar\", \"sistem geneli\", \"her yerde\"\n- \"colony\", \"karınca\", \"paralel\", \"çoklu ajan\", \"multi-agent\"\n- 3+ dosya veya modül adı geçmesi\n- \"büyük değişiklik\", \"kapsamlı\", \"proje genelinde\"\n\nSinyal YOKSA → bu hatırlatmayı yoksay, normal çalış.\nSinyal VARSA → Faz 1 (Keşif) ile başla: context-gatherer sub-agent çağır, Qdrant'ta workspace-fact ve bug-fix ara, SCOUT_INTEL formatında iç plan oluştur."
+  }
+}

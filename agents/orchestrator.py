@@ -600,14 +600,20 @@ class OrchestratorAgent(BaseAgent):
         return await super().handle_tool_call(fn_name, fn_args, thread)
 
     async def _handle_idea_to_project(self, fn_args: dict, thread: Thread) -> str:
-        """Run the Idea-to-Project pipeline through specialist agents."""
+        """Run the Idea-to-Project pipeline through specialist agents.
+
+        Improvements:
+        - Context summarization between phases to prevent bloat
+        - Quality gate on final output
+        - Phase-level progress events
+        """
         from tools.idea_to_project import (
             PHASES,
             get_phase_prompt,
             detect_project_type,
             save_project_output,
         )
-        from pipelines.engine import PipelineEngine
+        from pipelines.engine import PipelineEngine, _summarize_phase_output
 
         idea = fn_args["idea"]
         project_type = fn_args.get("project_type") or detect_project_type(idea)
@@ -631,10 +637,15 @@ class OrchestratorAgent(BaseAgent):
         if self._live_monitor:
             engine.set_live_monitor(self._live_monitor)
 
-        for phase in phases_to_run:
-            self._emit("pipeline", f"📋 Faz: {phase['name']}")
+        for i, phase in enumerate(phases_to_run):
+            self._emit("pipeline", f"📋 Faz {i+1}/{len(phases_to_run)}: {phase['name']}")
 
-            prompt = get_phase_prompt(phase["id"], idea, prev_result)
+            # Summarize previous result to prevent context bloat
+            compressed_prev = prev_result
+            if len(prev_result) > 2000 and phase["id"] not in ("analyze",):
+                compressed_prev = _summarize_phase_output(phase["id"], prev_result)
+
+            prompt = get_phase_prompt(phase["id"], idea, compressed_prev)
             agent_role = AgentRole(phase["agent"])
             agent = engine.get_agent(agent_role)
 
@@ -655,7 +666,17 @@ class OrchestratorAgent(BaseAgent):
                 parts.append(f"{'='*60}")
                 parts.append(results[phase["id"]])
 
-        return "\n".join(parts)
+        final = "\n".join(parts)
+
+        # Quality Gate on final output
+        try:
+            final, qg_passed = await self._quality_gate(final, idea, thread)
+            if not qg_passed and self._live_monitor:
+                self._live_monitor.emit("pipeline", "orchestrator", "⚠️ Quality Gate: refinement önerildi")
+        except Exception:
+            pass
+
+        return final
 
     async def _handle_generate_presentation(self, fn_args: dict, thread: Thread) -> str:
         """Generate a professional PPTX presentation with deep research + AI visuals.
@@ -2139,7 +2160,8 @@ class OrchestratorAgent(BaseAgent):
 
     async def _quality_gate(self, result: str, user_input: str, thread: Thread) -> tuple[str, bool]:
         """
-        Phase 5.5: Quality Gate — Critic (Qwen) reviews the final synthesis.
+        Phase 5.5: Quality Gate — Critic reviews the final synthesis using
+        rubric-based evaluation from agentic_eval when available.
         Returns (result, passed). If quality < 0.6, returns (result, False) for refinement.
         """
         if not result or len(result.strip()) < 100:
@@ -2151,24 +2173,44 @@ class OrchestratorAgent(BaseAgent):
             if hasattr(self, '_live_monitor') and self._live_monitor:
                 critic.set_live_monitor(self._live_monitor)
 
-            review_prompt = (
-                f"QUALITY REVIEW — rate this response.\n\n"
-                f"USER REQUEST: {user_input[:300]}\n\n"
-                f"RESPONSE TO REVIEW:\n{result[:3000]}\n\n"
-                f"Rate quality 0.0-1.0. Output ONLY valid JSON:\n"
-                f'{{"quality": 0.0-1.0, "issues": ["issue1"], "pass": true/false}}'
-            )
+            # Try rubric-based evaluation from agentic_eval
+            try:
+                from tools.agentic_eval import (
+                    build_rubric_eval_prompt,
+                    compute_weighted_score,
+                    detect_eval_task_type,
+                    get_rubric,
+                )
+
+                task_type = detect_eval_task_type(user_input)
+                rubric = get_rubric(task_type)
+                review_prompt = build_rubric_eval_prompt(result, user_input, rubric)
+            except Exception:
+                # Fallback to simple prompt
+                review_prompt = (
+                    f"QUALITY REVIEW — rate this response.\n\n"
+                    f"USER REQUEST: {user_input[:300]}\n\n"
+                    f"RESPONSE TO REVIEW:\n{result[:3000]}\n\n"
+                    f"Rate quality 0.0-1.0. Output ONLY valid JSON:\n"
+                    f'{{"quality": 0.0-1.0, "issues": ["issue1"], "pass": true/false}}'
+                )
+                rubric = None
 
             review_result = await critic.execute(review_prompt, thread)
 
             # Parse quality score
             try:
-                # Try to extract JSON from response
                 json_match = re.search(r'\{[^}]+\}', review_result)
                 if json_match:
                     review_data = json.loads(json_match.group())
-                    quality = float(review_data.get("quality", 0.7))
-                    passed = review_data.get("pass", True)
+
+                    # Compute weighted score from rubric dimensions if available
+                    if rubric and review_data.get("dimensions"):
+                        quality = compute_weighted_score(review_data["dimensions"], rubric)
+                        passed = quality >= 0.6 and review_data.get("approved", quality >= 0.8)
+                    else:
+                        quality = float(review_data.get("quality", review_data.get("overall_score", 0.7)))
+                        passed = review_data.get("pass", review_data.get("approved", True))
 
                     self._emit(
                         "pipeline",

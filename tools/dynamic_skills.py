@@ -238,25 +238,35 @@ def search_skills(query: str, max_results: int = 3) -> list[dict[str, Any]]:
         for sc, s in scored[:max_results]
     ]
 
-    if results:
-        ids = [r["id"] for r in results]
+    # NOTE: use_count is NOT incremented on search — only on actual skill usage
+    # (get_skill_knowledge / get_full_skill_context). This prevents search-inflation
+    # of popularity scores in optimization_engine.rank_skills().
+    return results
+
+
+def _increment_use_count(skill_id: str) -> None:
+    """Increment use_count when a skill is actually used (not just searched)."""
+    try:
         conn = get_conn()
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE skills SET use_count = use_count + 1 WHERE id = ANY(%s)",
-                    (ids,),
+                    "UPDATE skills SET use_count = use_count + 1 WHERE id = %s",
+                    (skill_id,),
                 )
             conn.commit()
         finally:
             release_conn(conn)
-
-    return results
+    except Exception:
+        pass  # Never break skill usage for metrics
 
 
 def get_skill_knowledge(skill_id: str) -> str | None:
     skill = get_skill(skill_id)
-    return skill["knowledge"] if skill else None
+    if skill:
+        _increment_use_count(skill_id)
+        return skill["knowledge"]
+    return None
 
 
 # Stopwords to avoid as skill name / keyword (Turkish + English)
@@ -476,6 +486,8 @@ def get_full_skill_context(skill_id: str) -> str | None:
 
     if not knowledge and not ref_content:
         return None
+
+    _increment_use_count(skill_id)
 
     parts = []
     if knowledge:

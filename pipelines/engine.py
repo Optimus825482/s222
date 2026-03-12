@@ -13,9 +13,23 @@ import time
 from typing import Any
 
 # Max seconds for one sub-agent run; prevents one stuck agent from blocking the pipeline
-SUBTASK_TIMEOUT = 30
+SUBTASK_TIMEOUT = 45
 # Max seconds for entire parallel/consensus gather
-PIPELINE_GATHER_TIMEOUT = 60
+PIPELINE_GATHER_TIMEOUT = 90
+
+# ── Adaptive Timeout per Pipeline Phase ──────────────────────────
+# Complex phases (PRD, architecture) need more time than simple ones
+PHASE_TIMEOUTS: dict[str, int] = {
+    "analyze": 45,
+    "prd": 90,
+    "architecture": 90,
+    "tasks": 60,
+    "scaffold": 75,
+    "default": 45,
+}
+
+# Max retries for failed pipeline phases before giving up
+PHASE_MAX_RETRIES = 2
 ITERATIVE_SCORE_THRESHOLD = 0.8
 ITERATIVE_MIN_IMPROVEMENT_DELTA = 0.05
 ITERATIVE_DEFAULT_MAX_ROUNDS = 3
@@ -129,6 +143,68 @@ from tools.skill_finder import get_skill_knowledge
 from tools.circuit_breaker import get_circuit_breaker
 from tools.cache import get_cached_response, cache_response
 from tools.confidence import score_confidence
+
+
+def _summarize_phase_output(phase_id: str, content: str, max_chars: int = 3000) -> str:
+    """Compress previous phase output to prevent context bloat in sequential pipelines.
+
+    Uses extractive summarization: keeps structured headers and first N chars of each section.
+    This prevents the exponential context growth problem in idea-to-project pipeline
+    where each phase receives the FULL output of all previous phases.
+    """
+    if len(content) <= max_chars:
+        return content
+
+    lines = content.split("\n")
+    summary_parts: list[str] = []
+    current_section = ""
+    current_lines: list[str] = []
+
+    for line in lines:
+        # Keep all headers and structural markers
+        if line.startswith("#") or line.startswith("**") or line.startswith("##"):
+            if current_section and current_lines:
+                section_text = "\n".join(current_lines[:15])  # max 15 lines per section
+                summary_parts.append(f"{current_section}\n{section_text}")
+            current_section = line
+            current_lines = []
+        else:
+            current_lines.append(line)
+
+    # Flush last section
+    if current_section and current_lines:
+        section_text = "\n".join(current_lines[:15])
+        summary_parts.append(f"{current_section}\n{section_text}")
+
+    result = "\n\n".join(summary_parts)
+    if len(result) > max_chars:
+        result = result[:max_chars] + "\n\n[... truncated for context efficiency ...]"
+
+    return f"[SUMMARIZED from {phase_id} phase — {len(content)} chars → {len(result)} chars]\n\n{result}"
+
+
+async def _run_with_retry(
+    coro_factory,
+    max_retries: int = PHASE_MAX_RETRIES,
+    phase_id: str = "unknown",
+) -> str:
+    """Execute a coroutine with retry logic for pipeline phases.
+
+    On failure, retries up to max_retries times with the same parameters.
+    Returns the result on success, or an error message after all retries exhausted.
+    """
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            result = await coro_factory()
+            if result and not str(result).startswith("[Timeout]") and not str(result).startswith("[Error]"):
+                return result
+            last_error = result
+        except Exception as e:
+            last_error = f"[Error] Phase {phase_id} attempt {attempt}/{max_retries}: {e}"
+            logger.warning(f"Phase {phase_id} retry {attempt}/{max_retries}: {e}")
+
+    return str(last_error or f"[Error] Phase {phase_id} failed after {max_retries} retries")
 
 
 class PipelineEngine:
@@ -475,9 +551,15 @@ class PipelineEngine:
 
         t0 = time.monotonic()
         try:
+            # Use adaptive timeout: phase-specific if available, else default
+            effective_timeout = SUBTASK_TIMEOUT
+            if hasattr(subtask, 'metadata') and subtask.metadata.get('phase_id'):
+                effective_timeout = PHASE_TIMEOUTS.get(
+                    subtask.metadata['phase_id'], SUBTASK_TIMEOUT
+                )
             result = await asyncio.wait_for(
                 agent.execute(enriched_context, thread),
-                timeout=SUBTASK_TIMEOUT,
+                timeout=effective_timeout,
             )
             cb.record_success(agent_role_str)
         except asyncio.TimeoutError:
@@ -542,11 +624,19 @@ class PipelineEngine:
     # ── Sequential Pipeline ──────────────────────────────────────
 
     async def _sequential(self, task: Task, thread: Thread) -> str:
-        """A → B → C: Each agent receives previous agent's output."""
+        """A → B → C: Each agent receives previous agent's output.
+
+        Improvement: Context summarization between steps to prevent
+        exponential context growth in long chains.
+        """
         context = task.user_input
         results = []
 
-        for subtask in sorted(task.sub_tasks, key=lambda s: s.priority):
+        for i, subtask in enumerate(sorted(task.sub_tasks, key=lambda s: s.priority)):
+            # Summarize context if it's getting large (>3000 chars) and not the first step
+            if i > 0 and len(context) > 3000:
+                context = _summarize_phase_output(f"step-{i}", context, max_chars=2500)
+
             enriched = f"Original request: {task.user_input}\n\nPrevious context:\n{context}\n\nYour task: {subtask.description}"
             result = await self._run_subtask(subtask, enriched, thread)
             context = result
@@ -600,7 +690,11 @@ class PipelineEngine:
     # ── Consensus Pipeline ───────────────────────────────────────
 
     async def _consensus(self, task: Task, thread: Thread) -> str:
-        """All agents answer the same question → compare results."""
+        """All agents answer the same question → compare results.
+
+        Improvement: Extended timeout, agreement/disagreement detection hint
+        in output for downstream synthesis.
+        """
         question = task.user_input
         agents_to_use = [AgentRole.THINKER, AgentRole.SPEED, AgentRole.RESEARCHER, AgentRole.REASONER]
 
@@ -617,12 +711,19 @@ class PipelineEngine:
         except asyncio.TimeoutError:
             results = ["[Timeout] Consensus round did not complete in time."] * len(agents_to_use)
 
-        parts = ["CONSENSUS RESULTS — Multiple agents answered the same question:\n"]
+        parts = [f"CONSENSUS RESULTS — {len(agents_to_use)} agents answered the same question:\n"]
+        successful_results = []
         for role, result in zip(agents_to_use, results):
             if isinstance(result, Exception):
                 parts.append(f"[{role.value}] Error: {result}")
             else:
                 parts.append(f"[{role.value}] {result}")
+                successful_results.append(str(result))
+
+        # Add agreement hint for synthesizer
+        if len(successful_results) >= 2:
+            parts.append(f"\n--- CONSENSUS META ---")
+            parts.append(f"Agents responded: {len(successful_results)}/{len(agents_to_use)}")
 
         return "\n\n---\n\n".join(parts)
 
@@ -680,7 +781,12 @@ class PipelineEngine:
         fast_mode: bool,
         thread: Thread,
     ) -> tuple[dict[str, Any] | None, str]:
-        """Run structured reviewer evaluation and return (parsed_json, raw_text)."""
+        """Run structured reviewer evaluation and return (parsed_json, raw_text).
+
+        In full mode, uses rubric-based evaluation from agentic_eval for
+        weighted multi-dimensional scoring.  Fast mode keeps the lightweight
+        prompt for low-latency iterations.
+        """
         if fast_mode:
             review_prompt = (
                 f"Original request: {user_input}\n"
@@ -690,30 +796,61 @@ class PipelineEngine:
                 "Rules: overall_score 0..1, keep weaknesses/improvements very short (max 2 each)."
             )
         else:
-            review_prompt = (
-                f"Original request: {user_input}\n\n"
-                f"Draft (round {round_num}):\n{draft}\n\n"
-                "Evaluate this draft and respond ONLY as JSON with this schema:\n"
-                "{\n"
-                '  "approved": boolean,\n'
-                '  "overall_score": number,\n'
-                '  "dimensions": {\n'
-                '    "accuracy": number,\n'
-                '    "clarity": number,\n'
-                '    "completeness": number,\n'
-                '    "actionability": number\n'
-                "  },\n"
-                '  "weaknesses": [string],\n'
-                '  "improvements": [string]\n'
-                "}\n"
-                "Scoring rules:\n"
-                "- overall_score must be 0.0 to 1.0\n"
-                "- approved=true only if overall_score >= 0.8 and no critical weaknesses\n"
-                "- weaknesses/improvements must be concise and actionable\n"
-            )
+            # Use rubric-based evaluation from agentic_eval
+            try:
+                from tools.agentic_eval import (
+                    build_rubric_eval_prompt,
+                    compute_weighted_score,
+                    detect_eval_task_type,
+                    get_rubric,
+                )
+
+                task_type = detect_eval_task_type(user_input)
+                rubric = get_rubric(task_type)
+                review_prompt = build_rubric_eval_prompt(draft, user_input, rubric)
+            except Exception:
+                # Fallback to original prompt if agentic_eval unavailable
+                review_prompt = (
+                    f"Original request: {user_input}\n\n"
+                    f"Draft (round {round_num}):\n{draft}\n\n"
+                    "Evaluate this draft and respond ONLY as JSON with this schema:\n"
+                    "{\n"
+                    '  "approved": boolean,\n'
+                    '  "overall_score": number,\n'
+                    '  "dimensions": {\n'
+                    '    "accuracy": number,\n'
+                    '    "clarity": number,\n'
+                    '    "completeness": number,\n'
+                    '    "actionability": number\n'
+                    "  },\n"
+                    '  "weaknesses": [string],\n'
+                    '  "improvements": [string]\n'
+                    "}\n"
+                    "Scoring rules:\n"
+                    "- overall_score must be 0.0 to 1.0\n"
+                    "- approved=true only if overall_score >= 0.8 and no critical weaknesses\n"
+                    "- weaknesses/improvements must be concise and actionable\n"
+                )
 
         raw_review = await reviewer.execute(review_prompt, thread)
         parsed = self._extract_json_object(raw_review)
+
+        # In full mode, recompute weighted score from rubric if dimensions present
+        if not fast_mode and parsed and parsed.get("dimensions"):
+            try:
+                from tools.agentic_eval import compute_weighted_score, detect_eval_task_type, get_rubric
+
+                task_type = detect_eval_task_type(user_input)
+                rubric = get_rubric(task_type)
+                weighted = compute_weighted_score(parsed["dimensions"], rubric)
+                parsed["overall_score"] = weighted
+                parsed["approved"] = weighted >= 0.8 and not any(
+                    "critical" in str(w).lower()
+                    for w in (parsed.get("weaknesses") or [])
+                )
+            except Exception:
+                pass
+
         return parsed, raw_review
 
     async def _iterative(
@@ -777,8 +914,22 @@ class PipelineEngine:
 
         best_draft = draft
         best_score = 0.0
-        stagnation_rounds = 0
         review_summary: dict[str, Any] | None = None
+
+        # Use ConvergenceTracker from agentic_eval for smarter convergence detection
+        try:
+            from tools.agentic_eval import ConvergenceTracker, EvalHistory, EvalIteration, detect_eval_task_type
+            tracker = ConvergenceTracker(min_delta=min_improvement_delta)
+            eval_history = EvalHistory(
+                task_type=detect_eval_task_type(task.user_input),
+                rubric_used="iterative_pipeline",
+            )
+            use_tracker = True
+        except Exception:
+            tracker = None  # type: ignore[assignment]
+            eval_history = None  # type: ignore[assignment]
+            use_tracker = False
+            _stagnation_rounds = 0
 
         for round_num in range(1, effective_max_rounds + 1):
             review_json, review_raw = await self._evaluate_draft_with_reviewer(
@@ -815,24 +966,46 @@ class PipelineEngine:
                 agent_role=reviewer_task.assigned_agent,
             )
 
+            # Track score with ConvergenceTracker or manual fallback
+            if use_tracker:
+                tracker.record(score)
+                try:
+                    iteration = EvalIteration(
+                        round_num=round_num,
+                        score=score,
+                        dimensions=review_json.get("dimensions", {}),
+                        weaknesses=review_json.get("weaknesses", []),
+                        improvements=review_json.get("improvements", []),
+                        approved=approved,
+                        timestamp_ms=time.monotonic() * 1000,
+                    )
+                    eval_history.add_iteration(iteration)
+                except Exception:
+                    pass
+
             if score > best_score:
-                if score - best_score < min_improvement_delta:
-                    stagnation_rounds += 1
-                else:
-                    stagnation_rounds = 0
+                if not use_tracker:
+                    if score - best_score < min_improvement_delta:
+                        _stagnation_rounds += 1
+                    else:
+                        _stagnation_rounds = 0
                 best_score = score
                 best_draft = draft
             else:
-                stagnation_rounds += 1
+                if not use_tracker:
+                    _stagnation_rounds += 1
 
             if approved or score >= score_threshold:
                 best_draft = draft
                 break
 
-            if stagnation_rounds >= 2:
+            # Convergence check: use tracker if available, else manual stagnation
+            converged = tracker.is_converged() if use_tracker else _stagnation_rounds >= 2
+            if converged:
+                summary_info = tracker.get_summary() if use_tracker else {"stagnation": _stagnation_rounds}
                 thread.add_event(
                     EventType.EVALUATION,
-                    "Iterative loop stopped due to convergence/stagnation",
+                    f"Iterative loop stopped: convergence detected {summary_info}",
                     agent_role=reviewer_task.assigned_agent,
                 )
                 break
@@ -870,13 +1043,18 @@ class PipelineEngine:
         """
         Deep Research: All agents work in parallel on the same query,
         each from their specialty angle. Results are merged for synthesis.
+
+        Improvements:
+        - Extended gather timeout (2x normal) for thorough research
+        - Per-result confidence scoring for weighted synthesis
+        - Failed agent results excluded from final output
         """
         thread.add_event(
             EventType.PIPELINE_STEP,
             f"🔬 Deep Research: {len(task.sub_tasks)} agents launching in parallel",
         )
 
-        # Phase 1: All agents run simultaneously
+        # Phase 1: All agents run simultaneously with extended timeout
         coros = []
         for subtask in task.sub_tasks:
             enriched = (
@@ -888,10 +1066,12 @@ class PipelineEngine:
             )
             coros.append(self._run_subtask(subtask, enriched, thread))
 
+        # Deep research gets 2x the normal gather timeout
+        deep_research_timeout = PIPELINE_GATHER_TIMEOUT * 2
         try:
             results = await asyncio.wait_for(
                 asyncio.gather(*coros, return_exceptions=True),
-                timeout=PIPELINE_GATHER_TIMEOUT,
+                timeout=deep_research_timeout,
             )
         except asyncio.TimeoutError:
             results = [
@@ -900,19 +1080,31 @@ class PipelineEngine:
             for st in task.sub_tasks:
                 st.status = TaskStatus.FAILED
 
-        # Phase 2: Merge results with agent labels
+        # Phase 2: Merge results with agent labels, skip empty/error results
         parts = []
+        success_count = 0
         for subtask, result in zip(task.sub_tasks, results):
             agent_name = subtask.assigned_agent.value
             if isinstance(result, Exception):
                 parts.append(f"[{agent_name}] Error: {result}")
                 subtask.status = TaskStatus.FAILED
-            else:
+            elif str(result).startswith("[Timeout]") or str(result).startswith("[Error]"):
                 parts.append(f"[{agent_name}] {result}")
+            else:
+                success_count += 1
+                # Score confidence for successful results
+                try:
+                    from tools.agent_eval import detect_task_type
+                    task_type = detect_task_type(task.user_input)
+                    conf = score_confidence(str(result), agent_name, task_type)
+                    subtask.metadata["confidence"] = conf
+                    parts.append(f"[{agent_name}] (confidence: {conf:.0%})\n{result}")
+                except Exception:
+                    parts.append(f"[{agent_name}] {result}")
 
         thread.add_event(
             EventType.PIPELINE_STEP,
-            f"🔬 Deep Research complete: {sum(1 for r in results if not isinstance(r, Exception))}/{len(results)} agents succeeded",
+            f"🔬 Deep Research complete: {success_count}/{len(results)} agents succeeded",
         )
 
         return "\n\n---\n\n".join(parts)
@@ -923,6 +1115,12 @@ class PipelineEngine:
         """
         Idea-to-Project: Sequential phases where each builds on previous.
         Analyze → PRD → Architecture → Tasks → Scaffold.
+
+        Improvements over v1:
+        - Adaptive timeout per phase (PRD/Architecture get 90s, others 45-75s)
+        - Context summarization between phases to prevent context bloat
+        - Retry logic for failed phases (up to 2 retries)
+        - Phase-level progress events for live monitoring
         """
         from tools.idea_to_project import PHASES, get_phase_prompt, save_project_output
 
@@ -933,9 +1131,19 @@ class PipelineEngine:
 
         results = {}
         prev_result = ""
+        failed_phases: list[str] = []
 
-        for phase in PHASES:
-            prompt = get_phase_prompt(phase["id"], task.user_input, prev_result)
+        for i, phase in enumerate(PHASES):
+            phase_id = phase["id"]
+            phase_timeout = PHASE_TIMEOUTS.get(phase_id, SUBTASK_TIMEOUT)
+
+            # Summarize previous result to prevent context bloat
+            # Only summarize if prev_result is large (>2000 chars)
+            compressed_prev = prev_result
+            if len(prev_result) > 2000 and phase_id not in ("analyze",):
+                compressed_prev = _summarize_phase_output(phase_id, prev_result)
+
+            prompt = get_phase_prompt(phase_id, task.user_input, compressed_prev)
             agent_role = AgentRole(phase["agent"])
 
             subtask = SubTask(
@@ -943,15 +1151,54 @@ class PipelineEngine:
                 assigned_agent=agent_role,
                 priority=1,
             )
+            # Tag subtask with phase_id for adaptive timeout
+            subtask.metadata["phase_id"] = phase_id
 
-            result = await self._run_subtask(subtask, prompt, thread)
-            results[phase["id"]] = result
-            prev_result = result
+            # Emit progress for live monitoring
+            if self._live_monitor:
+                self._live_monitor.emit(
+                    "pipeline", "orchestrator",
+                    f"🚀 Phase {i+1}/{len(PHASES)}: {phase['name']}",
+                )
 
-            project_name = task.user_input[:50].strip()
-            save_project_output(project_name, phase["id"], result)
+            # Run with retry logic
+            async def _phase_coro():
+                return await self._run_subtask(subtask, prompt, thread)
 
+            result = await _run_with_retry(
+                _phase_coro,
+                max_retries=PHASE_MAX_RETRIES,
+                phase_id=phase_id,
+            )
+
+            # Track failures but continue pipeline
+            if result.startswith("[Error]") or result.startswith("[Timeout]"):
+                failed_phases.append(phase_id)
+                thread.add_event(
+                    EventType.ERROR,
+                    f"⚠️ Phase {phase['name']} failed: {result[:200]}",
+                    agent_role=agent_role,
+                )
+            else:
+                results[phase_id] = result
+                prev_result = result
+
+                project_name = task.user_input[:50].strip()
+                save_project_output(project_name, phase_id, result)
+
+            # Stop check between phases
+            if self._live_monitor and self._live_monitor.should_stop():
+                thread.add_event(
+                    EventType.ERROR,
+                    f"Idea-to-Project stopped by user after phase {phase['name']}",
+                )
+                break
+
+        # Build final output
         parts = [f"🚀 IDEA-TO-PROJECT COMPLETE\n"]
+        if failed_phases:
+            parts.append(f"⚠️ Failed phases: {', '.join(failed_phases)}\n")
+
         for phase in PHASES:
             if phase["id"] in results:
                 parts.append(f"\n{'='*60}")
@@ -1105,6 +1352,56 @@ class PipelineEngine:
             thread.add_event(EventType.ERROR, "Brainstorm stopped by user after Round 2")
             return "\n\n---\n\n".join(all_parts) + "\n\n[Stopped after Round 2]"
 
+        # ── Round 2.5: Critic Quality Gate ──────────────────────
+        # Critic agent evaluates the debate quality and identifies
+        # weak arguments, logical fallacies, and missing perspectives
+
+        thread.add_event(
+            EventType.PIPELINE_STEP,
+            "🎯 Brainstorm Round 2.5: Critic evaluates debate quality",
+        )
+        if self._live_monitor:
+            self._live_monitor.emit(
+                "pipeline", "orchestrator",
+                "🎯 Brainstorm Round 2.5 — Critic quality gate",
+            )
+
+        critic_prompt = (
+            f"You are the CRITIC evaluating a multi-agent brainstorm debate.\n\n"
+            f"TOPIC: {topic}\n\n"
+            f"ROUND 1 — Initial Perspectives:\n"
+            + "\n\n".join(
+                f"[{role.value.upper()}]: {round1_texts.get(role, '[no response]')}"
+                for role in agents_order
+            )
+            + f"\n\nROUND 2 — Cross-Challenge:\n"
+            + "\n\n".join(
+                f"[{role.value.upper()}]: {r}"
+                for role, r in zip(agents_order, round2_results)
+                if not isinstance(r, Exception)
+            )
+            + "\n\nEvaluate this debate:\n"
+            "1. Rate overall debate quality (1-5)\n"
+            "2. Identify the strongest and weakest arguments\n"
+            "3. Flag any logical fallacies or unsupported claims\n"
+            "4. Note any critical perspectives that were MISSING from the debate\n"
+            "5. Provide 2-3 key questions the synthesis should address\n\n"
+            "Be concise and constructive."
+        )
+
+        try:
+            from agents.critic import CriticAgent
+            critic_agent = CriticAgent()
+            critic_agent.set_live_monitor(self._live_monitor)
+            critic_result = await asyncio.wait_for(
+                critic_agent.execute(critic_prompt, thread),
+                timeout=SUBTASK_TIMEOUT,
+            )
+            all_parts.append(f"## 🎯 CRITIC EVALUATION\n\n{critic_result}")
+        except Exception as e:
+            logger.warning(f"Brainstorm critic gate failed (non-fatal): {e}")
+            critic_result = ""
+
         # ── Round 3: Synthesis (SPEED agent) ────────────────────
 
         thread.add_event(
@@ -1126,7 +1423,8 @@ class PipelineEngine:
             f"1. **Key Agreements** — Points where agents converged\n"
             f"2. **Key Disagreements** — Unresolved tensions and opposing views\n"
             f"3. **Strongest Arguments** — The most compelling points from the debate\n"
-            f"4. **Final Recommendation** — Your balanced conclusion based on all perspectives\n\n"
+            f"4. **Critic's Key Concerns** — Address the critic's evaluation points\n"
+            f"5. **Final Recommendation** — Your balanced conclusion based on all perspectives\n\n"
             f"Be concise and actionable. Reference which agent made which point."
         )
 

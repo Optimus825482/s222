@@ -1692,21 +1692,36 @@ class BaseAgent(ABC):
                 continue  # Back to LLM for continuation
 
             # ── Reflexion: Self-evaluation and improvement ───────────────
+            # Quality-critical roles get multi-iteration agentic eval;
+            # others get the standard single-pass reflexion.
             try:
                 import config
                 if config.REFLEXION_ENABLED:
                     from tools.reflexion import evaluate_and_improve
+
+                    _quality_critical_roles = {"thinker", "reasoner", "researcher"}
+                    _max_iter = (
+                        config.REFLEXION_MAX_ITERATIONS
+                        if self.role.value not in _quality_critical_roles
+                        else max(config.REFLEXION_MAX_ITERATIONS, 2)
+                    )
+
                     content, reflexion_eval = await evaluate_and_improve(
                         agent=self,
                         question=task_input,
                         response=content,
                         threshold=config.REFLEXION_SCORE_THRESHOLD,
-                        max_iterations=config.REFLEXION_MAX_ITERATIONS,
+                        max_iterations=_max_iter,
                     )
                     if reflexion_eval:
+                        _is_agentic = reflexion_eval.get("agentic_eval", False)
+                        _scores = reflexion_eval.get("scores", {})
+                        _score_sum = sum(_scores.values()) if _scores else 0
+                        _score_count = len(_scores) if _scores else 1
                         thread.add_event(
                             EventType.AGENT_THINKING,
-                            f"Reflexion: avg_score={sum(reflexion_eval.get('scores', {}).values()) / 5:.1f}/5",
+                            f"Reflexion{'(rubric)' if _is_agentic else ''}: "
+                            f"avg_score={_score_sum / max(_score_count, 1):.1f}/5",
                             agent_role=self.role,
                         )
             except Exception as e:
@@ -2115,45 +2130,96 @@ class BaseAgent(ABC):
             prompt = fn_args["prompt"]
             width = fn_args.get("width", 800)
             height = fn_args.get("height", 450)
+            model = (fn_args.get("model") or "flux").lower().strip()
+            if model not in {"flux", "zimage", "turbo", "imagen-4", "grok-imagine"}:
+                model = "flux"
             encoded_prompt = urllib.parse.quote(prompt)
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&width={width}&height={height}"
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model={model}&width={width}&height={height}"
             # Download image to data/images/
             images_dir = os.path.join("data", "images")
             os.makedirs(images_dir, exist_ok=True)
             filename = f"img_{uuid_module.uuid4().hex[:10]}.jpg"
             filepath = os.path.join(images_dir, filename)
-            # Retry up to 3 times — Pollinations can be slow on first request
             last_error = None
-            for attempt in range(3):
-                try:
-                    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-                        resp = await client.get(image_url)
-                        if resp.status_code == 200 and len(resp.content) > 1000:
-                            with open(filepath, "wb") as f:
-                                f.write(resp.content)
-                            download_url = f"/api/images/{filename}/download"
-                            return (
-                                f"Image generated successfully.\n\n"
-                                f"![{prompt}]({image_url})\n\n"
-                                f"**Download:** [{filename}]({download_url})\n\n"
-                                f"Direct URL: {image_url}"
-                            )
-                        elif resp.status_code == 200:
-                            # Got 200 but tiny response — likely placeholder, retry
-                            last_error = "Response too small, retrying..."
-                            await asyncio.sleep(2)
-                            continue
-                        else:
-                            last_error = f"HTTP {resp.status_code}"
-                            await asyncio.sleep(2)
-                            continue
-                except Exception as e:
-                    last_error = str(e)
+
+            async def _try_download(
+                url: str, timeout: float, headers: dict | None = None
+            ) -> tuple[bool, str | None]:
+                nonlocal last_error
+                for _ in range(3):
+                    try:
+                        async with httpx.AsyncClient(
+                            timeout=timeout, follow_redirects=True
+                        ) as client:
+                            resp = await client.get(url, headers=headers)
+                            if resp.status_code == 200 and len(resp.content) > 1000:
+                                with open(filepath, "wb") as f:
+                                    f.write(resp.content)
+                                return True, None
+                            if resp.status_code == 200:
+                                last_error = "Response too small"
+                            else:
+                                last_error = f"HTTP {resp.status_code}"
+                    except Exception as e:
+                        last_error = str(e)
                     await asyncio.sleep(2)
-                    continue
-            # All retries failed — still return the URL for direct access
+                return False, last_error
+
+            # Prefer authenticated generation endpoint when API key is available.
+            api_key = (
+                os.environ.get("POLLINATIONS_API_KEY")
+                or os.environ.get("Pollinations_api_key")
+                or ""
+            ).strip()
+            if api_key:
+                gen_url = (
+                    f"https://gen.pollinations.ai/image/{encoded_prompt}"
+                    f"?model={model}&width={width}&height={height}&nologo=true&enhance=true"
+                )
+                ok, _ = await _try_download(
+                    gen_url,
+                    timeout=65.0,
+                    headers={
+                        "Accept": "image/jpeg, image/png",
+                        "Authorization": f"Bearer {api_key}",
+                    },
+                )
+                if not ok and model != "flux":
+                    flux_url = (
+                        f"https://gen.pollinations.ai/image/{encoded_prompt}"
+                        f"?model=flux&width={width}&height={height}&nologo=true&enhance=true"
+                    )
+                    ok, _ = await _try_download(
+                        flux_url,
+                        timeout=65.0,
+                        headers={
+                            "Accept": "image/jpeg, image/png",
+                            "Authorization": f"Bearer {api_key}",
+                        },
+                    )
+                if ok:
+                    download_url = f"/api/images/{filename}/download"
+                    return (
+                        f"Image generated successfully.\n\n"
+                        f"![{prompt}]({image_url})\n\n"
+                        f"**Download:** [{filename}]({download_url})\n\n"
+                        f"Direct URL: {image_url}"
+                    )
+
+            # Public endpoint fallback.
+            ok, _ = await _try_download(image_url, timeout=20.0)
+            if ok:
+                download_url = f"/api/images/{filename}/download"
+                return (
+                    f"Image generated successfully.\n\n"
+                    f"![{prompt}]({image_url})\n\n"
+                    f"**Download:** [{filename}]({download_url})\n\n"
+                    f"Direct URL: {image_url}"
+                )
+
+            # All download attempts failed — still provide direct URL.
             return (
-                f"Image URL generated (download failed after 3 attempts: {last_error}).\n\n"
+                f"Image URL generated, but automatic download is currently unavailable ({last_error}).\n\n"
                 f"![{prompt}]({image_url})\n\n"
                 f"Direct URL: {image_url}"
             )

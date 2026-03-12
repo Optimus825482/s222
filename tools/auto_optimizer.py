@@ -759,13 +759,14 @@ class AutoOptimizer:
 
         return action_desc
 
-    def auto_apply_safe_recommendations(self, confidence_threshold: float = 0.8) -> dict[str, Any]:
+    def auto_apply_safe_recommendations(self, confidence_threshold: float = 0.8, max_per_cycle: int = 3) -> dict[str, Any]:
         """Auto-apply safe recommendations (high confidence, non-critical).
 
         Called by feedback loop after analyzing metrics.
 
         Args:
             confidence_threshold: Minimum confidence for auto-apply (default 0.8).
+            max_per_cycle: Maximum recommendations to apply per cycle (default 3).
 
         Returns summary of auto-applied recommendations.
         """
@@ -775,6 +776,10 @@ class AutoOptimizer:
         pending = self.get_recommendations(status="pending")
 
         for rec in pending:
+            # Rate limit: stop after max_per_cycle successful applies
+            if len(applied) >= max_per_cycle:
+                skipped.append({"id": rec["id"], "reason": "rate_limit_reached"})
+                continue
             # Skip critical and low confidence
             if rec.get("priority") == "critical":
                 skipped.append({"id": rec["id"], "reason": "critical_priority"})

@@ -92,9 +92,10 @@ class OptimizationEngine:
 
                 skill_score = (0.4 * avg_rating) + (0.3 * norm_use) + (0.3 * perf_score)
 
-                # Exploration bonus for underused skills
+                # Exploration bonus for underused skills (decays with usage)
                 if task_use < 5:
-                    skill_score += 0.5
+                    exploration_bonus = 0.3 * (1.0 - task_use / 5.0)
+                    skill_score += exploration_bonus
 
                 scored.append((skill_score, row["id"]))
 

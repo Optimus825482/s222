@@ -26,6 +26,36 @@ from tools.pg_connection import get_conn, release_conn, postgres_available
 
 logger = logging.getLogger(__name__)
 
+
+def _get_cached_tools_for_server(server_id: str) -> list[dict[str, Any]]:
+    """Return previously discovered tools for server as resilient fallback."""
+    cached_tools = list_discovered_tools(server_id)
+    return [
+        {
+            "id": f"{server_id}:{t.get('name', '')}",
+            "name": t.get("name", ""),
+            "description": t.get("description", ""),
+            "server": server_id,
+        }
+        for t in cached_tools
+        if t.get("name")
+    ]
+
+
+async def _read_stderr_excerpt(
+    proc: asyncio.subprocess.Process, limit: int = 600
+) -> str:
+    """Best-effort stderr snippet for diagnostics without blocking process lifecycle."""
+    try:
+        if proc.stderr is None:
+            return ""
+        chunk = await asyncio.wait_for(proc.stderr.read(limit), timeout=0.3)
+        text = chunk.decode(errors="ignore").strip()
+        return text[:limit]
+    except Exception:
+        return ""
+
+
 DATA_DIR = Path(__file__).parent.parent / "data"
 MCP_CONFIG_PATH = DATA_DIR / "mcp_servers.json"
 
@@ -383,7 +413,12 @@ async def discover_tools(server_id: str) -> list[dict[str, Any]]:
             return []
         handshake_ok = await _mcp_handshake(proc, stdout)
         if not handshake_ok:
-            logger.warning(f"MCP handshake failed for {server_id}, trying direct tools/list")
+            stderr_excerpt = await _read_stderr_excerpt(proc)
+            logger.warning(
+                "MCP handshake failed for %s, trying direct tools/list%s",
+                server_id,
+                f" | stderr={stderr_excerpt}" if stderr_excerpt else "",
+            )
             # Fallback: some older servers might not need handshake
             # Kill and restart for clean state
             try:
@@ -426,7 +461,7 @@ async def discover_tools(server_id: str) -> list[dict[str, Any]]:
 
         if not response or "result" not in response:
             logger.warning(f"No tools response from MCP server: {server_id}")
-            return []
+            return _get_cached_tools_for_server(server_id)
 
         tools = response.get("result", {}).get("tools", [])
 
@@ -468,10 +503,10 @@ async def discover_tools(server_id: str) -> list[dict[str, Any]]:
 
     except asyncio.TimeoutError:
         logger.warning(f"MCP server {server_id} timed out during tool discovery")
-        return []
+        return _get_cached_tools_for_server(server_id)
     except Exception as e:
         logger.error(f"MCP tool discovery failed for {server_id}: {e}")
-        return []
+        return _get_cached_tools_for_server(server_id)
 
 
 def list_discovered_tools(server_id: str | None = None) -> list[dict[str, Any]]:

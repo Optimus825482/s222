@@ -71,7 +71,7 @@ def get_relevant_teachings(
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            query_words = [w for w in query.lower().split() if len(w) > 2]
+            query_words = set(w for w in query.lower().split() if len(w) > 2)
             if not query_words:
                 cur.execute(
                     """SELECT * FROM teachings WHERE active = TRUE
@@ -86,14 +86,51 @@ def get_relevant_teachings(
             )
             rows = cur.fetchall()
 
+        # Build query bigrams for phrase matching
+        query_bigrams = set()
+        qw_list = query.lower().split()
+        for i in range(len(qw_list) - 1):
+            query_bigrams.add(f"{qw_list[i]} {qw_list[i+1]}")
+
         scored = []
         for row in rows:
             d = _as_row_dict(row)
-            text = (
-                str(d.get("instruction", "")) + " " + str(d.get("trigger_text", ""))
-            ).lower()
-            score = sum(1.0 for w in query_words if w in text)
+            instruction = str(d.get("instruction", "")).lower()
+            trigger = str(d.get("trigger_text", "")).lower()
+            text = instruction + " " + trigger
+            text_words = set(w for w in text.split() if len(w) > 2)
+
+            # Word overlap score
+            overlap = query_words & text_words
+            score = len(overlap) * 1.5
+
+            # Bigram match bonus (phrase-level matching)
+            for bg in query_bigrams:
+                if bg in text:
+                    score += 3.0
+
+            # Partial substring match for compound words
+            for qw in query_words:
+                if any(qw in tw or tw in qw for tw in text_words if len(tw) > 3):
+                    score += 0.5
+
+            # Category boost: corrections > preferences
+            cat = d.get("category", "")
+            if cat == "correction":
+                score *= 1.3
+            elif cat == "rule":
+                score *= 1.2
+
+            # Usage popularity
             score += float(d.get("use_count", 0)) * 0.1
+
+            # Recency boost (newer teachings slightly preferred)
+            created = str(d.get("created_at", ""))
+            if "2026" in created:
+                score += 0.3
+            elif "2025" in created:
+                score += 0.1
+
             if score > 0:
                 scored.append((score, d))
 
