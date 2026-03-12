@@ -1237,9 +1237,15 @@ class BaseAgent(ABC):
         12-Factor #8: Own your control flow.
         While-loop with break/continue for tool calls.
         """
+        # Strip injected skill blocks from event log display
+        _clean_input = task_input
+        _skill_tag = "--- INJECTED SKILLS"
+        if _skill_tag in _clean_input:
+            _clean_input = _clean_input[:_clean_input.index(_skill_tag)].strip()
+
         thread.add_event(
             EventType.AGENT_START,
-            f"Agent {self.role.value} starting: {task_input[:100]}",
+            f"Agent {self.role.value} starting: {_clean_input[:100]}",
             agent_role=self.role,
         )
 
@@ -1256,7 +1262,7 @@ class BaseAgent(ABC):
             AgentStatus.THINKING,
             progress_percent=10,
         )
-        self._emit("agent_start", f"Görev alındı: {task_input[:80]}")
+        self._emit("agent_start", f"Görev alındı: {_clean_input[:120]}")
 
         messages = await self.build_context(thread, task_input)
         tools = self.get_tools()

@@ -2128,15 +2128,28 @@ class OrchestratorAgent(BaseAgent):
         if not required:
             return []
 
+        # Deduplicate required skill list (LLM sometimes repeats the same skill)
+        seen_req: set[str] = set()
+        unique_required: list[str] = []
+        for s in required:
+            s_lower = s.lower().strip()
+            if s_lower and s_lower not in seen_req:
+                seen_req.add(s_lower)
+                unique_required.append(s)
+
         found_skills = []
         missing_skills = []
+        seen_found: set[str] = set()
 
         try:
             from tools.dynamic_skills import search_skills
-            for skill_id in required[:5]:  # Max 5 skill lookups
+            for skill_id in unique_required[:5]:  # Max 5 skill lookups
                 results = search_skills(query=skill_id, max_results=1)
                 if results:
-                    found_skills.append(results[0])
+                    sid = results[0].get("id", "")
+                    if sid not in seen_found:
+                        seen_found.add(sid)
+                        found_skills.append(results[0])
                 else:
                     missing_skills.append(skill_id)
         except Exception:
