@@ -190,16 +190,36 @@ class ChaosEngine:
         )
 
     async def _inject_agent_crash(self, target: str, duration_s: float, intensity: float) -> ChaosResult:
-        """Simulate agent crash by unsubscribing from event bus."""
+        """Simulate agent crash by unsubscribing from event bus, then auto-recover."""
         try:
             from core.event_bus import get_event_bus
             bus = get_event_bus()
+
+            # Snapshot subscriptions before removal for recovery
+            subs_backup = [
+                (ch, sub)
+                for ch, subs in bus._subscriptions.items()
+                for sub in subs
+                if sub.agent_role == target
+            ]
+
             removed = bus.unsubscribe_all(target)
             self._active_injections[f"crash:{target}"] = time.time() + duration_s
             logger.warning(f"CHAOS: Agent {target} crashed (removed {removed} subscriptions)")
+
+            # Schedule auto-recovery after duration_s
+            async def _recover():
+                await asyncio.sleep(duration_s)
+                for channel, sub in subs_backup:
+                    bus.subscribe(sub.agent_role, channel, sub.handler, sub.priority)
+                self._active_injections.pop(f"crash:{target}", None)
+                logger.info(f"CHAOS RECOVERY: Agent {target} re-subscribed ({len(subs_backup)} subs restored)")
+
+            asyncio.ensure_future(_recover())
+
             return ChaosResult(
                 ChaosScenario.AGENT_CRASH, target, True,
-                f"Agent {target} unsubscribed ({removed} subs removed), recovery in {duration_s}s",
+                f"Agent {target} unsubscribed ({removed} subs removed), auto-recovery in {duration_s}s",
             )
         except Exception as e:
             return ChaosResult(ChaosScenario.AGENT_CRASH, target, False, str(e))
@@ -215,7 +235,8 @@ class ChaosEngine:
 
     async def _inject_memory_pressure(self, target: str, duration_s: float, intensity: float) -> ChaosResult:
         """Simulate memory pressure by allocating temporary buffers."""
-        size_mb = int(10 * intensity)
+        capped_intensity = min(intensity, 1.0)
+        size_mb = int(10 * capped_intensity)  # max 10MB
         _pressure = [bytearray(1024 * 1024) for _ in range(size_mb)]
         await asyncio.sleep(min(duration_s, 3.0))
         del _pressure

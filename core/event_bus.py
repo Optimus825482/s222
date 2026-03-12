@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
@@ -115,7 +115,7 @@ class EventBus:
         # Channel → list of subscriptions
         self._subscriptions: dict[str, list[Subscription]] = defaultdict(list)
         # Message dedup set (exactly-once delivery)
-        self._delivered_ids: set[str] = set()
+        self._delivered_ids: OrderedDict[str, None] = OrderedDict()
         self._delivered_ids_max = 10_000
         # Middleware pipeline
         self._middlewares: list[Middleware] = []
@@ -207,12 +207,10 @@ class EventBus:
             if msg.id in self._delivered_ids:
                 logger.debug(f"Dedup: message {msg.id} already delivered")
                 return True
-            self._delivered_ids.add(msg.id)
-            # Evict old IDs to prevent memory leak
-            if len(self._delivered_ids) > self._delivered_ids_max:
-                # Remove oldest ~20%
-                to_remove = list(self._delivered_ids)[:self._delivered_ids_max // 5]
-                self._delivered_ids -= set(to_remove)
+            self._delivered_ids[msg.id] = None
+            # Evict oldest IDs to prevent memory leak
+            while len(self._delivered_ids) > self._delivered_ids_max:
+                self._delivered_ids.popitem(last=False)
 
         # Apply middlewares
         processed = await self._apply_middlewares(msg)
@@ -296,11 +294,16 @@ class EventBus:
         if msg.can_retry:
             msg.retry_count += 1
             self._stats[msg.channel].retried += 1
-            # Schedule retry (fire-and-forget)
-            asyncio.get_event_loop().call_later(
-                2 ** msg.retry_count,  # Exponential backoff
-                lambda: asyncio.ensure_future(self.publish(msg)),
-            )
+            # Schedule retry with exponential backoff
+            try:
+                loop = asyncio.get_running_loop()
+                loop.call_later(
+                    2 ** msg.retry_count,
+                    lambda: asyncio.ensure_future(self.publish(msg)),
+                )
+            except RuntimeError:
+                # No running loop — push to DLQ instead
+                self.dlq.push(msg, f"no_running_loop: {reason}")
         else:
             self.dlq.push(msg, f"max_retries_or_expired: {reason}")
 

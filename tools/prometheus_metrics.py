@@ -215,6 +215,17 @@ class MetricsCollector:
                         f'agent_requests_total{{agent_role="{role}",task_type="{task}",status="{status}"}} {val}'
                     )
 
+        lines.append("# HELP agent_errors_total Total agent errors")
+        lines.append("# TYPE agent_errors_total counter")
+        for key, val in self._counters.items():
+            if key.startswith("errors:"):
+                parts = key.split(":", 2)
+                if len(parts) == 3:
+                    _, role, error_type = parts
+                    lines.append(
+                        f'agent_errors_total{{agent_role="{role}",error_type="{error_type}"}} {val}'
+                    )
+
         lines.append("# HELP agent_cost_usd_total Total cost in USD")
         lines.append("# TYPE agent_cost_usd_total counter")
         for key, val in self._gauges.items():
@@ -228,6 +239,21 @@ class MetricsCollector:
             if key.startswith("active_tasks:"):
                 role = key.split(":", 1)[1]
                 lines.append(f'agent_active_tasks{{agent_role="{role}"}} {val}')
+
+        lines.append("# HELP agent_request_duration_seconds Agent request latency")
+        lines.append("# TYPE agent_request_duration_seconds summary")
+        for key, vals in self._histograms.items():
+            if key.startswith("latency:") and vals:
+                parts = key.split(":", 2)
+                if len(parts) == 3:
+                    _, role, tool = parts
+                    label = f'agent_role="{role}"'
+                    if tool:
+                        label += f',tool_name="{tool}"'
+                    count = len(vals)
+                    total = sum(vals)
+                    lines.append(f'agent_request_duration_seconds_count{{{label}}} {count}')
+                    lines.append(f'agent_request_duration_seconds_sum{{{label}}} {total:.4f}')
 
         return "\n".join(lines) + "\n"
 

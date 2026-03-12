@@ -1025,37 +1025,92 @@ async def api_get_rlhf_data(limit: int = 100, user=Depends(get_current_user)):
 
 @router.get("/api/inter-agent/messages")
 async def api_get_inter_agent_messages(limit: int = 50, user=Depends(get_current_user)):
-    """Get inter-agent message history."""
+    """Get inter-agent message history — merges EventBus middleware + AgentMessageBus."""
     from tools.inter_agent_comm import get_message_bus
-    
+
     bus = get_message_bus()
-    messages = bus.get_history(limit=limit)
-    
+    # Source 1: Faz 16 AgentMessageBus history
+    faz16_msgs = bus.get_history(limit=limit)
+
+    # Source 2: EventBus middleware captured messages (inter_agent.py store)
+    try:
+        from routes.inter_agent import _message_history, _install_bus_middleware
+        _install_bus_middleware()
+        eventbus_msgs = list(_message_history)
+    except Exception:
+        eventbus_msgs = []
+
+    # Merge & dedup by message id
+    seen_ids: set[str] = set()
+    merged: list[dict] = []
+    for msg in faz16_msgs:
+        mid = msg.get("id", "")
+        if mid and mid in seen_ids:
+            continue
+        seen_ids.add(mid)
+        merged.append(msg)
+    for msg in eventbus_msgs:
+        mid = msg.get("id", "")
+        if mid and mid in seen_ids:
+            continue
+        seen_ids.add(mid)
+        merged.append(msg)
+
+    # Sort by created_at descending (newest first)
+    merged.sort(key=lambda m: m.get("created_at", ""), reverse=True)
+    merged = merged[:limit]
+
     return {
-        "messages": messages,
-        "total": len(messages),
+        "messages": merged,
+        "total": len(merged),
     }
 
 
 @router.get("/api/inter-agent/knowledge")
 async def api_get_inter_agent_knowledge(user=Depends(get_current_user)):
-    """Get all shared knowledge between agents."""
+    """Get all shared knowledge — merges EventBus store + AgentMessageBus."""
     from tools.inter_agent_comm import get_message_bus
-    
+
     bus = get_message_bus()
-    all_knowledge = bus.get_all_knowledge()
-    
-    # Convert to list format
-    knowledge_list = []
-    for key, value in all_knowledge.items():
+    # Source 1: Faz 16 AgentMessageBus knowledge (key → value)
+    faz16_knowledge = bus.get_all_knowledge()
+
+    # Source 2: EventBus middleware knowledge store (inter_agent.py)
+    try:
+        from routes.inter_agent import _shared_knowledge
+        eventbus_knowledge = dict(_shared_knowledge)
+    except Exception:
+        eventbus_knowledge = {}
+
+    # Merge: Faz 16 entries first, then EventBus entries (dedup by key)
+    seen_keys: set[str] = set()
+    knowledge_list: list[dict] = []
+
+    for key, value in faz16_knowledge.items():
+        seen_keys.add(key)
         knowledge_list.append({
             "key": key,
             "value": value,
-            "source_agent": "unknown",
+            "source_agent": "agent",
             "tags": [],
             "created_at": "",
         })
-    
+
+    for key, entry in eventbus_knowledge.items():
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        if isinstance(entry, dict):
+            knowledge_list.append(entry)
+        else:
+            knowledge_list.append({
+                "key": key,
+                "value": entry,
+                "source_agent": "unknown",
+                "tags": [],
+                "created_at": "",
+            })
+
     return {
         "knowledge": knowledge_list,
         "total": len(knowledge_list),
@@ -1064,24 +1119,36 @@ async def api_get_inter_agent_knowledge(user=Depends(get_current_user)):
 
 @router.get("/api/inter-agent/status")
 async def api_get_inter_agent_status(user=Depends(get_current_user)):
-    """Get status of all agents in the communication system."""
+    """Get status of all agents — merges both communication systems."""
     from tools.inter_agent_comm import get_message_bus, get_agent_capabilities
     from tools.agent_retry import get_agent_health
-    
+
     bus = get_message_bus()
     health = get_agent_health()
-    
+
+    # Count messages from both sources
+    faz16_msg_count = len(bus.get_history(limit=10000))
+    faz16_knowledge_count = len(bus.get_all_knowledge())
+    try:
+        from routes.inter_agent import _message_history, _shared_knowledge, _install_bus_middleware
+        _install_bus_middleware()
+        eventbus_msg_count = len(_message_history)
+        eventbus_knowledge_count = len(_shared_knowledge)
+    except Exception:
+        eventbus_msg_count = 0
+        eventbus_knowledge_count = 0
+
     agents = []
     active_count = 0
-    
+
     for agent_role in ["orchestrator", "thinker", "researcher", "speed", "reasoner", "critic"]:
         pending = bus.get_pending_count(agent_role)
         agent_health = health.get(agent_role, {})
         status = agent_health.get("status", "healthy")
-        
+
         if status == "healthy":
             active_count += 1
-        
+
         agents.append({
             "agent_role": agent_role,
             "pending_messages": pending,
@@ -1089,24 +1156,32 @@ async def api_get_inter_agent_status(user=Depends(get_current_user)):
             "capabilities": get_agent_capabilities(agent_role),
             "failures": agent_health.get("failures", 0),
         })
-    
+
     return {
         "agents": agents,
         "active_agents": active_count,
-        "total_messages": len(bus.get_history(limit=1000)),
-        "total_knowledge": len(bus.get_all_knowledge()),
+        "total_messages": faz16_msg_count + eventbus_msg_count,
+        "total_knowledge": faz16_knowledge_count + eventbus_knowledge_count,
     }
 
 
 @router.post("/api/inter-agent/clear")
 async def api_clear_inter_agent_data(user=Depends(get_current_user)):
-    """Clear inter-agent message history and knowledge."""
+    """Clear inter-agent message history and knowledge from both sources."""
     from tools.inter_agent_comm import get_message_bus
-    
+
     bus = get_message_bus()
     bus._history = []
     bus.clear_knowledge()
-    
+
+    # Also clear EventBus middleware store
+    try:
+        from routes.inter_agent import _message_history, _shared_knowledge
+        _message_history.clear()
+        _shared_knowledge.clear()
+    except Exception:
+        pass
+
     _audit(user, "inter_agent_clear", "Cleared all inter-agent data")
-    
+
     return {"success": True, "message": "Inter-agent data cleared"}

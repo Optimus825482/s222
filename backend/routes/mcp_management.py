@@ -231,7 +231,7 @@ async def mcp_usage_stats(user: dict = Depends(get_current_user)):
                                   SUM(latency_ms) as lat,
                                   SUM(tokens_used) as tok
                            FROM tool_usage
-                           WHERE user_id = %s
+                           WHERE user_id IN (%s, 'system')
                              AND (tool_name ILIKE %s OR tool_name ILIKE %s)""",
                         (uid, f"%{sid}%", f"%{sname}%"),
                     )
@@ -261,7 +261,7 @@ async def mcp_usage_stats(user: dict = Depends(get_current_user)):
                               SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as ok,
                               SUM(latency_ms) as lat,
                               SUM(tokens_used) as tok
-                       FROM tool_usage WHERE user_id = %s
+                       FROM tool_usage WHERE user_id IN (%s, 'system')
                        GROUP BY tool_name ORDER BY cnt DESC LIMIT 50""",
                     (uid,),
                 )
@@ -281,7 +281,7 @@ async def mcp_usage_stats(user: dict = Depends(get_current_user)):
             try:
                 cur.execute(
                     """SELECT agent_role, tool_name, COUNT(*) as cnt
-                       FROM tool_usage WHERE user_id = %s
+                       FROM tool_usage WHERE user_id IN (%s, 'system')
                        GROUP BY agent_role, tool_name
                        ORDER BY cnt DESC LIMIT 200""",
                     (uid,),
@@ -302,7 +302,7 @@ async def mcp_usage_stats(user: dict = Depends(get_current_user)):
                 cur.execute(
                     """SELECT DATE(timestamp) as day, tool_name, COUNT(*) as cnt
                        FROM tool_usage
-                       WHERE user_id = %s
+                       WHERE user_id IN (%s, 'system')
                          AND timestamp >= NOW() - INTERVAL '30 days'
                        GROUP BY DATE(timestamp), tool_name
                        ORDER BY day ASC""",

@@ -314,6 +314,7 @@ function RecommendationsTab() {
   const [ld, setLd] = useState(true);
   const [e, setE] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
+  const [batchBusy, setBatchBusy] = useState<"apply" | "dismiss" | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -360,6 +361,28 @@ function RecommendationsTab() {
     [load],
   );
 
+  const applyAll = useCallback(async () => {
+    try {
+      setBatchBusy("apply");
+      await optimizerApi.applyAll();
+      await load();
+    } catch {
+    } finally {
+      setBatchBusy(null);
+    }
+  }, [load]);
+
+  const dismissAll = useCallback(async () => {
+    try {
+      setBatchBusy("dismiss");
+      await optimizerApi.dismissAll();
+      await load();
+    } catch {
+    } finally {
+      setBatchBusy(null);
+    }
+  }, [load]);
+
   if (ld) return <Sk n={4} />;
   if (e) return <Er m={e} r={load} />;
 
@@ -378,6 +401,30 @@ function RecommendationsTab() {
 
   return (
     <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+      {/* Batch action bar */}
+      <div className="flex items-center justify-between bg-slate-800/60 border border-slate-700/30 rounded-lg px-3 py-2 sticky top-0 z-10 backdrop-blur-sm">
+        <span className="text-[10px] text-slate-400">
+          {recs.length} bekleyen öneri
+        </span>
+        <div className="flex gap-1.5">
+          <button
+            onClick={applyAll}
+            disabled={batchBusy !== null}
+            className="px-2.5 py-1 text-[9px] bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded border border-emerald-500/25 transition-colors disabled:opacity-40 font-medium"
+          >
+            {batchBusy === "apply"
+              ? "Uygulanıyor..."
+              : `✓ Hepsini Uygula (${recs.length})`}
+          </button>
+          <button
+            onClick={dismissAll}
+            disabled={batchBusy !== null}
+            className="px-2.5 py-1 text-[9px] bg-red-600/15 hover:bg-red-600/25 text-red-400 rounded border border-red-500/20 transition-colors disabled:opacity-40 font-medium"
+          >
+            {batchBusy === "dismiss" ? "Reddediliyor..." : "✕ Hepsini Reddet"}
+          </button>
+        </div>
+      </div>
       {recs.map((r) => (
         <div
           key={r.id}

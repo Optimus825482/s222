@@ -934,6 +934,50 @@ async def optimizer_dismiss(
     return result
 
 
+@router.post("/api/optimizer/recommendations/batch-apply")
+async def optimizer_batch_apply(
+    user: dict = Depends(get_current_user),
+):
+    """Apply ALL pending recommendations in one call."""
+    _audit("optimizer_batch_apply", user["user_id"])
+    auto_optimizer = _require_auto_optimizer()
+    pending = auto_optimizer.get_recommendations(status="pending")
+    applied = []
+    failed = []
+    for rec in pending:
+        rec_id = rec.get("id")
+        if not rec_id:
+            continue
+        result = auto_optimizer.apply_recommendation(rec_id)
+        if isinstance(result, dict) and "error" in result:
+            failed.append({"id": rec_id, "error": result["error"]})
+        else:
+            applied.append(rec_id)
+    return {"applied": applied, "failed": failed, "applied_count": len(applied), "failed_count": len(failed)}
+
+
+@router.post("/api/optimizer/recommendations/batch-dismiss")
+async def optimizer_batch_dismiss(
+    user: dict = Depends(get_current_user),
+):
+    """Dismiss ALL pending recommendations in one call."""
+    _audit("optimizer_batch_dismiss", user["user_id"])
+    auto_optimizer = _require_auto_optimizer()
+    pending = auto_optimizer.get_recommendations(status="pending")
+    dismissed = []
+    failed = []
+    for rec in pending:
+        rec_id = rec.get("id")
+        if not rec_id:
+            continue
+        result = auto_optimizer.dismiss_recommendation(rec_id)
+        if isinstance(result, dict) and "error" in result:
+            failed.append({"id": rec_id, "error": result["error"]})
+        else:
+            dismissed.append(rec_id)
+    return {"dismissed": dismissed, "failed": failed, "dismissed_count": len(dismissed), "failed_count": len(failed)}
+
+
 @router.get("/api/optimizer/agent/{agent_role}")
 async def optimizer_agent_profile(
     agent_role: str,

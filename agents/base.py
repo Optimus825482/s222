@@ -1459,6 +1459,7 @@ class BaseAgent(ABC):
                     )
 
                     if parse_error:
+                        _tool_latency_ms = 0.0
                         self._emit(
                             "tool_validation",
                             parse_error[:150],
@@ -1472,6 +1473,7 @@ class BaseAgent(ABC):
                             "Call the same tool again with valid JSON object arguments.",
                         )
                     elif validation_error_msg:
+                        _tool_latency_ms = 0.0
                         self._emit(
                             "tool_validation",
                             validation_error_msg[:150],
@@ -1493,16 +1495,20 @@ class BaseAgent(ABC):
                             validation_code="ok",
                         )
                         try:
+                            _tool_t0 = time.monotonic()
                             tool_result = await self.handle_tool_call(
                                 fn_name, fn_args, thread
                             )
+                            _tool_latency_ms = (time.monotonic() - _tool_t0) * 1000
                         except KeyError as e:
+                            _tool_latency_ms = (time.monotonic() - _tool_t0) * 1000
                             tool_result = self._tool_error(
                                 "missing_required_argument",
                                 f"Missing required argument: {e}",
                                 "Check tool schema and provide all required fields.",
                             )
                         except Exception as e:
+                            _tool_latency_ms = (time.monotonic() - _tool_t0) * 1000
                             tool_result = self._tool_error(
                                 "tool_execution_failed",
                                 f"{type(e).__name__}: {e}",
@@ -1542,6 +1548,32 @@ class BaseAgent(ABC):
                                 _ats.record_success(self.role.value, fn_name, task_input)
                         except Exception:
                             pass
+
+                    # Record to PostgreSQL tool_usage table for MCP usage panel
+                    try:
+                        from tools.pg_connection import get_conn, release_conn, postgres_available
+                        if postgres_available():
+                            _pg = get_conn()
+                            try:
+                                with _pg.cursor() as _cur:
+                                    _cur.execute(
+                                        """INSERT INTO tool_usage
+                                           (tool_name, agent_role, latency_ms, success, tokens_used, user_id, timestamp)
+                                           VALUES (%s, %s, %s, %s, %s, %s, NOW())""",
+                                        (
+                                            fn_name,
+                                            self.role.value,
+                                            round(_tool_latency_ms, 1),
+                                            0 if _is_tool_error else 1,
+                                            0,
+                                            getattr(thread, 'user_id', 'system'),
+                                        ),
+                                    )
+                                _pg.commit()
+                            finally:
+                                release_conn(_pg)
+                    except Exception:
+                        pass  # Non-critical — don't break tool execution
 
                     # Append to messages for next LLM turn
                     messages.append(

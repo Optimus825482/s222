@@ -63,7 +63,7 @@ AGENT_ROLES = ["orchestrator", "thinker", "researcher", "speed", "reasoner", "cr
 
 
 def _get_agent_statuses() -> list[dict[str, Any]]:
-    """Mevcut agent durumlarını EventBus subscription + metrics'ten derle."""
+    """Mevcut agent durumlarını EventBus subscription + AgentMessageBus'tan derle."""
     statuses = []
     try:
         from core.event_bus import get_event_bus
@@ -88,6 +88,18 @@ def _get_agent_statuses() -> list[dict[str, Any]]:
     except Exception:
         pass
 
+    # Also add Faz 16 AgentMessageBus pending counts
+    try:
+        from tools.inter_agent_comm import get_message_bus
+        msg_bus = get_message_bus()
+        for role in AGENT_ROLES:
+            pending_counts[role] += msg_bus.get_pending_count(role)
+            # If agent has a queue in AgentMessageBus, consider it active
+            if role in msg_bus._queues:
+                active_agents.add(role)
+    except Exception:
+        pass
+
     for role in AGENT_ROLES:
         statuses.append({
             "agent_role": role,
@@ -101,31 +113,97 @@ def _get_agent_statuses() -> list[dict[str, Any]]:
 
 @router.get("/messages")
 async def get_messages(limit: int = 50):
-    """Agent-arası mesaj geçmişi."""
+    """Agent-arası mesaj geçmişi — merges EventBus + AgentMessageBus."""
     _install_bus_middleware()
-    messages = list(_message_history)[-limit:]
-    messages.reverse()  # newest first
-    return {"messages": messages}
+
+    # Source 1: EventBus middleware captured messages
+    eventbus_msgs = list(_message_history)
+
+    # Source 2: Faz 16 AgentMessageBus history
+    try:
+        from tools.inter_agent_comm import get_message_bus
+        bus = get_message_bus()
+        faz16_msgs = bus.get_history(limit=limit)
+    except Exception:
+        faz16_msgs = []
+
+    # Merge & dedup by id
+    seen_ids: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    for msg in eventbus_msgs:
+        mid = msg.get("id", "")
+        if mid and mid in seen_ids:
+            continue
+        seen_ids.add(mid)
+        merged.append(msg)
+    for msg in faz16_msgs:
+        mid = msg.get("id", "")
+        if mid and mid in seen_ids:
+            continue
+        seen_ids.add(mid)
+        merged.append(msg)
+
+    # Sort newest first
+    merged.sort(key=lambda m: m.get("created_at", ""), reverse=True)
+    merged = merged[:limit]
+    return {"messages": merged}
 
 
 @router.get("/knowledge")
 async def get_knowledge():
-    """Paylaşılan bilgi havuzu."""
+    """Paylaşılan bilgi havuzu — merges EventBus store + AgentMessageBus."""
     _install_bus_middleware()
-    knowledge_list = list(_shared_knowledge.values())
+
+    # Source 1: EventBus middleware knowledge
+    knowledge_list: list[dict[str, Any]] = list(_shared_knowledge.values())
+    seen_keys: set[str] = {e.get("key", "") for e in knowledge_list}
+
+    # Source 2: Faz 16 AgentMessageBus knowledge
+    try:
+        from tools.inter_agent_comm import get_message_bus
+        bus = get_message_bus()
+        for key, value in bus.get_all_knowledge().items():
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            knowledge_list.append({
+                "key": key,
+                "value": value,
+                "source_agent": "agent",
+                "tags": [],
+                "created_at": "",
+            })
+    except Exception:
+        pass
+
     return {"knowledge": knowledge_list}
 
 
 @router.get("/status")
 async def get_status():
-    """Agent durumları ve genel istatistikler."""
+    """Agent durumları ve genel istatistikler — merges both sources."""
     _install_bus_middleware()
     agents = _get_agent_statuses()
     active_count = sum(1 for a in agents if a["status"] == "healthy")
+
+    # EventBus counts
+    eventbus_msg_count = len(_message_history)
+    eventbus_knowledge_count = len(_shared_knowledge)
+
+    # Faz 16 AgentMessageBus counts
+    try:
+        from tools.inter_agent_comm import get_message_bus
+        bus = get_message_bus()
+        faz16_msg_count = len(bus.get_history(limit=10000))
+        faz16_knowledge_count = len(bus.get_all_knowledge())
+    except Exception:
+        faz16_msg_count = 0
+        faz16_knowledge_count = 0
+
     return {
         "agents": agents,
-        "total_messages": len(_message_history),
-        "total_knowledge": len(_shared_knowledge),
+        "total_messages": eventbus_msg_count + faz16_msg_count,
+        "total_knowledge": eventbus_knowledge_count + faz16_knowledge_count,
         "active_agents": active_count,
     }
 

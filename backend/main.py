@@ -296,6 +296,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[Backend] Knowledge moderation init failed (non-critical): {e}")
 
+    # Install inter-agent monitor middleware on EventBus at startup
+    try:
+        from routes.inter_agent import _install_bus_middleware
+        _install_bus_middleware()
+        print("[Backend] Inter-agent monitor middleware installed on EventBus")
+    except Exception as e:
+        print(f"[Backend] Inter-agent monitor middleware failed (non-critical): {e}")
+
     yield
 
     # Shutdown: stop autonomous chat scheduler

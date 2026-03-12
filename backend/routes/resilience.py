@@ -129,6 +129,18 @@ async def resilience_health():
     except Exception:
         health["components"]["chaos_engine"] = {"enabled": False}
 
+    # Scheduled tasks
+    try:
+        from tools.scheduled_tasks import get_scheduled_task_scheduler
+        scheduler = get_scheduled_task_scheduler()
+        task_dicts = scheduler.list_tasks_dicts(enabled_only=True)
+        health["components"]["scheduled_tasks"] = {
+            "status": "running" if scheduler._running else "stopped",
+            "active_tasks": len(task_dicts),
+        }
+    except Exception as e:
+        health["components"]["scheduled_tasks"] = {"status": "unknown", "error": str(e)}
+
     # Overall status
     pg_ok = health["components"].get("postgres", {}).get("status") == "healthy"
     if not pg_ok:

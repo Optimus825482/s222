@@ -1167,6 +1167,24 @@ export const optimizerApi = {
     return res.json();
   },
 
+  async applyAll() {
+    const res = await fetch(
+      `${BASE}/api/optimizer/recommendations/batch-apply`,
+      { method: "POST", headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
+  async dismissAll() {
+    const res = await fetch(
+      `${BASE}/api/optimizer/recommendations/batch-dismiss`,
+      { method: "POST", headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+
   async getAgentProfile(role: string) {
     const res = await fetch(
       `${BASE}/api/optimizer/agent/${encodeURIComponent(role)}`,
