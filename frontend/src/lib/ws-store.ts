@@ -196,3 +196,21 @@ export function clearStreamState() {
   store.streamToolCalls = [];
   notify();
 }
+
+/* ── Retry callback for ChatBubble to trigger WS-based retry ── */
+
+let _retryCb: ((threadId: string, taskId: string) => void) | null = null;
+
+export function registerRetryCallback(
+  cb: ((threadId: string, taskId: string) => void) | null,
+) {
+  _retryCb = cb;
+}
+
+export function triggerRetry(threadId: string, taskId: string): boolean {
+  if (_retryCb) {
+    _retryCb(threadId, taskId);
+    return true;
+  }
+  return false;
+}

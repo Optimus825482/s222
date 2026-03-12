@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { detectArtifacts, ArtifactCard } from "@/components/artifacts-panel";
 import { getWSSnapshot, subscribeWS } from "@/lib/ws-store";
+import { triggerRetry } from "@/lib/ws-store";
 import { DetailModal } from "./detail-modal";
 import { api } from "@/lib/api";
 
@@ -608,13 +609,17 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
             <button
               type="button"
               disabled={retrying}
-              onClick={async () => {
+              onClick={() => {
                 if (!lastTask) return;
                 setRetrying(true);
                 try {
-                  await api.retryTask(thread.id, lastTask.id);
+                  const sent = triggerRetry(thread.id, lastTask.id);
+                  if (!sent) {
+                    // Fallback to HTTP if WS callback not registered
+                    api.retryTask(thread.id, lastTask.id).catch(() => {});
+                  }
                 } catch {
-                  // silently fail — user will see no new result
+                  // silently fail
                 } finally {
                   setTimeout(() => setRetrying(false), 3000);
                 }

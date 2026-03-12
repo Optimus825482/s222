@@ -9,7 +9,12 @@ import type {
   PipelineType,
 } from "./types";
 import { useAuth } from "@/lib/auth";
-import { setWSStatus, pushWSLiveEvent, clearWSLiveEvents } from "./ws-store";
+import {
+  setWSStatus,
+  pushWSLiveEvent,
+  clearWSLiveEvents,
+  registerRetryCallback,
+} from "./ws-store";
 
 const INITIAL_RECONNECT_MS = 1_000;
 const MAX_RECONNECT_MS = 30_000;
@@ -83,7 +88,10 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
 
     // Build base URL - ALWAYS prefer environment variable over stored ref
     // This fixes issues where stale tunnel URLs persist across sessions
-    let baseUrl = process.env.NEXT_PUBLIC_WS_URL || currentWsUrlRef.current || "ws://localhost:8001/ws/chat";
+    let baseUrl =
+      process.env.NEXT_PUBLIC_WS_URL ||
+      currentWsUrlRef.current ||
+      "ws://localhost:8001/ws/chat";
 
     // Strip any existing query params from base
     const qIdx = baseUrl.indexOf("?");
@@ -327,11 +335,39 @@ export function useAgentSocket(opts: UseAgentSocketOptions = {}) {
     [],
   );
 
+  const sendRetry = useCallback(
+    (threadId: string, taskId: string) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        connect();
+        setTimeout(() => sendRetry(threadId, taskId), 500);
+        return;
+      }
+      setStatus("connecting");
+      setLiveEvents([]);
+      ws.send(
+        JSON.stringify({
+          type: "retry",
+          thread_id: threadId,
+          task_id: taskId,
+        }),
+      );
+    },
+    [connect],
+  );
+
+  // Register sendRetry globally so ChatBubble can call it without prop drilling
+  useEffect(() => {
+    registerRetryCallback(sendRetry);
+    return () => registerRetryCallback(null);
+  }, [sendRetry]);
+
   return {
     status,
     liveEvents,
     sendMessage,
     sendOrchestratorChat,
+    sendRetry,
     stop,
     reconnect,
   };

@@ -716,6 +716,70 @@ async def ws_chat(ws: WebSocket):
                 await _safe_ws_send({"type": "pong"})
                 continue
 
+            # ── Retry via WebSocket (live monitoring support) ──
+            if msg_type == "retry":
+                retry_thread_id = data.get("thread_id", "")
+                retry_task_id = data.get("task_id", "")
+                if not retry_thread_id or not retry_task_id:
+                    await _safe_ws_send({"type": "error", "message": "retry requires thread_id and task_id"})
+                    continue
+
+                active_task = getattr(ws.state, "run_task", None)
+                if active_task is not None and not active_task.done():
+                    await _safe_ws_send({"type": "error", "message": "Bir görev zaten çalışıyor."})
+                    continue
+
+                retry_thread = load_thread(retry_thread_id, user_id=user_id or None)
+                if not retry_thread:
+                    await _safe_ws_send({"type": "error", "message": "Thread not found"})
+                    continue
+
+                # Find the target task
+                target_task = None
+                for t in retry_thread.tasks:
+                    if t.id == retry_task_id:
+                        target_task = t
+                        break
+
+                if not target_task:
+                    await _safe_ws_send({"type": "error", "message": "Task not found"})
+                    continue
+
+                from core.models import TaskStatus as _TS
+                if target_task.status not in (
+                    _TS.COMPLETED, _TS.FAILED, _TS.STOPPED,
+                    "completed", "failed", "stopped", "error",
+                ):
+                    await _safe_ws_send({"type": "error", "message": f"Task status '{target_task.status}' is not retryable"})
+                    continue
+
+                original_input = target_task.user_input
+                retry_pipeline_str = (
+                    target_task.pipeline_type.value
+                    if hasattr(target_task.pipeline_type, "value")
+                    else str(target_task.pipeline_type)
+                )
+
+                ws.state.live_events = []
+                monitor = WSLiveMonitor(ws, ws.state.live_events)
+                ws.state.monitor = monitor
+                correlation_id = data.get("correlation_id") or monitor._run_id
+                started_at = time.time()
+                monitor.start(f"[Retry] {original_input[:100]}")
+
+                ws.state.run_task = asyncio.create_task(
+                    _execute_run(
+                        original_input,
+                        retry_thread,
+                        monitor,
+                        retry_pipeline_str,
+                        user_id,
+                        correlation_id,
+                        started_at,
+                    ),
+                )
+                continue
+
             if msg_type == "orchestrator_chat":
                 user_msg = (data.get("message") or "").strip()
                 run_task = getattr(ws.state, "run_task", None)
