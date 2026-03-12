@@ -83,18 +83,27 @@ async def resilience_health():
     # Redis
     try:
         from tools.redis_client import redis_health
-        health["components"]["redis"] = redis_health()
+        import time as _time
+        _redis_t0 = _time.monotonic()
+        _rh = redis_health()
+        _rh["response_ms"] = round((_time.monotonic() - _redis_t0) * 1000, 1)
+        health["components"]["redis"] = _rh
     except Exception as e:
         health["components"]["redis"] = {"status": "unavailable", "error": str(e)}
 
     # PostgreSQL
     try:
         from tools.pg_connection import get_conn, release_conn
+        import time as _time
+        _pg_t0 = _time.monotonic()
         conn = get_conn()
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1")
-        release_conn(conn)
-        health["components"]["postgres"] = {"status": "healthy"}
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            _pg_ms = (_time.monotonic() - _pg_t0) * 1000
+            health["components"]["postgres"] = {"status": "healthy", "response_ms": round(_pg_ms, 1)}
+        finally:
+            release_conn(conn)
     except Exception as e:
         health["components"]["postgres"] = {"status": "unhealthy", "error": str(e)}
 

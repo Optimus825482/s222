@@ -40,10 +40,12 @@ class CircuitState(str, Enum):
 
 # Agent fallback mapping — semantically similar roles
 _FALLBACK_MAP: dict[str, str] = {
-    "researcher": "thinker",   # both do analysis
-    "thinker": "reasoner",     # both do deep thinking
-    "reasoner": "thinker",     # bidirectional
-    "speed": "researcher",     # both can format
+    "researcher": "thinker",    # both do analysis
+    "thinker": "reasoner",      # both do deep thinking
+    "reasoner": "thinker",      # bidirectional
+    "speed": "researcher",      # both can format
+    "critic": "reasoner",       # both do evaluation/verification
+    "orchestrator": "thinker",  # thinker can do planning as fallback
 }
 
 

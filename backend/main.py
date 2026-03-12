@@ -85,71 +85,75 @@ async def lifespan(app: FastAPI):
         print("[Backend] Migration 005 skipped (PostgreSQL unavailable)", flush=True)
 
     # Run migration 006: SQLite → PostgreSQL (schedules, benchmarks, evaluations, etc.)
-    # Execute statement-by-statement to avoid psycopg2 multi-statement issues
-    try:
-        from tools.pg_connection import get_conn, release_conn
-        import pathlib
-        _mig006_path = pathlib.Path(__file__).parent / "migrations" / "006_sqlite_to_pg_migration.sql"
-        if _mig006_path.exists():
-            _mig006_sql = _mig006_path.read_text(encoding="utf-8")
-            _mig006_conn = get_conn()
-            try:
-                with _mig006_conn.cursor() as cur:
-                    # Split by semicolons and execute each statement individually
-                    for stmt in _mig006_sql.split(";"):
-                        stmt = stmt.strip()
-                        if stmt and not stmt.startswith("--"):
-                            cur.execute(stmt)
-                _mig006_conn.commit()
-                print("[Backend] Migration 006 (SQLite→PG) applied", flush=True)
-            except Exception as e:
-                _mig006_conn.rollback()
-                print(f"[Backend] Migration 006 failed: {e}", flush=True)
-            finally:
-                release_conn(_mig006_conn)
-    except Exception as e:
-        print(f"[Backend] Migration 006 load failed: {e}", flush=True)
+    if pg_available:
+        try:
+            from tools.pg_connection import get_conn, release_conn
+            import pathlib
+            _mig006_path = pathlib.Path(__file__).parent / "migrations" / "006_sqlite_to_pg_migration.sql"
+            if _mig006_path.exists():
+                _mig006_sql = _mig006_path.read_text(encoding="utf-8")
+                _mig006_conn = get_conn()
+                try:
+                    with _mig006_conn.cursor() as cur:
+                        for stmt in _mig006_sql.split(";"):
+                            stmt = stmt.strip()
+                            if stmt and not stmt.startswith("--"):
+                                cur.execute(stmt)
+                    _mig006_conn.commit()
+                    print("[Backend] Migration 006 (SQLite→PG) applied", flush=True)
+                except Exception as e:
+                    _mig006_conn.rollback()
+                    print(f"[Backend] Migration 006 failed: {e}", flush=True)
+                finally:
+                    release_conn(_mig006_conn)
+        except Exception as e:
+            print(f"[Backend] Migration 006 load failed: {e}", flush=True)
+    else:
+        print("[Backend] Migration 006 skipped (PostgreSQL unavailable)", flush=True)
 
     # Create analytics tables
-    try:
-        from tools.pg_connection import get_conn, release_conn
-        conn = get_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS tool_usage (
-                    id SERIAL PRIMARY KEY,
-                    tool_name TEXT NOT NULL,
-                    agent_role TEXT NOT NULL,
-                    latency_ms REAL DEFAULT 0,
-                    success INTEGER DEFAULT 1,
-                    tokens_used INTEGER DEFAULT 0,
-                    user_id TEXT NOT NULL,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS user_behavior (
-                    id SERIAL PRIMARY KEY,
-                    action TEXT NOT NULL,
-                    context TEXT DEFAULT '',
-                    metadata JSONB DEFAULT '{}',
-                    user_id TEXT NOT NULL,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_tool_usage_user_id
-                ON tool_usage(user_id, timestamp DESC)
-            """)
-            cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_user_behavior_user_id
-                ON user_behavior(user_id, timestamp DESC)
-            """)
-        conn.commit()
-        release_conn(conn)
-        print("[Backend] Analytics tables initialized")
-    except Exception as e:
-        print(f"[Backend] Analytics tables init failed: {e}")
+    if pg_available:
+        try:
+            from tools.pg_connection import get_conn, release_conn
+            conn = get_conn()
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS tool_usage (
+                        id SERIAL PRIMARY KEY,
+                        tool_name TEXT NOT NULL,
+                        agent_role TEXT NOT NULL,
+                        latency_ms REAL DEFAULT 0,
+                        success INTEGER DEFAULT 1,
+                        tokens_used INTEGER DEFAULT 0,
+                        user_id TEXT NOT NULL,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS user_behavior (
+                        id SERIAL PRIMARY KEY,
+                        action TEXT NOT NULL,
+                        context TEXT DEFAULT '',
+                        metadata JSONB DEFAULT '{}',
+                        user_id TEXT NOT NULL,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_tool_usage_user_id
+                    ON tool_usage(user_id, timestamp DESC)
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_user_behavior_user_id
+                    ON user_behavior(user_id, timestamp DESC)
+                """)
+            conn.commit()
+            release_conn(conn)
+            print("[Backend] Analytics tables initialized")
+        except Exception as e:
+            print(f"[Backend] Analytics tables init failed: {e}")
+    else:
+        print("[Backend] Analytics tables init skipped (PostgreSQL unavailable)")
 
     # Seed default MCP servers for orchestration + discover tools
     try:
@@ -244,10 +248,10 @@ async def lifespan(app: FastAPI):
         print(f"[Backend] Scheduled tasks init failed (non-critical): {e}")
 
     # Autonomous chat background scheduler (messaging module)
+    # Auto-start disabled — manual trigger only via POST /api/agents/autonomous-chat/trigger
     try:
-        from routes.messaging import start_auto_chat_scheduler
-        await start_auto_chat_scheduler()
-        print("[Backend] Autonomous chat auto-start enabled")
+        from routes.messaging import start_auto_chat_scheduler  # noqa: F401
+        print("[Backend] Autonomous chat scheduler available (manual trigger only)")
     except Exception as e:
         print(f"[Backend] Autonomous chat auto-start failed (non-critical): {e}")
 
@@ -332,11 +336,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Multi-Agent Ops Center API", version="3.0.0", lifespan=lifespan)
 
-_cors_origins = ["*"]  # Allow all origins for cross-origin requests
+_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+if _cors_origins == ["*"]:
+    import logging as _log
+    _log.getLogger("backend").warning(
+        "CORS allow_origins=['*'] — restrict to specific origins in production via CORS_ORIGINS env var"
+    )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

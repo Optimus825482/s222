@@ -92,6 +92,7 @@ def _audit(event_type: str, user_id: str, detail: str = "", **extra: Any) -> Non
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event_type": event_type,
         "user_id": user_id,
+        "user_id_masked": _mask_user_id(user_id),
         "detail": detail,
         **extra,
     }

@@ -104,7 +104,16 @@ _active_tokens: dict[str, str] = {}
 _revoked_tokens: set[str] = set()
 
 _TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", str(7 * 24 * 60 * 60)))
-_TOKEN_SECRET = os.getenv("AUTH_TOKEN_SECRET", "dev-insecure-change-me")
+_TOKEN_SECRET = os.getenv("AUTH_TOKEN_SECRET", "")
+if not _TOKEN_SECRET:
+    import warnings
+    warnings.warn(
+        "AUTH_TOKEN_SECRET not set! Using random secret (tokens won't survive restarts). "
+        "Set AUTH_TOKEN_SECRET in .env for production.",
+        stacklevel=2,
+    )
+    import secrets
+    _TOKEN_SECRET = secrets.token_hex(32)
 
 
 def _issue_signed_token(user_id: str, ttl_seconds: int = _TOKEN_TTL_SECONDS) -> str:

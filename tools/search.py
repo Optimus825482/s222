@@ -5,6 +5,7 @@ Priority chain based on API key availability and result quality.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -183,21 +184,28 @@ async def web_search(query: str, max_results: int = 5) -> list[dict[str, str]]:
     """
     Search chain: Tavily → Exa → Whoogle.
     Returns first provider that yields results.
+    Falls back to parallel mode if primary fails fast.
     """
-    # 1) Tavily
+    # 1) Tavily (primary — fastest, most reliable)
     results = await _search_tavily(query, max_results)
     if results:
         return results
 
-    # 2) Exa
-    results = await _search_exa(query, max_results)
-    if results:
-        return results
+    # 2) Parallel fallback: Exa + Whoogle simultaneously
+    exa_task = asyncio.create_task(_search_exa(query, max_results))
+    whoogle_task = asyncio.create_task(_search_whoogle(query, max_results))
 
-    # 3) Whoogle
-    results = await _search_whoogle(query, max_results)
-    if results:
-        return results
+    for coro in asyncio.as_completed([exa_task, whoogle_task]):
+        try:
+            result = await coro
+            if result:
+                # Cancel the other task
+                for t in [exa_task, whoogle_task]:
+                    if not t.done():
+                        t.cancel()
+                return result
+        except Exception:
+            continue
 
     logger.warning("All search providers returned 0 results for: %s", query[:80])
     return []

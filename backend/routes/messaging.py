@@ -33,7 +33,7 @@ _MAX_POST_TASK_MEETINGS = 30
 def _default_auto_chat_config() -> dict[str, Any]:
     return {
         "enabled": True,
-        "auto_start": True,
+        "auto_start": False,
         "interval_minutes": 5,
         "max_exchanges": 4,
         "enabled_agents": [
