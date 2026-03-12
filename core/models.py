@@ -201,6 +201,18 @@ class SubTask(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class Checkpoint(BaseModel):
+    """Snapshot of agent progress during task execution."""
+    id: str = Field(default_factory=_uid)
+    step: int = 0
+    label: str = ""
+    agent_role: str = ""
+    progress_percent: int = 0
+    messages_count: int = 0
+    tokens_used: int = 0
+    created_at: datetime = Field(default_factory=_now)
+
+
 class Task(BaseModel):
     """Top-level user task with pipeline and sub-tasks."""
     id: str = Field(default_factory=_uid)
@@ -214,6 +226,8 @@ class Task(BaseModel):
     total_latency_ms: float = 0.0
     created_at: datetime = Field(default_factory=_now)
     completed_at: datetime | None = None
+    checkpoints: list[Checkpoint] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 # ── Metrics ──────────────────────────────────────────────────────

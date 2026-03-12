@@ -431,22 +431,52 @@ class PipelineEngine:
                     live_monitor=self._live_monitor,
                 )
             else:
-                _set_task_state(
-                    thread,
-                    task,
-                    TaskStatus.SYNTHESIZING,
-                    EventType.PIPELINE_STEP,
-                    "Pipeline execution finished, synthesizing outputs",
-                    live_monitor=self._live_monitor,
+                # Check if ALL sub-tasks failed
+                all_failed = (
+                    len(task.sub_tasks) > 0
+                    and all(
+                        getattr(st, "status", None) in (TaskStatus.FAILED, "failed")
+                        for st in task.sub_tasks
+                    )
                 )
-                _set_task_state(
-                    thread,
-                    task,
-                    TaskStatus.COMPLETED,
-                    EventType.PIPELINE_COMPLETE,
-                    "Pipeline synthesis completed",
-                    live_monitor=self._live_monitor,
-                )
+                if all_failed:
+                    _set_task_state(
+                        thread,
+                        task,
+                        TaskStatus.FAILED,
+                        EventType.ERROR,
+                        f"All {len(task.sub_tasks)} sub-tasks failed",
+                        live_monitor=self._live_monitor,
+                    )
+                else:
+                    # Log partial failures if any
+                    failed_agents = [
+                        st.assigned_agent.value
+                        for st in task.sub_tasks
+                        if getattr(st, "status", None) in (TaskStatus.FAILED, "failed")
+                    ]
+                    if failed_agents and self._live_monitor:
+                        self._live_monitor.emit(
+                            "warning",
+                            "orchestrator",
+                            f"⚠️ Kısmi başarı — başarısız: {', '.join(failed_agents)}",
+                        )
+                    _set_task_state(
+                        thread,
+                        task,
+                        TaskStatus.SYNTHESIZING,
+                        EventType.PIPELINE_STEP,
+                        "Pipeline execution finished, synthesizing outputs",
+                        live_monitor=self._live_monitor,
+                    )
+                    _set_task_state(
+                        thread,
+                        task,
+                        TaskStatus.COMPLETED,
+                        EventType.PIPELINE_COMPLETE,
+                        "Pipeline synthesis completed",
+                        live_monitor=self._live_monitor,
+                    )
         except Exception as e:
             result = f"[Pipeline Error] {e}"
             _set_task_state(

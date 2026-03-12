@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Coroutine, Union
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from fastapi import Request
+from fastapi import Request, Depends
 from fastapi.responses import StreamingResponse
 
 _parent = str(Path(__file__).parent.parent)
@@ -981,3 +981,116 @@ async def stream_chat(request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ── Task Retry Endpoint ──────────────────────────────────────────
+
+@router.post("/api/threads/{thread_id}/tasks/{task_id}/retry")
+async def retry_task(thread_id: str, task_id: str, request: Request):
+    """Re-execute a completed or failed task on the same thread."""
+    from deps import get_current_user
+    from fastapi.responses import JSONResponse
+    from core.models import EventType, TaskStatus as TS
+
+    auth_header = request.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
+    if not token:
+        return JSONResponse({"error": "Missing authorization token"}, status_code=401)
+
+    user = _get_user_from_token(token)
+    if not user:
+        return JSONResponse({"error": "Invalid token"}, status_code=401)
+
+    user_id = user["user_id"]
+
+    thread = load_thread(thread_id, user_id=user_id)
+    if not thread:
+        return JSONResponse({"error": "Thread not found"}, status_code=404)
+
+    # Find the task
+    target_task = None
+    for t in thread.tasks:
+        if t.id == task_id:
+            target_task = t
+            break
+
+    if not target_task:
+        return JSONResponse({"error": "Task not found"}, status_code=404)
+
+    if target_task.status not in (
+        TS.COMPLETED, TS.FAILED, TS.STOPPED, TS.ERROR,
+        "completed", "failed", "stopped", "error",
+    ):
+        return JSONResponse(
+            {"error": f"Task status '{target_task.status}' is not retryable"},
+            status_code=400,
+        )
+
+    original_input = target_task.user_input
+    pipeline_str = (
+        target_task.pipeline_type.value
+        if hasattr(target_task.pipeline_type, "value")
+        else str(target_task.pipeline_type)
+    )
+
+    # Create a background execution
+    async def _run_retry():
+        try:
+            from agents.orchestrator import OrchestratorAgent
+
+            orchestrator = OrchestratorAgent()
+            forced_pipe = None
+            if pipeline_str != "auto":
+                try:
+                    forced_pipe = PipelineType(pipeline_str)
+                except ValueError:
+                    pass
+
+            result = await orchestrator.route_and_execute(
+                original_input,
+                thread,
+                forced_pipeline=forced_pipe,
+                user_id=user_id,
+            )
+            save_thread(thread, user_id=user_id)
+        except Exception as exc:
+            logger.error("retry_task.failed", extra={
+                "thread_id": thread_id,
+                "task_id": task_id,
+                "error": str(exc),
+            })
+
+    asyncio.create_task(_run_retry())
+
+    new_task_id = thread.tasks[-1].id if thread.tasks else task_id
+    return JSONResponse({
+        "status": "retry_started",
+        "thread_id": thread_id,
+        "new_task_id": new_task_id,
+    })
+
+
+@router.get("/api/threads/{thread_id}/tasks/{task_id}/checkpoints")
+async def get_task_checkpoints(thread_id: str, task_id: str, request: Request):
+    """Return checkpoints for a specific task."""
+    from fastapi.responses import JSONResponse
+
+    auth_header = request.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
+    if not token:
+        return JSONResponse({"error": "Missing authorization token"}, status_code=401)
+
+    user = _get_user_from_token(token)
+    if not user:
+        return JSONResponse({"error": "Invalid token"}, status_code=401)
+
+    thread = load_thread(thread_id, user_id=user["user_id"])
+    if not thread:
+        return JSONResponse({"error": "Thread not found"}, status_code=404)
+
+    for t in thread.tasks:
+        if t.id == task_id:
+            checkpoints = [cp.model_dump(mode="json") for cp in getattr(t, "checkpoints", [])]
+            return JSONResponse({"checkpoints": checkpoints})
+
+    return JSONResponse({"error": "Task not found"}, status_code=404)

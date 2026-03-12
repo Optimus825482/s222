@@ -303,6 +303,30 @@ class OrchestratorAgent(BaseAgent):
 
         history = build_orchestrator_context(thread)
 
+        # Inject prior task summaries for follow-up queries in same session
+        prior_results_ctx = ""
+        if thread.tasks:
+            from core.models import TaskStatus
+            completed_summaries = []
+            for t in thread.tasks:
+                if getattr(t, "final_result", None) and t.status in (
+                    TaskStatus.COMPLETED, "completed"
+                ):
+                    summary = t.final_result[:1200]
+                    if len(t.final_result) > 1200:
+                        summary += "... [truncated]"
+                    completed_summaries.append(
+                        f"<prior_task query=\"{t.user_input[:150]}\">\n{summary}\n</prior_task>"
+                    )
+            if completed_summaries:
+                prior_results_ctx = (
+                    "\n\n--- PRIOR TASK RESULTS IN THIS SESSION ---\n"
+                    "Use these results as context for follow-up queries. "
+                    "If the user asks for more detail, build upon these results.\n"
+                    + "\n".join(completed_summaries[-3:])
+                    + "\n--- END PRIOR RESULTS ---\n"
+                )
+
         # Auto-recall relevant memories
         memory_context = ""
         try:
@@ -333,8 +357,10 @@ class OrchestratorAgent(BaseAgent):
             system_content += teaching_context
 
         messages = [{"role": "system", "content": system_content}]
-        if history.strip() or memory_context:
+        if history.strip() or memory_context or prior_results_ctx:
             ctx = ""
+            if prior_results_ctx:
+                ctx += prior_results_ctx + "\n"
             if history.strip():
                 ctx += f"Thread history:\n{history}"
             if memory_context:
@@ -1706,9 +1732,50 @@ class OrchestratorAgent(BaseAgent):
                 # Parse agent results from brainstorm output
                 agent_results = {}
                 for st in task.sub_tasks:
-                    if st.result:
+                    if st.result and st.status in (TaskStatus.COMPLETED, "completed"):
                         agent_results[st.assigned_agent.value] = st.result
-                
+
+                # If ALL sub-tasks failed, merge with prior task results
+                if not agent_results and task.status in (TaskStatus.FAILED, "failed"):
+                    prior_results = []
+                    for prev_task in thread.tasks[:-1]:
+                        if getattr(prev_task, "final_result", None) and prev_task.status in (
+                            TaskStatus.COMPLETED, "completed"
+                        ):
+                            prior_results.append(prev_task.final_result)
+                    if prior_results:
+                        self._emit("routing", "⚠️ Brainstorm agent'ları başarısız — önceki sonuçlarla birleştiriliyor")
+                        merge_input = (
+                            f"The brainstorm agents all failed. Use prior session results to answer.\n\n"
+                            f"PRIOR RESULTS:\n{'---'.join(r[:2000] for r in prior_results[-2:])}\n\n"
+                            f"CURRENT REQUEST: {user_input}\n\n"
+                            f"Expand on the prior results to provide a more detailed brainstorm. "
+                            f"Respond in the same language as the user's request."
+                        )
+                        final = await self.execute(merge_input, thread)
+                        task.final_result = final
+                        task.status = TaskStatus.COMPLETED
+                        task.confidence_footer = "⚠️ Önceki sonuçlardan birleştirildi"
+                        self._auto_save_memory(user_input, final, user_id=user_id)
+                        return final
+                    else:
+                        error_msg = (
+                            "❌ Tüm brainstorm agent'ları başarısız oldu ve önceki sonuç bulunamadı. "
+                            "Lütfen sorguyu basitleştirip tekrar deneyin."
+                        )
+                        task.final_result = error_msg
+                        return error_msg
+
+                # Enrich with prior results for follow-up queries
+                prior_context = ""
+                for prev_task in thread.tasks[:-1]:
+                    if getattr(prev_task, "final_result", None) and prev_task.status in (
+                        TaskStatus.COMPLETED, "completed"
+                    ):
+                        prior_context += f"\n[Prior: {prev_task.user_input[:100]}]\n{prev_task.final_result[:1500]}\n"
+                if prior_context:
+                    agent_results["_prior_context"] = prior_context
+
                 final, conf_footer = await synthesizer.synthesize(agent_results, user_input, thread)
             except Exception:
                 # Fallback to old synthesis
@@ -1793,6 +1860,36 @@ class OrchestratorAgent(BaseAgent):
             if live_monitor:
                 live_monitor.emit("routing", "orchestrator", "Sonuçlar sentezleniyor...")
 
+            # Collect successful results
+            agent_results = {}
+            for st in task.sub_tasks:
+                if st.result and st.status in (TaskStatus.COMPLETED, "completed"):
+                    agent_results[st.assigned_agent.value] = st.result
+
+            # If ALL sub-tasks failed, merge with prior task results
+            if not agent_results and task.status in (TaskStatus.FAILED, "failed"):
+                prior_results = []
+                for prev_task in thread.tasks[:-1]:
+                    if getattr(prev_task, "final_result", None) and prev_task.status in (
+                        TaskStatus.COMPLETED, "completed"
+                    ):
+                        prior_results.append(prev_task.final_result)
+                if prior_results:
+                    self._emit("routing", "⚠️ Deep Research agent'ları başarısız — önceki sonuçlarla birleştiriliyor")
+                    merge_input = (
+                        f"The deep research agents all failed. Use prior session results to answer.\n\n"
+                        f"PRIOR RESULTS:\n{'---'.join(r[:2000] for r in prior_results[-2:])}\n\n"
+                        f"CURRENT REQUEST: {user_input}\n\n"
+                        f"Expand on the prior results to provide a more detailed answer. "
+                        f"Respond in the same language as the user's request."
+                    )
+                    final = await self.execute(merge_input, thread)
+                    task.final_result = final
+                    task.status = TaskStatus.COMPLETED
+                    task.confidence_footer = "⚠️ Önceki sonuçlardan birleştirildi"
+                    self._auto_save_memory(user_input, final, user_id=user_id)
+                    return final
+
             # Use SynthesizerAgent for structured synthesis with confidence
             try:
                 from agents.synthesizer import SynthesizerAgent
@@ -1801,10 +1898,15 @@ class OrchestratorAgent(BaseAgent):
                     synthesizer.set_live_monitor(live_monitor)
                     live_monitor.emit("routing", "orchestrator", "📊 Sentez Agent çalışıyor — güven skorları hesaplanıyor...")
                 
-                agent_results = {}
-                for st in task.sub_tasks:
-                    if st.result:
-                        agent_results[st.assigned_agent.value] = st.result
+                # Enrich with prior results for follow-up queries
+                prior_context = ""
+                for prev_task in thread.tasks[:-1]:
+                    if getattr(prev_task, "final_result", None) and prev_task.status in (
+                        TaskStatus.COMPLETED, "completed"
+                    ):
+                        prior_context += f"\n[Prior: {prev_task.user_input[:100]}]\n{prev_task.final_result[:1500]}\n"
+                if prior_context:
+                    agent_results["_prior_context"] = prior_context
                 
                 final, conf_footer = await synthesizer.synthesize(agent_results, user_input, thread)
             except Exception:
@@ -1945,6 +2047,46 @@ class OrchestratorAgent(BaseAgent):
                 if live_monitor:
                     live_monitor.emit("routing", "orchestrator", "Sonuçlar sentezleniyor...")
 
+                # Collect successful agent results
+                agent_results = {}
+                for st in current_task.sub_tasks:
+                    if st.result and st.status in (TaskStatus.COMPLETED, "completed"):
+                        agent_results[st.assigned_agent.value] = st.result
+
+                # If ALL sub-tasks failed, try to merge with prior task results
+                if not agent_results and current_task.status in (TaskStatus.FAILED, "failed"):
+                    prior_results = []
+                    for prev_task in thread.tasks[:-1]:
+                        if getattr(prev_task, "final_result", None) and prev_task.status in (
+                            TaskStatus.COMPLETED, "completed"
+                        ):
+                            prior_results.append(prev_task.final_result)
+
+                    if prior_results:
+                        self._emit("routing", "⚠️ Alt görevler başarısız — önceki sonuçlarla birleştiriliyor")
+                        merge_input = (
+                            f"The current task's agents all failed. However, there are prior results from this session.\n\n"
+                            f"PRIOR RESULTS:\n{'---'.join(r[:2000] for r in prior_results[-2:])}\n\n"
+                            f"CURRENT REQUEST: {user_input}\n\n"
+                            f"Using the prior results as context, provide the best possible answer to the current request. "
+                            f"If the current request asks for more detail on the prior topic, expand on those results. "
+                            f"Respond in the same language as the user's request."
+                        )
+                        final = await self.execute(merge_input, thread)
+                        current_task.final_result = final
+                        current_task.status = TaskStatus.COMPLETED
+                        current_task.confidence_footer = "⚠️ Önceki sonuçlardan birleştirildi — yeni agent çalışması yapılamadı"
+                        self._auto_save_memory(user_input, final, user_id=user_id)
+                        return final
+                    else:
+                        # No prior results either — return error
+                        error_msg = (
+                            "❌ Tüm agent'lar başarısız oldu ve önceki sonuç bulunamadı. "
+                            "Lütfen sorguyu basitleştirip tekrar deneyin."
+                        )
+                        current_task.final_result = error_msg
+                        return error_msg
+
                 # Use SynthesizerAgent for structured synthesis
                 try:
                     from agents.synthesizer import SynthesizerAgent
@@ -1953,11 +2095,16 @@ class OrchestratorAgent(BaseAgent):
                         synthesizer.set_live_monitor(live_monitor)
                         live_monitor.emit("routing", "orchestrator", "📊 Sentez Agent çalışıyor — güven skorları hesaplanıyor...")
                     
-                    agent_results = {}
-                    for st in current_task.sub_tasks:
-                        if st.result:
-                            agent_results[st.assigned_agent.value] = st.result
-                    
+                    # Enrich with prior task results for follow-up queries
+                    prior_context = ""
+                    for prev_task in thread.tasks[:-1]:
+                        if getattr(prev_task, "final_result", None) and prev_task.status in (
+                            TaskStatus.COMPLETED, "completed"
+                        ):
+                            prior_context += f"\n[Prior: {prev_task.user_input[:100]}]\n{prev_task.final_result[:1500]}\n"
+                    if prior_context:
+                        agent_results["_prior_context"] = prior_context
+
                     final, conf_footer = await synthesizer.synthesize(agent_results, user_input, thread)
                 except Exception:
                     # Fallback to old synthesis

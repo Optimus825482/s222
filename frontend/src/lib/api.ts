@@ -868,6 +868,13 @@ export const api = {
       method: "DELETE",
       headers: authHeaders(),
     }),
+
+  // Task Retry
+  retryTask: (threadId: string, taskId: string) =>
+    fetcher<{ status: string; thread_id: string; new_task_id: string }>(
+      `/api/threads/${encodeURIComponent(threadId)}/tasks/${encodeURIComponent(taskId)}/retry`,
+      { method: "POST", headers: authHeaders() },
+    ),
 };
 
 // ── Image Studio API (generate + improve prompt) ─────────────────

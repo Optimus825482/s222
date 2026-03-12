@@ -98,6 +98,9 @@ class SynthesizerAgent(BaseAgent):
         Returns:
             Tuple of (synthesized_response, confidence_footer).
         """
+        # Extract prior context (not an agent result) before scoring
+        prior_context = agent_results.pop("_prior_context", None)
+
         # Step 1: Score confidence for each agent result
         conf_scores: dict[str, dict] = {}
         task_type = _detect_task_type_simple(user_input)
@@ -121,6 +124,7 @@ class SynthesizerAgent(BaseAgent):
             conf_scores=conf_scores,
             contradictions=contradictions,
             weights=weights,
+            prior_context=prior_context,
         )
 
         # Step 5: Log synthesis event
@@ -184,12 +188,20 @@ def _build_synthesis_prompt(
     conf_scores: dict[str, dict],
     contradictions: list[dict],
     weights: dict[str, float],
+    prior_context: str | None = None,
 ) -> str:
     """Construct the prompt sent to the LLM for synthesis."""
     parts: list[str] = [
         f"## Original User Request\n{user_input}\n",
-        "## Agent Outputs (with confidence weights)\n",
     ]
+
+    if prior_context:
+        parts.append(
+            "## Prior Session Results (use as additional context for follow-up queries)\n"
+            f"{prior_context}\n"
+        )
+
+    parts.append("## Agent Outputs (with confidence weights)\n")
 
     for role, output in agent_results.items():
         score = conf_scores.get(role, {})

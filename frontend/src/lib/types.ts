@@ -83,6 +83,17 @@ export interface SubTask {
   latency_ms: number;
 }
 
+export interface Checkpoint {
+  id: string;
+  step: number;
+  label: string;
+  agent_role: string;
+  progress_percent: number;
+  messages_count: number;
+  tokens_used: number;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   user_input: string;
@@ -95,6 +106,8 @@ export interface Task {
   total_latency_ms: number;
   created_at: string;
   completed_at: string | null;
+  checkpoints?: Checkpoint[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface AgentMetrics {

@@ -214,6 +214,30 @@ class BaseAgent(ABC):
         identity_ctx = self._identity_prompt()
 
         history = serialize_thread_for_llm(thread, max_events=30)
+
+        # If thread has prior completed tasks, inject their summaries
+        # instead of relying on raw event history (prevents context bloat)
+        prior_results_ctx = ""
+        if thread.tasks:
+            completed_summaries = []
+            for t in thread.tasks:
+                if getattr(t, "final_result", None) and t.status in (
+                    TaskStatus.COMPLETED, "completed"
+                ):
+                    summary = t.final_result[:800]
+                    if len(t.final_result) > 800:
+                        summary += "... [truncated]"
+                    completed_summaries.append(
+                        f"<prior_task query=\"{t.user_input[:120]}\">\n{summary}\n</prior_task>"
+                    )
+            if completed_summaries:
+                prior_results_ctx = (
+                    "\n\n--- PRIOR TASK RESULTS IN THIS SESSION ---\n"
+                    + "\n".join(completed_summaries[-3:])  # max 3 prior tasks
+                    + "\n--- END PRIOR RESULTS ---\n"
+                )
+                # Reduce raw event history when we have prior summaries
+                history = serialize_thread_for_llm(thread, max_events=10)
         system_content = self.system_prompt() + date_injection + integrity_rules + image_capability
         if identity_ctx:
             system_content = identity_ctx + "\n\n---\nAgent Task Instructions:\n" + system_content
@@ -246,8 +270,13 @@ class BaseAgent(ABC):
         messages = [
             {"role": "system", "content": system_content},
         ]
-        if history.strip():
-            messages.append({"role": "user", "content": f"Context so far:\n{history}"})
+        if history.strip() or prior_results_ctx:
+            ctx = ""
+            if prior_results_ctx:
+                ctx += prior_results_ctx + "\n"
+            if history.strip():
+                ctx += f"Thread history:\n{history}"
+            messages.append({"role": "user", "content": ctx})
             messages.append({"role": "assistant", "content": "Understood. I have the context."})
         messages.append({"role": "user", "content": task_input})
         return messages
@@ -1267,6 +1296,31 @@ class BaseAgent(ABC):
         messages = await self.build_context(thread, task_input)
         tools = self.get_tools()
 
+        # Checkpoint helper — saves progress snapshot to current task
+        def _save_checkpoint(step: int, label: str, progress_pct: int, msg_count: int, tokens: int):
+            try:
+                from core.models import Checkpoint
+                if thread.tasks:
+                    cp = Checkpoint(
+                        step=step,
+                        label=label,
+                        agent_role=self.role.value,
+                        progress_percent=progress_pct,
+                        messages_count=msg_count,
+                        tokens_used=tokens,
+                    )
+                    thread.tasks[-1].checkpoints.append(cp)
+                    if self._live_monitor:
+                        self._live_monitor.emit(
+                            "checkpoint",
+                            self.role.value,
+                            f"Checkpoint #{step}: {label}",
+                            checkpoint_id=cp.id,
+                            progress_percent=progress_pct,
+                        )
+            except Exception:
+                pass  # Non-critical — never break agent flow
+
         # Adaptive Tool Selector — record tool usage for learning (Faz 12)
         try:
             from tools.adaptive_tool_selector import get_adaptive_tool_selector
@@ -1622,6 +1676,14 @@ class BaseAgent(ABC):
                     f"🔧 {_tools_label} (adım {step + 1})",
                     AgentStatus.EXECUTING,
                     progress_percent=progress_pct,
+                )
+                # Save checkpoint after each tool batch
+                _save_checkpoint(
+                    step=step,
+                    label=f"Tool batch: {_tools_label}",
+                    progress_pct=progress_pct,
+                    msg_count=len(messages),
+                    tokens=cumulative_tokens,
                 )
                 continue  # Back to LLM with tool results
 

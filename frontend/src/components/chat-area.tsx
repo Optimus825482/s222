@@ -9,10 +9,18 @@ import {
 } from "react";
 import type { Thread, AgentEvent } from "@/lib/types";
 import { getAgentInfo } from "@/lib/agents";
-import { Brain, CheckCircle, Clock, Coins, ShieldCheck } from "lucide-react";
+import {
+  Brain,
+  CheckCircle,
+  Clock,
+  Coins,
+  RotateCcw,
+  ShieldCheck,
+} from "lucide-react";
 import { detectArtifacts, ArtifactCard } from "@/components/artifacts-panel";
 import { getWSSnapshot, subscribeWS } from "@/lib/ws-store";
 import { DetailModal } from "./detail-modal";
+import { api } from "@/lib/api";
 
 interface Props {
   thread: Thread | null;
@@ -464,6 +472,7 @@ function WelcomeScreen({
 
 function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
   const [showConfModal, setShowConfModal] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const wsSnap = useSyncExternalStore(
     subscribeWS,
     getWSSnapshot,
@@ -596,6 +605,29 @@ function ChatBubble({ event, thread }: { event: AgentEvent; thread: Thread }) {
                 Güven Analizi
               </button>
             )}
+            <button
+              type="button"
+              disabled={retrying}
+              onClick={async () => {
+                if (!lastTask) return;
+                setRetrying(true);
+                try {
+                  await api.retryTask(thread.id, lastTask.id);
+                } catch {
+                  // silently fail — user will see no new result
+                } finally {
+                  setTimeout(() => setRetrying(false), 3000);
+                }
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 transition-colors cursor-pointer border border-blue-800/30 disabled:opacity-50"
+              title="Görevi Tekrarla"
+            >
+              <RotateCcw
+                className={`w-3 h-3 ${retrying ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              {retrying ? "Başlatılıyor..." : "Tekrarla"}
+            </button>
           </div>
         )}
 
