@@ -4,6 +4,7 @@ import asyncio
 import json
 import sys
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -509,6 +510,70 @@ async def benchmark_progress(run_id: str, user: dict = Depends(get_current_user)
     elif entry["status"] == "error":
         resp["error"] = entry["error"]
     return resp
+
+
+@router.get("/api/benchmarks/dimensions/{agent_role}")
+async def benchmark_dimensions(
+    agent_role: str,
+    days: int | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Get dimension breakdown for a specific agent across all benchmark runs."""
+    bench_runner = _require_bench_runner()
+    from tools.pg_connection import get_conn, release_conn
+    conn = get_conn()
+    try:
+        conditions = ["agent_role = %s"]
+        params: list = [agent_role]
+        if days is not None:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            conditions.append("created_at >= %s")
+            params.append(cutoff)
+        where = "WHERE " + " AND ".join(conditions)
+        cur = conn.cursor()
+        cur.execute(f"SELECT dimensions, scenario_id, category, score FROM benchmark_results {where}", params)
+        rows = cur.fetchall()
+
+        dim_sums: dict[str, list[float]] = {}
+        by_category: dict[str, dict[str, list[float]]] = {}
+        for fetched in rows:
+            row = bench_runner._row_to_dict(fetched)
+            if not row:
+                continue
+            dims = row.get("dimensions")
+            if isinstance(dims, str):
+                try:
+                    dims = json.loads(dims)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+            if not isinstance(dims, dict):
+                continue
+            cat = row.get("category", "unknown")
+            if cat not in by_category:
+                by_category[cat] = {}
+            for k, v in dims.items():
+                dim_sums.setdefault(k, []).append(float(v))
+                by_category[cat].setdefault(k, []).append(float(v))
+
+        avg_dimensions = {k: round(sum(vs) / len(vs), 2) for k, vs in dim_sums.items() if vs}
+        category_dimensions = {}
+        for cat, cat_dims in by_category.items():
+            category_dimensions[cat] = {k: round(sum(vs) / len(vs), 2) for k, vs in cat_dims.items() if vs}
+
+        # Find weakest and strongest dimensions
+        weakest = min(avg_dimensions, key=avg_dimensions.get, default=None) if avg_dimensions else None
+        strongest = max(avg_dimensions, key=avg_dimensions.get, default=None) if avg_dimensions else None
+
+        return {
+            "agent_role": agent_role,
+            "total_runs": len(rows),
+            "avg_dimensions": avg_dimensions,
+            "category_dimensions": category_dimensions,
+            "weakest_dimension": weakest,
+            "strongest_dimension": strongest,
+        }
+    finally:
+        release_conn(conn)
 
 
 @router.post("/api/benchmarks/run-stream")

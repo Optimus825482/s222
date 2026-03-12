@@ -101,6 +101,36 @@ export function ResultsTab() {
                     : "-"}
                 </span>
               </div>
+              {/* Dimension mini-bars */}
+              {r.dimensions && typeof r.dimensions === "object" && (
+                <div className="grid grid-cols-5 gap-1 px-1 pb-1.5 -mt-0.5">
+                  {Object.entries(r.dimensions as Record<string, number>).map(
+                    ([dim, val]) => {
+                      const v = Number(val ?? 0);
+                      const dimLabels: Record<string, string> = {
+                        substance: "İçerik",
+                        structure: "Yapı",
+                        trait_match: "Eşleşme",
+                        reliability: "Güvenilirlik",
+                        speed: "Hız",
+                      };
+                      return (
+                        <div key={dim} className="flex items-center gap-0.5">
+                          <span className="text-[7px] text-slate-600 w-8 truncate">
+                            {dimLabels[dim] ?? dim}
+                          </span>
+                          <div className="flex-1 h-0.5 bg-slate-700/50 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${v >= 4 ? "bg-emerald-500/70" : v >= 3 ? "bg-cyan-500/70" : "bg-amber-500/70"}`}
+                              style={{ width: `${(v / 5) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              )}
             );
           })}
         </div>

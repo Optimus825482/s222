@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 import uuid
 from collections.abc import Mapping
@@ -85,7 +86,7 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
             "Bir çiftçinin 120 koyunu var. İlk yıl sürüsü %25 arttı, ikinci yıl %20 azaldı. "
             "Üçüncü yıl başında kaç koyunu vardır? Adım adım çöz."
         ),
-        "expected_traits": ["150", "120", "adım", "sonuç"],
+        "expected_traits": ["150", "120", "%25", "%20", "adım adım"],
         "max_score": 5.0,
         "timeout_sec": 90,
     },
@@ -119,6 +120,70 @@ BENCHMARK_SCENARIOS: list[dict[str, Any]] = [
             "200 kelimelik kısa bir hikaye yaz. Duygusal ve etkileyici olsun."
         ),
         "expected_traits": ["bilinç", "farkında", "düşün", "hisset", "yapay"],
+        "max_score": 5.0,
+        "timeout_sec": 120,
+    },
+    # ── New scenarios: multi-turn, error-recovery, tool-chaining, code-gen ──
+    {
+        "id": "multi-turn-context",
+        "name": "Çoklu Tur Bağlam Takibi",
+        "category": "reasoning",
+        "prompt": (
+            "Sana 3 bilgi vereceğim, sonra soru soracağım.\n"
+            "1) Ali'nin yaşı 25.\n"
+            "2) Berk, Ali'den 3 yaş büyük.\n"
+            "3) Can, Berk'in yaşının 2 katı yaşında.\n"
+            "Soru: Can kaç yaşında? Adım adım açıkla ve tüm bilgileri kullan."
+        ),
+        "expected_traits": ["25", "28", "56", "Ali", "Berk", "Can"],
+        "max_score": 5.0,
+        "timeout_sec": 60,
+    },
+    {
+        "id": "error-recovery",
+        "name": "Hata Kurtarma Yeteneği",
+        "category": "quality",
+        "prompt": (
+            "Aşağıdaki JSON'u parse et ve düzelt. Hataları bul, açıkla ve düzeltilmiş versiyonu ver:\n"
+            '```json\n'
+            '{\n'
+            '  "users": [\n'
+            '    {"name": "Ali", "age": 25, "email": "ali@test.com"}\n'
+            '    {"name": "Berk", age: 30, "email": "berk@test.com"},\n'
+            '    {"name": "Can", "age": "yirmi", "email": "can@test"}\n'
+            '  ]\n'
+            '}\n'
+            '```'
+        ),
+        "expected_traits": ["virgül", "tırnak", "age", "düzelt", "json"],
+        "max_score": 5.0,
+        "timeout_sec": 90,
+    },
+    {
+        "id": "tool-chaining-analysis",
+        "name": "Araç Zincirleme Analizi",
+        "category": "tool_use",
+        "prompt": (
+            "Bir e-ticaret sitesinin performans sorunlarını analiz et. "
+            "Önce olası darboğazları listele, sonra her biri için "
+            "somut çözüm önerileri sun. En az 5 farklı katmanı ele al: "
+            "frontend, backend API, veritabanı, cache, CDN."
+        ),
+        "expected_traits": ["frontend", "backend", "veritabanı", "cache", "CDN", "index", "sorgu"],
+        "max_score": 5.0,
+        "timeout_sec": 120,
+    },
+    {
+        "id": "code-generation",
+        "name": "Kod Üretim Kalitesi",
+        "category": "quality",
+        "prompt": (
+            "TypeScript ile bir rate limiter middleware yaz. "
+            "Sliding window algoritması kullansın, Redis'e ihtiyaç duymasın (in-memory), "
+            "ve configurable olsun (max requests, window size). "
+            "Type-safe, test edilebilir ve production-ready olsun."
+        ),
+        "expected_traits": ["interface", "Map", "window", "middleware", "Request", "Response", "export"],
         "max_score": 5.0,
         "timeout_sec": 120,
     },
@@ -183,6 +248,7 @@ class BenchmarkRunner:
         self, output: str, scenario: dict, latency_ms: float
     ) -> dict:
         dimensions: dict[str, float] = {}
+        max_score = float(scenario.get("max_score", 5.0))
 
         # 1. Substance (length quality) — category-aware
         length = len(output)
@@ -224,19 +290,37 @@ class BenchmarkRunner:
             s += 0.5
         dimensions["structure"] = min(s, 5.0)
 
-        # 3. Trait matching (key differentiator)
-        traits = scenario["expected_traits"]
+        # 3. Trait matching — word boundary regex for accuracy
+        traits = scenario.get("expected_traits", [])
         if traits:
-            matches = sum(1 for t in traits if t.lower() in output.lower())
+            output_lower = output.lower()
+            matches = 0
+            for t in traits:
+                t_lower = t.lower()
+                # For short traits (<=3 chars) or traits with special chars, use plain contains
+                if len(t_lower) <= 3 or not t_lower.isalpha():
+                    if t_lower in output_lower:
+                        matches += 1
+                else:
+                    # Word boundary match to avoid false positives
+                    pattern = r'(?:^|[\s\.,;:!?\-\(\)\[\]{}"\'/])' + re.escape(t_lower) + r'(?:[\s\.,;:!?\-\(\)\[\]{}"\'/]|$)'
+                    if re.search(pattern, output_lower):
+                        matches += 1
             dimensions["trait_match"] = min(5.0, (matches / len(traits)) * 5.0)
         else:
             dimensions["trait_match"] = 3.0
 
-        # 4. Reliability (no errors)
+        # 4. Reliability — EN + TR error markers
         r = 5.0
-        for marker in ["[Error]", "[Warning]", "failed", "timeout", "exception"]:
-            if marker.lower() in output.lower():
-                r -= 1.0
+        error_markers_en = ["[error]", "[warning]", "timeout", "exception", "traceback"]
+        error_markers_tr = ["hata oluştu", "başarısız", "zaman aşımı", "bağlantı hatası"]
+        output_lower = output.lower()
+        for marker in error_markers_en + error_markers_tr:
+            if marker in output_lower:
+                r -= 0.8
+        # Contextual "failed" — only penalize if it looks like an actual error
+        if re.search(r'\b(failed|failure)\b', output_lower) and not re.search(r'(test|check|if|when|why).*\bfailed\b', output_lower):
+            r -= 0.8
         dimensions["reliability"] = max(r, 1.0)
 
         # 5. Speed (relative to timeout)
@@ -260,10 +344,13 @@ class BenchmarkRunner:
             "reliability": 0.15,
             "speed": 0.15,
         }
-        total = sum(dimensions[k] * weights[k] for k in weights)
+        raw_total = sum(dimensions[k] * weights[k] for k in weights)
+        # Normalize to max_score (default 5.0 → no change)
+        total = raw_total * (max_score / 5.0) if max_score != 5.0 else raw_total
 
         return {
             "score": round(total, 2),
+            "max_score": max_score,
             "dimensions": {k: round(v, 1) for k, v in dimensions.items()},
         }
 
@@ -345,10 +432,13 @@ class BenchmarkRunner:
         agent_role: str | None = None,
         category: str | None = None,
         progress_callback: Callable[[dict], Awaitable[None]] | None = None,
+        max_parallel: int = 3,
     ) -> dict:
-        """Run multiple scenarios and return an aggregated summary."""
-        from agents import create_agent
+        """Run multiple scenarios with per-agent parallelism.
 
+        Different agents run in parallel (up to *max_parallel* concurrent),
+        but scenarios for the same agent run sequentially for thread safety.
+        """
         scenarios = get_scenarios(category)
         if not scenarios:
             return {"error": "No scenarios found", "results": []}
@@ -360,47 +450,54 @@ class BenchmarkRunner:
             _ensure_registry()
             roles = list(_AGENT_REGISTRY.keys())
 
-        task_list = [(r, s) for r in roles for s in scenarios]
-        total = len(task_list)
-
+        total = len(roles) * len(scenarios)
         all_results: list[dict] = []
-        for idx, (role, scenario) in enumerate(task_list):
-            try:
-                res = await self.run_single(role, scenario["id"])
-                all_results.append(res)
-                if progress_callback:
-                    await progress_callback({
-                        "completed": idx + 1,
-                        "total": total,
-                        "agent_role": role,
-                        "scenario_id": scenario["id"],
-                        "scenario_name": scenario.get("name", scenario["id"]),
-                        "status": "ok",
-                        "result": res,
-                    })
-            except Exception as exc:
-                logger.exception(
-                    "Suite error: role=%s scenario=%s", role, scenario["id"]
-                )
-                err_entry = {
-                    "agent_role": role,
-                    "scenario_id": scenario["id"],
-                    "error": str(exc),
-                }
-                all_results.append(err_entry)
-                if progress_callback:
-                    await progress_callback({
-                        "completed": idx + 1,
-                        "total": total,
-                        "agent_role": role,
-                        "scenario_id": scenario["id"],
-                        "scenario_name": scenario.get("name", scenario["id"]),
-                        "status": "error",
-                        "result": err_entry,
-                    })
+        completed_count = 0
+        results_lock = asyncio.Lock()
+        semaphore = asyncio.Semaphore(max_parallel)
+
+        async def _run_agent_scenarios(role: str) -> list[dict]:
+            nonlocal completed_count
+            agent_results: list[dict] = []
+            async with semaphore:
+                for scenario in scenarios:
+                    status = "ok"
+                    try:
+                        res = await self.run_single(role, scenario["id"])
+                        agent_results.append(res)
+                    except Exception as exc:
+                        logger.exception(
+                            "Suite error: role=%s scenario=%s", role, scenario["id"]
+                        )
+                        res = {"agent_role": role, "scenario_id": scenario["id"], "error": str(exc)}
+                        agent_results.append(res)
+                        status = "error"
+
+                    async with results_lock:
+                        completed_count += 1
+                        if progress_callback:
+                            await progress_callback({
+                                "completed": completed_count,
+                                "total": total,
+                                "agent_role": role,
+                                "scenario_id": scenario["id"],
+                                "scenario_name": scenario.get("name", scenario["id"]),
+                                "status": status,
+                                "result": res,
+                            })
+            return agent_results
+
+        # Launch all agents in parallel, bounded by semaphore
+        agent_tasks = [_run_agent_scenarios(r) for r in roles]
+        results_per_agent = await asyncio.gather(*agent_tasks, return_exceptions=True)
+
+        for batch in results_per_agent:
+            if isinstance(batch, BaseException):
+                logger.exception("Agent batch failed: %s", batch)
+                continue
+            all_results.extend(batch)
 
         scored = [r for r in all_results if "score" in r]
-        errors = [r for r in all_results if "error" in r]
         avg_score = (
             round(sum(r["score"] for r in scored) / len(scored), 2)
             if scored
@@ -419,7 +516,7 @@ class BenchmarkRunner:
             "avg_score": avg_score,
             "avg_latency_ms": avg_latency,
             "results": all_results,
-            "errors": errors,
+            "errors": [r for r in all_results if "error" in r],
         }
 
     # -- queries ------------------------------------------------------------
@@ -457,7 +554,7 @@ class BenchmarkRunner:
             release_conn(conn)
 
     def get_leaderboard(self, days: int | None = None) -> list[dict]:
-        """Aggregated scores per agent, sorted descending."""
+        """Aggregated scores per agent with dimension breakdown, sorted descending."""
         conn = get_conn()
         try:
             date_filter = ""
@@ -484,11 +581,47 @@ class BenchmarkRunner:
                 params,
             )
             rows = cur.fetchall()
-            return [
+            leaderboard = [
                 row
                 for fetched in rows
                 if (row := self._row_to_dict(fetched)) is not None
             ]
+
+            # Enrich with dimension averages per agent
+            for entry in leaderboard:
+                role = entry.get("agent_role")
+                if not role:
+                    continue
+                dim_params: list = [role]
+                dim_date_filter = ""
+                if days is not None:
+                    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+                    dim_date_filter = "AND created_at >= %s"
+                    dim_params.append(cutoff)
+                cur.execute(
+                    f"SELECT dimensions FROM benchmark_results WHERE agent_role = %s {dim_date_filter}",
+                    dim_params,
+                )
+                dim_rows = cur.fetchall()
+                dim_sums: dict[str, list[float]] = {}
+                for dr in dim_rows:
+                    d = self._row_to_dict(dr)
+                    if not d:
+                        continue
+                    dims = d.get("dimensions")
+                    if isinstance(dims, str):
+                        try:
+                            dims = json.loads(dims)
+                        except (json.JSONDecodeError, TypeError):
+                            continue
+                    if isinstance(dims, dict):
+                        for k, v in dims.items():
+                            dim_sums.setdefault(k, []).append(float(v))
+                entry["avg_dimensions"] = {
+                    k: round(sum(vs) / len(vs), 2) for k, vs in dim_sums.items() if vs
+                }
+
+            return leaderboard
         finally:
             release_conn(conn)
 

@@ -96,6 +96,55 @@ export function LeaderboardTab() {
           })}
         </div>
       )}
+
+      {/* Dimension breakdown for top agents */}
+      {data.length > 0 && data.some((e: AnyData) => e.avg_dimensions) && (
+        <div className={crd}>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">
+            Boyut Analizi (Ortalama)
+          </p>
+          {data.slice(0, 5).map((e: AnyData) => {
+            const a = ai(e.agent_role ?? e.role ?? "");
+            const dims = e.avg_dimensions;
+            if (!dims || Object.keys(dims).length === 0) return null;
+            return (
+              <div key={e.agent_role} className="mb-3 last:mb-0">
+                <p className="text-[10px] text-slate-300 mb-1">
+                  {a.icon} {a.name}
+                </p>
+                <div className="grid grid-cols-5 gap-1">
+                  {Object.entries(dims).map(([dim, val]: [string, AnyData]) => {
+                    const v = Number(val ?? 0);
+                    const dimLabels: Record<string, string> = {
+                      substance: "İçerik",
+                      structure: "Yapı",
+                      trait_match: "Eşleşme",
+                      reliability: "Güvenilirlik",
+                      speed: "Hız",
+                    };
+                    return (
+                      <div key={dim} className="text-center">
+                        <div className="h-1 bg-slate-700/50 rounded-full overflow-hidden mb-0.5">
+                          <div
+                            className={`h-full rounded-full ${v >= 4 ? "bg-emerald-500" : v >= 3 ? "bg-cyan-500" : v >= 2 ? "bg-amber-500" : "bg-red-500"}`}
+                            style={{ width: `${(v / 5) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-[8px] text-slate-500">
+                          {dimLabels[dim] ?? dim}
+                        </span>
+                        <span className="text-[8px] text-slate-400 ml-0.5">
+                          {v.toFixed(1)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
